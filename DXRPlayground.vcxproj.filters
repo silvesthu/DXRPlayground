@@ -1,0 +1,63 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source">
+      <UniqueIdentifier>{6a945472-3660-4da6-b204-5b13d8c50831}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Thirdparty">
+      <UniqueIdentifier>{60f9b1ff-c156-4a86-bc3f-a1c46a5fdba8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Thirdparty\imgui">
+      <UniqueIdentifier>{5de635c4-666e-4734-a0a4-ff4fc0bf863e}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Source\imgui_impl_win32.h">
+      <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\imgui_impl_dx12.h">
+      <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Thirdparty\imgui\imstb_rectpack.h">
+      <Filter>Source\Thirdparty\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Thirdparty\imgui\imstb_textedit.h">
+      <Filter>Source\Thirdparty\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Thirdparty\imgui\imstb_truetype.h">
+      <Filter>Source\Thirdparty\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Thirdparty\imgui\imconfig.h">
+      <Filter>Source\Thirdparty\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Thirdparty\imgui\imgui.h">
+      <Filter>Source\Thirdparty\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Thirdparty\imgui\imgui_internal.h">
+      <Filter>Source\Thirdparty\imgui</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Source\imgui_impl_dx12.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\imgui_impl_win32.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Thirdparty\imgui\imgui_widgets.cpp">
+      <Filter>Source\Thirdparty\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Thirdparty\imgui\imgui.cpp">
+      <Filter>Source\Thirdparty\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Thirdparty\imgui\imgui_demo.cpp">
+      <Filter>Source\Thirdparty\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Thirdparty\imgui\imgui_draw.cpp">
+      <Filter>Source\Thirdparty\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\DXRPlayground.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>
