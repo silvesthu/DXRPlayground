@@ -32,6 +32,7 @@
 #pragma comment(lib, "d3d12")
 #pragma comment(lib, "dxgi")		// CreateDeviceD3D()
 #pragma comment(lib, "d3dcompiler") // Automatically link with d3dcompiler.lib as we are using D3DCompile() below.
+#pragma comment(lib, "dxguid")		// For DXGI_DEBUG_ALL
 #endif
 
 // DirectX data

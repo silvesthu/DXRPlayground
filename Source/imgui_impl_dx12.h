@@ -12,7 +12,8 @@
 
 #pragma once
 
-enum DXGI_FORMAT;
+#include <dxgiformat.h>
+
 struct ID3D12Device;
 struct ID3D12GraphicsCommandList;
 struct D3D12_CPU_DESCRIPTOR_HANDLE;

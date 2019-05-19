@@ -1,12 +1,20 @@
 ﻿#include "Thirdparty/imgui/imgui.h"
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx12.h"
+
 #include <d3d12.h>
 #include <dxgi1_4.h>
+#include <dxcapi.h>
+#include <dxgidebug.h>
+#include <comdef.h>
+#include <wrl.h>	// For ComPtr. See https://github.com/Microsoft/DirectXTK/wiki/ComPtr
+using Microsoft::WRL::ComPtr;
+
 #include <tchar.h>
 #include <string>
 #include <iostream>
 #include <array>
+#include <vector>
 
 #define DX12_ENABLE_DEBUG_LAYER     1
 
@@ -23,10 +31,10 @@ static UINT                         g_FrameIndex = 0;
 
 static int const                    NUM_BACK_BUFFERS = 3;
 static ID3D12Device5*				g_D3DDevice = NULL;
-static ID3D12DescriptorHeap*		g_D3dRtvDescHeap = NULL;
-static ID3D12DescriptorHeap*		g_D3dSrvDescHeap = NULL;
-static ID3D12CommandQueue*			g_D3dCommandQueue = NULL;
-static ID3D12GraphicsCommandList4*	g_D3dCommandList = NULL;
+static ID3D12DescriptorHeap*		g_D3DRtvDescHeap = NULL;
+static ID3D12DescriptorHeap*		g_D3DSrvDescHeap = NULL;
+static ID3D12CommandQueue*			g_D3DCommandQueue = NULL;
+static ID3D12GraphicsCommandList4*	g_D3DCommandList = NULL;
 static ID3D12Fence*					g_Fence = NULL;
 static HANDLE                       g_FenceEvent = NULL;
 static UINT64                       g_FenceLastSignaledValue = 0;
@@ -38,13 +46,17 @@ static D3D12_CPU_DESCRIPTOR_HANDLE  g_mainRenderTargetDescriptor[NUM_BACK_BUFFER
 // Customization - Data
 static const char*					g_ApplicationTitle = "DXR Playground";
 static const wchar_t*				g_ApplicationTitleW = L"DXR Playground";
-static uint64_t						g_FenceValue;
-static ID3D12Resource*				g_VertexBuffer;
-static ID3D12Resource*				g_BottomLevelAccelerationStructureScratch;
-static ID3D12Resource*				g_BottomLevelAccelerationStructureDest;
-static ID3D12Resource*				g_TopLevelAccelerationStructureScratch;
-static ID3D12Resource*				g_TopLevelAccelerationStructureDest;
-static ID3D12Resource*				g_TopLevelAccelerationStructureInstanceDesc;
+
+static uint64_t						g_FenceValue = 0;
+
+static ID3D12Resource*				g_VertexBuffer = nullptr;
+static ID3D12Resource*				g_BottomLevelAccelerationStructureScratch = nullptr;
+static ID3D12Resource*				g_BottomLevelAccelerationStructureDest = nullptr;
+static ID3D12Resource*				g_TopLevelAccelerationStructureScratch = nullptr;
+static ID3D12Resource*				g_TopLevelAccelerationStructureDest = nullptr;
+static ID3D12Resource*				g_TopLevelAccelerationStructureInstanceDesc = nullptr;
+
+static ID3D12StateObject*			g_StateObject = nullptr;
 
 // Forward declarations of helper functions
 bool CreateDeviceD3D(HWND hWnd);
@@ -74,6 +86,8 @@ void CreateBottomLevelAccelerationStructure();
 void CleanupBottomLevelAccelerationStructure();
 void CreateTopLevelAccelerationStructure();
 void CleanupTopLevelAccelerationStructure();
+void ExecuteAccelerationStructureCreation();
+void CreatePipelineState();
 
 // Main code
 int main(int, char**)
@@ -92,9 +106,18 @@ int main(int, char**)
 	}
 
 	// Customization - Initialize
-	CreateVertexBuffer();
-	CreateBottomLevelAccelerationStructure();
-	CreateTopLevelAccelerationStructure();
+	{
+		// Create resource
+		CreateVertexBuffer();
+		CreateBottomLevelAccelerationStructure();
+		CreateTopLevelAccelerationStructure();
+
+		// The tutorial doesn't have any resource lifetime management, so we flush and sync here. 
+		// This is not required by the DXR spec - you can submit the list whenever you like as long as you take care of the resources lifetime.
+		ExecuteAccelerationStructureCreation();
+
+		CreatePipelineState();
+	}
 
 	// Show the window
 	::ShowWindow(hwnd, SW_SHOWDEFAULT);
@@ -115,8 +138,8 @@ int main(int, char**)
 	ImGui_ImplWin32_Init(hwnd);
 	ImGui_ImplDX12_Init(g_D3DDevice, NUM_FRAMES_IN_FLIGHT,
 		DXGI_FORMAT_R8G8B8A8_UNORM,
-		g_D3dSrvDescHeap->GetCPUDescriptorHandleForHeapStart(),
-		g_D3dSrvDescHeap->GetGPUDescriptorHandleForHeapStart());
+		g_D3DSrvDescHeap->GetCPUDescriptorHandleForHeapStart(),
+		g_D3DSrvDescHeap->GetGPUDescriptorHandleForHeapStart());
 
 	// Load Fonts
 	// - If no fonts are loaded, dear imgui will use the default font. You can also load multiple fonts and use ImGui::PushFont()/PopFont() to select them.
@@ -230,11 +253,11 @@ int main(int, char**)
 				barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
 				barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
 
-				g_D3dCommandList->Reset(frameCtxt->CommandAllocator, NULL);
-				g_D3dCommandList->ResourceBarrier(1, &barrier);
-				g_D3dCommandList->ClearRenderTargetView(g_mainRenderTargetDescriptor[backBufferIdx], (float*)& clear_color, 0, NULL);
-				g_D3dCommandList->OMSetRenderTargets(1, &g_mainRenderTargetDescriptor[backBufferIdx], FALSE, NULL);
-				g_D3dCommandList->SetDescriptorHeaps(1, &g_D3dSrvDescHeap);
+				g_D3DCommandList->Reset(frameCtxt->CommandAllocator, NULL);
+				g_D3DCommandList->ResourceBarrier(1, &barrier);
+				g_D3DCommandList->ClearRenderTargetView(g_mainRenderTargetDescriptor[backBufferIdx], (float*)& clear_color, 0, NULL);
+				g_D3DCommandList->OMSetRenderTargets(1, &g_mainRenderTargetDescriptor[backBufferIdx], FALSE, NULL);
+				g_D3DCommandList->SetDescriptorHeaps(1, &g_D3DSrvDescHeap);
 			}
 
 			// Customization - Draw
@@ -250,16 +273,16 @@ int main(int, char**)
 				// Record
 				ImGui::Render();
 				// Draw (Create command)
-				ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), g_D3dCommandList);
+				ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), g_D3DCommandList);
 			}
 
 			// Frame end
 			{
 				barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
 				barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
-				g_D3dCommandList->ResourceBarrier(1, &barrier);
-				g_D3dCommandList->Close();
-				g_D3dCommandQueue->ExecuteCommandLists(1, (ID3D12CommandList* const*)& g_D3dCommandList);
+				g_D3DCommandList->ResourceBarrier(1, &barrier);
+				g_D3DCommandList->Close();
+				g_D3DCommandQueue->ExecuteCommandLists(1, (ID3D12CommandList* const*)& g_D3DCommandList);
 			}			
 
 			// Swap
@@ -268,7 +291,7 @@ int main(int, char**)
 				//g_SwapChain->Present(0, 0); // Present without vsync
 
 				UINT64 fenceValue = g_FenceLastSignaledValue + 1;
-				g_D3dCommandQueue->Signal(g_Fence, fenceValue);
+				g_D3DCommandQueue->Signal(g_Fence, fenceValue);
 				g_FenceLastSignaledValue = fenceValue;
 				frameCtxt->FenceValue = fenceValue;
 			}
@@ -300,14 +323,14 @@ int main(int, char**)
 bool CreateDeviceD3D(HWND hWnd)
 {
 	// Setup swap chain
-	DXGI_SWAP_CHAIN_DESC1 sd;
+	DXGI_SWAP_CHAIN_DESC1 sd = {};
 	{
 		ZeroMemory(&sd, sizeof(sd));
 		sd.BufferCount = NUM_BACK_BUFFERS;
 		sd.Width = 0;
 		sd.Height = 0;
 		sd.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		sd.Flags = DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
+		sd.Flags = DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;	// for IDXGISwapChain2::SetMaximumFrameLatency(), IDXGISwapChain2::GetFrameLatencyWaitableObject()
 		sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 		sd.SampleDesc.Count = 1;
 		sd.SampleDesc.Quality = 0;
@@ -349,11 +372,11 @@ bool CreateDeviceD3D(HWND hWnd)
 		desc.NumDescriptors = NUM_BACK_BUFFERS;
 		desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 		desc.NodeMask = 1;
-		if (g_D3DDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&g_D3dRtvDescHeap)) != S_OK)
+		if (g_D3DDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&g_D3DRtvDescHeap)) != S_OK)
 			return false;
 
 		SIZE_T rtvDescriptorSize = g_D3DDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = g_D3dRtvDescHeap->GetCPUDescriptorHandleForHeapStart();
+		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = g_D3DRtvDescHeap->GetCPUDescriptorHandleForHeapStart();
 		for (UINT i = 0; i < NUM_BACK_BUFFERS; i++)
 		{
 			g_mainRenderTargetDescriptor[i] = rtvHandle;
@@ -366,7 +389,7 @@ bool CreateDeviceD3D(HWND hWnd)
 		desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 		desc.NumDescriptors = 1;
 		desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-		if (g_D3DDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&g_D3dSrvDescHeap)) != S_OK)
+		if (g_D3DDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&g_D3DSrvDescHeap)) != S_OK)
 			return false;
 	}
 
@@ -375,16 +398,17 @@ bool CreateDeviceD3D(HWND hWnd)
 		desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 		desc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
 		desc.NodeMask = 1;
-		if (g_D3DDevice->CreateCommandQueue(&desc, IID_PPV_ARGS(&g_D3dCommandQueue)) != S_OK)
+		if (g_D3DDevice->CreateCommandQueue(&desc, IID_PPV_ARGS(&g_D3DCommandQueue)) != S_OK)
 			return false;
 	}
 
 	for (UINT i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
+	{
 		if (g_D3DDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&g_FrameContext[i].CommandAllocator)) != S_OK)
 			return false;
+	}
 
-	if (g_D3DDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, g_FrameContext[0].CommandAllocator, NULL, IID_PPV_ARGS(&g_D3dCommandList)) != S_OK ||
-		g_D3dCommandList->Close() != S_OK)
+	if (g_D3DDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, g_FrameContext[0].CommandAllocator, NULL, IID_PPV_ARGS(&g_D3DCommandList)) != S_OK)
 		return false;
 
 	if (g_D3DDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&g_Fence)) != S_OK)
@@ -398,7 +422,7 @@ bool CreateDeviceD3D(HWND hWnd)
 		IDXGIFactory4* dxgiFactory = NULL;
 		IDXGISwapChain1* swapChain1 = NULL;
 		if (CreateDXGIFactory1(IID_PPV_ARGS(&dxgiFactory)) != S_OK ||
-			dxgiFactory->CreateSwapChainForHwnd(g_D3dCommandQueue, hWnd, &sd, NULL, NULL, &swapChain1) != S_OK ||
+			dxgiFactory->CreateSwapChainForHwnd(g_D3DCommandQueue, hWnd, &sd, NULL, NULL, &swapChain1) != S_OK ||
 			swapChain1->QueryInterface(IID_PPV_ARGS(&g_SwapChain)) != S_OK)
 			return false;
 		swapChain1->Release();
@@ -418,13 +442,20 @@ void CleanupDeviceD3D()
 	if (g_SwapChainWaitableObject != NULL) { CloseHandle(g_SwapChainWaitableObject); }
 	for (UINT i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
 		if (g_FrameContext[i].CommandAllocator) { g_FrameContext[i].CommandAllocator->Release(); g_FrameContext[i].CommandAllocator = NULL; }
-	if (g_D3dCommandQueue) { g_D3dCommandQueue->Release(); g_D3dCommandQueue = NULL; }
-	if (g_D3dCommandList) { g_D3dCommandList->Release(); g_D3dCommandList = NULL; }
-	if (g_D3dRtvDescHeap) { g_D3dRtvDescHeap->Release(); g_D3dRtvDescHeap = NULL; }
-	if (g_D3dSrvDescHeap) { g_D3dSrvDescHeap->Release(); g_D3dSrvDescHeap = NULL; }
+	if (g_D3DCommandQueue) { g_D3DCommandQueue->Release(); g_D3DCommandQueue = NULL; }
+	if (g_D3DCommandList) { g_D3DCommandList->Release(); g_D3DCommandList = NULL; }
+	if (g_D3DRtvDescHeap) { g_D3DRtvDescHeap->Release(); g_D3DRtvDescHeap = NULL; }
+	if (g_D3DSrvDescHeap) { g_D3DSrvDescHeap->Release(); g_D3DSrvDescHeap = NULL; }
 	if (g_Fence) { g_Fence->Release(); g_Fence = NULL; }
 	if (g_FenceEvent) { CloseHandle(g_FenceEvent); g_FenceEvent = NULL; }
 	if (g_D3DDevice) { g_D3DDevice->Release(); g_D3DDevice = NULL; }
+
+	if (DX12_ENABLE_DEBUG_LAYER)
+	{
+		ComPtr<IDXGIDebug1> dxgi_debug;
+		if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgi_debug))))
+			dxgi_debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_FLAGS(DXGI_DEBUG_RLO_SUMMARY | DXGI_DEBUG_RLO_IGNORE_INTERNAL));
+	}
 }
 
 void CreateRenderTarget()
@@ -499,7 +530,7 @@ void ResizeSwapChain(HWND hWnd, int width, int height)
 	CloseHandle(g_SwapChainWaitableObject);
 
 	IDXGISwapChain1* swapChain1 = NULL;
-	dxgiFactory->CreateSwapChainForHwnd(g_D3dCommandQueue, hWnd, &sd, NULL, NULL, &swapChain1);
+	dxgiFactory->CreateSwapChainForHwnd(g_D3DCommandQueue, hWnd, &sd, NULL, NULL, &swapChain1);
 	swapChain1->QueryInterface(IID_PPV_ARGS(&g_SwapChain));
 	swapChain1->Release();
 	dxgiFactory->Release();
@@ -599,18 +630,14 @@ void CreateBottomLevelAccelerationStructure()
 	inputs.pGeometryDescs = &geomDesc;
 	inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
 
-	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO info = {};
-	g_D3DDevice->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &info);
-
 	// Create the buffers. They need to support UAV, and since we are going to immediately use them, we create them with an unordered-access state
 	{
-		D3D12_HEAP_PROPERTIES props;
-		memset(&props, 0, sizeof(D3D12_HEAP_PROPERTIES));
+		D3D12_HEAP_PROPERTIES props = {};
 		props.Type = D3D12_HEAP_TYPE_DEFAULT;
 		props.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
 		props.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
 
-		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO info;
+		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO info = {};
 		g_D3DDevice->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &info);
 
 		D3D12_RESOURCE_DESC bufDesc = {};
@@ -639,7 +666,7 @@ void CreateBottomLevelAccelerationStructure()
 		asDesc.DestAccelerationStructureData = g_BottomLevelAccelerationStructureDest->GetGPUVirtualAddress();
 		asDesc.ScratchAccelerationStructureData = g_BottomLevelAccelerationStructureScratch->GetGPUVirtualAddress();
 
-		g_D3dCommandList->BuildRaytracingAccelerationStructure(&asDesc, 0, nullptr);
+		g_D3DCommandList->BuildRaytracingAccelerationStructure(&asDesc, 0, nullptr);
 	}
 
 	// We need to insert a UAV barrier before using the acceleration structures in a raytracing operation
@@ -647,7 +674,7 @@ void CreateBottomLevelAccelerationStructure()
 		D3D12_RESOURCE_BARRIER uavBarrier = {};
 		uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
 		uavBarrier.UAV.pResource = g_BottomLevelAccelerationStructureDest;
-		g_D3dCommandList->ResourceBarrier(1, &uavBarrier);
+		g_D3DCommandList->ResourceBarrier(1, &uavBarrier);
 	}
 }
 
@@ -666,18 +693,14 @@ void CreateTopLevelAccelerationStructure()
 	inputs.NumDescs = 1;
 	inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
 
-	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO info;
-	g_D3DDevice->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &info);
-
 	// Create the buffers
 	{
-		D3D12_HEAP_PROPERTIES props;
-		memset(&props, 0, sizeof(D3D12_HEAP_PROPERTIES));
+		D3D12_HEAP_PROPERTIES props = {};
 		props.Type = D3D12_HEAP_TYPE_DEFAULT;
 		props.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
 		props.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
 
-		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO info;
+		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO info = {};
 		g_D3DDevice->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &info);
 
 		D3D12_RESOURCE_DESC bufDesc = {};
@@ -734,7 +757,7 @@ void CreateTopLevelAccelerationStructure()
 		asDesc.DestAccelerationStructureData = g_TopLevelAccelerationStructureDest->GetGPUVirtualAddress();
 		asDesc.ScratchAccelerationStructureData = g_TopLevelAccelerationStructureScratch->GetGPUVirtualAddress();
 
-		g_D3dCommandList->BuildRaytracingAccelerationStructure(&asDesc, 0, nullptr);
+		g_D3DCommandList->BuildRaytracingAccelerationStructure(&asDesc, 0, nullptr);
 	}
 
 	// We need to insert a UAV barrier before using the acceleration structures in a raytracing operation
@@ -742,7 +765,7 @@ void CreateTopLevelAccelerationStructure()
 		D3D12_RESOURCE_BARRIER uavBarrier = {};
 		uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
 		uavBarrier.UAV.pResource = g_TopLevelAccelerationStructureDest;
-		g_D3dCommandList->ResourceBarrier(1, &uavBarrier);
+		g_D3DCommandList->ResourceBarrier(1, &uavBarrier);
 	}
 }
 
@@ -751,4 +774,366 @@ void CleanupTopLevelAccelerationStructure()
 	gSafeRelease(g_TopLevelAccelerationStructureScratch);
 	gSafeRelease(g_TopLevelAccelerationStructureDest);
 	gSafeRelease(g_TopLevelAccelerationStructureInstanceDesc);
+}
+
+void ExecuteAccelerationStructureCreation()
+{
+	g_D3DCommandList->Close();
+	g_D3DCommandQueue->ExecuteCommandLists(1, (ID3D12CommandList * const*)& g_D3DCommandList);
+	g_FenceValue++;
+	g_D3DCommandQueue->Signal(g_Fence, g_FenceValue);
+	g_Fence->SetEventOnCompletion(g_FenceValue, g_FenceEvent);
+	WaitForSingleObject(g_FenceEvent, INFINITE);
+
+	// CommandList is closed
+}
+
+const char gShaderSource[] = R"(
+RaytracingAccelerationStructure gRtScene : register(t0);
+RWTexture2D<float4> gOutput : register(u0);
+
+float3 linearToSrgb(float3 c)
+{
+    // Based on http://chilliant.blogspot.com/2012/08/srgb-approximations-for-hlsl.html
+    float3 sq1 = sqrt(c);
+    float3 sq2 = sqrt(sq1);
+    float3 sq3 = sqrt(sq2);
+    float3 srgb = 0.662002687 * sq1 + 0.684122060 * sq2 - 0.323583601 * sq3 - 0.0225411470 * c;
+    return srgb;
+}
+
+[shader("raygeneration")]
+void rayGen()
+{  
+    uint3 launchIndex = DispatchRaysIndex();
+    float3 col = linearToSrgb(float3(0.4, 0.6, 0.2));
+    gOutput[launchIndex.xy] = float4(col, 1);
+}
+
+struct Payload
+{
+    bool hit;
+};
+
+[shader("miss")]
+void miss(inout Payload payload)
+{
+    payload.hit = false;
+}
+
+[shader("closesthit")]
+void chs(inout Payload payload, in BuiltInTriangleIntersectionAttributes attribs)
+{
+    payload.hit = true;
+}
+)";
+
+IDxcBlob* CompileShader(const wchar_t* inName, const char* inSource, uint32_t inSize)
+{
+	static DxcCreateInstanceProc sDxcCreateInstanceProc = nullptr;
+
+	if (sDxcCreateInstanceProc == nullptr)
+	{
+		HMODULE dll = LoadLibraryW(L"dxcompiler.dll");
+		assert(dll != nullptr);
+		sDxcCreateInstanceProc = (DxcCreateInstanceProc)GetProcAddress(dll, "DxcCreateInstance");
+	}
+
+	IDxcLibrary* library;
+	IDxcBlobEncoding* blob_encoding;
+	sDxcCreateInstanceProc(CLSID_DxcLibrary, __uuidof(IDxcLibrary), (void**)& library);
+	if (FAILED(library->CreateBlobWithEncodingFromPinned(inSource, inSize, CP_UTF8, &blob_encoding)))
+	{
+		assert(false);
+		return nullptr;
+	}
+
+	IDxcCompiler* compiler;
+	sDxcCreateInstanceProc(CLSID_DxcCompiler, __uuidof(IDxcCompiler), (void**)& compiler);
+
+	IDxcOperationResult* operation_result;
+	assert(SUCCEEDED(compiler->Compile(
+		blob_encoding,		// program text
+		inName,				// file name, mostly for error messages
+		L"",				// entry point function
+		L"lib_6_3",			// target profile
+		nullptr, 0,			// compilation arguments and their count
+		nullptr, 0,			// name/value defines and their count
+		nullptr,			// handler for #include directives
+		&operation_result)));
+
+	HRESULT compile_result;
+	assert(SUCCEEDED(operation_result->GetStatus(&compile_result)));
+
+	if (FAILED(compile_result)) 
+	{
+		IDxcBlobEncoding* pPrintBlob, *pPrintBlob16;
+		assert(SUCCEEDED(operation_result->GetErrorBuffer(&pPrintBlob)));
+		// We can use the library to get our preferred encoding.
+		assert(SUCCEEDED(library->GetBlobAsUtf16(pPrintBlob, &pPrintBlob16)));
+		wprintf(L"%*s", (int)pPrintBlob16->GetBufferSize() / 2, (LPCWSTR)pPrintBlob16->GetBufferPointer());
+		pPrintBlob->Release();
+		pPrintBlob16->Release();
+		return nullptr;
+	}
+
+	IDxcBlob* blob = nullptr;
+	assert(SUCCEEDED(operation_result->GetResult(&blob)));
+	return blob;
+}
+
+struct RootSignatureDescriptor
+{
+	D3D12_ROOT_SIGNATURE_DESC mDesc = {};
+	std::vector<D3D12_DESCRIPTOR_RANGE> mDescriptorRanges;
+	std::vector<D3D12_ROOT_PARAMETER> mRootParameters;
+};
+
+void GenerateRayGenLocalRootDesc(RootSignatureDescriptor& outDesc)
+{
+	// gOutput
+	D3D12_DESCRIPTOR_RANGE descriptor_range = {};
+	descriptor_range.BaseShaderRegister = 0;
+	descriptor_range.NumDescriptors = 1;
+	descriptor_range.RegisterSpace = 0;
+	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+	descriptor_range.OffsetInDescriptorsFromTableStart = 0;
+	outDesc.mDescriptorRanges.push_back(descriptor_range);
+
+	// gRtScene
+	descriptor_range = {};
+	descriptor_range.BaseShaderRegister = 0;
+	descriptor_range.NumDescriptors = 1;
+	descriptor_range.RegisterSpace = 0;
+	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	descriptor_range.OffsetInDescriptorsFromTableStart = 1;
+	outDesc.mDescriptorRanges.push_back(descriptor_range);
+
+	// Root Parameters
+	D3D12_ROOT_PARAMETER root_parameter = {};
+	root_parameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	root_parameter.DescriptorTable.NumDescriptorRanges = (UINT)outDesc.mDescriptorRanges.size();
+	root_parameter.DescriptorTable.pDescriptorRanges = outDesc.mDescriptorRanges.data();
+	outDesc.mRootParameters.push_back(root_parameter);
+
+	// Create the desc
+	outDesc.mDesc.NumParameters = (UINT)outDesc.mRootParameters.size();
+	outDesc.mDesc.pParameters = outDesc.mRootParameters.data();
+	outDesc.mDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
+}
+
+ComPtr<ID3D12RootSignature> CreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC& desc)
+{
+	ComPtr<ID3DBlob> signature_blob;
+	ComPtr<ID3DBlob> error_blob;
+	HRESULT hr = D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1, &signature_blob, &error_blob);
+	if (FAILED(hr))
+	{
+		std::string str((char*)error_blob->GetBufferPointer(), error_blob->GetBufferSize());
+		OutputDebugStringA(str.c_str());
+		assert(false);
+		return nullptr;
+	}
+	ComPtr<ID3D12RootSignature> root_signature;
+	assert(SUCCEEDED(g_D3DDevice->CreateRootSignature(0, signature_blob->GetBufferPointer(), signature_blob->GetBufferSize(), IID_PPV_ARGS(&root_signature))));
+	return root_signature;
+}
+
+// Hold data for D3D12_STATE_SUBOBJECT
+template <typename DescType, D3D12_STATE_SUBOBJECT_TYPE SubObjecType>
+struct StateSubobjectHolder
+{
+	StateSubobjectHolder()
+	{
+		mStateSubobject.Type = SubObjecType;
+		mStateSubobject.pDesc = &mDesc;
+	}
+
+	D3D12_STATE_SUBOBJECT mStateSubobject = {};
+
+protected:
+	DescType mDesc = {};
+};
+
+// Shader binary
+struct DXILLibrary : public StateSubobjectHolder<D3D12_DXIL_LIBRARY_DESC, D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY>
+{
+	DXILLibrary(IDxcBlob* inShaderBlob, const wchar_t* inEntryPoint[], uint32_t inEntryPointCount) : mShaderBlob(inShaderBlob)
+	{
+		mExportDescs.resize(inEntryPointCount);
+		mExportNames.resize(inEntryPointCount);
+
+		if (inShaderBlob)
+		{
+			mDesc.DXILLibrary.pShaderBytecode = inShaderBlob->GetBufferPointer();
+			mDesc.DXILLibrary.BytecodeLength = inShaderBlob->GetBufferSize();
+			mDesc.NumExports = inEntryPointCount;
+			mDesc.pExports = mExportDescs.data();
+
+			for (uint32_t i = 0; i < inEntryPointCount; i++)
+			{
+				mExportNames[i] = inEntryPoint[i];
+				mExportDescs[i].Name = mExportNames[i].c_str();
+				mExportDescs[i].Flags = D3D12_EXPORT_FLAG_NONE;
+				mExportDescs[i].ExportToRename = nullptr;
+			}
+		}
+	}
+
+private:
+	ComPtr<IDxcBlob> mShaderBlob;
+	std::vector<D3D12_EXPORT_DESC> mExportDescs;
+	std::vector<std::wstring> mExportNames;
+};
+
+// Ray tracing shader structure
+struct HitGroup : public StateSubobjectHolder<D3D12_HIT_GROUP_DESC, D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP>
+{
+	HitGroup(const wchar_t* inAnyHitShaderImport, const wchar_t* inClosestHitShaderImport, const wchar_t* inHitGroupExport)
+	{
+		mDesc.AnyHitShaderImport = inAnyHitShaderImport;
+		mDesc.ClosestHitShaderImport = inClosestHitShaderImport;
+		mDesc.HitGroupExport = inHitGroupExport;
+	}
+};
+
+// Local root signature - Shader input
+struct LocalRootSignature : public StateSubobjectHolder<ID3D12RootSignature*, D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE>
+{
+	LocalRootSignature(const D3D12_ROOT_SIGNATURE_DESC& inDesc)
+	{
+		mRootSignature = CreateRootSignature(inDesc);
+		mDesc = mRootSignature.Get();
+	}
+private:
+	ComPtr<ID3D12RootSignature> mRootSignature; // Necessary?
+};
+
+// Associate subobject to exports - Shader entry point -> Shader input
+struct SubobjectToExportsAssociation : public StateSubobjectHolder<D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION, D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION>
+{
+	SubobjectToExportsAssociation(const wchar_t* inExportNames[], uint32_t inExportCount, const D3D12_STATE_SUBOBJECT* inSubobjectToAssociate)
+	{
+		mDesc.NumExports = inExportCount;
+		mDesc.pExports = inExportNames;
+		mDesc.pSubobjectToAssociate = inSubobjectToAssociate;
+	}
+};
+
+// Shader config
+struct ShaderConfig : public StateSubobjectHolder<D3D12_RAYTRACING_SHADER_CONFIG, D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG>
+{
+	ShaderConfig(uint32_t inMaxAttributeSizeInBytes, uint32_t inMaxPayloadSizeInBytes)
+	{
+		mDesc.MaxAttributeSizeInBytes = inMaxAttributeSizeInBytes;
+		mDesc.MaxPayloadSizeInBytes = inMaxPayloadSizeInBytes;
+	}
+};
+
+// Pipeline config
+struct PipelineConfig : public StateSubobjectHolder<D3D12_RAYTRACING_PIPELINE_CONFIG, D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG>
+{
+	PipelineConfig(uint32_t inMaxTraceRecursionDepth)
+	{
+		mDesc.MaxTraceRecursionDepth = inMaxTraceRecursionDepth;
+	}
+};
+
+// Global root signature
+struct GlobalRootSignature : public StateSubobjectHolder<ID3D12RootSignature*, D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE>
+{
+	GlobalRootSignature(const D3D12_ROOT_SIGNATURE_DESC& inDesc)
+	{
+		mRootSignature = CreateRootSignature(inDesc);
+		mDesc = mRootSignature.Get();
+	}
+	ComPtr<ID3D12RootSignature> mRootSignature; // Necessary?
+};
+
+static const wchar_t* kRayGenShader = L"rayGen";
+static const wchar_t* kMissShader = L"miss";
+static const wchar_t* kClosestHitShader = L"chs";
+static const wchar_t* kHitGroup = L"HitGroup";
+
+void gValidate(HRESULT in)
+{
+	if (FAILED(in))
+	{
+		char message[512];
+		FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, nullptr, in, 0, message, ARRAYSIZE(message), nullptr);
+		OutputDebugStringA(message);
+		assert(false);
+	}
+}
+
+void CreatePipelineState()
+{
+	// See D3D12_STATE_SUBOBJECT_TYPE
+	// Notice all pointers should be valid until CreateStateObject
+
+	// Need 10 subobjects:
+	//  1 for the DXIL library
+	//  1 for hit-group
+	//  2 for RayGen root-signature (root-signature and the subobject association)
+	//  2 for the root-signature shared between miss and hit shaders (signature and association)
+	//  2 for shader config (shared between all programs. 1 for the config, 1 for association)
+	//  1 for pipeline config
+	//  1 for the global root signature
+	std::array<D3D12_STATE_SUBOBJECT, 10> subobjects;
+	uint32_t index = 0;
+
+	// 1 for the DXIL library
+	const wchar_t* entry_points[] = { kRayGenShader, kMissShader, kClosestHitShader };
+	DXILLibrary dxilLibrary(CompileShader(L"Shader", gShaderSource, _countof(gShaderSource)), entry_points, _countof(entry_points));
+	subobjects[index++] = dxilLibrary.mStateSubobject;
+
+	// 1 for hit-group
+ 	HitGroup hit_group(nullptr, kClosestHitShader, kHitGroup);
+ 	subobjects[index++] = hit_group.mStateSubobject;
+ 
+ 	// 2 for RayGen root-signature
+	RootSignatureDescriptor ray_gen_local_root_signature_desc;
+	GenerateRayGenLocalRootDesc(ray_gen_local_root_signature_desc);
+ 	LocalRootSignature ray_gen_local_root_signature(ray_gen_local_root_signature_desc.mDesc);
+ 	subobjects[index++] = ray_gen_local_root_signature.mStateSubobject;
+
+	SubobjectToExportsAssociation ray_gen_association(&kRayGenShader, 1, &(subobjects[index - 1]));
+ 	subobjects[index++] = ray_gen_association.mStateSubobject;
+ 
+ 	// 2 for the root-signature shared between miss and hit shaders
+	RootSignatureDescriptor miss_closest_hit_local_root_signature_desc;
+	miss_closest_hit_local_root_signature_desc.mDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
+ 	LocalRootSignature miss_closest_hit_local_root_signature(miss_closest_hit_local_root_signature_desc.mDesc);
+	subobjects[index++] = miss_closest_hit_local_root_signature.mStateSubobject;
+ 
+ 	const wchar_t* miss_closest_hit_export_names[] = { kMissShader, kClosestHitShader};
+ 	SubobjectToExportsAssociation miss_closest_hit_association(miss_closest_hit_export_names, _countof(miss_closest_hit_export_names), &(subobjects[index - 1]));
+	subobjects[index++] = miss_closest_hit_association.mStateSubobject;
+
+ 	// 2 for shader config
+	ShaderConfig shader_config(sizeof(float) * 2, sizeof(float) * 1); // ???
+	subobjects[index++] = shader_config.mStateSubobject;
+ 
+ 	const wchar_t* shader_exports[] = { kMissShader, kClosestHitShader, kRayGenShader }; // does order matter?
+	SubobjectToExportsAssociation shader_config_association(shader_exports, _countof(shader_exports), &(subobjects[index - 1]));
+	subobjects[index++] = shader_config_association.mStateSubobject;
+ 
+ 	// 1 for pipeline config
+ 	PipelineConfig pipeline_config(0);
+	subobjects[index++] = pipeline_config.mStateSubobject;
+
+	// 1 for the global root signature
+	GlobalRootSignature global_root_signature({});
+	subobjects[index++] = global_root_signature.mStateSubobject;
+
+	// Create the state
+	D3D12_STATE_OBJECT_DESC desc;
+	desc.NumSubobjects = (UINT)subobjects.size();
+	desc.pSubobjects = subobjects.data();
+	desc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
+
+	// Most validation occurs here
+	// Be sure use correct dll for dxc compiler
+	// e.g. Error "Hash check failed for DXILibrary.pShaderBytecode" appears when dxil.dll is missing.
+	gValidate(g_D3DDevice->CreateStateObject(&desc, IID_PPV_ARGS(&g_StateObject)));
 }
