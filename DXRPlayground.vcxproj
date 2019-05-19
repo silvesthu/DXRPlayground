@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -11,8 +11,13 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Source\AccelerationStructure.h" />
+    <ClInclude Include="Source\CommonInclude.h" />
     <ClInclude Include="Source\imgui_impl_dx12.h" />
     <ClInclude Include="Source\imgui_impl_win32.h" />
+    <ClInclude Include="Source\PipelineState.h" />
+    <ClInclude Include="Source\ShaderResource.h" />
+    <ClInclude Include="Source\ShaderTable.h" />
     <ClInclude Include="Source\Thirdparty\imgui\imconfig.h" />
     <ClInclude Include="Source\Thirdparty\imgui\imgui.h" />
     <ClInclude Include="Source\Thirdparty\imgui\imgui_internal.h" />
@@ -21,9 +26,13 @@
     <ClInclude Include="Source\Thirdparty\imgui\imstb_truetype.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Source\AccelerationStructure.cpp" />
     <ClCompile Include="Source\imgui_impl_dx12.cpp" />
     <ClCompile Include="Source\imgui_impl_win32.cpp" />
     <ClCompile Include="Source\DXRPlayground.cpp" />
+    <ClCompile Include="Source\PipelineState.cpp" />
+    <ClCompile Include="Source\ShaderResource.cpp" />
+    <ClCompile Include="Source\ShaderTable.cpp" />
     <ClCompile Include="Source\Thirdparty\imgui\imgui.cpp" />
     <ClCompile Include="Source\Thirdparty\imgui\imgui_demo.cpp" />
     <ClCompile Include="Source\Thirdparty\imgui\imgui_draw.cpp" />

@@ -1,0 +1,74 @@
+#pragma once
+
+#include <d3d12.h>
+#include <dxgi1_4.h>
+#include <dxcapi.h>
+#include <dxgidebug.h>
+#include <comdef.h>
+#include <wrl.h>	// For ComPtr. See https://github.com/Microsoft/DirectXTK/wiki/ComPtr
+using Microsoft::WRL::ComPtr;
+
+#include <tchar.h>
+#include <string>
+#include <iostream>
+#include <array>
+#include <vector>
+
+extern ID3D12Device5*						gD3DDevice;
+extern ID3D12DescriptorHeap* 				gD3DRtvDescHeap;
+extern ID3D12DescriptorHeap* 				gD3DSrvDescHeap;
+extern ID3D12CommandQueue* 					gD3DCommandQueue;
+extern ID3D12GraphicsCommandList4* 			gD3DCommandList;
+extern ID3D12Fence* 						gFence;
+extern HANDLE                       		gFenceEvent;
+extern UINT64                       		gFenceLastSignaledValue;
+extern IDXGISwapChain3* 					gSwapChain;
+extern HANDLE                       		gSwapChainWaitableObject;
+
+extern uint64_t								gFenceValue;
+
+extern ID3D12Resource* 						gDxrVertexBuffer;
+extern ID3D12Resource* 						gDxrBottomLevelAccelerationStructureScratch;
+extern ID3D12Resource* 						gDxrBottomLevelAccelerationStructureDest;
+extern ID3D12Resource* 						gDxrTopLevelAccelerationStructureScratch;
+extern ID3D12Resource* 						gDxrTopLevelAccelerationStructureDest;
+extern ID3D12Resource* 						gDxrTopLevelAccelerationStructureInstanceDesc;
+
+extern ID3D12StateObject* 					gDxrStateObject;
+extern ID3D12Resource*						gDxrShaderTable;
+extern ID3D12Resource*						gDxrOutputResource;
+extern ID3D12DescriptorHeap*				gDxrSrvUavHeap;
+
+// String literals
+static const wchar_t*						kRayGenShader = L"rayGen";
+static const wchar_t*						kMissShader = L"miss";
+static const wchar_t*						kClosestHitShader = L"chs";
+static const wchar_t*						kHitGroup = L"HitGroup";
+
+// Helper
+template <typename T>
+void gSafeRelease(T*& pointer)
+{
+	if (pointer != nullptr)
+	{
+		pointer->Release();
+		pointer = nullptr;
+	}
+}
+
+inline void gValidate(HRESULT in)
+{
+	if (FAILED(in))
+	{
+		char message[512];
+		FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, nullptr, in, 0, message, ARRAYSIZE(message), nullptr);
+		OutputDebugStringA(message);
+		assert(false);
+	}
+}
+
+template <typename T>
+inline T gAlignUp(T inValue, T inAlignment)
+{
+	return (((inValue + inAlignment - 1) / inAlignment) * inAlignment);
+}
