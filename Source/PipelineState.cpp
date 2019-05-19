@@ -2,6 +2,33 @@
 #include "CommonInclude.h"
 
 static const char kShaderSource[] = R"(
+/***************************************************************************
+# Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#  * Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#  * Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#  * Neither the name of NVIDIA CORPORATION nor the names of its
+#    contributors may be used to endorse or promote products derived
+#    from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+***************************************************************************/
 RaytracingAccelerationStructure gRtScene : register(t0);
 RWTexture2D<float4> gOutput : register(u0);
 
@@ -15,36 +42,58 @@ float3 linearToSrgb(float3 c)
     return srgb;
 }
 
+struct RayPayload
+{
+    float3 color;
+};
+
 [shader("raygeneration")]
 void rayGen()
-{  
+{
     uint3 launchIndex = DispatchRaysIndex();
-    float3 col = linearToSrgb(float3(0.4, 0.6, 0.2));
+    uint3 launchDim = DispatchRaysDimensions();
+
+    float2 crd = float2(launchIndex.xy);
+    float2 dims = float2(launchDim.xy);
+
+    float2 d = ((crd/dims) * 2.f - 1.f);
+    float aspectRatio = dims.x / dims.y;
+
+    RayDesc ray;
+    ray.Origin = float3(0, 0, -2);
+    ray.Direction = normalize(float3(d.x * aspectRatio, -d.y, 1));
+
+    ray.TMin = 0;
+    ray.TMax = 100000;
+
+    RayPayload payload;
+    TraceRay( gRtScene, 0 /*rayFlags*/, 0xFF, 0 /* ray index*/, 0, 0, ray, payload );
+    float3 col = linearToSrgb(payload.color);
     gOutput[launchIndex.xy] = float4(col, 1);
 }
 
-struct Payload
-{
-    bool hit;
-};
-
 [shader("miss")]
-void miss(inout Payload payload)
+void miss(inout RayPayload payload)
 {
-    payload.hit = false;
+    payload.color = float3(0.4, 0.6, 0.2);
 }
 
 [shader("closesthit")]
-void chs(inout Payload payload, in BuiltInTriangleIntersectionAttributes attribs)
+void chs(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attribs)
 {
-    payload.hit = true;
+    float3 barycentrics = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y, attribs.barycentrics.x, attribs.barycentrics.y);
+
+    const float3 A = float3(1, 0, 0);
+    const float3 B = float3(0, 1, 0);
+    const float3 C = float3(0, 0, 1);
+
+    payload.color = A * barycentrics.x + B * barycentrics.y + C * barycentrics.z;
 }
 )";
 
 IDxcBlob* CompileShader(const wchar_t* inName, const char* inSource, uint32_t inSize)
 {
 	static DxcCreateInstanceProc sDxcCreateInstanceProc = nullptr;
-
 	if (sDxcCreateInstanceProc == nullptr)
 	{
 		HMODULE dll = LoadLibraryW(L"dxcompiler.dll");
@@ -55,11 +104,7 @@ IDxcBlob* CompileShader(const wchar_t* inName, const char* inSource, uint32_t in
 	IDxcLibrary* library;
 	IDxcBlobEncoding* blob_encoding;
 	sDxcCreateInstanceProc(CLSID_DxcLibrary, __uuidof(IDxcLibrary), (void**)& library);
-	if (FAILED(library->CreateBlobWithEncodingFromPinned(inSource, inSize, CP_UTF8, &blob_encoding)))
-	{
-		assert(false);
-		return nullptr;
-	}
+	gValidate(library->CreateBlobWithEncodingFromPinned(inSource, inSize, CP_UTF8, &blob_encoding));
 
 	IDxcCompiler* compiler;
 	sDxcCreateInstanceProc(CLSID_DxcCompiler, __uuidof(IDxcCompiler), (void**)& compiler);
@@ -76,14 +121,14 @@ IDxcBlob* CompileShader(const wchar_t* inName, const char* inSource, uint32_t in
 		&operation_result)));
 
 	HRESULT compile_result;
-	assert(SUCCEEDED(operation_result->GetStatus(&compile_result)));
+	gValidate(operation_result->GetStatus(&compile_result));
 
 	if (FAILED(compile_result))
 	{
 		IDxcBlobEncoding* pPrintBlob, * pPrintBlob16;
-		assert(SUCCEEDED(operation_result->GetErrorBuffer(&pPrintBlob)));
+		gValidate(operation_result->GetErrorBuffer(&pPrintBlob));
 		// We can use the library to get our preferred encoding.
-		assert(SUCCEEDED(library->GetBlobAsUtf16(pPrintBlob, &pPrintBlob16)));
+		gValidate(library->GetBlobAsUtf16(pPrintBlob, &pPrintBlob16));
 		wprintf(L"%*s", (int)pPrintBlob16->GetBufferSize() / 2, (LPCWSTR)pPrintBlob16->GetBufferPointer());
 		pPrintBlob->Release();
 		pPrintBlob16->Release();
@@ -91,7 +136,7 @@ IDxcBlob* CompileShader(const wchar_t* inName, const char* inSource, uint32_t in
 	}
 
 	IDxcBlob* blob = nullptr;
-	assert(SUCCEEDED(operation_result->GetResult(&blob)));
+	gValidate(operation_result->GetResult(&blob));
 	return blob;
 }
 
@@ -308,7 +353,7 @@ void CreatePipelineState()
 	subobjects[index++] = miss_closest_hit_association.mStateSubobject;
 
 	// 2 for shader config
-	ShaderConfig shader_config(sizeof(float) * 2, sizeof(float) * 1); // ???
+	ShaderConfig shader_config(sizeof(float) * 2, sizeof(float) * 3); // ???
 	subobjects[index++] = shader_config.mStateSubobject;
 
 	const wchar_t* shader_exports[] = { kMissShader, kClosestHitShader, kRayGenShader }; // does order matter?
@@ -316,11 +361,12 @@ void CreatePipelineState()
 	subobjects[index++] = shader_configassociation.mStateSubobject;
 
 	// 1 for pipeline config
-	PipelineConfig pipeline_config(0);
+	PipelineConfig pipeline_config(1); // ???
 	subobjects[index++] = pipeline_config.mStateSubobject;
 
 	// 1 for the global root signature
 	GlobalRootSignature global_root_signature({});
+	gDxrEmptyRootSignature = global_root_signature.mRootSignature.Get();
 	subobjects[index++] = global_root_signature.mStateSubobject;
 
 	// Create the state

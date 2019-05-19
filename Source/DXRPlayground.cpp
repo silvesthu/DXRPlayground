@@ -8,8 +8,9 @@
 #include "PipelineState.h"
 #include "ShaderResource.h"
 #include "ShaderTable.h"
+#include "RayTrace.h"
 
-#define DX12_ENABLE_DEBUG_LAYER     1
+#define DX12_ENABLE_DEBUG_LAYER     (0)
 
 struct FrameContext
 {
@@ -49,8 +50,10 @@ ID3D12Resource*						gDxrTopLevelAccelerationStructureScratch = nullptr;
 ID3D12Resource*						gDxrTopLevelAccelerationStructureDest = nullptr;
 ID3D12Resource*						gDxrTopLevelAccelerationStructureInstanceDesc = nullptr;
 
+ID3D12RootSignature*				gDxrEmptyRootSignature = nullptr;
 ID3D12StateObject*					gDxrStateObject = nullptr;
 ID3D12Resource*						gDxrShaderTable = nullptr;
+uint64_t							gDxrShaderTableEntrySize = 0;
 ID3D12Resource*						gDxrOutputResource = nullptr;
 ID3D12DescriptorHeap*				gDxrSrvUavHeap = nullptr;
 
@@ -217,35 +220,36 @@ int main(int, char**)
 			// Reset
 			frameCtxt->CommandAllocator->Reset();
 
-			// Frame begin
-			D3D12_RESOURCE_BARRIER barrier = {};
-			{
-				UINT backBufferIdx = gSwapChain->GetCurrentBackBufferIndex();
+			// Frame data
+			uint32_t frame_index = gSwapChain->GetCurrentBackBufferIndex();
+			ID3D12Resource* frame_render_target_resource = sBackBufferRenderTargetResource[frame_index];
+			D3D12_CPU_DESCRIPTOR_HANDLE& frame_render_target_descriptor = sBackBufferRenderTargetDescriptor[frame_index];
 
+			// Frame begin
+			{
+				D3D12_RESOURCE_BARRIER barrier = {};
 				barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 				barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-				barrier.Transition.pResource = sBackBufferRenderTargetResource[backBufferIdx];
+				barrier.Transition.pResource = frame_render_target_resource;
 				barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
 				barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
 				barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
 
 				gD3DCommandList->Reset(frameCtxt->CommandAllocator, nullptr);
 				gD3DCommandList->ResourceBarrier(1, &barrier);
-				gD3DCommandList->ClearRenderTargetView(sBackBufferRenderTargetDescriptor[backBufferIdx], (float*)& clear_color, 0, nullptr);
-				gD3DCommandList->OMSetRenderTargets(1, &sBackBufferRenderTargetDescriptor[backBufferIdx], FALSE, nullptr);
-				gD3DCommandList->SetDescriptorHeaps(1, &gD3DSrvDescHeap);
 			}
 
-			// Customization - Draw
+			// Draw
 			{
-				// Draw screen quad
-				{
-
-				}
+				gD3DCommandList->ClearRenderTargetView(frame_render_target_descriptor, (float*)& clear_color, 0, nullptr);
+				RayTrace(frame_render_target_resource);
 			}
 
 			// Draw ImGui
 			{
+				gD3DCommandList->OMSetRenderTargets(1, &frame_render_target_descriptor, FALSE, nullptr);
+				gD3DCommandList->SetDescriptorHeaps(1, &gD3DSrvDescHeap);
+
 				// Record
 				ImGui::Render();
 				// Draw (Create command)
@@ -254,6 +258,11 @@ int main(int, char**)
 
 			// Frame end
 			{
+				D3D12_RESOURCE_BARRIER barrier = {};
+				barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+				barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+				barrier.Transition.pResource = frame_render_target_resource;
+				barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
 				barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
 				barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
 				gD3DCommandList->ResourceBarrier(1, &barrier);

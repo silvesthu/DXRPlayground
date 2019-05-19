@@ -34,8 +34,10 @@ extern ID3D12Resource* 						gDxrTopLevelAccelerationStructureScratch;
 extern ID3D12Resource* 						gDxrTopLevelAccelerationStructureDest;
 extern ID3D12Resource* 						gDxrTopLevelAccelerationStructureInstanceDesc;
 
+extern ID3D12RootSignature*					gDxrEmptyRootSignature;
 extern ID3D12StateObject* 					gDxrStateObject;
 extern ID3D12Resource*						gDxrShaderTable;
+extern uint64_t								gDxrShaderTableEntrySize;
 extern ID3D12Resource*						gDxrOutputResource;
 extern ID3D12DescriptorHeap*				gDxrSrvUavHeap;
 

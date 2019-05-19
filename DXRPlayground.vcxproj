@@ -16,6 +16,7 @@
     <ClInclude Include="Source\imgui_impl_dx12.h" />
     <ClInclude Include="Source\imgui_impl_win32.h" />
     <ClInclude Include="Source\PipelineState.h" />
+    <ClInclude Include="Source\RayTrace.h" />
     <ClInclude Include="Source\ShaderResource.h" />
     <ClInclude Include="Source\ShaderTable.h" />
     <ClInclude Include="Source\Thirdparty\imgui\imconfig.h" />
@@ -31,6 +32,7 @@
     <ClCompile Include="Source\imgui_impl_win32.cpp" />
     <ClCompile Include="Source\DXRPlayground.cpp" />
     <ClCompile Include="Source\PipelineState.cpp" />
+    <ClCompile Include="Source\RayTrace.cpp" />
     <ClCompile Include="Source\ShaderResource.cpp" />
     <ClCompile Include="Source\ShaderTable.cpp" />
     <ClCompile Include="Source\Thirdparty\imgui\imgui.cpp" />

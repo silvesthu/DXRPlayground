@@ -51,6 +51,9 @@
     <ClInclude Include="Source\ShaderResource.h">
       <Filter>Source</Filter>
     </ClInclude>
+    <ClInclude Include="Source\RayTrace.h">
+      <Filter>Source</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\imgui_impl_dx12.cpp">
@@ -84,6 +87,9 @@
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="Source\ShaderResource.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\RayTrace.cpp">
       <Filter>Source</Filter>
     </ClCompile>
   </ItemGroup>
