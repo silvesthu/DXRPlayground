@@ -14,6 +14,21 @@ using Microsoft::WRL::ComPtr;
 #include <array>
 #include <vector>
 
+enum 
+{
+	NUM_FRAMES_IN_FLIGHT = 3,
+	NUM_BACK_BUFFERS = 3
+};
+
+struct FrameContext
+{
+	ID3D12CommandAllocator*					CommandAllocator;
+	UINT64									FenceValue;
+};
+
+extern FrameContext							gFrameContext[];
+extern UINT									gFrameIndex;
+
 extern ID3D12Device5*						gD3DDevice;
 extern ID3D12DescriptorHeap* 				gD3DRtvDescHeap;
 extern ID3D12DescriptorHeap* 				gD3DSrvDescHeap;
@@ -24,6 +39,8 @@ extern HANDLE                       		gFenceEvent;
 extern UINT64                       		gFenceLastSignaledValue;
 extern IDXGISwapChain3* 					gSwapChain;
 extern HANDLE                       		gSwapChainWaitableObject;
+extern ID3D12Resource*						gBackBufferRenderTargetResource[];
+extern D3D12_CPU_DESCRIPTOR_HANDLE			gBackBufferRenderTargetDescriptor[];
 
 extern uint64_t								gFenceValue;
 
@@ -39,7 +56,14 @@ extern ID3D12StateObject* 					gDxrStateObject;
 extern ID3D12Resource*						gDxrShaderTable;
 extern uint64_t								gDxrShaderTableEntrySize;
 extern ID3D12Resource*						gDxrOutputResource;
-extern ID3D12DescriptorHeap*				gDxrSrvUavHeap;
+extern ID3D12Resource*						gDxrConstantBufferResource;
+extern ID3D12DescriptorHeap*				gDxrCbvSrvUavHeap;
+
+struct PerFrame
+{
+	float mBackgroundColor[4] = { 0.4f, 0.6f, 0.2f, 1.0f };
+};
+extern PerFrame								gPerFrame;
 
 // String literals
 static const wchar_t*						kRayGenShader = L"rayGen";

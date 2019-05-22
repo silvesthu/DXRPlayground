@@ -39,9 +39,6 @@
     <ClInclude Include="Source\AccelerationStructure.h">
       <Filter>Source</Filter>
     </ClInclude>
-    <ClInclude Include="Source\CommonInclude.h">
-      <Filter>Source</Filter>
-    </ClInclude>
     <ClInclude Include="Source\ShaderTable.h">
       <Filter>Source</Filter>
     </ClInclude>
@@ -52,6 +49,9 @@
       <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="Source\RayTrace.h">
+      <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Common.h">
       <Filter>Source</Filter>
     </ClInclude>
   </ItemGroup>
@@ -90,6 +90,9 @@
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="Source\RayTrace.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Common.cpp">
       <Filter>Source</Filter>
     </ClCompile>
   </ItemGroup>

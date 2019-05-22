@@ -1,5 +1,5 @@
 #include "AccelerationStructure.h"
-#include "CommonInclude.h"
+#include "Common.h"
 
 void CreateVertexBuffer()
 {

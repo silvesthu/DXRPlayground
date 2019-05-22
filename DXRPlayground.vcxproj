@@ -12,7 +12,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\AccelerationStructure.h" />
-    <ClInclude Include="Source\CommonInclude.h" />
+    <ClInclude Include="Source\Common.h" />
     <ClInclude Include="Source\imgui_impl_dx12.h" />
     <ClInclude Include="Source\imgui_impl_win32.h" />
     <ClInclude Include="Source\PipelineState.h" />
@@ -28,6 +28,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\AccelerationStructure.cpp" />
+    <ClCompile Include="Source\Common.cpp" />
     <ClCompile Include="Source\imgui_impl_dx12.cpp" />
     <ClCompile Include="Source\imgui_impl_win32.cpp" />
     <ClCompile Include="Source\DXRPlayground.cpp" />

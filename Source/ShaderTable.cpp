@@ -1,5 +1,5 @@
 #include "AccelerationStructure.h"
-#include "CommonInclude.h"
+#include "Common.h"
 
 void CreateShaderTable()
 {
@@ -56,8 +56,13 @@ void CreateShaderTable()
 
 		// Entry 0 - ray-gen program ID and descriptor data
 		memcpy(data_pointer + gDxrShaderTableEntrySize * 0, state_object_properties->GetShaderIdentifier(kRayGenShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-		uint64_t heapStart = gDxrSrvUavHeap->GetGPUDescriptorHandleForHeapStart().ptr;
-		*(uint64_t*)(data_pointer + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES) = heapStart;
+		
+		// ??? Necessary?
+		if (0)
+		{
+			uint64_t heapStart = gDxrCbvSrvUavHeap->GetGPUDescriptorHandleForHeapStart().ptr;
+			*(uint64_t*)(data_pointer + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES) = heapStart;
+		}
 
 		// Entry 1 - miss program
 		memcpy(data_pointer + gDxrShaderTableEntrySize * 1, state_object_properties->GetShaderIdentifier(kMissShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);

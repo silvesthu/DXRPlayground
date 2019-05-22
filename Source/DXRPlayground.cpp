@@ -2,7 +2,7 @@
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx12.h"
 
-#include "CommonInclude.h"
+#include "Common.h"
 
 #include "AccelerationStructure.h"
 #include "PipelineState.h"
@@ -10,52 +10,10 @@
 #include "ShaderTable.h"
 #include "RayTrace.h"
 
-#define DX12_ENABLE_DEBUG_LAYER     (0)
+#define DX12_ENABLE_DEBUG_LAYER     (1)
 
-struct FrameContext
-{
-	ID3D12CommandAllocator* CommandAllocator;
-	UINT64                  FenceValue;
-};
-
-// Data
-static int const                    NUM_FRAMES_IN_FLIGHT = 3;
-static FrameContext                	gFrameContext[NUM_FRAMES_IN_FLIGHT] = {};
-static UINT                    		gFrameIndex = 0;
-
-static int const                    NUM_BACK_BUFFERS = 3;
-ID3D12Device5*						gD3DDevice = nullptr;
-ID3D12DescriptorHeap*				gD3DRtvDescHeap = nullptr;
-ID3D12DescriptorHeap*				gD3DSrvDescHeap = nullptr;
-ID3D12CommandQueue*					gD3DCommandQueue = nullptr;
-ID3D12GraphicsCommandList4*			gD3DCommandList = nullptr;
-ID3D12Fence*						gFence = nullptr;
-HANDLE                       		gFenceEvent = nullptr;
-UINT64                       		gFenceLastSignaledValue = 0;
-IDXGISwapChain3*					gSwapChain = nullptr;
-HANDLE                       		gSwapChainWaitableObject = nullptr;
-static ID3D12Resource*				sBackBufferRenderTargetResource[NUM_BACK_BUFFERS] = {};
-static D3D12_CPU_DESCRIPTOR_HANDLE  sBackBufferRenderTargetDescriptor[NUM_BACK_BUFFERS] = {};
-
-// Customization - Data
 static const char*					kApplicationTitle = "DXR Playground";
 static const wchar_t*				kApplicationTitleW = L"DXR Playground";
-
-uint64_t							gFenceValue = 0; // ???
-
-ID3D12Resource*						gDxrVertexBuffer = nullptr;
-ID3D12Resource*						gDxrBottomLevelAccelerationStructureScratch = nullptr;
-ID3D12Resource*						gDxrBottomLevelAccelerationStructureDest = nullptr;
-ID3D12Resource*						gDxrTopLevelAccelerationStructureScratch = nullptr;
-ID3D12Resource*						gDxrTopLevelAccelerationStructureDest = nullptr;
-ID3D12Resource*						gDxrTopLevelAccelerationStructureInstanceDesc = nullptr;
-
-ID3D12RootSignature*				gDxrEmptyRootSignature = nullptr;
-ID3D12StateObject*					gDxrStateObject = nullptr;
-ID3D12Resource*						gDxrShaderTable = nullptr;
-uint64_t							gDxrShaderTableEntrySize = 0;
-ID3D12Resource*						gDxrOutputResource = nullptr;
-ID3D12DescriptorHeap*				gDxrSrvUavHeap = nullptr;
 
 // Forward declarations of helper functions
 bool CreateDeviceD3D(HWND hWnd);
@@ -111,7 +69,6 @@ int main(int, char**)
 
 	// Setup Dear ImGui style
 	ImGui::StyleColorsDark();
-	//ImGui::StyleColorsClassic();
 
 	// Setup Platform/Renderer bindings
 	ImGui_ImplWin32_Init(hwnd);
@@ -119,26 +76,6 @@ int main(int, char**)
 		DXGI_FORMAT_R8G8B8A8_UNORM,
 		gD3DSrvDescHeap->GetCPUDescriptorHandleForHeapStart(),
 		gD3DSrvDescHeap->GetGPUDescriptorHandleForHeapStart());
-
-	// Load Fonts
-	// - If no fonts are loaded, dear imgui will use the default font. You can also load multiple fonts and use ImGui::PushFont()/PopFont() to select them.
-	// - AddFontFromFileTTF() will return the ImFont* so you can store it if you need to select the font among multiple.
-	// - If the file cannot be loaded, the function will return nullptr. Please handle those errors in your application (e.g. use an assertion, or display an error and quit).
-	// - The fonts will be rasterized at a given size (w/ oversampling) and stored into a texture when calling ImFontAtlas::Build()/GetTexDataAsXXXX(), which ImGui_ImplXXXX_NewFrame below will call.
-	// - Read 'misc/fonts/README.txt' for more instructions and details.
-	// - Remember that in C/C++ if you want to include a backslash \ in a string literal you need to write a double backslash \\ !
-	//io.Fonts->AddFontDefault();
-	//io.Fonts->AddFontFromFileTTF("../../misc/fonts/Roboto-Medium.ttf", 16.0f);
-	//io.Fonts->AddFontFromFileTTF("../../misc/fonts/Cousine-Regular.ttf", 15.0f);
-	//io.Fonts->AddFontFromFileTTF("../../misc/fonts/DroidSans.ttf", 16.0f);
-	//io.Fonts->AddFontFromFileTTF("../../misc/fonts/ProggyTiny.ttf", 10.0f);
-	//ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, nullptr, io.Fonts->GetGlyphRangesJapanese());
-	//IM_ASSERT(font != nullptr);
-
-	// Our state
-	bool show_demo_window = true;
-	bool show_another_window = false;
-	ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
 	// Main loop
 	MSG msg;
@@ -162,49 +99,18 @@ int main(int, char**)
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
 
-		// ImGui sample code
+		// Main window
 		{
-			// 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-			if (show_demo_window)
-				ImGui::ShowDemoWindow(&show_demo_window);
-
-			// 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
+			ImGui::Begin("DXR Playground");
 			{
-				static float f = 0.0f;
-				static int counter = 0;
-
-				ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
-
-				ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
-				ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
-				ImGui::Checkbox("Another Window", &show_another_window);
-
-				ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-				ImGui::ColorEdit3("clear color", (float*)& clear_color); // Edit 3 floats representing a color
-
-				if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-					counter++;
-				ImGui::SameLine();
-				ImGui::Text("counter = %d", counter);
-
-				ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-				ImGui::End();
+				ImGui::ColorEdit3("Background Color", (float*)& gPerFrame.mBackgroundColor[0]);
 			}
-
-			// 3. Show another simple window.
-			if (show_another_window)
-			{
-				ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-				ImGui::Text("Hello from another window!");
-				if (ImGui::Button("Close Me"))
-					show_another_window = false;
-				ImGui::End();
-			}
+			ImGui::End();
 		}
 
 		// Customization - GUI
 		{
-			// Window Title
+			// Application Title
 			{
 				char buff[256];
 				snprintf(buff, sizeof(buff), "%s - Average %.3f ms/frame (%.1f FPS)", kApplicationTitle, 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
@@ -222,8 +128,8 @@ int main(int, char**)
 
 			// Frame data
 			uint32_t frame_index = gSwapChain->GetCurrentBackBufferIndex();
-			ID3D12Resource* frame_render_target_resource = sBackBufferRenderTargetResource[frame_index];
-			D3D12_CPU_DESCRIPTOR_HANDLE& frame_render_target_descriptor = sBackBufferRenderTargetDescriptor[frame_index];
+			ID3D12Resource* frame_render_target_resource = gBackBufferRenderTargetResource[frame_index];
+			D3D12_CPU_DESCRIPTOR_HANDLE& frame_render_target_descriptor = gBackBufferRenderTargetDescriptor[frame_index];
 
 			// Frame begin
 			{
@@ -239,9 +145,16 @@ int main(int, char**)
 				gD3DCommandList->ResourceBarrier(1, &barrier);
 			}
 
-			// Draw
+ 			// Customization - Update
 			{
-				gD3DCommandList->ClearRenderTargetView(frame_render_target_descriptor, (float*)& clear_color, 0, nullptr);
+				uint8_t* pData = nullptr;
+				gDxrConstantBufferResource->Map(0, nullptr, (void**)& pData);
+				memcpy(pData, &gPerFrame, sizeof(gPerFrame));
+				gDxrConstantBufferResource->Unmap(0, nullptr);
+			}
+
+			// Customization - Draw
+			{
 				RayTrace(frame_render_target_resource);
 			}
 
@@ -370,7 +283,7 @@ bool CreateDeviceD3D(HWND hWnd)
 		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = gD3DRtvDescHeap->GetCPUDescriptorHandleForHeapStart();
 		for (UINT i = 0; i < NUM_BACK_BUFFERS; i++)
 		{
-			sBackBufferRenderTargetDescriptor[i] = rtvHandle;
+			gBackBufferRenderTargetDescriptor[i] = rtvHandle;
 			rtvHandle.ptr += rtvDescriptorSize;
 		}
 	}
@@ -456,8 +369,8 @@ void CreateRenderTarget()
 	for (UINT i = 0; i < NUM_BACK_BUFFERS; i++)
 	{
 		gSwapChain->GetBuffer(i, IID_PPV_ARGS(&pBackBuffer));
-		gD3DDevice->CreateRenderTargetView(pBackBuffer, nullptr, sBackBufferRenderTargetDescriptor[i]);
-		sBackBufferRenderTargetResource[i] = pBackBuffer;
+		gD3DDevice->CreateRenderTargetView(pBackBuffer, nullptr, gBackBufferRenderTargetDescriptor[i]);
+		gBackBufferRenderTargetResource[i] = pBackBuffer;
 	}
 }
 
@@ -466,7 +379,7 @@ void CleanupRenderTarget()
 	WaitForLastSubmittedFrame();
 
 	for (UINT i = 0; i < NUM_BACK_BUFFERS; i++)
-		if (sBackBufferRenderTargetResource[i]) { sBackBufferRenderTargetResource[i]->Release(); sBackBufferRenderTargetResource[i] = nullptr; }
+		if (gBackBufferRenderTargetResource[i]) { gBackBufferRenderTargetResource[i]->Release(); gBackBufferRenderTargetResource[i] = nullptr; }
 }
 
 void WaitForLastSubmittedFrame()

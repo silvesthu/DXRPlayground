@@ -1,5 +1,5 @@
 #include "AccelerationStructure.h"
-#include "CommonInclude.h"
+#include "Common.h"
 
 static const char kShaderSource[] = R"(
 /***************************************************************************
@@ -29,8 +29,12 @@ static const char kShaderSource[] = R"(
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ***************************************************************************/
-RaytracingAccelerationStructure gRtScene : register(t0);
-RWTexture2D<float4> gOutput : register(u0);
+RaytracingAccelerationStructure RaytracingScene : register(t0);
+RWTexture2D<float4> RaytracingOutput : register(u0);
+cbuffer PerFrame : register(b0)
+{
+    float3 BackgroundColor;
+}
 
 float3 linearToSrgb(float3 c)
 {
@@ -67,15 +71,15 @@ void rayGen()
     ray.TMax = 100000;
 
     RayPayload payload;
-    TraceRay( gRtScene, 0 /*rayFlags*/, 0xFF, 0 /* ray index*/, 0, 0, ray, payload );
+    TraceRay( RaytracingScene, 0 /*rayFlags*/, 0xFF, 0 /* ray index*/, 0, 0, ray, payload );
     float3 col = linearToSrgb(payload.color);
-    gOutput[launchIndex.xy] = float4(col, 1);
+    RaytracingOutput[launchIndex.xy] = float4(col, 1);
 }
 
 [shader("miss")]
 void miss(inout RayPayload payload)
 {
-    payload.color = float3(0.4, 0.6, 0.2);
+    payload.color = BackgroundColor;
 }
 
 [shader("closesthit")]
@@ -149,7 +153,7 @@ struct RootSignatureDescriptor
 
 void GenerateRayGenLocalRootDesc(RootSignatureDescriptor & outDesc)
 {
-	// gOutput
+	// RaytracingOutput
 	D3D12_DESCRIPTOR_RANGE descriptor_range = {};
 	descriptor_range.BaseShaderRegister = 0;
 	descriptor_range.NumDescriptors = 1;
@@ -158,13 +162,37 @@ void GenerateRayGenLocalRootDesc(RootSignatureDescriptor & outDesc)
 	descriptor_range.OffsetInDescriptorsFromTableStart = 0;
 	outDesc.mDescriptorRanges.push_back(descriptor_range);
 
-	// gRtScene
+	// RaytracingScene
 	descriptor_range = {};
 	descriptor_range.BaseShaderRegister = 0;
 	descriptor_range.NumDescriptors = 1;
 	descriptor_range.RegisterSpace = 0;
 	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 	descriptor_range.OffsetInDescriptorsFromTableStart = 1;
+	outDesc.mDescriptorRanges.push_back(descriptor_range);
+
+	// Root Parameters
+	D3D12_ROOT_PARAMETER root_parameter = {};
+	root_parameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	root_parameter.DescriptorTable.NumDescriptorRanges = (UINT)outDesc.mDescriptorRanges.size();
+	root_parameter.DescriptorTable.pDescriptorRanges = outDesc.mDescriptorRanges.data();
+	outDesc.mRootParameters.push_back(root_parameter);
+
+	// Create the desc
+	outDesc.mDesc.NumParameters = (UINT)outDesc.mRootParameters.size();
+	outDesc.mDesc.pParameters = outDesc.mRootParameters.data();
+	outDesc.mDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
+}
+
+void GenerateMissClosestHitRootDesc(RootSignatureDescriptor& outDesc)
+{
+	// PerFrame
+	D3D12_DESCRIPTOR_RANGE descriptor_range = {};
+	descriptor_range.BaseShaderRegister = 0;
+	descriptor_range.NumDescriptors = 1;
+	descriptor_range.RegisterSpace = 0;
+	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+	descriptor_range.OffsetInDescriptorsFromTableStart = 2;
 	outDesc.mDescriptorRanges.push_back(descriptor_range);
 
 	// Root Parameters
@@ -344,7 +372,7 @@ void CreatePipelineState()
 
 	// 2 for the root-signature shared between miss and hit shaders
 	RootSignatureDescriptor miss_closest_hit_local_root_signature_desc;
-	miss_closest_hit_local_root_signature_desc.mDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
+	GenerateMissClosestHitRootDesc(miss_closest_hit_local_root_signature_desc);
 	LocalRootSignature miss_closest_hit_local_root_signature(miss_closest_hit_local_root_signature_desc.mDesc);
 	subobjects[index++] = miss_closest_hit_local_root_signature.mStateSubobject;
 
@@ -353,7 +381,7 @@ void CreatePipelineState()
 	subobjects[index++] = miss_closest_hit_association.mStateSubobject;
 
 	// 2 for shader config
-	ShaderConfig shader_config(sizeof(float) * 2, sizeof(float) * 3); // ???
+	ShaderConfig shader_config(sizeof(float) * 2, sizeof(float) * 3); // ???, see struct RayPayload
 	subobjects[index++] = shader_config.mStateSubobject;
 
 	const wchar_t* shader_exports[] = { kMissShader, kClosestHitShader, kRayGenShader }; // does order matter?

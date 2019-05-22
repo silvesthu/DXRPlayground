@@ -1,5 +1,5 @@
 #include "AccelerationStructure.h"
-#include "CommonInclude.h"
+#include "Common.h"
 
 void RayTrace(ID3D12Resource* inFrameRenderTargetResource)
 {
@@ -43,9 +43,11 @@ void RayTrace(ID3D12Resource* inFrameRenderTargetResource)
 	gD3DCommandList->SetComputeRootSignature(gDxrEmptyRootSignature);
 
 	// Dispatch
-	gD3DCommandList->SetDescriptorHeaps(1, &gDxrSrvUavHeap);
+	gD3DCommandList->SetDescriptorHeaps(1, &gDxrCbvSrvUavHeap);
 	gD3DCommandList->SetPipelineState1(gDxrStateObject);
 	gD3DCommandList->DispatchRays(&dispatch_rays_desc);
+
+	// [TODO] Should batch barrier together
 
 	// Output: UAV -> Copy
 	{
