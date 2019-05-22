@@ -103,19 +103,10 @@ int main(int, char**)
 		{
 			ImGui::Begin("DXR Playground");
 			{
+				ImGui::Text("Average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 				ImGui::ColorEdit3("Background Color", (float*)& gPerFrame.mBackgroundColor[0]);
 			}
 			ImGui::End();
-		}
-
-		// Customization - GUI
-		{
-			// Application Title
-			{
-				char buff[256];
-				snprintf(buff, sizeof(buff), "%s - Average %.3f ms/frame (%.1f FPS)", kApplicationTitle, 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-				SetWindowTextA(hwnd, buff);
-			}
 		}
 
 		// Rendering
@@ -163,9 +154,7 @@ int main(int, char**)
 				gD3DCommandList->OMSetRenderTargets(1, &frame_render_target_descriptor, FALSE, nullptr);
 				gD3DCommandList->SetDescriptorHeaps(1, &gD3DSrvDescHeap);
 
-				// Record
 				ImGui::Render();
-				// Draw (Create command)
 				ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), gD3DCommandList);
 			}
 
