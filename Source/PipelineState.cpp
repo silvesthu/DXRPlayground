@@ -85,6 +85,8 @@ void miss(inout RayPayload payload)
 [shader("closesthit")]
 void chs(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attribs)
 {
+	// BuiltInTriangleIntersectionAttributes: hit attributes for fixed-function triangle intersection
+
     float3 barycentrics = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y, attribs.barycentrics.x, attribs.barycentrics.y);
 
     const float3 A = float3(1, 0, 0);
@@ -280,6 +282,7 @@ struct HitGroup : public StateSubobjectHolder<D3D12_HIT_GROUP_DESC, D3D12_STATE_
 		mDesc.AnyHitShaderImport = inAnyHitShaderImport;
 		mDesc.ClosestHitShaderImport = inClosestHitShaderImport;
 		mDesc.HitGroupExport = inHitGroupExport;
+		mDesc.IntersectionShaderImport = nullptr; // not used
 	}
 };
 
@@ -380,16 +383,16 @@ void CreatePipelineState()
 	SubobjectToExportsAssociation miss_closest_hit_association(miss_closest_hit_export_names, ARRAYSIZE(miss_closest_hit_export_names), &(subobjects[index - 1]));
 	subobjects[index++] = miss_closest_hit_association.mStateSubobject;
 
-	// 2 for shader config
-	ShaderConfig shader_config(sizeof(float) * 2, sizeof(float) * 3); // ???, see struct RayPayload
+	// 2 for shader config - sizeof(BuiltInTriangleIntersectionAttributes) and depends on interaction type, sizeof(RayPayload) and is fully customized
+	ShaderConfig shader_config(sizeof(float) * 2, sizeof(float) * 3);
 	subobjects[index++] = shader_config.mStateSubobject;
 
-	const wchar_t* shader_exports[] = { kMissShader, kClosestHitShader, kRayGenShader }; // does order matter?
+	const wchar_t* shader_exports[] = { kMissShader, kClosestHitShader, kRayGenShader };
 	SubobjectToExportsAssociation shader_configassociation(shader_exports, ARRAYSIZE(shader_exports), &(subobjects[index - 1]));
 	subobjects[index++] = shader_configassociation.mStateSubobject;
 
-	// 1 for pipeline config
-	PipelineConfig pipeline_config(1); // ???
+	// 1 for pipeline config - MaxTraceRecursionDepth
+	PipelineConfig pipeline_config(1);
 	subobjects[index++] = pipeline_config.mStateSubobject;
 
 	// 1 for the global root signature

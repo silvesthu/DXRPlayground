@@ -577,6 +577,7 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
 
     if (g_D3DDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&g_PipelineState)) != S_OK)
         return false;
+	g_PipelineState->SetName(L"g_PipelineState");
 
     ImGui_ImplDX12_CreateFontsTexture();
 

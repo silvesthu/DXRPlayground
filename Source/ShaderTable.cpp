@@ -16,11 +16,23 @@ void CreateShaderTable()
 	{
 		// Calculate the size and create the buffer
 		gDxrShaderTableEntrySize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
-		gDxrShaderTableEntrySize += 8; // The ray-gen's descriptor table
-		gDxrShaderTableEntrySize = gAlignUp(gDxrShaderTableEntrySize, (uint64_t)D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
+
+		// For now, shader table between all ray tracing shader types, by adding offset when reference the table
+		// So it is necessary to align up to table size rather than record size
+		// Use the record size when there are multiple entries of same shader type
+
+		// All these references suggest that shader table should have space for local root signature
+		// https://github.com/NVIDIAGameWorks/DxrTutorials/blob/dcb8810086f80e77157a6a3b7deff2f24e0986d7/Tutorials/06-Raytrace/06-Raytrace.cpp#L734
+		// https://github.com/NVIDIAGameWorks/Falcor/blob/236927c2bca252f9ea1e3bacb982f8fcba817a67/Framework/Source/Experimental/Raytracing/RtProgramVars.cpp#L116
+		// p20 http://intro-to-dxr.cwyman.org/presentations/IntroDXR_RaytracingAPI.pdf
+		// I wonder why it is still working without them
+		// And not those information will be provided by state object? Or just an alternative way to do the same thing?
+
+		gDxrShaderTableEntrySize = gAlignUp(gDxrShaderTableEntrySize, (uint64_t)D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
+
 		uint64_t shaderTableSize = gDxrShaderTableEntrySize * 3;
 
-		// For simplicity, we create the shader-table on the upload heap. You can also create it on the default heap // ???
+		// For simplicity, we create the shader-table on the upload heap. You can also create it on the default heap
 		D3D12_HEAP_PROPERTIES heap_props;
 		heap_props.Type = D3D12_HEAP_TYPE_UPLOAD;
 		heap_props.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
@@ -47,27 +59,15 @@ void CreateShaderTable()
  
 	// Fill the table
 	{
-		// Map the buffer
+		// Map
 		uint8_t* data_pointer;
 		gValidate(gDxrShaderTable->Map(0, nullptr, (void**)& data_pointer));
 
 		ComPtr<ID3D12StateObjectProperties> state_object_properties;
 		gDxrStateObject->QueryInterface(IID_PPV_ARGS(&state_object_properties));
 
-		// Entry 0 - ray-gen program ID and descriptor data
 		memcpy(data_pointer + gDxrShaderTableEntrySize * 0, state_object_properties->GetShaderIdentifier(kRayGenShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-		
-		// ??? Necessary?
-		if (0)
-		{
-			uint64_t heapStart = gDxrCbvSrvUavHeap->GetGPUDescriptorHandleForHeapStart().ptr;
-			*(uint64_t*)(data_pointer + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES) = heapStart;
-		}
-
-		// Entry 1 - miss program
 		memcpy(data_pointer + gDxrShaderTableEntrySize * 1, state_object_properties->GetShaderIdentifier(kMissShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-
-		// Entry 2 - hit program
 		memcpy(data_pointer + gDxrShaderTableEntrySize * 2, state_object_properties->GetShaderIdentifier(kHitGroup), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 
 		// Unmap

@@ -6,7 +6,6 @@ UINT                    			gFrameIndex = 0;
 
 ID3D12Device5*						gD3DDevice = nullptr;
 ID3D12DescriptorHeap*				gD3DRtvDescHeap = nullptr;
-ID3D12DescriptorHeap*				gD3DSrvDescHeap = nullptr;
 ID3D12CommandQueue*					gD3DCommandQueue = nullptr;
 ID3D12GraphicsCommandList4*			gD3DCommandList = nullptr;
 ID3D12Fence*						gFence = nullptr;
@@ -17,9 +16,10 @@ HANDLE                       		gSwapChainWaitableObject = nullptr;
 ID3D12Resource*						gBackBufferRenderTargetResource[NUM_BACK_BUFFERS] = {};
 D3D12_CPU_DESCRIPTOR_HANDLE			gBackBufferRenderTargetDescriptor[NUM_BACK_BUFFERS] = {};
 
-// Customization - Data
-uint64_t							gFenceValue = 0; // ???
+// ImGui - Data
+ID3D12DescriptorHeap*				gImGuiSrvDescHeap = nullptr;
 
+// Customization - Data
 ID3D12Resource*						gDxrVertexBuffer = nullptr;
 ID3D12Resource*						gDxrBottomLevelAccelerationStructureScratch = nullptr;
 ID3D12Resource*						gDxrBottomLevelAccelerationStructureDest = nullptr;
@@ -35,4 +35,4 @@ ID3D12Resource*						gDxrOutputResource = nullptr;
 ID3D12Resource*						gDxrConstantBufferResource = nullptr;
 ID3D12DescriptorHeap*				gDxrCbvSrvUavHeap = nullptr;
 
-PerFrame							gPerFrame = {};
+PerFrame							gPerFrameConstantBuffer = {};

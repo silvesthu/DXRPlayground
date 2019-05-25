@@ -9,7 +9,7 @@ void CreateShaderResource()
 	// Create UAV resource
 	{
 		// Create the output resource. The dimensions and format should match the swap-chain
-		// As this resource is used to hold output and copy to back-buffer
+		// As this resource is used to hold output and to be copied to back-buffer
 		D3D12_RESOURCE_DESC resource_desc = {};
 		resource_desc.DepthOrArraySize = 1;
 		resource_desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
@@ -56,30 +56,29 @@ void CreateShaderResource()
 		gValidate(gD3DDevice->CreateCommittedResource(&heap_props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gDxrConstantBufferResource)));
 	}
 
-	// Create an CBV/SRV/UAV descriptor heap
+	// Create a descriptor heap
 	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
 	desc.NumDescriptors = 3;
 	desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	gValidate(gD3DDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&gDxrCbvSrvUavHeap)));
 
-	// Fill heap
+	// Fill the descriptor heap
 	{
 		D3D12_CPU_DESCRIPTOR_HANDLE handle = gDxrCbvSrvUavHeap->GetCPUDescriptorHandleForHeapStart();
 
 		{
-			// Create the UAV. Based on the root signature we created it should be the first entry
+			// Create the UAV. Referenced in GenerateRayGenLocalRootDesc()
 			D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
 			uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
 			gD3DDevice->CreateUnorderedAccessView(gDxrOutputResource, nullptr, &uavDesc, handle);
 		}
 
 		{
-			// Create the TLAS SRV right after the UAV. Note that we are using a different SRV desc here
+			// Create the SRV. Referenced in GenerateRayGenLocalRootDesc()
 			D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 			srvDesc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
 			srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-
 			srvDesc.RaytracingAccelerationStructure.Location = gDxrTopLevelAccelerationStructureDest->GetGPUVirtualAddress();
 			
 			handle.ptr += gD3DDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -87,7 +86,7 @@ void CreateShaderResource()
 		}
 
 		{
-			// Create the CBV.
+			// Create the CBV. Referenced in GenerateMissClosestHitRootDesc()
 			D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
 			cbvDesc.BufferLocation = gDxrConstantBufferResource->GetGPUVirtualAddress();
 			cbvDesc.SizeInBytes = gAlignUp((UINT)sizeof(PerFrame), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);

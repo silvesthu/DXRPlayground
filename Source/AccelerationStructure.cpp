@@ -52,7 +52,6 @@ void CreateBottomLevelAccelerationStructure()
 	geomDesc.Triangles.VertexCount = 3;
 	geomDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
 
-	// Get buffer sizes
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
 	inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
 	inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_NONE;
@@ -82,7 +81,6 @@ void CreateBottomLevelAccelerationStructure()
 		bufDesc.SampleDesc.Count = 1;
 		bufDesc.SampleDesc.Quality = 0;
 		bufDesc.Width = info.ScratchDataSizeInBytes;
-
 		gD3DDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&gDxrBottomLevelAccelerationStructureScratch));
 
 		bufDesc.Width = info.ResultDataMaxSizeInBytes;
@@ -145,7 +143,6 @@ void CreateTopLevelAccelerationStructure()
 		bufDesc.SampleDesc.Count = 1;
 		bufDesc.SampleDesc.Quality = 0;
 		bufDesc.Width = info.ScratchDataSizeInBytes;
-
 		gD3DDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&gDxrTopLevelAccelerationStructureScratch));
 
 		bufDesc.Width = info.ResultDataMaxSizeInBytes;
@@ -208,12 +205,15 @@ void CleanupTopLevelAccelerationStructure()
 
 void ExecuteAccelerationStructureCreation()
 {
+	// The tutorial doesn't have any resource lifetime management, so we flush and sync here. 
+	// This is not required by the DXR spec - you can submit the list whenever you like as long as you take care of the resources lifetime.
+
 	gD3DCommandList->Close();
 	gD3DCommandQueue->ExecuteCommandLists(1, (ID3D12CommandList * const*)& gD3DCommandList);
-	gFenceValue++;
-	gD3DCommandQueue->Signal(gFence, gFenceValue);
-	gFence->SetEventOnCompletion(gFenceValue, gFenceEvent);
+	uint64_t one_shot_fence_value = 0xff;
+	gD3DCommandQueue->Signal(gFence, one_shot_fence_value);
+	gFence->SetEventOnCompletion(one_shot_fence_value, gFenceEvent);
 	WaitForSingleObject(gFenceEvent, INFINITE);
 
-	// CommandList is closed
+	// Note that the CommandList is closed here, it will be reset at beginning of render loop
 }

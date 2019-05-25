@@ -25,6 +25,43 @@ FrameContext* WaitForNextFrameResources();
 void ResizeSwapChain(HWND hWnd, int width, int height);
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
+void CleanupApplication()
+{
+	CleanupShaderResource();
+	CleanupShaderTable();
+	CleanupPipelineState();
+
+	CleanupTopLevelAccelerationStructure();
+	CleanupBottomLevelAccelerationStructure();
+	CleanupVertexBuffer();
+}
+
+void UpdateDrawApplication()
+{
+	uint8_t* pData = nullptr;
+	gDxrConstantBufferResource->Map(0, nullptr, (void**)& pData);
+	memcpy(pData, &gPerFrameConstantBuffer, sizeof(gPerFrameConstantBuffer));
+	gDxrConstantBufferResource->Unmap(0, nullptr);
+}
+
+void DrawApplication(ID3D12Resource* frame_render_target_resource)
+{
+	RayTrace(frame_render_target_resource);
+}
+
+void CreateApplication()
+{
+	CreateVertexBuffer();
+	CreateBottomLevelAccelerationStructure();
+	CreateTopLevelAccelerationStructure();
+
+	ExecuteAccelerationStructureCreation();
+
+	CreatePipelineState();
+	CreateShaderResource();
+	CreateShaderTable();
+}
+
 // Main code
 int main(int, char**)
 {
@@ -40,21 +77,10 @@ int main(int, char**)
 		::UnregisterClass(wc.lpszClassName, wc.hInstance);
 		return 1;
 	}
+	CreateRenderTarget();
 
-	// Customization - Initialize
-	{
-		CreateVertexBuffer();
-		CreateBottomLevelAccelerationStructure();
-		CreateTopLevelAccelerationStructure();
-
-		// The tutorial doesn't have any resource lifetime management, so we flush and sync here. 
-		// This is not required by the DXR spec - you can submit the list whenever you like as long as you take care of the resources lifetime.
-		ExecuteAccelerationStructureCreation();
-
-		CreatePipelineState();
-		CreateShaderResource();
-		CreateShaderTable();
-	}
+	// Customization - Create
+	CreateApplication();
 
 	// Show the window
 	::ShowWindow(hwnd, SW_SHOWDEFAULT);
@@ -74,8 +100,8 @@ int main(int, char**)
 	ImGui_ImplWin32_Init(hwnd);
 	ImGui_ImplDX12_Init(gD3DDevice, NUM_FRAMES_IN_FLIGHT,
 		DXGI_FORMAT_R8G8B8A8_UNORM,
-		gD3DSrvDescHeap->GetCPUDescriptorHandleForHeapStart(),
-		gD3DSrvDescHeap->GetGPUDescriptorHandleForHeapStart());
+		gImGuiSrvDescHeap->GetCPUDescriptorHandleForHeapStart(),
+		gImGuiSrvDescHeap->GetGPUDescriptorHandleForHeapStart());
 
 	// Main loop
 	MSG msg;
@@ -104,26 +130,23 @@ int main(int, char**)
 			ImGui::Begin("DXR Playground");
 			{
 				ImGui::Text("Average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-				ImGui::ColorEdit3("Background Color", (float*)& gPerFrame.mBackgroundColor[0]);
+				ImGui::ColorEdit3("Background Color", (float*)& gPerFrameConstantBuffer.mBackgroundColor[0]);
 			}
 			ImGui::End();
 		}
 
 		// Rendering
 		{
-			// Wait
+			// Frame context
 			FrameContext* frameCtxt = WaitForNextFrameResources();
-
-			// Reset
-			frameCtxt->CommandAllocator->Reset();
-
-			// Frame data
 			uint32_t frame_index = gSwapChain->GetCurrentBackBufferIndex();
 			ID3D12Resource* frame_render_target_resource = gBackBufferRenderTargetResource[frame_index];
 			D3D12_CPU_DESCRIPTOR_HANDLE& frame_render_target_descriptor = gBackBufferRenderTargetDescriptor[frame_index];
 
 			// Frame begin
 			{
+				frameCtxt->CommandAllocator->Reset();
+
 				D3D12_RESOURCE_BARRIER barrier = {};
 				barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 				barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
@@ -136,23 +159,14 @@ int main(int, char**)
 				gD3DCommandList->ResourceBarrier(1, &barrier);
 			}
 
- 			// Customization - Update
-			{
-				uint8_t* pData = nullptr;
-				gDxrConstantBufferResource->Map(0, nullptr, (void**)& pData);
-				memcpy(pData, &gPerFrame, sizeof(gPerFrame));
-				gDxrConstantBufferResource->Unmap(0, nullptr);
-			}
-
-			// Customization - Draw
-			{
-				RayTrace(frame_render_target_resource);
-			}
+ 			// Customization
+			UpdateDrawApplication();
+			DrawApplication(frame_render_target_resource);
 
 			// Draw ImGui
 			{
 				gD3DCommandList->OMSetRenderTargets(1, &frame_render_target_descriptor, FALSE, nullptr);
-				gD3DCommandList->SetDescriptorHeaps(1, &gD3DSrvDescHeap);
+				gD3DCommandList->SetDescriptorHeaps(1, &gImGuiSrvDescHeap);
 
 				ImGui::Render();
 				ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), gD3DCommandList);
@@ -193,16 +207,9 @@ int main(int, char**)
 		ImGui::DestroyContext();
 
 		// Customization - Cleanup
-		{
-			CleanupShaderResource();
-			CleanupShaderTable();
-			CleanupPipelineState();
+		CleanupApplication();
 
-			CleanupTopLevelAccelerationStructure();
-			CleanupBottomLevelAccelerationStructure();
-			CleanupVertexBuffer();
-		}
-
+		CleanupRenderTarget();
 		CleanupDeviceD3D();
 		::DestroyWindow(hwnd);
 		::UnregisterClass(wc.lpszClassName, wc.hInstance);
@@ -282,7 +289,7 @@ bool CreateDeviceD3D(HWND hWnd)
 		desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 		desc.NumDescriptors = 1;
 		desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-		if (gD3DDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&gD3DSrvDescHeap)) != S_OK)
+		if (gD3DDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&gImGuiSrvDescHeap)) != S_OK)
 			return false;
 	}
 
@@ -318,20 +325,20 @@ bool CreateDeviceD3D(HWND hWnd)
 			dxgiFactory->CreateSwapChainForHwnd(gD3DCommandQueue, hWnd, &sd, nullptr, nullptr, &swapChain1) != S_OK ||
 			swapChain1->QueryInterface(IID_PPV_ARGS(&gSwapChain)) != S_OK)
 			return false;
+
+		dxgiFactory->MakeWindowAssociation(hWnd, DXGI_MWA_NO_ALT_ENTER);
+
 		swapChain1->Release();
 		dxgiFactory->Release();
 		gSwapChain->SetMaximumFrameLatency(NUM_BACK_BUFFERS);
 		gSwapChainWaitableObject = gSwapChain->GetFrameLatencyWaitableObject();
 	}
 
-	CreateRenderTarget();
 	return true;
 }
 
 void CleanupDeviceD3D()
 {
-	CleanupRenderTarget();
-
 	if (gSwapChain) { gSwapChain->Release(); gSwapChain = nullptr; }
 	if (gSwapChainWaitableObject != nullptr) { CloseHandle(gSwapChainWaitableObject); }
 	for (UINT i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
@@ -339,7 +346,7 @@ void CleanupDeviceD3D()
 	if (gD3DCommandQueue) { gD3DCommandQueue->Release(); gD3DCommandQueue = nullptr; }
 	if (gD3DCommandList) { gD3DCommandList->Release(); gD3DCommandList = nullptr; }
 	if (gD3DRtvDescHeap) { gD3DRtvDescHeap->Release(); gD3DRtvDescHeap = nullptr; }
-	if (gD3DSrvDescHeap) { gD3DSrvDescHeap->Release(); gD3DSrvDescHeap = nullptr; }
+	if (gImGuiSrvDescHeap) { gImGuiSrvDescHeap->Release(); gImGuiSrvDescHeap = nullptr; }
 	if (gFence) { gFence->Release(); gFence = nullptr; }
 	if (gFenceEvent) { CloseHandle(gFenceEvent); gFenceEvent = nullptr; }
 	if (gD3DDevice) { gD3DDevice->Release(); gD3DDevice = nullptr; }
@@ -365,10 +372,8 @@ void CreateRenderTarget()
 
 void CleanupRenderTarget()
 {
-	WaitForLastSubmittedFrame();
-
 	for (UINT i = 0; i < NUM_BACK_BUFFERS; i++)
-		if (gBackBufferRenderTargetResource[i]) { gBackBufferRenderTargetResource[i]->Release(); gBackBufferRenderTargetResource[i] = nullptr; }
+		gSafeRelease(gBackBufferRenderTargetResource[i]);
 }
 
 void WaitForLastSubmittedFrame()
@@ -447,11 +452,23 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	case WM_SIZE:
 		if (gD3DDevice != nullptr && wParam != SIZE_MINIMIZED)
 		{
-			ImGui_ImplDX12_InvalidateDeviceObjects();
-			CleanupRenderTarget();
-			ResizeSwapChain(hWnd, (UINT)LOWORD(lParam), (UINT)HIWORD(lParam));
-			CreateRenderTarget();
-			ImGui_ImplDX12_CreateDeviceObjects();
+			WaitForLastSubmittedFrame();
+
+			// Recreate window size dependent resources
+
+			// Application (may get size from swap chain size)
+			{
+				CleanupShaderResource();
+
+				// DXGI & D3D
+				{					
+					CleanupRenderTarget();
+					ResizeSwapChain(hWnd, (UINT)LOWORD(lParam), (UINT)HIWORD(lParam));
+					CreateRenderTarget();	
+				}
+
+				CreateShaderResource();
+			}
 		}
 		return 0;
 	case WM_SYSCOMMAND:

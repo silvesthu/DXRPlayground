@@ -23,26 +23,24 @@ enum
 struct FrameContext
 {
 	ID3D12CommandAllocator*					CommandAllocator;
-	UINT64									FenceValue;
+	uint64_t									FenceValue;
 };
 
 extern FrameContext							gFrameContext[];
-extern UINT									gFrameIndex;
+extern uint32_t								gFrameIndex;
 
 extern ID3D12Device5*						gD3DDevice;
 extern ID3D12DescriptorHeap* 				gD3DRtvDescHeap;
-extern ID3D12DescriptorHeap* 				gD3DSrvDescHeap;
+extern ID3D12DescriptorHeap* 				gImGuiSrvDescHeap;
 extern ID3D12CommandQueue* 					gD3DCommandQueue;
 extern ID3D12GraphicsCommandList4* 			gD3DCommandList;
 extern ID3D12Fence* 						gFence;
 extern HANDLE                       		gFenceEvent;
-extern UINT64                       		gFenceLastSignaledValue;
+extern uint64_t                       		gFenceLastSignaledValue;
 extern IDXGISwapChain3* 					gSwapChain;
 extern HANDLE                       		gSwapChainWaitableObject;
 extern ID3D12Resource*						gBackBufferRenderTargetResource[];
 extern D3D12_CPU_DESCRIPTOR_HANDLE			gBackBufferRenderTargetDescriptor[];
-
-extern uint64_t								gFenceValue;
 
 extern ID3D12Resource* 						gDxrVertexBuffer;
 extern ID3D12Resource* 						gDxrBottomLevelAccelerationStructureScratch;
@@ -63,13 +61,13 @@ struct PerFrame
 {
 	float mBackgroundColor[4] = { 0.4f, 0.6f, 0.2f, 1.0f };
 };
-extern PerFrame								gPerFrame;
+extern PerFrame								gPerFrameConstantBuffer;
 
 // String literals
-static const wchar_t*						kRayGenShader = L"rayGen";
-static const wchar_t*						kMissShader = L"miss";
-static const wchar_t*						kClosestHitShader = L"chs";
-static const wchar_t*						kHitGroup = L"HitGroup";
+static const wchar_t*						kRayGenShader		= L"rayGen";
+static const wchar_t*						kMissShader			= L"miss";
+static const wchar_t*						kClosestHitShader	= L"chs";
+static const wchar_t*						kHitGroup			= L"HitGroup";
 
 // Helper
 template <typename T>
