@@ -326,6 +326,7 @@ bool CreateDeviceD3D(HWND hWnd)
 			swapChain1->QueryInterface(IID_PPV_ARGS(&gSwapChain)) != S_OK)
 			return false;
 
+		// Fullscreen -> Windowed cause crash on resource reference in WM_SIZE handling, disable fullscreen for now
 		dxgiFactory->MakeWindowAssociation(hWnd, DXGI_MWA_NO_ALT_ENTER);
 
 		swapChain1->Release();
@@ -455,20 +456,17 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			WaitForLastSubmittedFrame();
 
 			// Recreate window size dependent resources
-
-			// Application (may get size from swap chain size)
-			{
-				CleanupShaderResource();
-
-				// DXGI & D3D
-				{					
-					CleanupRenderTarget();
-					ResizeSwapChain(hWnd, (UINT)LOWORD(lParam), (UINT)HIWORD(lParam));
-					CreateRenderTarget();	
-				}
-
-				CreateShaderResource();
-			}
+			CleanupShaderResource();	
+			CleanupRenderTarget();
+			// ImGui sample re-create swap chain and stop DXGI_MWA_NO_ALT_ENTER from working
+			gSwapChain->ResizeBuffers(
+				NUM_BACK_BUFFERS, 
+				gMax((UINT)LOWORD(lParam), 8u), 
+				gMax((UINT)HIWORD(lParam), 8u), 
+				DXGI_FORMAT_R8G8B8A8_UNORM, 
+				DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT);
+			CreateRenderTarget();	
+			CreateShaderResource();
 		}
 		return 0;
 	case WM_SYSCOMMAND:

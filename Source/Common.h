@@ -96,3 +96,15 @@ inline T gAlignUp(T inValue, T inAlignment)
 {
 	return (((inValue + inAlignment - 1) / inAlignment) * inAlignment);
 }
+
+template <typename T>
+inline T gMin(T inLhs, T inRhs)
+{
+	return inLhs < inRhs ? inLhs : inRhs;
+}
+
+template <typename T>
+inline T gMax(T inLhs, T inRhs)
+{
+	return inLhs > inRhs ? inLhs : inRhs;
+}
