@@ -34,5 +34,6 @@ uint64_t							gDxrShaderTableEntrySize = 0;
 ID3D12Resource*						gDxrOutputResource = nullptr;
 ID3D12Resource*						gDxrConstantBufferResource = nullptr;
 ID3D12DescriptorHeap*				gDxrCbvSrvUavHeap = nullptr;
+ID3D12Resource*						gDxrHitConstantBufferResource = nullptr;
 
 PerFrame							gPerFrameConstantBuffer = {};

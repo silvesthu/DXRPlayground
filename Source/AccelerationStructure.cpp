@@ -29,7 +29,8 @@ void CreateVertexBuffer()
 	props.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
 	props.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
 
-	gD3DDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gDxrVertexBuffer));
+	gValidate(gD3DDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gDxrVertexBuffer)));
+	gDxrVertexBuffer->SetName(L"gDxrVertexBuffer");
 
 	uint8_t* pData = nullptr;
 	gDxrVertexBuffer->Map(0, nullptr, (void**)& pData);
@@ -81,10 +82,12 @@ void CreateBottomLevelAccelerationStructure()
 		bufDesc.SampleDesc.Count = 1;
 		bufDesc.SampleDesc.Quality = 0;
 		bufDesc.Width = info.ScratchDataSizeInBytes;
-		gD3DDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&gDxrBottomLevelAccelerationStructureScratch));
+		gValidate(gD3DDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&gDxrBottomLevelAccelerationStructureScratch)));
+		gDxrBottomLevelAccelerationStructureScratch->SetName(L"gDxrBottomLevelAccelerationStructureScratch");
 
 		bufDesc.Width = info.ResultDataMaxSizeInBytes;
-		gD3DDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, nullptr, IID_PPV_ARGS(&gDxrBottomLevelAccelerationStructureDest));
+		gValidate(gD3DDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, nullptr, IID_PPV_ARGS(&gDxrBottomLevelAccelerationStructureDest)));
+		gDxrBottomLevelAccelerationStructureDest->SetName(L"gDxrBottomLevelAccelerationStructureDest");
 	}
 
 	// Create the bottom level acceleration structure
@@ -114,11 +117,13 @@ void CleanupBottomLevelAccelerationStructure()
 
 void CreateTopLevelAccelerationStructure()
 {
+	uint32_t instance_count = 3;
+
 	// Get buffer sizes
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
 	inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
 	inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_NONE;
-	inputs.NumDescs = 1;
+	inputs.NumDescs = instance_count;
 	inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
 
 	// Create the buffers
@@ -143,34 +148,34 @@ void CreateTopLevelAccelerationStructure()
 		bufDesc.SampleDesc.Count = 1;
 		bufDesc.SampleDesc.Quality = 0;
 		bufDesc.Width = info.ScratchDataSizeInBytes;
-		gD3DDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&gDxrTopLevelAccelerationStructureScratch));
+		gValidate(gD3DDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&gDxrTopLevelAccelerationStructureScratch)));
+		gDxrTopLevelAccelerationStructureScratch->SetName(L"gDxrTopLevelAccelerationStructureScratch");
 
 		bufDesc.Width = info.ResultDataMaxSizeInBytes;
-		gD3DDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, nullptr, IID_PPV_ARGS(&gDxrTopLevelAccelerationStructureDest));
+		gValidate(gD3DDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, nullptr, IID_PPV_ARGS(&gDxrTopLevelAccelerationStructureDest)));
+		gDxrTopLevelAccelerationStructureDest->SetName(L"gDxrTopLevelAccelerationStructureDest");
 
 		props.Type = D3D12_HEAP_TYPE_UPLOAD;
 		bufDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-		bufDesc.Width = sizeof(D3D12_RAYTRACING_INSTANCE_DESC);
-		gD3DDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gDxrTopLevelAccelerationStructureInstanceDesc));
+		bufDesc.Width = sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instance_count;
+		gValidate(gD3DDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gDxrTopLevelAccelerationStructureInstanceDesc)));
+		gDxrTopLevelAccelerationStructureInstanceDesc->SetName(L"gDxrTopLevelAccelerationStructureInstanceDesc");
 
-		// The instance desc should be inside a buffer, create and map the buffer
-		D3D12_RAYTRACING_INSTANCE_DESC* pInstanceDesc;
-		gDxrTopLevelAccelerationStructureInstanceDesc->Map(0, nullptr, (void**)& pInstanceDesc);
-
-		// Initialize the instance desc. We only have a single instance
-		pInstanceDesc->InstanceID = 0;                            // This value will be exposed to the shader via InstanceID()
-		pInstanceDesc->InstanceContributionToHitGroupIndex = 0;   // This is the offset inside the shader-table. We only have a single geometry, so the offset 0
-		pInstanceDesc->Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
-		float m[] =
+ 		// The instance desc should be inside a buffer, create and map the buffer
+ 		D3D12_RAYTRACING_INSTANCE_DESC* pInstanceDesc;
+ 		gDxrTopLevelAccelerationStructureInstanceDesc->Map(0, nullptr, (void**)& pInstanceDesc);
+ 
+		for (uint32_t i = 0; i < instance_count; i++)
 		{
-			1,0,0,0,
-			0,1,0,0,
-			0,0,1,0,
-			0,0,0,1,
-		}; // Identity matrix
-		memcpy(pInstanceDesc->Transform, &m, sizeof(pInstanceDesc->Transform));
-		pInstanceDesc->AccelerationStructure = gDxrBottomLevelAccelerationStructureDest->GetGPUVirtualAddress();
-		pInstanceDesc->InstanceMask = 0xFF;
+			pInstanceDesc[i].InstanceID = i;                            // This value will be exposed to the shader via InstanceID()
+			pInstanceDesc[i].InstanceContributionToHitGroupIndex = 0;   // This is the offset inside the shader-table. We only have a single geometry, so the offset 0
+			pInstanceDesc[i].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
+			glm::mat4 transform = glm::translate(glm::mat4(1.0f), glm::vec3(-2.0f + 2.0f * i, 0.f, 0.f)); // Instances in a line
+			transform = glm::transpose(transform); // Column-major => Row-major
+			memcpy(pInstanceDesc[i].Transform, &transform, sizeof(pInstanceDesc[i].Transform));
+			pInstanceDesc[i].AccelerationStructure = gDxrBottomLevelAccelerationStructureDest->GetGPUVirtualAddress();
+			pInstanceDesc[i].InstanceMask = 0xFF;
+		}
 
 		// Unmap
 		gDxrTopLevelAccelerationStructureInstanceDesc->Unmap(0, nullptr);

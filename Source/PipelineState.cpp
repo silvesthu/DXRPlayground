@@ -36,6 +36,13 @@ cbuffer PerFrame : register(b0)
     float3 BackgroundColor;
 }
 
+cbuffer PerScene : register(b1)
+{
+    float3 A[3];
+    float3 B[3];
+    float3 C[3];
+}
+
 float3 linearToSrgb(float3 c)
 {
     // Based on http://chilliant.blogspot.com/2012/08/srgb-approximations-for-hlsl.html
@@ -87,13 +94,9 @@ void chs(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr
 {
 	// BuiltInTriangleIntersectionAttributes: hit attributes for fixed-function triangle intersection
 
+	uint instanceID = InstanceID();
     float3 barycentrics = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y, attribs.barycentrics.x, attribs.barycentrics.y);
-
-    const float3 A = float3(1, 0, 0);
-    const float3 B = float3(0, 1, 0);
-    const float3 C = float3(0, 0, 1);
-
-    payload.color = A * barycentrics.x + B * barycentrics.y + C * barycentrics.z;
+	payload.color = A[instanceID] * barycentrics.x + B[instanceID] * barycentrics.y + C[instanceID] * barycentrics.z;
 }
 )";
 
@@ -155,7 +158,7 @@ struct RootSignatureDescriptor
 
 void GenerateRayGenLocalRootDesc(RootSignatureDescriptor & outDesc)
 {
-	// RaytracingOutput
+	// RaytracingOutput - DescriptorRange
 	D3D12_DESCRIPTOR_RANGE descriptor_range = {};
 	descriptor_range.BaseShaderRegister = 0;
 	descriptor_range.NumDescriptors = 1;
@@ -164,7 +167,7 @@ void GenerateRayGenLocalRootDesc(RootSignatureDescriptor & outDesc)
 	descriptor_range.OffsetInDescriptorsFromTableStart = 0;
 	outDesc.mDescriptorRanges.push_back(descriptor_range);
 
-	// RaytracingScene
+	// RaytracingScene - DescriptorRange
 	descriptor_range = {};
 	descriptor_range.BaseShaderRegister = 0;
 	descriptor_range.NumDescriptors = 1;
@@ -173,22 +176,22 @@ void GenerateRayGenLocalRootDesc(RootSignatureDescriptor & outDesc)
 	descriptor_range.OffsetInDescriptorsFromTableStart = 1;
 	outDesc.mDescriptorRanges.push_back(descriptor_range);
 
-	// Root Parameters
+	// RootDescriptor contains entry of DescriptorTable, DescriptorRange within
 	D3D12_ROOT_PARAMETER root_parameter = {};
 	root_parameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	root_parameter.DescriptorTable.NumDescriptorRanges = (UINT)outDesc.mDescriptorRanges.size();
 	root_parameter.DescriptorTable.pDescriptorRanges = outDesc.mDescriptorRanges.data();
 	outDesc.mRootParameters.push_back(root_parameter);
 
-	// Create the desc
+	// Create the RootDescriptor
 	outDesc.mDesc.NumParameters = (UINT)outDesc.mRootParameters.size();
 	outDesc.mDesc.pParameters = outDesc.mRootParameters.data();
 	outDesc.mDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
 }
 
-void GenerateMissClosestHitRootDesc(RootSignatureDescriptor& outDesc)
+void GenerateMissRootDesc(RootSignatureDescriptor& outDesc)
 {
-	// PerFrame
+	// PerFrame - DescriptorRange
 	D3D12_DESCRIPTOR_RANGE descriptor_range = {};
 	descriptor_range.BaseShaderRegister = 0;
 	descriptor_range.NumDescriptors = 1;
@@ -197,14 +200,29 @@ void GenerateMissClosestHitRootDesc(RootSignatureDescriptor& outDesc)
 	descriptor_range.OffsetInDescriptorsFromTableStart = 2;
 	outDesc.mDescriptorRanges.push_back(descriptor_range);
 
-	// Root Parameters
+	// RootDescriptor contains entry of DescriptorTable, DescriptorRange within
 	D3D12_ROOT_PARAMETER root_parameter = {};
 	root_parameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	root_parameter.DescriptorTable.NumDescriptorRanges = (UINT)outDesc.mDescriptorRanges.size();
 	root_parameter.DescriptorTable.pDescriptorRanges = outDesc.mDescriptorRanges.data();
 	outDesc.mRootParameters.push_back(root_parameter);
 
-	// Create the desc
+	// Create the RootDescriptor
+	outDesc.mDesc.NumParameters = (UINT)outDesc.mRootParameters.size();
+	outDesc.mDesc.pParameters = outDesc.mRootParameters.data();
+	outDesc.mDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
+}
+
+void GenerateHitRootDesc(RootSignatureDescriptor& outDesc)
+{
+	// PerScene - Descriptor - RootDescriptor contains descriptor directly
+	D3D12_ROOT_PARAMETER root_parameter = {};
+	root_parameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	root_parameter.Descriptor.ShaderRegister = 1;
+	root_parameter.Descriptor.RegisterSpace = 0;
+	outDesc.mRootParameters.push_back(root_parameter);
+
+	// Create the RootDescriptor
 	outDesc.mDesc.NumParameters = (UINT)outDesc.mRootParameters.size();
 	outDesc.mDesc.pParameters = outDesc.mRootParameters.data();
 	outDesc.mDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
@@ -344,15 +362,16 @@ void CreatePipelineState()
 	// See D3D12_STATE_SUBOBJECT_TYPE
 	// Notice all pointers should be valid until CreateStateObject
 
-	// Need 10 subobjects:
+	// Subobjects:
 	//  1 for the DXIL library
 	//  1 for hit-group
-	//  2 for RayGen root-signature (root-signature and the subobject association)
-	//  2 for the root-signature shared between miss and hit shaders (signature and association)
+	//  2 for RayGen root-signature (signature and association)
+	//  2 for Miss root-signature (signature and association)
+	//  2 for Hit root-signature (signature and association)
 	//  2 for shader config (shared between all programs. 1 for the config, 1 for association)
 	//  1 for pipeline config
 	//  1 for the global root signature
-	std::array<D3D12_STATE_SUBOBJECT, 10> subobjects;
+	std::array<D3D12_STATE_SUBOBJECT, 12> subobjects;
 	uint32_t index = 0;
 
 	// 1 for the DXIL library
@@ -373,15 +392,23 @@ void CreatePipelineState()
 	SubobjectToExportsAssociation ray_gen_association(&kRayGenShader, 1, &(subobjects[index - 1]));
 	subobjects[index++] = ray_gen_association.mStateSubobject;
 
-	// 2 for the root-signature shared between miss and hit shaders
-	RootSignatureDescriptor miss_closest_hit_local_root_signature_desc;
-	GenerateMissClosestHitRootDesc(miss_closest_hit_local_root_signature_desc);
-	LocalRootSignature miss_closest_hit_local_root_signature(miss_closest_hit_local_root_signature_desc.mDesc);
-	subobjects[index++] = miss_closest_hit_local_root_signature.mStateSubobject;
+	// 2 for Miss root-signature
+	RootSignatureDescriptor miss_local_root_signature_desc;
+	GenerateMissRootDesc(miss_local_root_signature_desc);
+	LocalRootSignature miss_local_root_signature(miss_local_root_signature_desc.mDesc);
+	subobjects[index++] = miss_local_root_signature.mStateSubobject;
 
-	const wchar_t* miss_closest_hit_export_names[] = { kMissShader, kClosestHitShader };
-	SubobjectToExportsAssociation miss_closest_hit_association(miss_closest_hit_export_names, ARRAYSIZE(miss_closest_hit_export_names), &(subobjects[index - 1]));
-	subobjects[index++] = miss_closest_hit_association.mStateSubobject;
+	SubobjectToExportsAssociation miss_association(&kMissShader, 1, &(subobjects[index - 1]));
+	subobjects[index++] = miss_association.mStateSubobject;
+
+	// 2 for Hit root-signature
+	RootSignatureDescriptor hit_local_root_signature_desc;
+	GenerateHitRootDesc(hit_local_root_signature_desc);
+	LocalRootSignature hit_local_root_signature(hit_local_root_signature_desc.mDesc);
+	subobjects[index++] = hit_local_root_signature.mStateSubobject;
+
+	SubobjectToExportsAssociation hit_association(&kClosestHitShader, 1, &(subobjects[index - 1]));
+	subobjects[index++] = hit_association.mStateSubobject;
 
 	// 2 for shader config - sizeof(BuiltInTriangleIntersectionAttributes) and depends on interaction type, sizeof(RayPayload) and is fully customized
 	ShaderConfig shader_config(sizeof(float) * 2, sizeof(float) * 3);

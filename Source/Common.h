@@ -14,6 +14,8 @@ using Microsoft::WRL::ComPtr;
 #include <array>
 #include <vector>
 
+#include "Thirdparty/glm/glm/gtx/transform.hpp"
+
 enum 
 {
 	NUM_FRAMES_IN_FLIGHT = 3,
@@ -56,6 +58,7 @@ extern uint64_t								gDxrShaderTableEntrySize;
 extern ID3D12Resource*						gDxrOutputResource;
 extern ID3D12Resource*						gDxrConstantBufferResource;
 extern ID3D12DescriptorHeap*				gDxrCbvSrvUavHeap;
+extern ID3D12Resource*						gDxrHitConstantBufferResource;
 
 struct PerFrame
 {
