@@ -90,7 +90,7 @@ void miss(inout RayPayload payload)
 }
 
 [shader("closesthit")]
-void chs(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attribs)
+void triangleHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attribs)
 {
 	// BuiltInTriangleIntersectionAttributes: hit attributes for fixed-function triangle intersection
 
@@ -98,6 +98,13 @@ void chs(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr
     float3 barycentrics = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y, attribs.barycentrics.x, attribs.barycentrics.y);
 	payload.color = A[instanceID] * barycentrics.x + B[instanceID] * barycentrics.y + C[instanceID] * barycentrics.z;
 }
+
+[shader("closesthit")]
+void planeHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attribs)
+{
+	payload.color = 0.18;
+}
+
 )";
 
 IDxcBlob* CompileShader(const wchar_t* inName, const char* inSource, uint32_t inSize)
@@ -360,74 +367,89 @@ struct GlobalRootSignature : public StateSubobjectHolder<ID3D12RootSignature*, D
 void CreatePipelineState()
 {
 	// See D3D12_STATE_SUBOBJECT_TYPE
-	// Notice all pointers should be valid until CreateStateObject
-
+	// Note that all pointers should be valid until CreateStateObject
+	
 	// Subobjects:
-	//  1 for the DXIL library
-	//  1 for hit-group
-	//  2 for RayGen root-signature (signature and association)
-	//  2 for Miss root-signature (signature and association)
-	//  2 for Hit root-signature (signature and association)
-	//  2 for shader config (shared between all programs. 1 for the config, 1 for association)
-	//  1 for pipeline config
-	//  1 for the global root signature
-	std::array<D3D12_STATE_SUBOBJECT, 12> subobjects;
+	//  DXIL library
+	//  Hit group
+	//  Local root signature and association for each shader
+	//  Shader config and association
+	//  Pipeline config
+	//  Global root signature
+
+	// When add new shader:
+	//  DXIL library (for shader binary)
+	//  Hit group
+	//  Local root signature and association
+	//  Shader config
+
+	std::array<D3D12_STATE_SUBOBJECT, 15> subobjects;
 	uint32_t index = 0;
 
-	// 1 for the DXIL library
-	const wchar_t* entry_points[] = { kRayGenShader, kMissShader, kClosestHitShader };
+	// DXIL library
+	const wchar_t* entry_points[] = { kRayGenShader, kMissShader, kTriangleHitShader, kPlaneHitShader };
 	DXILLibrary dxilLibrary(CompileShader(L"Shader", kShaderSource, ARRAYSIZE(kShaderSource)), entry_points, ARRAYSIZE(entry_points));
 	subobjects[index++] = dxilLibrary.mStateSubobject;
 
-	// 1 for hit-group
-	HitGroup hit_group(nullptr, kClosestHitShader, kHitGroup);
-	subobjects[index++] = hit_group.mStateSubobject;
+	// Hit group
+	HitGroup triangle_hit_group(nullptr, kTriangleHitShader, kTriangleHitGroup);
+	subobjects[index++] = triangle_hit_group.mStateSubobject;
+ 	HitGroup plane_hit_group(nullptr, kPlaneHitShader, kPlaneHitGroup);
+ 	subobjects[index++] = plane_hit_group.mStateSubobject;
 
-	// 2 for RayGen root-signature
+	// Local root signatures and association
+	// Ray-gen shader
 	RootSignatureDescriptor ray_gen_local_root_signature_desc;
 	GenerateRayGenLocalRootDesc(ray_gen_local_root_signature_desc);
 	LocalRootSignature ray_gen_local_root_signature(ray_gen_local_root_signature_desc.mDesc);
 	subobjects[index++] = ray_gen_local_root_signature.mStateSubobject;
-
 	SubobjectToExportsAssociation ray_gen_association(&kRayGenShader, 1, &(subobjects[index - 1]));
 	subobjects[index++] = ray_gen_association.mStateSubobject;
 
-	// 2 for Miss root-signature
+	// Miss shader
 	RootSignatureDescriptor miss_local_root_signature_desc;
 	GenerateMissRootDesc(miss_local_root_signature_desc);
 	LocalRootSignature miss_local_root_signature(miss_local_root_signature_desc.mDesc);
 	subobjects[index++] = miss_local_root_signature.mStateSubobject;
-
 	SubobjectToExportsAssociation miss_association(&kMissShader, 1, &(subobjects[index - 1]));
 	subobjects[index++] = miss_association.mStateSubobject;
 
-	// 2 for Hit root-signature
-	RootSignatureDescriptor hit_local_root_signature_desc;
-	GenerateHitRootDesc(hit_local_root_signature_desc);
-	LocalRootSignature hit_local_root_signature(hit_local_root_signature_desc.mDesc);
-	subobjects[index++] = hit_local_root_signature.mStateSubobject;
+	// Triangle hit shader
+	RootSignatureDescriptor triangle_hit_local_root_signature_desc;
+	GenerateHitRootDesc(triangle_hit_local_root_signature_desc);
+	LocalRootSignature triangle_hit_local_root_signature(triangle_hit_local_root_signature_desc.mDesc);
+	subobjects[index++] = triangle_hit_local_root_signature.mStateSubobject;
+	SubobjectToExportsAssociation triangle_hit_association(&kTriangleHitShader, 1, &(subobjects[index - 1]));
+	subobjects[index++] = triangle_hit_association.mStateSubobject;
 
-	SubobjectToExportsAssociation hit_association(&kClosestHitShader, 1, &(subobjects[index - 1]));
-	subobjects[index++] = hit_association.mStateSubobject;
+	// Plane hit shader
+	RootSignatureDescriptor plane_hit_local_root_signature_desc;
+	GenerateHitRootDesc(plane_hit_local_root_signature_desc);
+	LocalRootSignature plane_hit_local_root_signature(plane_hit_local_root_signature_desc.mDesc);
+	subobjects[index++] = plane_hit_local_root_signature.mStateSubobject;
+	SubobjectToExportsAssociation plane_hit_association(&kPlaneHitShader, 1, &(subobjects[index - 1]));
+	subobjects[index++] = plane_hit_association.mStateSubobject;
 
-	// 2 for shader config - sizeof(BuiltInTriangleIntersectionAttributes) and depends on interaction type, sizeof(RayPayload) and is fully customized
+	// Shader config
+	//  sizeof(BuiltInTriangleIntersectionAttributes), depends on interaction type
+	//  sizeof(RayPayload), fully customized
 	ShaderConfig shader_config(sizeof(float) * 2, sizeof(float) * 3);
 	subobjects[index++] = shader_config.mStateSubobject;
-
-	const wchar_t* shader_exports[] = { kMissShader, kClosestHitShader, kRayGenShader };
+	const wchar_t* shader_exports[] = { kMissShader, kTriangleHitShader, kRayGenShader, kPlaneHitShader };
 	SubobjectToExportsAssociation shader_configassociation(shader_exports, ARRAYSIZE(shader_exports), &(subobjects[index - 1]));
 	subobjects[index++] = shader_configassociation.mStateSubobject;
 
-	// 1 for pipeline config - MaxTraceRecursionDepth
+	// Pipeline config
+	//  MaxTraceRecursionDepth
 	PipelineConfig pipeline_config(1);
 	subobjects[index++] = pipeline_config.mStateSubobject;
 
-	// 1 for the global root signature
+	// Global root signature
 	GlobalRootSignature global_root_signature({});
 	gDxrEmptyRootSignature = global_root_signature.mRootSignature.Get();
 	subobjects[index++] = global_root_signature.mStateSubobject;
 
-	// Create the state
+	// Create the state object
 	D3D12_STATE_OBJECT_DESC desc;
 	desc.NumSubobjects = (UINT)subobjects.size();
 	desc.pSubobjects = subobjects.data();
@@ -435,7 +457,7 @@ void CreatePipelineState()
 
 	// Most validation occurs here
 	// Be sure use correct dll for dxc compiler
-	// e.g. Error "Hash check failed for DXILibrary.pShaderBytecode" appears when dxil.dll is missing.
+	// e.g. Error "Hash check failed for DXILibrary.pShaderBytecode" appears when dxil.dll is missing
 	gValidate(gD3DDevice->CreateStateObject(&desc, IID_PPV_ARGS(&gDxrStateObject)));
 }
 

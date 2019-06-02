@@ -1,27 +1,65 @@
 #include "AccelerationStructure.h"
 #include "Common.h"
 
+struct ShaderIdentifier
+{
+	uint8_t identifier[32];
+};
+
+struct ShaderTableEntry
+{
+	ShaderIdentifier mShaderIdentifier;
+
+	struct HitShaderLocalRootArguments
+	{
+		D3D12_GPU_VIRTUAL_ADDRESS mConstantBufferAddress;
+	};
+	union
+	{
+		// Any information that LocalRootSignature can reference
+
+		HitShaderLocalRootArguments mHitShaderLocalRootArguments = {};
+	};
+
+	uint8_t mPadding[24] = {};
+};
+static_assert(sizeof(ShaderTableEntry::mShaderIdentifier) == D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES, "D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES check failed");
+static_assert(sizeof(ShaderTableEntry) == D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT, "D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT check failed");
+
 void CreateShaderTable()
 {
-	/** The shader-table layout is as follows:
-        Entry 0 - Ray-gen program
-        Entry 1 - Miss program
-        Entry 2 - Hit program
-        All entries in the shader-table must have the same size, so we will choose it base on the largest required entry.
-        The ray-gen program requires the largest entry - sizeof(program identifier) + 8 bytes for a descriptor-table.
-        The entry size must be aligned up to D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT
-    */
+	// Construct the table
+	ShaderTableEntry shader_table_entries[4];
+	{
+		// Shader table between all ray tracing shader types, by adding offset when reference the table
+		// So it is necessary to align up to table size rather than record size (entry size)
+
+		// Local root argument may be embedded along with shader identifier
+		// https://github.com/NVIDIAGameWorks/DxrTutorials/blob/dcb8810086f80e77157a6a3b7deff2f24e0986d7/Tutorials/06-Raytrace/06-Raytrace.cpp#L734
+		// https://github.com/NVIDIAGameWorks/Falcor/blob/236927c2bca252f9ea1e3bacb982f8fcba817a67/Framework/Source/Experimental/Raytracing/RtProgramVars.cpp#L116
+		// p20 http://intro-to-dxr.cwyman.org/presentations/IntroDXR_RaytracingAPI.pdf
+		// http://intro-to-dxr.cwyman.org/spec/DXR_FunctionalSpec_v0.09.docx
+
+		// Signature -> DescriptorHeap
+		// * Global - SetDescriptorHeaps() - D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE
+		// * Per Shader -  SetDescriptorHeaps() - D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE
+		// * Per Shader Instance - Shader Table (DescriptorHeap or raw address) - D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE
+
+		ComPtr<ID3D12StateObjectProperties> state_object_properties;
+		gDxrStateObject->QueryInterface(IID_PPV_ARGS(&state_object_properties));
+
+		memcpy(&shader_table_entries[0].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kRayGenShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+		memcpy(&shader_table_entries[1].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kMissShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+		memcpy(&shader_table_entries[2].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kTriangleHitGroup), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+		shader_table_entries[2].mHitShaderLocalRootArguments.mConstantBufferAddress = gDxrHitConstantBufferResource->GetGPUVirtualAddress();
+		memcpy(&shader_table_entries[3].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kPlaneHitGroup), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+		shader_table_entries[3].mHitShaderLocalRootArguments.mConstantBufferAddress = gDxrHitConstantBufferResource->GetGPUVirtualAddress();
+	}
 
 	// Create the table
 	{
 		// Calculate the size and create the buffer
-		gDxrShaderTableEntrySize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
-
-		gDxrShaderTableEntrySize += sizeof(D3D12_GPU_VIRTUAL_ADDRESS); // depends on local root argument
-
-		gDxrShaderTableEntrySize = gAlignUp(gDxrShaderTableEntrySize, (uint64_t)D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
-
-		uint64_t shaderTableSize = gDxrShaderTableEntrySize * 3;
+		gDxrShaderTableEntrySize = sizeof(ShaderTableEntry);
 
 		// For simplicity, we create the shader-table on the upload heap. You can also create it on the default heap
 		D3D12_HEAP_PROPERTIES heap_props;
@@ -43,43 +81,20 @@ void CreateShaderTable()
 		bufDesc.MipLevels = 1;
 		bufDesc.SampleDesc.Count = 1;
 		bufDesc.SampleDesc.Quality = 0;
-		bufDesc.Width = shaderTableSize;
+		bufDesc.Width = sizeof(shader_table_entries);
 
 		gValidate(gD3DDevice->CreateCommittedResource(&heap_props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gDxrShaderTable)));
 		gDxrShaderTable->SetName(L"gDxrShaderTable");
 	}
  
-	// Fill the table
+	// Copy the table
 	{
-		// For now, shader table between all ray tracing shader types, by adding offset when reference the table
-		// So it is necessary to align up to table size rather than record size
-		// Use the record size when there are multiple entries of same shader type
-
-		// Local root argument may be embedded along with shader identifier
-		// https://github.com/NVIDIAGameWorks/DxrTutorials/blob/dcb8810086f80e77157a6a3b7deff2f24e0986d7/Tutorials/06-Raytrace/06-Raytrace.cpp#L734
-		// https://github.com/NVIDIAGameWorks/Falcor/blob/236927c2bca252f9ea1e3bacb982f8fcba817a67/Framework/Source/Experimental/Raytracing/RtProgramVars.cpp#L116
-		// p20 http://intro-to-dxr.cwyman.org/presentations/IntroDXR_RaytracingAPI.pdf
-		// http://intro-to-dxr.cwyman.org/spec/DXR_FunctionalSpec_v0.09.docx
-
-		// Signature -> DescriptorHeap
-		// * Global - SetDescriptorHeaps() - D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE
-		// * Per Shader -  SetDescriptorHeaps() - D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE
-		// * Per Shader Instance - Shader Table (DescriptorHeap or raw data) - D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE
-
 		// Map
 		uint8_t* data_pointer;
 		gValidate(gDxrShaderTable->Map(0, nullptr, (void**)& data_pointer));
 
-		ComPtr<ID3D12StateObjectProperties> state_object_properties;
-		gDxrStateObject->QueryInterface(IID_PPV_ARGS(&state_object_properties));
-
-		memcpy(data_pointer + gDxrShaderTableEntrySize * 0, state_object_properties->GetShaderIdentifier(kRayGenShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-
-		memcpy(data_pointer + gDxrShaderTableEntrySize * 1, state_object_properties->GetShaderIdentifier(kMissShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-
-		memcpy(data_pointer + gDxrShaderTableEntrySize * 2, state_object_properties->GetShaderIdentifier(kHitGroup), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-		D3D12_GPU_VIRTUAL_ADDRESS constant_buffer_gpu_virtual_address = gDxrHitConstantBufferResource->GetGPUVirtualAddress();
-		memcpy(data_pointer + gDxrShaderTableEntrySize * 2 + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES, &constant_buffer_gpu_virtual_address, sizeof(D3D12_GPU_VIRTUAL_ADDRESS));
+		// Copy
+		memcpy(data_pointer, shader_table_entries, sizeof(shader_table_entries));
 
 		// Unmap
 		gDxrShaderTable->Unmap(0, nullptr);

@@ -127,5 +127,7 @@ extern PerFrame								gPerFrameConstantBuffer;
 // String literals
 static const wchar_t*						kRayGenShader		= L"rayGen";
 static const wchar_t*						kMissShader			= L"miss";
-static const wchar_t*						kClosestHitShader	= L"chs";
-static const wchar_t*						kHitGroup			= L"HitGroup";
+static const wchar_t*						kTriangleHitShader	= L"triangleHit";
+static const wchar_t*						kPlaneHitShader		= L"planeHit";
+static const wchar_t*						kTriangleHitGroup	= L"TriangleHitGroup";
+static const wchar_t*						kPlaneHitGroup		= L"PlaneHitGroup";
