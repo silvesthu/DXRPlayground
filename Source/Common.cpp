@@ -20,9 +20,10 @@ D3D12_CPU_DESCRIPTOR_HANDLE			gBackBufferRenderTargetDescriptor[NUM_BACK_BUFFERS
 ID3D12DescriptorHeap*				gImGuiSrvDescHeap = nullptr;
 
 // Customization - Data
-ID3D12Resource*						gDxrVertexBuffer = nullptr;
-ID3D12Resource*						gDxrBottomLevelAccelerationStructureScratch = nullptr;
-ID3D12Resource*						gDxrBottomLevelAccelerationStructureDest = nullptr;
+VertexBuffer 						gDxrTriangleVertexBuffer;
+VertexBuffer						gDxrPlaneVertexBuffer;
+BottomLevelAccelerationStructure 	gDxrTriangleBLAS;
+BottomLevelAccelerationStructure 	gDxrPlaneBLAS;
 ID3D12Resource*						gDxrTopLevelAccelerationStructureScratch = nullptr;
 ID3D12Resource*						gDxrTopLevelAccelerationStructureDest = nullptr;
 ID3D12Resource*						gDxrTopLevelAccelerationStructureInstanceDesc = nullptr;

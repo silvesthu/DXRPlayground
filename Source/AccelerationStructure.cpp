@@ -1,15 +1,8 @@
 #include "AccelerationStructure.h"
 #include "Common.h"
 
-void CreateVertexBuffer()
+void CreateVertexBuffer(void* inData, uint32_t inVertexSize, uint32_t inVertexCount, VertexBuffer& outVertexBuffer)
 {
-	std::array<float, 9> vertices =
-	{
-		0.0f,    1.0f,  0.0f,
-		0.866f,  -0.5f, 0.0f,
-		-0.866f, -0.5f, 0.0f,
-	};
-
 	D3D12_RESOURCE_DESC bufDesc = {};
 	bufDesc.Alignment = 0;
 	bufDesc.DepthOrArraySize = 1;
@@ -21,7 +14,7 @@ void CreateVertexBuffer()
 	bufDesc.MipLevels = 1;
 	bufDesc.SampleDesc.Count = 1;
 	bufDesc.SampleDesc.Quality = 0;
-	bufDesc.Width = sizeof(vertices);
+	bufDesc.Width = inVertexSize * inVertexCount;
 
 	D3D12_HEAP_PROPERTIES props;
 	memset(&props, 0, sizeof(D3D12_HEAP_PROPERTIES));
@@ -29,35 +22,63 @@ void CreateVertexBuffer()
 	props.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
 	props.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
 
-	gValidate(gD3DDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gDxrVertexBuffer)));
-	gDxrVertexBuffer->SetName(L"gDxrVertexBuffer");
+	gValidate(gD3DDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&outVertexBuffer.mResource)));
+	outVertexBuffer.mVertexCount = inVertexCount;
+	outVertexBuffer.mVertexSize = inVertexSize;
+	outVertexBuffer.mResource->SetName(L"VertexBuffer");
 
 	uint8_t* pData = nullptr;
-	gDxrVertexBuffer->Map(0, nullptr, (void**)& pData);
-	memcpy(pData, vertices.data(), sizeof(vertices));
-	gDxrVertexBuffer->Unmap(0, nullptr);
+	outVertexBuffer.mResource->Map(0, nullptr, (void**)& pData);
+	memcpy(pData, inData, inVertexSize * inVertexCount);
+	outVertexBuffer.mResource->Unmap(0, nullptr);
+}
+
+void CreateVertexBuffer()
+{
+	// triangle
+	float triangle[] =
+	{
+		0.0f,    1.0f,  0.0f,
+		0.866f,  -0.5f, 0.0f,
+		-0.866f, -0.5f, 0.0f,
+	};
+	CreateVertexBuffer(triangle, sizeof(float) * 3, 3, gDxrTriangleVertexBuffer);
+
+	// plane
+	float plane[] =
+	{
+		-8, -1, -8,
+		8, -1, 8,
+		-8, -1, 8,
+
+		-8, -1, -8,
+		8, -1, -8,
+		8, -1, 8,
+	};
+	CreateVertexBuffer(plane, sizeof(float) * 3, 6, gDxrPlaneVertexBuffer);
 }
 
 void CleanupVertexBuffer()
 {
-	if (gDxrVertexBuffer) { gDxrVertexBuffer->Release(); gDxrVertexBuffer = NULL; }
+	gDxrTriangleVertexBuffer.Release();
+	gDxrPlaneVertexBuffer.Release();
 }
 
-void CreateBottomLevelAccelerationStructure()
+void CreateBottomLevelAccelerationStructure(const VertexBuffer& inVertexBuffer, BottomLevelAccelerationStructure& outBLAS)
 {
-	D3D12_RAYTRACING_GEOMETRY_DESC geomDesc = {};
-	geomDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-	geomDesc.Triangles.VertexBuffer.StartAddress = gDxrVertexBuffer->GetGPUVirtualAddress();
-	geomDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(float) * 3;
-	geomDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-	geomDesc.Triangles.VertexCount = 3;
-	geomDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
+	D3D12_RAYTRACING_GEOMETRY_DESC geometry_desc = {};
+	geometry_desc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
+	geometry_desc.Triangles.VertexBuffer.StartAddress = inVertexBuffer.mResource->GetGPUVirtualAddress();
+	geometry_desc.Triangles.VertexBuffer.StrideInBytes = inVertexBuffer.mVertexSize;
+	geometry_desc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+	geometry_desc.Triangles.VertexCount = inVertexBuffer.mVertexCount;
+	geometry_desc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
 
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
 	inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
 	inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_NONE;
 	inputs.NumDescs = 1;
-	inputs.pGeometryDescs = &geomDesc;
+	inputs.pGeometryDescs = &geometry_desc;
 	inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
 
 	// Create the buffers. They need to support UAV, and since we are going to immediately use them, we create them with an unordered-access state
@@ -82,20 +103,20 @@ void CreateBottomLevelAccelerationStructure()
 		bufDesc.SampleDesc.Count = 1;
 		bufDesc.SampleDesc.Quality = 0;
 		bufDesc.Width = info.ScratchDataSizeInBytes;
-		gValidate(gD3DDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&gDxrBottomLevelAccelerationStructureScratch)));
-		gDxrBottomLevelAccelerationStructureScratch->SetName(L"gDxrBottomLevelAccelerationStructureScratch");
+		gValidate(gD3DDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&outBLAS.mScratch)));
+		outBLAS.mScratch->SetName(L"BLAS Scratch");
 
 		bufDesc.Width = info.ResultDataMaxSizeInBytes;
-		gValidate(gD3DDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, nullptr, IID_PPV_ARGS(&gDxrBottomLevelAccelerationStructureDest)));
-		gDxrBottomLevelAccelerationStructureDest->SetName(L"gDxrBottomLevelAccelerationStructureDest");
+		gValidate(gD3DDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, nullptr, IID_PPV_ARGS(&outBLAS.mDest)));
+		outBLAS.mDest->SetName(L"BLAS Dest");
 	}
 
 	// Create the bottom level acceleration structure
 	{
 		D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC asDesc = {};
 		asDesc.Inputs = inputs;
-		asDesc.DestAccelerationStructureData = gDxrBottomLevelAccelerationStructureDest->GetGPUVirtualAddress();
-		asDesc.ScratchAccelerationStructureData = gDxrBottomLevelAccelerationStructureScratch->GetGPUVirtualAddress();
+		asDesc.DestAccelerationStructureData = outBLAS.mDest->GetGPUVirtualAddress();
+		asDesc.ScratchAccelerationStructureData = outBLAS.mScratch->GetGPUVirtualAddress();
 
 		gD3DCommandList->BuildRaytracingAccelerationStructure(&asDesc, 0, nullptr);
 	}
@@ -104,20 +125,28 @@ void CreateBottomLevelAccelerationStructure()
 	{
 		D3D12_RESOURCE_BARRIER uavBarrier = {};
 		uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-		uavBarrier.UAV.pResource = gDxrBottomLevelAccelerationStructureDest;
+		uavBarrier.UAV.pResource = outBLAS.mDest;
 		gD3DCommandList->ResourceBarrier(1, &uavBarrier);
 	}
 }
 
+void CreateBottomLevelAccelerationStructure()
+{
+	CreateBottomLevelAccelerationStructure(gDxrTriangleVertexBuffer, gDxrTriangleBLAS);
+	CreateBottomLevelAccelerationStructure(gDxrPlaneVertexBuffer, gDxrPlaneBLAS);
+}
+
 void CleanupBottomLevelAccelerationStructure()
 {
-	gSafeRelease(gDxrBottomLevelAccelerationStructureScratch);
-	gSafeRelease(gDxrBottomLevelAccelerationStructureDest);
+	gDxrTriangleBLAS.Release();
+	gDxrPlaneBLAS.Release();
 }
 
 void CreateTopLevelAccelerationStructure()
 {
-	uint32_t instance_count = 3;
+	uint32_t plane_count = 1;
+	uint32_t triangle_count = 3;
+	uint32_t instance_count = plane_count + triangle_count;
 
 	// Get buffer sizes
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
@@ -164,17 +193,34 @@ void CreateTopLevelAccelerationStructure()
  		// The instance desc should be inside a buffer, create and map the buffer
  		D3D12_RAYTRACING_INSTANCE_DESC* pInstanceDesc;
  		gDxrTopLevelAccelerationStructureInstanceDesc->Map(0, nullptr, (void**)& pInstanceDesc);
- 
-		for (uint32_t i = 0; i < instance_count; i++)
+
+		uint32_t instance_index = 0;
+
+		for (uint32_t i = 0; i < plane_count; i++)
 		{
-			pInstanceDesc[i].InstanceID = i;                            // This value will be exposed to the shader via InstanceID()
-			pInstanceDesc[i].InstanceContributionToHitGroupIndex = 0;   // This is the offset inside the shader-table. We only have a single geometry, so the offset 0
-			pInstanceDesc[i].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
+			pInstanceDesc[instance_index].InstanceID = i;                            // This value will be exposed to the shader via InstanceID()
+			pInstanceDesc[instance_index].InstanceContributionToHitGroupIndex = 0;   // This is the offset inside the shader-table. We only have a single geometry, so the offset 0
+			pInstanceDesc[instance_index].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
+			glm::mat4 transform = glm::mat4(1.0f);
+			memcpy(pInstanceDesc[instance_index].Transform, &transform, sizeof(pInstanceDesc[instance_index].Transform));
+			pInstanceDesc[instance_index].AccelerationStructure = gDxrPlaneBLAS.mDest->GetGPUVirtualAddress();
+			pInstanceDesc[instance_index].InstanceMask = 0xFF;
+
+			instance_index++;
+		}
+
+		for (uint32_t i = 0; i < triangle_count; i++)
+		{
+			pInstanceDesc[instance_index].InstanceID = i;                            // This value will be exposed to the shader via InstanceID()
+			pInstanceDesc[instance_index].InstanceContributionToHitGroupIndex = 0;   // This is the offset inside the shader-table. We only have a single geometry, so the offset 0
+			pInstanceDesc[instance_index].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
 			glm::mat4 transform = glm::translate(glm::mat4(1.0f), glm::vec3(-2.0f + 2.0f * i, 0.f, 0.f)); // Instances in a line
 			transform = glm::transpose(transform); // Column-major => Row-major
-			memcpy(pInstanceDesc[i].Transform, &transform, sizeof(pInstanceDesc[i].Transform));
-			pInstanceDesc[i].AccelerationStructure = gDxrBottomLevelAccelerationStructureDest->GetGPUVirtualAddress();
-			pInstanceDesc[i].InstanceMask = 0xFF;
+			memcpy(pInstanceDesc[instance_index].Transform, &transform, sizeof(pInstanceDesc[instance_index].Transform));
+			pInstanceDesc[instance_index].AccelerationStructure = gDxrTriangleBLAS.mDest->GetGPUVirtualAddress();
+			pInstanceDesc[instance_index].InstanceMask = 0xFF;
+
+			instance_index++;
 		}
 
 		// Unmap
