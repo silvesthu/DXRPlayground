@@ -38,6 +38,8 @@ void CleanupApplication()
 
 void UpdateDrawApplication()
 {
+	UpdateTopLevelAccelerationStructure();
+
 	uint8_t* pData = nullptr;
 	gDxrConstantBufferResource->Map(0, nullptr, (void**)& pData);
 	memcpy(pData, &gPerFrameConstantBuffer, sizeof(gPerFrameConstantBuffer));
@@ -184,6 +186,8 @@ int main(int, char**)
 				gD3DCommandList->ResourceBarrier(1, &barrier);
 				gD3DCommandList->Close();
 				gD3DCommandQueue->ExecuteCommandLists(1, (ID3D12CommandList* const*)& gD3DCommandList);
+
+				gTime += ImGui::GetIO().DeltaTime;
 			}			
 
 			// Swap

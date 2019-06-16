@@ -3,6 +3,7 @@
 // Data
 FrameContext                		gFrameContext[NUM_FRAMES_IN_FLIGHT] = {};
 UINT                    			gFrameIndex = 0;
+float								gTime = 0.0f;
 
 ID3D12Device5*						gD3DDevice = nullptr;
 ID3D12DescriptorHeap*				gD3DRtvDescHeap = nullptr;

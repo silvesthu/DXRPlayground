@@ -142,7 +142,7 @@ void CleanupBottomLevelAccelerationStructure()
 	gDxrPlaneBLAS.Release();
 }
 
-void CreateTopLevelAccelerationStructure()
+void CreateTopLevelAccelerationStructureInternal(bool inUpdate)
 {
 	uint32_t plane_count = 1;
 	uint32_t triangle_count = 3;
@@ -151,12 +151,22 @@ void CreateTopLevelAccelerationStructure()
 	// Get buffer sizes
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
 	inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-	inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_NONE;
+	inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
 	inputs.NumDescs = instance_count;
 	inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
 
-	// Create the buffers
+	if (inUpdate)
 	{
+		// If this a request for an update, then the TLAS was already used in a DispatchRay() call. We need a UAV barrier to make sure the read operation ends before updating the buffer
+		D3D12_RESOURCE_BARRIER uavBarrier = {};
+		uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+		uavBarrier.UAV.pResource = gDxrTopLevelAccelerationStructureDest;
+		gD3DCommandList->ResourceBarrier(1, &uavBarrier);
+	}
+	else
+	{
+		// Create the buffers
+
 		D3D12_HEAP_PROPERTIES props = {};
 		props.Type = D3D12_HEAP_TYPE_DEFAULT;
 		props.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
@@ -189,13 +199,15 @@ void CreateTopLevelAccelerationStructure()
 		bufDesc.Width = sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instance_count;
 		gValidate(gD3DDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gDxrTopLevelAccelerationStructureInstanceDesc)));
 		gDxrTopLevelAccelerationStructureInstanceDesc->SetName(L"gDxrTopLevelAccelerationStructureInstanceDesc");
+	}
 
+	// Fill the buffers
+	{
  		// The instance desc should be inside a buffer, create and map the buffer
  		D3D12_RAYTRACING_INSTANCE_DESC* pInstanceDesc;
  		gDxrTopLevelAccelerationStructureInstanceDesc->Map(0, nullptr, (void**)& pInstanceDesc);
 
 		uint32_t instance_index = 0;
-
 		for (uint32_t i = 0; i < plane_count; i++)
 		{
 			pInstanceDesc[instance_index].InstanceID = 0;							// This value will be exposed to the shader via InstanceID()
@@ -214,7 +226,10 @@ void CreateTopLevelAccelerationStructure()
 			pInstanceDesc[instance_index].InstanceID = i;							// This value will be exposed to the shader via InstanceID()
 			pInstanceDesc[instance_index].InstanceContributionToHitGroupIndex = 0;	// Match shader table
 			pInstanceDesc[instance_index].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
-			glm::mat4 transform = glm::translate(glm::mat4(1.0f), glm::vec3(-2.0f + 2.0f * i, 0.f, 0.f)); // Instances in a line
+			glm::mat4 transform = glm::mat4(1.0f);
+			transform = glm::translate(transform, glm::vec3(-2.0f + 2.0f * i, 0.f, 0.f)); // Instances in a line
+			float rotate_speed = 1.0f;
+			transform = glm::rotate(transform, gTime * rotate_speed, glm::vec3(0.f, 1.f, 0.f));
 			transform = glm::transpose(transform); // Column-major => Row-major
 			memcpy(pInstanceDesc[instance_index].Transform, &transform, sizeof(pInstanceDesc[instance_index].Transform));
 			pInstanceDesc[instance_index].AccelerationStructure = gDxrTriangleBLAS.mDest->GetGPUVirtualAddress();
@@ -235,6 +250,13 @@ void CreateTopLevelAccelerationStructure()
 		asDesc.DestAccelerationStructureData = gDxrTopLevelAccelerationStructureDest->GetGPUVirtualAddress();
 		asDesc.ScratchAccelerationStructureData = gDxrTopLevelAccelerationStructureScratch->GetGPUVirtualAddress();
 
+		// If this is an update operation, set the source buffer and the perform_update flag
+		if (inUpdate)
+		{
+			asDesc.Inputs.Flags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE;
+			asDesc.SourceAccelerationStructureData = gDxrTopLevelAccelerationStructureDest->GetGPUVirtualAddress();
+		}
+
 		gD3DCommandList->BuildRaytracingAccelerationStructure(&asDesc, 0, nullptr);
 	}
 
@@ -245,6 +267,16 @@ void CreateTopLevelAccelerationStructure()
 		uavBarrier.UAV.pResource = gDxrTopLevelAccelerationStructureDest;
 		gD3DCommandList->ResourceBarrier(1, &uavBarrier);
 	}
+}
+
+void CreateTopLevelAccelerationStructure()
+{
+	CreateTopLevelAccelerationStructureInternal(false);
+}
+	
+void UpdateTopLevelAccelerationStructure()
+{
+	CreateTopLevelAccelerationStructureInternal(true);
 }
 
 void CleanupTopLevelAccelerationStructure()

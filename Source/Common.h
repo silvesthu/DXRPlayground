@@ -70,6 +70,7 @@ struct FrameContext
 
 extern FrameContext							gFrameContext[];
 extern uint32_t								gFrameIndex;
+extern float								gTime;
 
 extern ID3D12Device5*						gD3DDevice;
 extern ID3D12DescriptorHeap* 				gD3DRtvDescHeap;
