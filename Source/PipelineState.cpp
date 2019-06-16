@@ -77,7 +77,16 @@ void rayGen()
     ray.TMax = 100000;
 
     RayPayload payload;
-    TraceRay( RaytracingScene, 0 /*rayFlags*/, 0xFF, 0 /* ray index*/, 0, 0, ray, payload );
+    TraceRay(
+		RaytracingScene, 		// RaytracingAccelerationStructure
+		0,						// RayFlags 
+		0xFF,					// InstanceInclusionMask
+		0,						// RayContributionToHitGroupIndex, 4bits
+		0,						// MultiplierForGeometryContributuionToHitGroupIndex, 16bits
+		0,						// MissShaderIndex
+		ray,					// RayDesc
+		payload					// payload_t
+	);
     float3 col = linearToSrgb(payload.color);
     RaytracingOutput[launchIndex.xy] = float4(col, 1);
 }
@@ -118,8 +127,26 @@ void planeHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes
 	ray.TMin = 0.01;
 	ray.TMax = 100000;
 
+	// See also https://sites.google.com/site/monshonosuana/directxno-hanashi-1/directx-153
+	// HitGroup Shader Index in Shader Table = 
+	//	InstanceContributionToHitGroupIndex + RayContributionToHitGroupIndex + (GeometryContributionToHitGroupIndex * MultiplierForGeometryContributionToHitGroupIndex)
+	//
+	// InstanceContributionToHitGroupIndex: TLAS - basically for material
+	// RayContributionToHitGroupIndex: RayDesc - basically for nth ray
+	// GeometryContribution: BLAS - automatically assigned
+	// MultiplierForGeometryContributionToHitGroupIndex: RayDesc - maybe same BLAS but different material set?
+
 	ShadowPayload shadowPayload;
-	TraceRay(RaytracingScene, 0 /*rayFlags*/, 0xFF, 1 /*ray index*/, 0, 1, ray, shadowPayload);
+	TraceRay(
+			RaytracingScene,	// RaytracingAccelerationStructure
+			0,					// RayFlags 
+			0xFF,				// InstanceInclusionMask
+			1,					// RayContributionToHitGroupIndex, 4bits
+			0,					// MultiplierForGeometryContributuionToHitGroupIndex, 16bits
+			1,					// MissShaderIndex
+			ray,				// RayDesc
+			shadowPayload		// payload_t
+	);
 
 	float shadow_factor = shadowPayload.hit ? 0.0 : 1.0;
 	float diffuse = 0.18;

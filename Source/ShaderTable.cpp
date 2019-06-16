@@ -70,7 +70,7 @@ void CreateShaderTable()
 			gDxrShaderTable.mMissCount = shader_table_entry_index - gDxrShaderTable.mMissOffset;
 		}
 
-		// HitGroup shaders - 2 type * 2nd hit
+		// HitGroup shaders - At least Material count * Ray(nth) count
 		{
 			gDxrShaderTable.mHitGroupOffset = shader_table_entry_index;
 
