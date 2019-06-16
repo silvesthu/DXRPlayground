@@ -65,7 +65,7 @@ enum
 struct FrameContext
 {
 	ID3D12CommandAllocator*					CommandAllocator;
-	uint64_t									FenceValue;
+	uint64_t								FenceValue;
 };
 
 extern FrameContext							gFrameContext[];
@@ -111,8 +111,20 @@ extern ID3D12Resource* 						gDxrTopLevelAccelerationStructureInstanceDesc;
 
 extern ID3D12RootSignature*					gDxrEmptyRootSignature;
 extern ID3D12StateObject* 					gDxrStateObject;
-extern ID3D12Resource*						gDxrShaderTable;
-extern uint64_t								gDxrShaderTableEntrySize;
+
+struct ShaderTable
+{
+	ID3D12Resource*							mResource = nullptr;
+	uint64_t								mEntrySize = 0;
+	uint32_t								mRayGenOffset = 0;
+	uint32_t								mRayGenCount = 0;
+	uint32_t								mMissOffset = 0;
+	uint32_t								mMissCount = 0;
+	uint32_t								mHitGroupOffset = 0;
+	uint32_t								mHitGroupCount = 0;
+};
+extern ShaderTable							gDxrShaderTable;
+
 extern ID3D12Resource*						gDxrOutputResource;
 extern ID3D12Resource*						gDxrConstantBufferResource;
 extern ID3D12DescriptorHeap*				gDxrCbvSrvUavHeap;
@@ -131,3 +143,6 @@ static const wchar_t*						kTriangleHitShader	= L"triangleHit";
 static const wchar_t*						kPlaneHitShader		= L"planeHit";
 static const wchar_t*						kTriangleHitGroup	= L"TriangleHitGroup";
 static const wchar_t*						kPlaneHitGroup		= L"PlaneHitGroup";
+static const wchar_t*						kShadowHitShader	= L"shadowHit";
+static const wchar_t*						kShadowMissShader	= L"shadowMiss";
+static const wchar_t*						kShadowHitGroup		= L"shadowGroup";

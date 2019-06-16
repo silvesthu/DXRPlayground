@@ -73,7 +73,6 @@ void rayGen()
     RayDesc ray;
     ray.Origin = float3(0, 0, -2);
     ray.Direction = normalize(float3(d.x * aspectRatio, -d.y, 1));
-
     ray.TMin = 0;
     ray.TMax = 100000;
 
@@ -99,10 +98,45 @@ void triangleHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttribu
 	payload.color = A[instanceID] * barycentrics.x + B[instanceID] * barycentrics.y + C[instanceID] * barycentrics.z;
 }
 
+struct ShadowPayload
+{
+    bool hit;
+};
+
 [shader("closesthit")]
 void planeHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attribs)
 {
-	payload.color = 0.18;
+	// See https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html for more system value intrinsics
+
+	// Find the world-space hit position
+	float3 hit_position = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
+
+	// Fire a shadow ray. The direction is hard-coded here, but can be fetched from a constant-buffer
+	RayDesc ray;
+	ray.Origin = hit_position;
+	ray.Direction = normalize(float3(-0.5, 0.5, -0.5));
+	ray.TMin = 0.01;
+	ray.TMax = 100000;
+
+	ShadowPayload shadowPayload;
+	TraceRay(RaytracingScene, 0 /*rayFlags*/, 0xFF, 1 /*ray index*/, 0, 1, ray, shadowPayload);
+
+	float shadow_factor = shadowPayload.hit ? 0.0 : 1.0;
+	float diffuse = 0.18;
+	float ambient = 0.01;
+	payload.color = diffuse * shadow_factor + ambient;
+}
+
+[shader("closesthit")]
+void shadowHit(inout ShadowPayload payload, in BuiltInTriangleIntersectionAttributes attribs)
+{
+	payload.hit = true;
+}
+
+[shader("miss")]
+void shadowMiss(inout ShadowPayload payload)
+{
+	payload.hit = false;
 }
 
 )";
@@ -220,13 +254,37 @@ void GenerateMissRootDesc(RootSignatureDescriptor& outDesc)
 	outDesc.mDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
 }
 
-void GenerateHitRootDesc(RootSignatureDescriptor& outDesc)
+void GenerateTriangleHitLocalRootDesc(RootSignatureDescriptor& outDesc)
 {
 	// PerScene - Descriptor - RootDescriptor contains descriptor directly
 	D3D12_ROOT_PARAMETER root_parameter = {};
 	root_parameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	root_parameter.Descriptor.ShaderRegister = 1;
 	root_parameter.Descriptor.RegisterSpace = 0;
+	outDesc.mRootParameters.push_back(root_parameter);
+
+	// Create the RootDescriptor
+	outDesc.mDesc.NumParameters = (UINT)outDesc.mRootParameters.size();
+	outDesc.mDesc.pParameters = outDesc.mRootParameters.data();
+	outDesc.mDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
+}
+
+void GeneratePlaneHitLocalRootDesc(RootSignatureDescriptor& outDesc)
+{
+	// RaytracingScene - DescriptorRange
+	D3D12_DESCRIPTOR_RANGE descriptor_range = {};
+	descriptor_range.BaseShaderRegister = 0;
+	descriptor_range.NumDescriptors = 1;
+	descriptor_range.RegisterSpace = 0;
+	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	descriptor_range.OffsetInDescriptorsFromTableStart = 0;
+	outDesc.mDescriptorRanges.push_back(descriptor_range);
+
+	// RootDescriptor contains entry of DescriptorTable, DescriptorRange within
+	D3D12_ROOT_PARAMETER root_parameter = {};
+	root_parameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	root_parameter.DescriptorTable.NumDescriptorRanges = (UINT)outDesc.mDescriptorRanges.size();
+	root_parameter.DescriptorTable.pDescriptorRanges = outDesc.mDescriptorRanges.data();
 	outDesc.mRootParameters.push_back(root_parameter);
 
 	// Create the RootDescriptor
@@ -383,19 +441,21 @@ void CreatePipelineState()
 	//  Local root signature and association
 	//  Shader config
 
-	std::array<D3D12_STATE_SUBOBJECT, 15> subobjects;
+	std::array<D3D12_STATE_SUBOBJECT, 18> subobjects;
 	uint32_t index = 0;
 
 	// DXIL library
-	const wchar_t* entry_points[] = { kRayGenShader, kMissShader, kTriangleHitShader, kPlaneHitShader };
+	const wchar_t* entry_points[] = { kRayGenShader, kMissShader, kTriangleHitShader, kPlaneHitShader, kShadowMissShader, kShadowHitShader };
 	DXILLibrary dxilLibrary(CompileShader(L"Shader", kShaderSource, ARRAYSIZE(kShaderSource)), entry_points, ARRAYSIZE(entry_points));
 	subobjects[index++] = dxilLibrary.mStateSubobject;
 
 	// Hit group
 	HitGroup triangle_hit_group(nullptr, kTriangleHitShader, kTriangleHitGroup);
 	subobjects[index++] = triangle_hit_group.mStateSubobject;
- 	HitGroup plane_hit_group(nullptr, kPlaneHitShader, kPlaneHitGroup);
- 	subobjects[index++] = plane_hit_group.mStateSubobject;
+	HitGroup plane_hit_group(nullptr, kPlaneHitShader, kPlaneHitGroup);
+	subobjects[index++] = plane_hit_group.mStateSubobject;
+	HitGroup shadow_hit_group(nullptr, kShadowHitShader, kShadowHitGroup);
+	subobjects[index++] = shadow_hit_group.mStateSubobject;
 
 	// Local root signatures and association
 	// Ray-gen shader
@@ -416,7 +476,7 @@ void CreatePipelineState()
 
 	// Triangle hit shader
 	RootSignatureDescriptor triangle_hit_local_root_signature_desc;
-	GenerateHitRootDesc(triangle_hit_local_root_signature_desc);
+	GenerateTriangleHitLocalRootDesc(triangle_hit_local_root_signature_desc);
 	LocalRootSignature triangle_hit_local_root_signature(triangle_hit_local_root_signature_desc.mDesc);
 	subobjects[index++] = triangle_hit_local_root_signature.mStateSubobject;
 	SubobjectToExportsAssociation triangle_hit_association(&kTriangleHitShader, 1, &(subobjects[index - 1]));
@@ -424,24 +484,33 @@ void CreatePipelineState()
 
 	// Plane hit shader
 	RootSignatureDescriptor plane_hit_local_root_signature_desc;
-	GenerateHitRootDesc(plane_hit_local_root_signature_desc);
+	GeneratePlaneHitLocalRootDesc(plane_hit_local_root_signature_desc);
 	LocalRootSignature plane_hit_local_root_signature(plane_hit_local_root_signature_desc.mDesc);
 	subobjects[index++] = plane_hit_local_root_signature.mStateSubobject;
 	SubobjectToExportsAssociation plane_hit_association(&kPlaneHitShader, 1, &(subobjects[index - 1]));
 	subobjects[index++] = plane_hit_association.mStateSubobject;
+
+	// Empty local root signature
+	RootSignatureDescriptor empty_local_root_signature_descriptor;
+	empty_local_root_signature_descriptor.mDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
+	LocalRootSignature empty_root_signature(empty_local_root_signature_descriptor.mDesc);
+	subobjects[index++] = empty_root_signature.mStateSubobject;
+	const wchar_t* shader_with_empty_associations[] = { kShadowMissShader, kShadowHitShader };
+	SubobjectToExportsAssociation empty_local_root_signature_association(shader_with_empty_associations, ARRAYSIZE(shader_with_empty_associations), &(subobjects[index - 1]));
+	subobjects[index++] = empty_local_root_signature_association.mStateSubobject;
 
 	// Shader config
 	//  sizeof(BuiltInTriangleIntersectionAttributes), depends on interaction type
 	//  sizeof(RayPayload), fully customized
 	ShaderConfig shader_config(sizeof(float) * 2, sizeof(float) * 3);
 	subobjects[index++] = shader_config.mStateSubobject;
-	const wchar_t* shader_exports[] = { kMissShader, kTriangleHitShader, kRayGenShader, kPlaneHitShader };
+	const wchar_t* shader_exports[] = { kRayGenShader, kMissShader, kTriangleHitShader, kPlaneHitShader, kShadowHitShader, kShadowMissShader };
 	SubobjectToExportsAssociation shader_configassociation(shader_exports, ARRAYSIZE(shader_exports), &(subobjects[index - 1]));
 	subobjects[index++] = shader_configassociation.mStateSubobject;
 
 	// Pipeline config
 	//  MaxTraceRecursionDepth
-	PipelineConfig pipeline_config(1);
+	PipelineConfig pipeline_config(2); // Primary, Shadow
 	subobjects[index++] = pipeline_config.mStateSubobject;
 
 	// Global root signature

@@ -25,19 +25,19 @@ void RayTrace(ID3D12Resource* inFrameRenderTargetResource)
 		dispatch_rays_desc.Height = swap_chain_desc.Height;
 		dispatch_rays_desc.Depth = 1;
 
-		// RayGen is the first entry in the shader-table
-		dispatch_rays_desc.RayGenerationShaderRecord.StartAddress = gDxrShaderTable->GetGPUVirtualAddress() + gDxrShaderTableEntrySize * 0;
-		dispatch_rays_desc.RayGenerationShaderRecord.SizeInBytes = gDxrShaderTableEntrySize;
+		// RayGen
+		dispatch_rays_desc.RayGenerationShaderRecord.StartAddress = gDxrShaderTable.mResource->GetGPUVirtualAddress() + gDxrShaderTable.mEntrySize * gDxrShaderTable.mRayGenOffset;
+		dispatch_rays_desc.RayGenerationShaderRecord.SizeInBytes = gDxrShaderTable.mEntrySize;
 
-		// Miss is the second entry in the shader-table
-		dispatch_rays_desc.MissShaderTable.StartAddress = gDxrShaderTable->GetGPUVirtualAddress() + gDxrShaderTableEntrySize * 1;
-		dispatch_rays_desc.MissShaderTable.StrideInBytes = gDxrShaderTableEntrySize;
-		dispatch_rays_desc.MissShaderTable.SizeInBytes = gDxrShaderTableEntrySize;
+		// Miss
+		dispatch_rays_desc.MissShaderTable.StartAddress = gDxrShaderTable.mResource->GetGPUVirtualAddress() + gDxrShaderTable.mEntrySize * gDxrShaderTable.mMissOffset;
+		dispatch_rays_desc.MissShaderTable.StrideInBytes = gDxrShaderTable.mEntrySize;
+		dispatch_rays_desc.MissShaderTable.SizeInBytes = gDxrShaderTable.mEntrySize * gDxrShaderTable.mMissCount;
 
-		// Hit is the third entry in the shader-table
-		dispatch_rays_desc.HitGroupTable.StartAddress = gDxrShaderTable->GetGPUVirtualAddress() + gDxrShaderTableEntrySize * 2;
-		dispatch_rays_desc.HitGroupTable.StrideInBytes = gDxrShaderTableEntrySize;
-		dispatch_rays_desc.HitGroupTable.SizeInBytes = gDxrShaderTableEntrySize;
+		// HitGroup
+		dispatch_rays_desc.HitGroupTable.StartAddress = gDxrShaderTable.mResource->GetGPUVirtualAddress() + gDxrShaderTable.mEntrySize * gDxrShaderTable.mHitGroupOffset;
+		dispatch_rays_desc.HitGroupTable.StrideInBytes = gDxrShaderTable.mEntrySize;
+		dispatch_rays_desc.HitGroupTable.SizeInBytes = gDxrShaderTable.mEntrySize * gDxrShaderTable.mHitGroupCount;
 	}
 
 	// Bind

@@ -30,8 +30,7 @@ ID3D12Resource*						gDxrTopLevelAccelerationStructureInstanceDesc = nullptr;
 
 ID3D12RootSignature*				gDxrEmptyRootSignature = nullptr;
 ID3D12StateObject*					gDxrStateObject = nullptr;
-ID3D12Resource*						gDxrShaderTable = nullptr;
-uint64_t							gDxrShaderTableEntrySize = 0;
+ShaderTable							gDxrShaderTable = {};
 ID3D12Resource*						gDxrOutputResource = nullptr;
 ID3D12Resource*						gDxrConstantBufferResource = nullptr;
 ID3D12DescriptorHeap*				gDxrCbvSrvUavHeap = nullptr;

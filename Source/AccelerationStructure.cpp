@@ -38,22 +38,22 @@ void CreateVertexBuffer()
 	// triangle
 	float triangle[] =
 	{
-		0.0f,    1.0f,  0.0f,
-		0.866f,  -0.5f, 0.0f,
-		-0.866f, -0.5f, 0.0f,
+		+0.000f,	+1.0f,		+0.0f,
+		+0.866f,	-0.5f,		+0.0f,
+		-0.866f,	-0.5f,		+0.0f,
 	};
 	CreateVertexBuffer(triangle, sizeof(float) * 3, 3, gDxrTriangleVertexBuffer);
 
 	// plane
 	float plane[] =
 	{
-		-8, -1, -8,
-		8, -1, 8,
-		-8, -1, 8,
+		-10.0f,		-1.0f,		-10.0f,
+		+10.0f,		-1.0f,		+10.0f,
+		-10.0f,		-1.0f,		+10.0f,
 
-		-8, -1, -8,
-		8, -1, -8,
-		8, -1, 8,
+		-10.0f,		-1.0f,		-10.0f,
+		+10.0f,		-1.0f,		-10.0f,
+		+10.0f,		-1.0f,		+10.0f,
 	};
 	CreateVertexBuffer(plane, sizeof(float) * 3, 6, gDxrPlaneVertexBuffer);
 }
@@ -196,28 +196,28 @@ void CreateTopLevelAccelerationStructure()
 
 		uint32_t instance_index = 0;
 
-		for (uint32_t i = 0; i < triangle_count; i++)
+		for (uint32_t i = 0; i < plane_count; i++)
 		{
-			pInstanceDesc[instance_index].InstanceID = i;                            // This value will be exposed to the shader via InstanceID()
-			pInstanceDesc[instance_index].InstanceContributionToHitGroupIndex = 0;
+			pInstanceDesc[instance_index].InstanceID = 0;							// This value will be exposed to the shader via InstanceID()
+			pInstanceDesc[instance_index].InstanceContributionToHitGroupIndex = 2;	// Match shader table
 			pInstanceDesc[instance_index].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
-			glm::mat4 transform = glm::translate(glm::mat4(1.0f), glm::vec3(-2.0f + 2.0f * i, 0.f, 0.f)); // Instances in a line
-			transform = glm::transpose(transform); // Column-major => Row-major
+			glm::mat4 transform = glm::mat4(1.0f);
 			memcpy(pInstanceDesc[instance_index].Transform, &transform, sizeof(pInstanceDesc[instance_index].Transform));
-			pInstanceDesc[instance_index].AccelerationStructure = gDxrTriangleBLAS.mDest->GetGPUVirtualAddress();
+			pInstanceDesc[instance_index].AccelerationStructure = gDxrPlaneBLAS.mDest->GetGPUVirtualAddress();
 			pInstanceDesc[instance_index].InstanceMask = 0xFF;
 
 			instance_index++;
 		}
 
-		for (uint32_t i = 0; i < plane_count; i++)
+		for (uint32_t i = 0; i < triangle_count; i++)
 		{
-			pInstanceDesc[instance_index].InstanceID = i;                            // This value will be exposed to the shader via InstanceID()
-			pInstanceDesc[instance_index].InstanceContributionToHitGroupIndex = 1;
+			pInstanceDesc[instance_index].InstanceID = i;							// This value will be exposed to the shader via InstanceID()
+			pInstanceDesc[instance_index].InstanceContributionToHitGroupIndex = 0;	// Match shader table
 			pInstanceDesc[instance_index].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
-			glm::mat4 transform = glm::mat4(1.0f);
+			glm::mat4 transform = glm::translate(glm::mat4(1.0f), glm::vec3(-2.0f + 2.0f * i, 0.f, 0.f)); // Instances in a line
+			transform = glm::transpose(transform); // Column-major => Row-major
 			memcpy(pInstanceDesc[instance_index].Transform, &transform, sizeof(pInstanceDesc[instance_index].Transform));
-			pInstanceDesc[instance_index].AccelerationStructure = gDxrPlaneBLAS.mDest->GetGPUVirtualAddress();
+			pInstanceDesc[instance_index].AccelerationStructure = gDxrTriangleBLAS.mDest->GetGPUVirtualAddress();
 			pInstanceDesc[instance_index].InstanceMask = 0xFF;
 
 			instance_index++;

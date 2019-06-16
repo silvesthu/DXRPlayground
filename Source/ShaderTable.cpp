@@ -10,17 +10,13 @@ struct ShaderTableEntry
 {
 	ShaderIdentifier mShaderIdentifier;
 
-	struct HitShaderLocalRootArguments
+	union RootArgument
 	{
-		D3D12_GPU_VIRTUAL_ADDRESS mConstantBufferAddress;
+		D3D12_GPU_VIRTUAL_ADDRESS mAddress;
+		uint64_t mHandle;
 	};
-	union
-	{
-		// Any information that LocalRootSignature can reference
-
-		HitShaderLocalRootArguments mHitShaderLocalRootArguments = {};
-	};
-
+	
+	RootArgument mRootArgument = {};
 	uint8_t mPadding[24] = {};
 };
 static_assert(sizeof(ShaderTableEntry::mShaderIdentifier) == D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES, "D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES check failed");
@@ -29,7 +25,9 @@ static_assert(sizeof(ShaderTableEntry) == D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALI
 void CreateShaderTable()
 {
 	// Construct the table
-	ShaderTableEntry shader_table_entries[4];
+	ShaderTableEntry shader_table_entries[16];
+	uint32_t shader_table_entry_index = 0;
+	uint32_t shader_table_entry_count = 0;
 	{
 		// Shader table between all ray tracing shader types, by adding offset when reference the table
 		// So it is necessary to align up to table size rather than record size (entry size)
@@ -48,19 +46,57 @@ void CreateShaderTable()
 		ComPtr<ID3D12StateObjectProperties> state_object_properties;
 		gDxrStateObject->QueryInterface(IID_PPV_ARGS(&state_object_properties));
 
-		memcpy(&shader_table_entries[0].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kRayGenShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-		memcpy(&shader_table_entries[1].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kMissShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-		memcpy(&shader_table_entries[2].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kTriangleHitGroup), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-		shader_table_entries[2].mHitShaderLocalRootArguments.mConstantBufferAddress = gDxrHitConstantBufferResource->GetGPUVirtualAddress();
-		memcpy(&shader_table_entries[3].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kPlaneHitGroup), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-		shader_table_entries[3].mHitShaderLocalRootArguments.mConstantBufferAddress = gDxrHitConstantBufferResource->GetGPUVirtualAddress();
+		// RayGen shaders
+		{
+			gDxrShaderTable.mRayGenOffset = shader_table_entry_index;
+
+			memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kRayGenShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+			shader_table_entries[shader_table_entry_index].mRootArgument.mHandle = gDxrCbvSrvUavHeap->GetGPUDescriptorHandleForHeapStart().ptr;
+			shader_table_entry_index++;
+
+			gDxrShaderTable.mRayGenCount = shader_table_entry_index - gDxrShaderTable.mRayGenOffset;
+		}
+
+		// Miss shaders
+		{
+			gDxrShaderTable.mMissOffset = shader_table_entry_index;
+
+			memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kMissShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+			shader_table_entry_index++;
+
+			memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kShadowMissShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+			shader_table_entry_index++;
+
+			gDxrShaderTable.mMissCount = shader_table_entry_index - gDxrShaderTable.mMissOffset;
+		}
+
+		// HitGroup shaders - 2 type * 2nd hit
+		{
+			gDxrShaderTable.mHitGroupOffset = shader_table_entry_index;
+
+			memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kTriangleHitGroup), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+			shader_table_entries[shader_table_entry_index].mRootArgument.mAddress = gDxrHitConstantBufferResource->GetGPUVirtualAddress();
+			shader_table_entry_index++;
+
+			memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kShadowHitGroup), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+			shader_table_entry_index++;
+
+			memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kPlaneHitGroup), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+			shader_table_entries[shader_table_entry_index].mRootArgument.mHandle = gDxrCbvSrvUavHeap->GetGPUDescriptorHandleForHeapStart().ptr + gD3DDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+			shader_table_entry_index++;
+
+			memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kShadowHitGroup), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+			shader_table_entry_index++;
+
+			gDxrShaderTable.mHitGroupCount = shader_table_entry_index - gDxrShaderTable.mHitGroupOffset;
+		}
+
+		gDxrShaderTable.mEntrySize = sizeof(ShaderTableEntry);
+		shader_table_entry_count = shader_table_entry_index;
 	}
 
 	// Create the table
 	{
-		// Calculate the size and create the buffer
-		gDxrShaderTableEntrySize = sizeof(ShaderTableEntry);
-
 		// For simplicity, we create the shader-table on the upload heap. You can also create it on the default heap
 		D3D12_HEAP_PROPERTIES heap_props;
 		heap_props.Type = D3D12_HEAP_TYPE_UPLOAD;
@@ -81,27 +117,27 @@ void CreateShaderTable()
 		bufDesc.MipLevels = 1;
 		bufDesc.SampleDesc.Count = 1;
 		bufDesc.SampleDesc.Quality = 0;
-		bufDesc.Width = sizeof(shader_table_entries);
+		bufDesc.Width = gDxrShaderTable.mEntrySize * shader_table_entry_index;
 
-		gValidate(gD3DDevice->CreateCommittedResource(&heap_props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gDxrShaderTable)));
-		gDxrShaderTable->SetName(L"gDxrShaderTable");
+		gValidate(gD3DDevice->CreateCommittedResource(&heap_props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gDxrShaderTable.mResource)));
+		gDxrShaderTable.mResource->SetName(L"mResource");
 	}
  
 	// Copy the table
 	{
 		// Map
 		uint8_t* data_pointer;
-		gValidate(gDxrShaderTable->Map(0, nullptr, (void**)& data_pointer));
+		gValidate(gDxrShaderTable.mResource->Map(0, nullptr, (void**)& data_pointer));
 
 		// Copy
-		memcpy(data_pointer, shader_table_entries, sizeof(shader_table_entries));
+		memcpy(data_pointer, shader_table_entries, gDxrShaderTable.mEntrySize * shader_table_entry_index);
 
 		// Unmap
-		gDxrShaderTable->Unmap(0, nullptr);
+		gDxrShaderTable.mResource->Unmap(0, nullptr);
 	}
 }
 
 void CleanupShaderTable()
 {
-	gSafeRelease(gDxrShaderTable);
+	gSafeRelease(gDxrShaderTable.mResource);
 }
