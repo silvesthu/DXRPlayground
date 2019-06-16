@@ -15,6 +15,22 @@
 static const char*					kApplicationTitle = "DXR Playground";
 static const wchar_t*				kApplicationTitleW = L"DXR Playground";
 
+struct CameraSettings
+{
+	glm::vec2 mMoveRotateSpeed;
+	float mHorizontalFovDegree;
+
+	CameraSettings() { Reset(); }
+
+	void Reset()
+	{
+		mMoveRotateSpeed = glm::vec2(0.1f, 0.01f);
+		mHorizontalFovDegree = 90.0f;
+	}
+};
+CameraSettings gCameraSettings = {};
+glm::ivec2 gRenderResolution = glm::ivec2(0, 0);
+
 // Forward declarations of helper functions
 bool CreateDeviceD3D(HWND hWnd);
 void CleanupDeviceD3D();
@@ -22,7 +38,6 @@ void CreateRenderTarget();
 void CleanupRenderTarget();
 void WaitForLastSubmittedFrame();
 FrameContext* WaitForNextFrameResources();
-void ResizeSwapChain(HWND hWnd, int width, int height);
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 void CleanupApplication()
@@ -127,12 +142,95 @@ int main(int, char**)
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
 
+		// Update (Logic)
+		{
+			// Rotate Camera
+			{
+				static ImVec2 mouse_prev_position(0, 0);
+				static bool mouse_prev_right_button_pressed = false;
+
+				ImVec2 mouse_current_position = ImGui::GetMousePos();
+				bool mouse_right_button_pressed = ImGui::IsMouseDown(1);
+				
+				ImVec2 mouse_delta(0, 0);
+				if (mouse_prev_right_button_pressed && mouse_right_button_pressed)
+					mouse_delta = ImVec2(mouse_current_position.x - mouse_prev_position.x, mouse_current_position.y - mouse_prev_position.y);
+
+				mouse_prev_position = mouse_current_position;
+				mouse_prev_right_button_pressed = mouse_right_button_pressed;
+
+				glm::vec4 front = gPerFrameConstantBuffer.mCameraDirection;
+				glm::vec4 right = glm::vec4(glm::normalize(glm::cross(glm::vec3(0, 1, 0), glm::vec3(front))), 0);
+				glm::vec4 up = glm::vec4(glm::normalize(glm::cross(glm::vec3(right), glm::vec3(front))), 0);
+				
+				front = glm::rotate(-mouse_delta.x * gCameraSettings.mMoveRotateSpeed.y, glm::vec3(up)) * front;
+				front = glm::rotate(mouse_delta.y * gCameraSettings.mMoveRotateSpeed.y, glm::vec3(right)) * front;
+				
+				gPerFrameConstantBuffer.mCameraDirection = glm::normalize(front);
+				if (glm::isnan(gPerFrameConstantBuffer.mCameraDirection.x))
+					gPerFrameConstantBuffer.mCameraDirection = glm::vec4(0,0,1,0);
+			}
+			
+			// Move Camera
+			{
+				float move_speed = gCameraSettings.mMoveRotateSpeed.x;
+				if (ImGui::GetIO().KeyShift)
+					move_speed *= 2.0f;
+				if (ImGui::GetIO().KeyCtrl)
+					move_speed *= 0.1f;
+
+				if (ImGui::IsKeyDown('W'))
+					gPerFrameConstantBuffer.mCameraPosition += gPerFrameConstantBuffer.mCameraDirection * move_speed;
+				if (ImGui::IsKeyDown('S'))
+					gPerFrameConstantBuffer.mCameraPosition -= gPerFrameConstantBuffer.mCameraDirection * move_speed;
+
+				glm::vec4 right = glm::vec4(glm::normalize(glm::cross(glm::vec3(0, 1, 0), glm::vec3(gPerFrameConstantBuffer.mCameraDirection))), 0);
+
+				if (ImGui::IsKeyDown('A'))
+					gPerFrameConstantBuffer.mCameraPosition -= right * move_speed;
+				if (ImGui::IsKeyDown('D'))
+					gPerFrameConstantBuffer.mCameraPosition += right * move_speed;
+			}
+
+			// Frustum
+			{
+				float horizontal_tan = glm::tan(gCameraSettings.mHorizontalFovDegree * 0.5f * glm::pi<float>() / 180.0f);
+
+				glm::vec4 right = glm::vec4(glm::normalize(glm::cross(glm::vec3(0, 1, 0), glm::vec3(gPerFrameConstantBuffer.mCameraDirection))), 0);
+				gPerFrameConstantBuffer.mCameraRightExtend = right * horizontal_tan;
+
+				glm::vec4 up = glm::vec4(glm::normalize(glm::cross(glm::vec3(right), glm::vec3(gPerFrameConstantBuffer.mCameraDirection))), 0);
+				gPerFrameConstantBuffer.mCameraUpExtend = up * horizontal_tan * (gRenderResolution.y * 1.0f / gRenderResolution.x);
+			}
+		}
+
 		// Main window
 		{
 			ImGui::Begin("DXR Playground");
 			{
-				ImGui::Text("Average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-				ImGui::ColorEdit3("Background Color", (float*)& gPerFrameConstantBuffer.mBackgroundColor[0]);
+				ImGui::Text("Average %.3f ms/frame (%.1f FPS) @ %dx%d", 
+					1000.0f / ImGui::GetIO().Framerate, 
+					ImGui::GetIO().Framerate,
+					gRenderResolution.x,
+					gRenderResolution.y);
+				ImGui::ColorEdit3("Background Color", (float*)& gPerFrameConstantBuffer.mBackgroundColor);
+
+				if (ImGui::TreeNodeEx("Camera", ImGuiTreeNodeFlags_DefaultOpen))
+				{
+					if (ImGui::Button("Reset"))
+					{
+						gPerFrameConstantBuffer.mCameraPosition = glm::vec4(0, 0, -5, 0);
+						gPerFrameConstantBuffer.mCameraDirection = glm::vec4(0, 0, 1, 0);
+						
+						gCameraSettings.Reset();
+					}
+					ImGui::InputFloat3("Position", (float*)& gPerFrameConstantBuffer.mCameraPosition);
+					ImGui::InputFloat3("Direction", (float*)& gPerFrameConstantBuffer.mCameraDirection);
+					ImGui::SliderFloat("Horz Fov", (float*)& gCameraSettings.mHorizontalFovDegree, 30.0f, 160.0f);
+					ImGui::InputFloat2("Move/Rotate Speed", (float*)&gCameraSettings.mMoveRotateSpeed);
+
+					ImGui::TreePop();
+				}
 			}
 			ImGui::End();
 		}
@@ -420,31 +518,6 @@ FrameContext * WaitForNextFrameResources()
 	return frameCtxt;
 }
 
-void ResizeSwapChain(HWND hWnd, int width, int height)
-{
-	DXGI_SWAP_CHAIN_DESC1 sd;
-	gSwapChain->GetDesc1(&sd);
-	sd.Width = width;
-	sd.Height = height;
-
-	IDXGIFactory4* dxgiFactory = nullptr;
-	gSwapChain->GetParent(IID_PPV_ARGS(&dxgiFactory));
-
-	gSwapChain->Release();
-	CloseHandle(gSwapChainWaitableObject);
-
-	IDXGISwapChain1* swapChain1 = nullptr;
-	dxgiFactory->CreateSwapChainForHwnd(gD3DCommandQueue, hWnd, &sd, nullptr, nullptr, &swapChain1);
-	swapChain1->QueryInterface(IID_PPV_ARGS(&gSwapChain));
-	swapChain1->Release();
-	dxgiFactory->Release();
-
-	gSwapChain->SetMaximumFrameLatency(NUM_BACK_BUFFERS);
-
-	gSwapChainWaitableObject = gSwapChain->GetFrameLatencyWaitableObject();
-	assert(gSwapChainWaitableObject != nullptr);
-}
-
 // Win32 message handler
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -460,17 +533,21 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			WaitForLastSubmittedFrame();
 
 			// Recreate window size dependent resources
-			CleanupShaderResource();	
+			CleanupShaderTable();
+			CleanupShaderResource();
 			CleanupRenderTarget();
 			// ImGui sample re-create swap chain and stop DXGI_MWA_NO_ALT_ENTER from working
+			gRenderResolution.x = gMax((UINT)LOWORD(lParam), 8u);
+			gRenderResolution.y = gMax((UINT)HIWORD(lParam), 8u);
 			gSwapChain->ResizeBuffers(
 				NUM_BACK_BUFFERS, 
-				gMax((UINT)LOWORD(lParam), 8u), 
-				gMax((UINT)HIWORD(lParam), 8u), 
+				gRenderResolution.x,
+				gRenderResolution.y,
 				DXGI_FORMAT_R8G8B8A8_UNORM, 
 				DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT);
 			CreateRenderTarget();	
 			CreateShaderResource();
+			CreateShaderTable();
 		}
 		return 0;
 	case WM_SYSCOMMAND:

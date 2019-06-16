@@ -9,13 +9,13 @@ static const char kShaderSource[] = R"(
 # modification, are permitted provided that the following conditions
 # are met:
 #  * Redistributions of source code must retain the above copyright
-#    notice, this list of conditions and the following disclaimer.
+#	notice, this list of conditions and the following disclaimer.
 #  * Redistributions in binary form must reproduce the above copyright
-#    notice, this list of conditions and the following disclaimer in the
-#    documentation and/or other materials provided with the distribution.
+#	notice, this list of conditions and the following disclaimer in the
+#	documentation and/or other materials provided with the distribution.
 #  * Neither the name of NVIDIA CORPORATION nor the names of its
-#    contributors may be used to endorse or promote products derived
-#    from this software without specific prior written permission.
+#	contributors may be used to endorse or promote products derived
+#	from this software without specific prior written permission.
 #
 # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
 # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
@@ -33,51 +33,54 @@ RaytracingAccelerationStructure RaytracingScene : register(t0);
 RWTexture2D<float4> RaytracingOutput : register(u0);
 cbuffer PerFrame : register(b0)
 {
-    float3 BackgroundColor;
+	float4 BackgroundColor;
+	float4 CameraPosition;
+	float4 CameraDirection;
+	float4 CameraRightExtend;
+	float4 CameraUpExtend;
 }
 
 cbuffer PerScene : register(b1)
 {
-    float3 A[3];
-    float3 B[3];
-    float3 C[3];
+	float3 A[3];
+	float3 B[3];
+	float3 C[3];
 }
 
 float3 linearToSrgb(float3 c)
 {
-    // Based on http://chilliant.blogspot.com/2012/08/srgb-approximations-for-hlsl.html
-    float3 sq1 = sqrt(c);
-    float3 sq2 = sqrt(sq1);
-    float3 sq3 = sqrt(sq2);
-    float3 srgb = 0.662002687 * sq1 + 0.684122060 * sq2 - 0.323583601 * sq3 - 0.0225411470 * c;
-    return srgb;
+	// Based on http://chilliant.blogspot.com/2012/08/srgb-approximations-for-hlsl.html
+	float3 sq1 = sqrt(c);
+	float3 sq2 = sqrt(sq1);
+	float3 sq3 = sqrt(sq2);
+	float3 srgb = 0.662002687 * sq1 + 0.684122060 * sq2 - 0.323583601 * sq3 - 0.0225411470 * c;
+	return srgb;
 }
 
 struct RayPayload
 {
-    float3 color;
+	float3 color;
 };
 
 [shader("raygeneration")]
 void rayGen()
 {
-    uint3 launchIndex = DispatchRaysIndex();
-    uint3 launchDim = DispatchRaysDimensions();
+	uint3 launchIndex = DispatchRaysIndex();
+	uint3 launchDim = DispatchRaysDimensions();
 
-    float2 crd = float2(launchIndex.xy);
-    float2 dims = float2(launchDim.xy);
+	float2 crd = float2(launchIndex.xy);
+	float2 dims = float2(launchDim.xy);
 
-    float2 d = ((crd/dims) * 2.f - 1.f);
-    float aspectRatio = dims.x / dims.y;
+	float2 d = ((crd/dims) * 2.f - 1.f); // 0~1 => -1~1
+	
+	RayDesc ray;
+	ray.Origin = CameraPosition;
+	ray.Direction = normalize(CameraDirection + CameraRightExtend * d.x + CameraUpExtend * d.y);
+	ray.TMin = 0;				// Near
+	ray.TMax = 100000;			// Far
 
-    RayDesc ray;
-    ray.Origin = float3(0, 0, -2);
-    ray.Direction = normalize(float3(d.x * aspectRatio, -d.y, 1));
-    ray.TMin = 0;
-    ray.TMax = 100000;
-
-    RayPayload payload;
-    TraceRay(
+	RayPayload payload;
+	TraceRay(
 		RaytracingScene, 		// RaytracingAccelerationStructure
 		0,						// RayFlags 
 		0xFF,					// InstanceInclusionMask
@@ -87,14 +90,14 @@ void rayGen()
 		ray,					// RayDesc
 		payload					// payload_t
 	);
-    float3 col = linearToSrgb(payload.color);
-    RaytracingOutput[launchIndex.xy] = float4(col, 1);
+	float3 col = linearToSrgb(payload.color);
+	RaytracingOutput[launchIndex.xy] = float4(col, 1);
 }
 
 [shader("miss")]
 void miss(inout RayPayload payload)
 {
-    payload.color = BackgroundColor;
+	payload.color = BackgroundColor;
 }
 
 [shader("closesthit")]
@@ -103,13 +106,13 @@ void triangleHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttribu
 	// BuiltInTriangleIntersectionAttributes: hit attributes for fixed-function triangle intersection
 
 	uint instanceID = InstanceID();
-    float3 barycentrics = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y, attribs.barycentrics.x, attribs.barycentrics.y);
+	float3 barycentrics = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y, attribs.barycentrics.x, attribs.barycentrics.y);
 	payload.color = A[instanceID] * barycentrics.x + B[instanceID] * barycentrics.y + C[instanceID] * barycentrics.z;
 }
 
 struct ShadowPayload
 {
-    bool hit;
+	bool hit;
 };
 
 [shader("closesthit")]
@@ -123,7 +126,7 @@ void planeHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes
 	// Fire a shadow ray. The direction is hard-coded here, but can be fetched from a constant-buffer
 	RayDesc ray;
 	ray.Origin = hit_position;
-	ray.Direction = normalize(float3(-0.5, 0.5, -0.5));
+	ray.Direction = normalize(float3(-1, 1, -1));
 	ray.TMin = 0.01;
 	ray.TMax = 100000;
 
@@ -242,6 +245,15 @@ void GenerateRayGenLocalRootDesc(RootSignatureDescriptor & outDesc)
 	descriptor_range.RegisterSpace = 0;
 	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 	descriptor_range.OffsetInDescriptorsFromTableStart = 1;
+	outDesc.mDescriptorRanges.push_back(descriptor_range);
+
+	// RaytracingScene - DescriptorRange
+	descriptor_range = {};
+	descriptor_range.BaseShaderRegister = 0;
+	descriptor_range.NumDescriptors = 1;
+	descriptor_range.RegisterSpace = 0;
+	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+	descriptor_range.OffsetInDescriptorsFromTableStart = 2;
 	outDesc.mDescriptorRanges.push_back(descriptor_range);
 
 	// RootDescriptor contains entry of DescriptorTable, DescriptorRange within
@@ -468,7 +480,7 @@ void CreatePipelineState()
 	//  Local root signature and association
 	//  Shader config
 
-	std::array<D3D12_STATE_SUBOBJECT, 18> subobjects;
+	std::array<D3D12_STATE_SUBOBJECT, 64> subobjects;
 	uint32_t index = 0;
 
 	// DXIL library
@@ -517,6 +529,7 @@ void CreatePipelineState()
 	SubobjectToExportsAssociation plane_hit_association(&kPlaneHitShader, 1, &(subobjects[index - 1]));
 	subobjects[index++] = plane_hit_association.mStateSubobject;
 
+#if 0 // Not really needed
 	// Empty local root signature
 	RootSignatureDescriptor empty_local_root_signature_descriptor;
 	empty_local_root_signature_descriptor.mDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
@@ -525,6 +538,7 @@ void CreatePipelineState()
 	const wchar_t* shader_with_empty_associations[] = { kShadowMissShader, kShadowHitShader };
 	SubobjectToExportsAssociation empty_local_root_signature_association(shader_with_empty_associations, ARRAYSIZE(shader_with_empty_associations), &(subobjects[index - 1]));
 	subobjects[index++] = empty_local_root_signature_association.mStateSubobject;
+#endif
 
 	// Shader config
 	//  sizeof(BuiltInTriangleIntersectionAttributes), depends on interaction type
@@ -547,7 +561,7 @@ void CreatePipelineState()
 
 	// Create the state object
 	D3D12_STATE_OBJECT_DESC desc;
-	desc.NumSubobjects = (UINT)subobjects.size();
+	desc.NumSubobjects = index;
 	desc.pSubobjects = subobjects.data();
 	desc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
 

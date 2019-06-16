@@ -133,7 +133,11 @@ extern ID3D12Resource*						gDxrHitConstantBufferResource;
 
 struct PerFrame
 {
-	float mBackgroundColor[4] = { 0.4f, 0.6f, 0.2f, 1.0f };
+	glm::vec4 mBackgroundColor = glm::vec4(0.4f, 0.6f, 0.2f, 1.0f);
+	glm::vec4 mCameraPosition = glm::vec4(0.0f, 0.0f, -5.0f, 0.0f);
+	glm::vec4 mCameraDirection = glm::vec4(0.0f, 0.0f, 1.0f, 0.0f);
+	glm::vec4 mCameraRightExtend = glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
+	glm::vec4 mCameraUpExtend = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
 };
 extern PerFrame								gPerFrameConstantBuffer;
 
