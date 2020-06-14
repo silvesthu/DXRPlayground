@@ -1,4 +1,4 @@
 #pragma once
 
-void CreateShaderTable();
-void CleanupShaderTable();
+void gCreateShaderTable();
+void gCleanupShaderTable();

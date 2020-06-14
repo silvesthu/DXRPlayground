@@ -18,12 +18,21 @@ using Microsoft::WRL::ComPtr;
 
 // Helper
 template <typename T>
-void gSafeRelease(T*& pointer)
+inline void gSafeRelease(T*& inPointer)
 {
-	if (pointer != nullptr)
+	if (inPointer != nullptr)
 	{
-		pointer->Release();
-		pointer = nullptr;
+		inPointer->Release();
+		inPointer = nullptr;
+	}
+}
+
+inline void gSafeCloseHandle(HANDLE& inHandle)
+{
+	if (inHandle != nullptr)
+	{
+		CloseHandle(inHandle);
+		inHandle = nullptr;
 	}
 }
 
@@ -36,6 +45,18 @@ inline void gValidate(HRESULT in)
 		OutputDebugStringA(message);
 		assert(false);
 	}
+}
+
+inline void gBarrierTransition(ID3D12GraphicsCommandList4* inCommandList, ID3D12Resource* inResource, D3D12_RESOURCE_STATES inBefore, D3D12_RESOURCE_STATES inAfter)
+{	
+	D3D12_RESOURCE_BARRIER barrier = {};
+	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+	barrier.Transition.pResource = inResource;
+	barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+	barrier.Transition.StateBefore = inBefore;
+	barrier.Transition.StateAfter = inAfter;
+	inCommandList->ResourceBarrier(1, &barrier);
 }
 
 template <typename T>
@@ -56,35 +77,24 @@ inline T gMax(T inLhs, T inRhs)
 	return inLhs > inRhs ? inLhs : inRhs;
 }
 
-enum 
-{
-	NUM_FRAMES_IN_FLIGHT = 3,
-	NUM_BACK_BUFFERS = 3
-};
+// System
+extern ID3D12Device5*						gDevice;
+extern ID3D12DescriptorHeap* 				gRtvDescHeap;
+extern ID3D12CommandQueue* 					gCommandQueue;
+extern ID3D12GraphicsCommandList4* 			gCommandList;
 
-struct FrameContext
-{
-	ID3D12CommandAllocator*					CommandAllocator;
-	uint64_t								FenceValue;
-};
-
-extern FrameContext							gFrameContext[];
-extern uint32_t								gFrameIndex;
-extern float								gTime;
-
-extern ID3D12Device5*						gD3DDevice;
-extern ID3D12DescriptorHeap* 				gD3DRtvDescHeap;
-extern ID3D12DescriptorHeap* 				gImGuiSrvDescHeap;
-extern ID3D12CommandQueue* 					gD3DCommandQueue;
-extern ID3D12GraphicsCommandList4* 			gD3DCommandList;
-extern ID3D12Fence* 						gFence;
-extern HANDLE                       		gFenceEvent;
+extern ID3D12Fence* 						gIncrementalFence;			// Fence value increment each frame (most time)
+extern HANDLE                       		gIncrementalFenceEvent;		// Allow CPU to wait on fence
 extern uint64_t                       		gFenceLastSignaledValue;
+
 extern IDXGISwapChain3* 					gSwapChain;
 extern HANDLE                       		gSwapChainWaitableObject;
 extern ID3D12Resource*						gBackBufferRenderTargetResource[];
 extern D3D12_CPU_DESCRIPTOR_HANDLE			gBackBufferRenderTargetDescriptor[];
 
+extern ID3D12DescriptorHeap* 				gImGuiSrvDescHeap;
+
+// Application
 struct VertexBuffer
 {
 	ID3D12Resource* mResource = nullptr;
@@ -127,17 +137,37 @@ struct ShaderTable
 extern ShaderTable							gDxrShaderTable;
 
 extern ID3D12Resource*						gDxrOutputResource;
-extern ID3D12Resource*						gDxrConstantBufferResource;
 extern ID3D12DescriptorHeap*				gDxrCbvSrvUavHeap;
 extern ID3D12Resource*						gDxrHitConstantBufferResource;
 
+extern ID3D12Resource*						gConstantGPUBuffer;
+
+// Frame
+enum
+{
+	NUM_FRAMES_IN_FLIGHT = 3,
+	NUM_BACK_BUFFERS = 3
+};
+struct FrameContext
+{
+	ID3D12CommandAllocator*					mCommandAllocator		= nullptr;
+
+	ID3D12Resource*							mConstantUploadBuffer	= nullptr;
+	void*									mConstantUploadBufferPointer = nullptr;
+
+	uint64_t								mFenceValue;
+};
+extern FrameContext							gFrameContext[];
+extern uint32_t								gFrameIndex;
+extern float								gTime;
+
 struct PerFrame
 {
-	glm::vec4 mBackgroundColor = glm::vec4(0.4f, 0.6f, 0.2f, 1.0f);
-	glm::vec4 mCameraPosition = glm::vec4(0.0f, 0.0f, -5.0f, 0.0f);
-	glm::vec4 mCameraDirection = glm::vec4(0.0f, 0.0f, 1.0f, 0.0f);
-	glm::vec4 mCameraRightExtend = glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
-	glm::vec4 mCameraUpExtend = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
+	glm::vec4 mBackgroundColor				= glm::vec4(0.4f, 0.6f, 0.2f, 1.0f);
+	glm::vec4 mCameraPosition				= glm::vec4(0.0f, 0.0f, -5.0f, 0.0f);
+	glm::vec4 mCameraDirection				= glm::vec4(0.0f, 0.0f, 1.0f, 0.0f);
+	glm::vec4 mCameraRightExtend			= glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
+	glm::vec4 mCameraUpExtend				= glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
 };
 extern PerFrame								gPerFrameConstantBuffer;
 

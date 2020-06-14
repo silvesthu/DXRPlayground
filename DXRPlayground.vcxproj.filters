@@ -19,14 +19,11 @@
     <Filter Include="Source\Thirdparty\glm\gtc">
       <UniqueIdentifier>{4cc267fd-7475-485f-bf1d-5be9606714c8}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\ImGui">
+      <UniqueIdentifier>{5b1f4eed-7610-4f7e-b607-708a422cd30a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Source\imgui_impl_win32.h">
-      <Filter>Source</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\imgui_impl_dx12.h">
-      <Filter>Source</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Thirdparty\imgui\imstb_rectpack.h">
       <Filter>Source\Thirdparty\imgui</Filter>
     </ClInclude>
@@ -132,14 +129,17 @@
     <ClInclude Include="Source\Thirdparty\glm\glm\mat4x4.hpp">
       <Filter>Source\Thirdparty\glm</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Scene.h">
+      <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\ImGui\imgui_impl_win32.h">
+      <Filter>Source\ImGui</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\ImGui\imgui_impl_dx12.h">
+      <Filter>Source\ImGui</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Source\imgui_impl_dx12.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\imgui_impl_win32.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Thirdparty\imgui\imgui_widgets.cpp">
       <Filter>Source\Thirdparty\imgui</Filter>
     </ClCompile>
@@ -172,6 +172,15 @@
     </ClCompile>
     <ClCompile Include="Source\Common.cpp">
       <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Scene.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\ImGui\imgui_impl_dx12.cpp">
+      <Filter>Source\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\ImGui\imgui_impl_win32.cpp">
+      <Filter>Source\ImGui</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

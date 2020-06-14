@@ -1,19 +1,10 @@
 #include "AccelerationStructure.h"
 #include "Common.h"
 
-void RayTrace(ID3D12Resource* inFrameRenderTargetResource)
+void gRaytrace(ID3D12Resource* inFrameRenderTargetResource)
 {
 	// Output - Copy -> UAV
-	{
-		D3D12_RESOURCE_BARRIER barrier = {};
-		barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-		barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-		barrier.Transition.pResource = gDxrOutputResource;
-		barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-		barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
-		barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-		gD3DCommandList->ResourceBarrier(1, &barrier);
-	}
+	gBarrierTransition(gCommandList, gDxrOutputResource, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 	// Setup D3D12_DISPATCH_RAYS_DESC
 	D3D12_DISPATCH_RAYS_DESC dispatch_rays_desc = {};
@@ -41,49 +32,22 @@ void RayTrace(ID3D12Resource* inFrameRenderTargetResource)
 	}
 
 	// Bind
-	gD3DCommandList->SetComputeRootSignature(gDxrEmptyRootSignature);
-	gD3DCommandList->SetDescriptorHeaps(1, &gDxrCbvSrvUavHeap);
-	gD3DCommandList->SetPipelineState1(gDxrStateObject);
+	gCommandList->SetComputeRootSignature(gDxrEmptyRootSignature);
+	gCommandList->SetDescriptorHeaps(1, &gDxrCbvSrvUavHeap);
+	gCommandList->SetPipelineState1(gDxrStateObject);
 
 	// Dispatch
-	gD3DCommandList->DispatchRays(&dispatch_rays_desc);
+	gCommandList->DispatchRays(&dispatch_rays_desc);
 
 	// Output: UAV -> Copy
-	{
-		D3D12_RESOURCE_BARRIER barrier = {};
-		barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-		barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-		barrier.Transition.pResource = gDxrOutputResource;
-		barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-		barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-		barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
-		gD3DCommandList->ResourceBarrier(1, &barrier);
-	}
+	gBarrierTransition(gCommandList, gDxrOutputResource, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
 	// RenderTarget: RT -> Dest
-	{
-		D3D12_RESOURCE_BARRIER barrier = {};
-		barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-		barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-		barrier.Transition.pResource = inFrameRenderTargetResource;
-		barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-		barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
-		barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
-		gD3DCommandList->ResourceBarrier(1, &barrier);
-	}
+	gBarrierTransition(gCommandList, inFrameRenderTargetResource, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_DEST);
 
 	// Copy output to render target
-	gD3DCommandList->CopyResource(inFrameRenderTargetResource, gDxrOutputResource);
+	gCommandList->CopyResource(inFrameRenderTargetResource, gDxrOutputResource);
 
 	// RenderTarget: Dest -> RT
-	{
-		D3D12_RESOURCE_BARRIER barrier = {};
-		barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-		barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-		barrier.Transition.pResource = inFrameRenderTargetResource;
-		barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-		barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-		barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-		gD3DCommandList->ResourceBarrier(1, &barrier);
-	}
+	gBarrierTransition(gCommandList, inFrameRenderTargetResource, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_RENDER_TARGET);
 }

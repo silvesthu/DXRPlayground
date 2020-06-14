@@ -13,10 +13,11 @@
   <ItemGroup>
     <ClInclude Include="Source\AccelerationStructure.h" />
     <ClInclude Include="Source\Common.h" />
-    <ClInclude Include="Source\imgui_impl_dx12.h" />
-    <ClInclude Include="Source\imgui_impl_win32.h" />
+    <ClInclude Include="Source\ImGui\imgui_impl_dx12.h" />
+    <ClInclude Include="Source\ImGui\imgui_impl_win32.h" />
     <ClInclude Include="Source\PipelineState.h" />
     <ClInclude Include="Source\RayTrace.h" />
+    <ClInclude Include="Source\Scene.h" />
     <ClInclude Include="Source\ShaderResource.h" />
     <ClInclude Include="Source\ShaderTable.h" />
     <ClInclude Include="Source\Thirdparty\glm\glm\common.hpp" />
@@ -52,11 +53,12 @@
   <ItemGroup>
     <ClCompile Include="Source\AccelerationStructure.cpp" />
     <ClCompile Include="Source\Common.cpp" />
-    <ClCompile Include="Source\imgui_impl_dx12.cpp" />
-    <ClCompile Include="Source\imgui_impl_win32.cpp" />
     <ClCompile Include="Source\DXRPlayground.cpp" />
+    <ClCompile Include="Source\ImGui\imgui_impl_dx12.cpp" />
+    <ClCompile Include="Source\ImGui\imgui_impl_win32.cpp" />
     <ClCompile Include="Source\PipelineState.cpp" />
     <ClCompile Include="Source\RayTrace.cpp" />
+    <ClCompile Include="Source\Scene.cpp" />
     <ClCompile Include="Source\ShaderResource.cpp" />
     <ClCompile Include="Source\ShaderTable.cpp" />
     <ClCompile Include="Source\Thirdparty\imgui\imgui.cpp" />

@@ -22,7 +22,7 @@ struct ShaderTableEntry
 static_assert(sizeof(ShaderTableEntry::mShaderIdentifier) == D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES, "D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES check failed");
 static_assert(sizeof(ShaderTableEntry) == D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT, "D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT check failed");
 
-void CreateShaderTable()
+void gCreateShaderTable()
 {
 	// Construct the table
 	ShaderTableEntry shader_table_entries[16];
@@ -82,7 +82,7 @@ void CreateShaderTable()
 			shader_table_entry_index++;
 
 			memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kPlaneHitGroup), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-			shader_table_entries[shader_table_entry_index].mRootArgument.mHandle = gDxrCbvSrvUavHeap->GetGPUDescriptorHandleForHeapStart().ptr + gD3DDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+			shader_table_entries[shader_table_entry_index].mRootArgument.mHandle = gDxrCbvSrvUavHeap->GetGPUDescriptorHandleForHeapStart().ptr + gDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 			shader_table_entry_index++;
 
 			memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kShadowHitGroup), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
@@ -119,7 +119,7 @@ void CreateShaderTable()
 		bufDesc.SampleDesc.Quality = 0;
 		bufDesc.Width = gDxrShaderTable.mEntrySize * shader_table_entry_index;
 
-		gValidate(gD3DDevice->CreateCommittedResource(&heap_props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gDxrShaderTable.mResource)));
+		gValidate(gDevice->CreateCommittedResource(&heap_props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gDxrShaderTable.mResource)));
 		gDxrShaderTable.mResource->SetName(L"mResource");
 	}
  
@@ -137,7 +137,7 @@ void CreateShaderTable()
 	}
 }
 
-void CleanupShaderTable()
+void gCleanupShaderTable()
 {
 	gSafeRelease(gDxrShaderTable.mResource);
 }

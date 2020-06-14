@@ -22,7 +22,7 @@ void CreateVertexBuffer(void* inData, uint32_t inVertexSize, uint32_t inVertexCo
 	props.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
 	props.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
 
-	gValidate(gD3DDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&outVertexBuffer.mResource)));
+	gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&outVertexBuffer.mResource)));
 	outVertexBuffer.mVertexCount = inVertexCount;
 	outVertexBuffer.mVertexSize = inVertexSize;
 	outVertexBuffer.mResource->SetName(L"VertexBuffer");
@@ -33,7 +33,7 @@ void CreateVertexBuffer(void* inData, uint32_t inVertexSize, uint32_t inVertexCo
 	outVertexBuffer.mResource->Unmap(0, nullptr);
 }
 
-void CreateVertexBuffer()
+void gCreateVertexBuffer()
 {
 	// triangle
 	float triangle[] =
@@ -58,7 +58,7 @@ void CreateVertexBuffer()
 	CreateVertexBuffer(plane, sizeof(float) * 3, 6, gDxrPlaneVertexBuffer);
 }
 
-void CleanupVertexBuffer()
+void gCleanupVertexBuffer()
 {
 	gDxrTriangleVertexBuffer.Release();
 	gDxrPlaneVertexBuffer.Release();
@@ -89,7 +89,7 @@ void CreateBottomLevelAccelerationStructure(const VertexBuffer& inVertexBuffer, 
 		props.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
 
 		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO info = {};
-		gD3DDevice->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &info);
+		gDevice->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &info);
 
 		D3D12_RESOURCE_DESC bufDesc = {};
 		bufDesc.Alignment = 0;
@@ -103,11 +103,11 @@ void CreateBottomLevelAccelerationStructure(const VertexBuffer& inVertexBuffer, 
 		bufDesc.SampleDesc.Count = 1;
 		bufDesc.SampleDesc.Quality = 0;
 		bufDesc.Width = info.ScratchDataSizeInBytes;
-		gValidate(gD3DDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&outBLAS.mScratch)));
+		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&outBLAS.mScratch)));
 		outBLAS.mScratch->SetName(L"BLAS Scratch");
 
 		bufDesc.Width = info.ResultDataMaxSizeInBytes;
-		gValidate(gD3DDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, nullptr, IID_PPV_ARGS(&outBLAS.mDest)));
+		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, nullptr, IID_PPV_ARGS(&outBLAS.mDest)));
 		outBLAS.mDest->SetName(L"BLAS Dest");
 	}
 
@@ -118,7 +118,7 @@ void CreateBottomLevelAccelerationStructure(const VertexBuffer& inVertexBuffer, 
 		asDesc.DestAccelerationStructureData = outBLAS.mDest->GetGPUVirtualAddress();
 		asDesc.ScratchAccelerationStructureData = outBLAS.mScratch->GetGPUVirtualAddress();
 
-		gD3DCommandList->BuildRaytracingAccelerationStructure(&asDesc, 0, nullptr);
+		gCommandList->BuildRaytracingAccelerationStructure(&asDesc, 0, nullptr);
 	}
 
 	// We need to insert a UAV barrier before using the acceleration structures in a raytracing operation
@@ -126,17 +126,17 @@ void CreateBottomLevelAccelerationStructure(const VertexBuffer& inVertexBuffer, 
 		D3D12_RESOURCE_BARRIER uavBarrier = {};
 		uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
 		uavBarrier.UAV.pResource = outBLAS.mDest;
-		gD3DCommandList->ResourceBarrier(1, &uavBarrier);
+		gCommandList->ResourceBarrier(1, &uavBarrier);
 	}
 }
 
-void CreateBottomLevelAccelerationStructure()
+void gCreateBottomLevelAccelerationStructure()
 {
 	CreateBottomLevelAccelerationStructure(gDxrTriangleVertexBuffer, gDxrTriangleBLAS);
 	CreateBottomLevelAccelerationStructure(gDxrPlaneVertexBuffer, gDxrPlaneBLAS);
 }
 
-void CleanupBottomLevelAccelerationStructure()
+void gCleanupBottomLevelAccelerationStructure()
 {
 	gDxrTriangleBLAS.Release();
 	gDxrPlaneBLAS.Release();
@@ -161,7 +161,7 @@ void CreateTopLevelAccelerationStructureInternal(bool inUpdate)
 		D3D12_RESOURCE_BARRIER uavBarrier = {};
 		uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
 		uavBarrier.UAV.pResource = gDxrTopLevelAccelerationStructureDest;
-		gD3DCommandList->ResourceBarrier(1, &uavBarrier);
+		gCommandList->ResourceBarrier(1, &uavBarrier);
 	}
 	else
 	{
@@ -173,7 +173,7 @@ void CreateTopLevelAccelerationStructureInternal(bool inUpdate)
 		props.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
 
 		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO info = {};
-		gD3DDevice->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &info);
+		gDevice->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &info);
 
 		D3D12_RESOURCE_DESC bufDesc = {};
 		bufDesc.Alignment = 0;
@@ -187,17 +187,17 @@ void CreateTopLevelAccelerationStructureInternal(bool inUpdate)
 		bufDesc.SampleDesc.Count = 1;
 		bufDesc.SampleDesc.Quality = 0;
 		bufDesc.Width = info.ScratchDataSizeInBytes;
-		gValidate(gD3DDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&gDxrTopLevelAccelerationStructureScratch)));
+		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&gDxrTopLevelAccelerationStructureScratch)));
 		gDxrTopLevelAccelerationStructureScratch->SetName(L"gDxrTopLevelAccelerationStructureScratch");
 
 		bufDesc.Width = info.ResultDataMaxSizeInBytes;
-		gValidate(gD3DDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, nullptr, IID_PPV_ARGS(&gDxrTopLevelAccelerationStructureDest)));
+		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, nullptr, IID_PPV_ARGS(&gDxrTopLevelAccelerationStructureDest)));
 		gDxrTopLevelAccelerationStructureDest->SetName(L"gDxrTopLevelAccelerationStructureDest");
 
 		props.Type = D3D12_HEAP_TYPE_UPLOAD;
 		bufDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
 		bufDesc.Width = sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instance_count;
-		gValidate(gD3DDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gDxrTopLevelAccelerationStructureInstanceDesc)));
+		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gDxrTopLevelAccelerationStructureInstanceDesc)));
 		gDxrTopLevelAccelerationStructureInstanceDesc->SetName(L"gDxrTopLevelAccelerationStructureInstanceDesc");
 	}
 
@@ -257,7 +257,7 @@ void CreateTopLevelAccelerationStructureInternal(bool inUpdate)
 			asDesc.SourceAccelerationStructureData = gDxrTopLevelAccelerationStructureDest->GetGPUVirtualAddress();
 		}
 
-		gD3DCommandList->BuildRaytracingAccelerationStructure(&asDesc, 0, nullptr);
+		gCommandList->BuildRaytracingAccelerationStructure(&asDesc, 0, nullptr);
 	}
 
 	// We need to insert a UAV barrier before using the acceleration structures in a raytracing operation
@@ -265,38 +265,36 @@ void CreateTopLevelAccelerationStructureInternal(bool inUpdate)
 		D3D12_RESOURCE_BARRIER uavBarrier = {};
 		uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
 		uavBarrier.UAV.pResource = gDxrTopLevelAccelerationStructureDest;
-		gD3DCommandList->ResourceBarrier(1, &uavBarrier);
+		gCommandList->ResourceBarrier(1, &uavBarrier);
 	}
 }
 
-void CreateTopLevelAccelerationStructure()
+void gCreateTopLevelAccelerationStructure()
 {
 	CreateTopLevelAccelerationStructureInternal(false);
 }
 	
-void UpdateTopLevelAccelerationStructure()
+void gUpdateTopLevelAccelerationStructure()
 {
 	CreateTopLevelAccelerationStructureInternal(true);
 }
 
-void CleanupTopLevelAccelerationStructure()
+void gCleanupTopLevelAccelerationStructure()
 {
 	gSafeRelease(gDxrTopLevelAccelerationStructureScratch);
 	gSafeRelease(gDxrTopLevelAccelerationStructureDest);
 	gSafeRelease(gDxrTopLevelAccelerationStructureInstanceDesc);
 }
 
-void ExecuteAccelerationStructureCreation()
+void gExecuteAccelerationStructureCreation()
 {
 	// The tutorial doesn't have any resource lifetime management, so we flush and sync here. 
 	// This is not required by the DXR spec - you can submit the list whenever you like as long as you take care of the resources lifetime.
 
-	gD3DCommandList->Close();
-	gD3DCommandQueue->ExecuteCommandLists(1, (ID3D12CommandList * const*)& gD3DCommandList);
+	gCommandList->Close();
+	gCommandQueue->ExecuteCommandLists(1, (ID3D12CommandList * const*)& gCommandList);
 	uint64_t one_shot_fence_value = 0xff;
-	gD3DCommandQueue->Signal(gFence, one_shot_fence_value);
-	gFence->SetEventOnCompletion(one_shot_fence_value, gFenceEvent);
-	WaitForSingleObject(gFenceEvent, INFINITE);
-
-	// Note that the CommandList is closed here, it will be reset at beginning of render loop
+	gCommandQueue->Signal(gIncrementalFence, one_shot_fence_value); // abuse fence to wait only during initialization
+	gIncrementalFence->SetEventOnCompletion(one_shot_fence_value, gIncrementalFenceEvent);
+	WaitForSingleObject(gIncrementalFenceEvent, INFINITE);
 }

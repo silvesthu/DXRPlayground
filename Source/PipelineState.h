@@ -1,4 +1,4 @@
 #pragma once
 
-void CreatePipelineState();
-void CleanupPipelineState();
+void gCreatePipelineState();
+void gCleanupPipelineState();

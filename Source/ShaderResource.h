@@ -1,4 +1,4 @@
 #pragma once
 
-void CreateShaderResource();
-void CleanupShaderResource();
+void gCreateShaderResource();
+void gCleanupShaderResource();

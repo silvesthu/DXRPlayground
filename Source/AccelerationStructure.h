@@ -1,10 +1,12 @@
 #pragma once
 
-void CreateVertexBuffer();
-void CleanupVertexBuffer();
-void CreateBottomLevelAccelerationStructure();
-void CleanupBottomLevelAccelerationStructure();
-void CreateTopLevelAccelerationStructure();
-void UpdateTopLevelAccelerationStructure();
-void CleanupTopLevelAccelerationStructure();
-void ExecuteAccelerationStructureCreation();
+void gCreateVertexBuffer();
+void gCleanupVertexBuffer();
+
+void gCreateBottomLevelAccelerationStructure();
+void gCleanupBottomLevelAccelerationStructure();
+
+void gCreateTopLevelAccelerationStructure();
+void gUpdateTopLevelAccelerationStructure();
+void gCleanupTopLevelAccelerationStructure();
+void gExecuteAccelerationStructureCreation();

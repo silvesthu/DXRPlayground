@@ -1,7 +1,7 @@
 #include "AccelerationStructure.h"
 #include "Common.h"
 
-void CreateShaderResource()
+void gCreateShaderResource()
 {
 	DXGI_SWAP_CHAIN_DESC1 swap_chain_desc;
 	gSwapChain->GetDesc1(&swap_chain_desc);
@@ -28,34 +28,8 @@ void CreateShaderResource()
 		heap_props.CreationNodeMask = 0;
 		heap_props.VisibleNodeMask = 0;
 
-		gValidate(gD3DDevice->CreateCommittedResource(&heap_props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_COPY_SOURCE, nullptr, IID_PPV_ARGS(&gDxrOutputResource))); // Starting as copy-source to simplify onFrameRender()
+		gValidate(gDevice->CreateCommittedResource(&heap_props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_COPY_SOURCE, nullptr, IID_PPV_ARGS(&gDxrOutputResource))); // Starting as copy-source to simplify onFrameRender()
 		gDxrOutputResource->SetName(L"gDxrOutputResource");
-	}
-
-	// Create CBV resource
-	{
-		D3D12_RESOURCE_DESC resource_desc = {};
-		resource_desc.Alignment = 0;
-		resource_desc.DepthOrArraySize = 1;
-		resource_desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-		resource_desc.Flags = D3D12_RESOURCE_FLAG_NONE;
-		resource_desc.Format = DXGI_FORMAT_UNKNOWN;
-		resource_desc.Width = gAlignUp((UINT)sizeof(PerFrame), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
-		resource_desc.Height = 1;
-		resource_desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-		resource_desc.MipLevels = 1;
-		resource_desc.SampleDesc.Count = 1;
-		resource_desc.SampleDesc.Quality = 0;
-
-		D3D12_HEAP_PROPERTIES heap_props;
-		heap_props.Type = D3D12_HEAP_TYPE_UPLOAD;
-		heap_props.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-		heap_props.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-		heap_props.CreationNodeMask = 0;
-		heap_props.VisibleNodeMask = 0;
-
-		gValidate(gD3DDevice->CreateCommittedResource(&heap_props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gDxrConstantBufferResource)));
-		gDxrConstantBufferResource->SetName(L"gDxrConstantBufferResource");
 	}
 
 	// Create a descriptor heap
@@ -63,7 +37,7 @@ void CreateShaderResource()
 	desc.NumDescriptors = 3;
 	desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-	gValidate(gD3DDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&gDxrCbvSrvUavHeap)));
+	gValidate(gDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&gDxrCbvSrvUavHeap)));
 
 	// Fill the descriptor heap
 	{
@@ -73,7 +47,7 @@ void CreateShaderResource()
 			// Create the UAV. Referenced in GenerateRayGenLocalRootDesc()
 			D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
 			uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-			gD3DDevice->CreateUnorderedAccessView(gDxrOutputResource, nullptr, &uavDesc, handle);
+			gDevice->CreateUnorderedAccessView(gDxrOutputResource, nullptr, &uavDesc, handle);
 		}
 
 		{
@@ -83,18 +57,18 @@ void CreateShaderResource()
 			srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 			srvDesc.RaytracingAccelerationStructure.Location = gDxrTopLevelAccelerationStructureDest->GetGPUVirtualAddress();
 			
-			handle.ptr += gD3DDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-			gD3DDevice->CreateShaderResourceView(nullptr, &srvDesc, handle);
+			handle.ptr += gDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+			gDevice->CreateShaderResourceView(nullptr, &srvDesc, handle);
 		}
 
 		{
 			// Create the CBV. Referenced in GenerateMissRootDesc()
 			D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-			cbvDesc.BufferLocation = gDxrConstantBufferResource->GetGPUVirtualAddress();
+			cbvDesc.BufferLocation = gConstantGPUBuffer->GetGPUVirtualAddress();
 			cbvDesc.SizeInBytes = gAlignUp((UINT)sizeof(PerFrame), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
 
-			handle.ptr += gD3DDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-			gD3DDevice->CreateConstantBufferView(&cbvDesc, handle);
+			handle.ptr += gDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+			gDevice->CreateConstantBufferView(&cbvDesc, handle);
 		}
 	}
 
@@ -120,7 +94,7 @@ void CreateShaderResource()
 		heap_props.CreationNodeMask = 0;
 		heap_props.VisibleNodeMask = 0;
 
-		gValidate(gD3DDevice->CreateCommittedResource(&heap_props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gDxrHitConstantBufferResource)));
+		gValidate(gDevice->CreateCommittedResource(&heap_props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gDxrHitConstantBufferResource)));
 		gDxrHitConstantBufferResource->SetName(L"gDxrHitConstantBufferResource");
 
 		glm::vec4 scene_data[] =
@@ -148,10 +122,9 @@ void CreateShaderResource()
 	}
 }
 
-void CleanupShaderResource()
+void gCleanupShaderResource()
 {
 	gSafeRelease(gDxrHitConstantBufferResource);
 	gSafeRelease(gDxrCbvSrvUavHeap);
-	gSafeRelease(gDxrConstantBufferResource);
 	gSafeRelease(gDxrOutputResource);
 }

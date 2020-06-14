@@ -345,7 +345,7 @@ ComPtr<ID3D12RootSignature> CreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC 
 		return nullptr;
 	}
 	ComPtr<ID3D12RootSignature> root_signature;
-	assert(SUCCEEDED(gD3DDevice->CreateRootSignature(0, signature_blob->GetBufferPointer(), signature_blob->GetBufferSize(), IID_PPV_ARGS(&root_signature))));
+	assert(SUCCEEDED(gDevice->CreateRootSignature(0, signature_blob->GetBufferPointer(), signature_blob->GetBufferSize(), IID_PPV_ARGS(&root_signature))));
 	return root_signature;
 }
 
@@ -461,7 +461,7 @@ struct GlobalRootSignature : public StateSubobjectHolder<ID3D12RootSignature*, D
 	ComPtr<ID3D12RootSignature> mRootSignature; // Necessary?
 };
 
-void CreatePipelineState()
+void gCreatePipelineState()
 {
 	// See D3D12_STATE_SUBOBJECT_TYPE
 	// Note that all pointers should be valid until CreateStateObject
@@ -568,10 +568,10 @@ void CreatePipelineState()
 	// Most validation occurs here
 	// Be sure use correct dll for dxc compiler
 	// e.g. Error "Hash check failed for DXILibrary.pShaderBytecode" appears when dxil.dll is missing
-	gValidate(gD3DDevice->CreateStateObject(&desc, IID_PPV_ARGS(&gDxrStateObject)));
+	gValidate(gDevice->CreateStateObject(&desc, IID_PPV_ARGS(&gDxrStateObject)));
 }
 
-void CleanupPipelineState()
+void gCleanupPipelineState()
 {
 	gSafeRelease(gDxrStateObject);
 }
