@@ -22,6 +22,9 @@
     <Filter Include="Source\ImGui">
       <UniqueIdentifier>{5b1f4eed-7610-4f7e-b607-708a422cd30a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shader">
+      <UniqueIdentifier>{11730d7c-3b75-4639-bdac-502be48ed4ec}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Thirdparty\imgui\imstb_rectpack.h">
@@ -182,5 +185,10 @@
     <ClCompile Include="Source\ImGui\imgui_impl_win32.cpp">
       <Filter>Source\ImGui</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CopyFileToFolders Include="Shader\Shader.hlsl">
+      <Filter>Shader</Filter>
+    </CopyFileToFolders>
   </ItemGroup>
 </Project>

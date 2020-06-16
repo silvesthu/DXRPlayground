@@ -66,6 +66,13 @@
     <ClCompile Include="Source\Thirdparty\imgui\imgui_draw.cpp" />
     <ClCompile Include="Source\Thirdparty\imgui\imgui_widgets.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <CopyFileToFolders Include="Shader\Shader.hlsl">
+      <FileType>Document</FileType>
+      <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)$(Platform)\$(Configuration)\Shader</DestinationFolders>
+      <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)$(Platform)\$(Configuration)\Shader</DestinationFolders>
+    </CopyFileToFolders>
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <ProjectGuid>{1296E4A0-1F08-493D-8453-CD5EF53FF812}</ProjectGuid>
@@ -101,9 +108,11 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
+    <CopyFileBeforeTargets>Run</CopyFileBeforeTargets>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
+    <CopyFileBeforeTargets>Run</CopyFileBeforeTargets>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
