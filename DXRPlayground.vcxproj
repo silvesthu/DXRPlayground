@@ -49,6 +49,7 @@
     <ClInclude Include="Source\Thirdparty\imgui\imstb_rectpack.h" />
     <ClInclude Include="Source\Thirdparty\imgui\imstb_textedit.h" />
     <ClInclude Include="Source\Thirdparty\imgui\imstb_truetype.h" />
+    <ClInclude Include="Source\Thirdparty\tinyobjloader\tiny_obj_loader.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\AccelerationStructure.cpp" />
@@ -65,6 +66,7 @@
     <ClCompile Include="Source\Thirdparty\imgui\imgui_demo.cpp" />
     <ClCompile Include="Source\Thirdparty\imgui\imgui_draw.cpp" />
     <ClCompile Include="Source\Thirdparty\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="Source\Thirdparty\tinyobjloader\tiny_obj_loader.cc" />
   </ItemGroup>
   <ItemGroup>
     <CopyFileToFolders Include="Shader\Shader.hlsl">

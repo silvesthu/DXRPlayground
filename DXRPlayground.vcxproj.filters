@@ -25,6 +25,9 @@
     <Filter Include="Shader">
       <UniqueIdentifier>{11730d7c-3b75-4639-bdac-502be48ed4ec}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\Thirdparty\tinyobjloader">
+      <UniqueIdentifier>{fbe86055-d12a-45fd-924e-e6837332d080}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Thirdparty\imgui\imstb_rectpack.h">
@@ -141,6 +144,9 @@
     <ClInclude Include="Source\ImGui\imgui_impl_dx12.h">
       <Filter>Source\ImGui</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Thirdparty\tinyobjloader\tiny_obj_loader.h">
+      <Filter>Source\Thirdparty\tinyobjloader</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Thirdparty\imgui\imgui_widgets.cpp">
@@ -184,6 +190,9 @@
     </ClCompile>
     <ClCompile Include="Source\ImGui\imgui_impl_win32.cpp">
       <Filter>Source\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Thirdparty\tinyobjloader\tiny_obj_loader.cc">
+      <Filter>Source\Thirdparty\tinyobjloader</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
