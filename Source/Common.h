@@ -47,6 +47,18 @@ inline void gValidate(HRESULT in)
 	}
 }
 
+inline void gDebugPrint(const char* inString)
+{
+	OutputDebugStringA(inString);
+}
+
+template <typename T>
+inline void gDebugPrint(const T& in)
+{
+	std::string str = std::to_string(in) + "\n";
+	OutputDebugStringA(str.c_str());
+}
+
 inline void gBarrierTransition(ID3D12GraphicsCommandList4* inCommandList, ID3D12Resource* inResource, D3D12_RESOURCE_STATES inBefore, D3D12_RESOURCE_STATES inAfter)
 {	
 	D3D12_RESOURCE_BARRIER barrier = {};
