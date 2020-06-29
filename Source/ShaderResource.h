@@ -1,4 +1,4 @@
 #pragma once
 
-void gCreateShaderResource();
+void gCreateShaderResource(D3D12_GPU_VIRTUAL_ADDRESS inAddress);
 void gCleanupShaderResource();

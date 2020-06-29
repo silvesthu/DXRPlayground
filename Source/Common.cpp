@@ -18,14 +18,6 @@ D3D12_CPU_DESCRIPTOR_HANDLE			gBackBufferRenderTargetDescriptor[NUM_BACK_BUFFERS
 ID3D12DescriptorHeap*				gImGuiSrvDescHeap = nullptr;
 
 // Application
-VertexBuffer 						gDxrTriangleVertexBuffer;
-VertexBuffer						gDxrPlaneVertexBuffer;
-BottomLevelAccelerationStructure 	gDxrTriangleBLAS;
-BottomLevelAccelerationStructure 	gDxrPlaneBLAS;
-ID3D12Resource*						gDxrTopLevelAccelerationStructureScratch = nullptr;
-ID3D12Resource*						gDxrTopLevelAccelerationStructureDest = nullptr;
-ID3D12Resource*						gDxrTopLevelAccelerationStructureInstanceDesc = nullptr;
-
 ID3D12RootSignature*				gDxrEmptyRootSignature = nullptr;
 ID3D12StateObject*					gDxrStateObject = nullptr;
 ShaderTable							gDxrShaderTable = {};

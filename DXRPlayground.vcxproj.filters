@@ -48,9 +48,6 @@
     <ClInclude Include="Source\Thirdparty\imgui\imgui_internal.h">
       <Filter>Source\Thirdparty\imgui</Filter>
     </ClInclude>
-    <ClInclude Include="Source\AccelerationStructure.h">
-      <Filter>Source</Filter>
-    </ClInclude>
     <ClInclude Include="Source\ShaderTable.h">
       <Filter>Source</Filter>
     </ClInclude>
@@ -162,9 +159,6 @@
       <Filter>Source\Thirdparty\imgui</Filter>
     </ClCompile>
     <ClCompile Include="Source\DXRPlayground.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\AccelerationStructure.cpp">
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="Source\ShaderTable.cpp">

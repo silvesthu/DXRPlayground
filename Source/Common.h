@@ -13,6 +13,8 @@ using Microsoft::WRL::ComPtr;
 #include <iostream>
 #include <array>
 #include <vector>
+#include <memory>
+#include <functional>
 
 #include "Thirdparty/glm/glm/gtx/transform.hpp"
 
@@ -59,6 +61,13 @@ inline void gDebugPrint(const T& in)
 	OutputDebugStringA(str.c_str());
 }
 
+template <typename T>
+inline void gSetName(ComPtr<T>& inObject, std::wstring inBaseName, std::wstring inName)
+{
+	std::wstring new_name = inBaseName + inName;
+	inObject->SetName(new_name.c_str());
+}
+
 inline void gBarrierTransition(ID3D12GraphicsCommandList4* inCommandList, ID3D12Resource* inResource, D3D12_RESOURCE_STATES inBefore, D3D12_RESOURCE_STATES inAfter)
 {	
 	D3D12_RESOURCE_BARRIER barrier = {};
@@ -68,6 +77,14 @@ inline void gBarrierTransition(ID3D12GraphicsCommandList4* inCommandList, ID3D12
 	barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
 	barrier.Transition.StateBefore = inBefore;
 	barrier.Transition.StateAfter = inAfter;
+	inCommandList->ResourceBarrier(1, &barrier);
+}
+
+inline void gBarrierUAV(ID3D12GraphicsCommandList4* inCommandList, ID3D12Resource* inResource)
+{
+	D3D12_RESOURCE_BARRIER barrier = {};
+	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+	barrier.UAV.pResource = inResource;
 	inCommandList->ResourceBarrier(1, &barrier);
 }
 
@@ -105,32 +122,6 @@ extern ID3D12Resource*						gBackBufferRenderTargetResource[];
 extern D3D12_CPU_DESCRIPTOR_HANDLE			gBackBufferRenderTargetDescriptor[];
 
 extern ID3D12DescriptorHeap* 				gImGuiSrvDescHeap;
-
-// Application
-struct VertexBuffer
-{
-	ID3D12Resource* mResource = nullptr;
-	uint32_t mVertexCount = 0;
-	uint32_t mVertexSize = 0;
-
-	void Release() { gSafeRelease(mResource); }
-};
-extern VertexBuffer 						gDxrTriangleVertexBuffer;
-extern VertexBuffer							gDxrPlaneVertexBuffer;
-
-struct BottomLevelAccelerationStructure
-{
-	ID3D12Resource* mScratch = nullptr;
-	ID3D12Resource* mDest = nullptr;
-
-	void Release() { gSafeRelease(mScratch); gSafeRelease(mDest); }
-};
-extern BottomLevelAccelerationStructure 	gDxrTriangleBLAS;
-extern BottomLevelAccelerationStructure 	gDxrPlaneBLAS;
-
-extern ID3D12Resource* 						gDxrTopLevelAccelerationStructureScratch;
-extern ID3D12Resource* 						gDxrTopLevelAccelerationStructureDest;
-extern ID3D12Resource* 						gDxrTopLevelAccelerationStructureInstanceDesc;
 
 extern ID3D12RootSignature*					gDxrEmptyRootSignature;
 extern ID3D12StateObject* 					gDxrStateObject;

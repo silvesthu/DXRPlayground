@@ -1,7 +1,6 @@
-#include "AccelerationStructure.h"
 #include "Common.h"
 
-void gCreateShaderResource()
+void gCreateShaderResource(D3D12_GPU_VIRTUAL_ADDRESS inTLASAddress)
 {
 	DXGI_SWAP_CHAIN_DESC1 swap_chain_desc;
 	gSwapChain->GetDesc1(&swap_chain_desc);
@@ -55,7 +54,7 @@ void gCreateShaderResource()
 			D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 			srvDesc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
 			srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			srvDesc.RaytracingAccelerationStructure.Location = gDxrTopLevelAccelerationStructureDest->GetGPUVirtualAddress();
+			srvDesc.RaytracingAccelerationStructure.Location = inTLASAddress;
 			
 			handle.ptr += gDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 			gDevice->CreateShaderResourceView(nullptr, &srvDesc, handle);

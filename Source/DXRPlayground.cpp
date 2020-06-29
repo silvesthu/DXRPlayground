@@ -10,6 +10,7 @@
 #define DX12_ENABLE_DEBUG_LAYER			(1)
 
 static const wchar_t*					kApplicationTitleW = L"DXR Playground";
+static const char*						kSceneFilename = "Asset/raytracing-references/cornellbox/cornellbox.obj";
 
 struct CameraSettings
 {
@@ -44,17 +45,7 @@ static void sUpdate();
 static void sRender();
 static LRESULT WINAPI sWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
-void CleanupApplication()
-{
-	gCleanupScene();
-}
-
-void CreateApplication()
-{
-	gCreateScene();
-}
-
-void sUpdate()
+static void sUpdate()
 {
 	// Rotate Camera
 	{
@@ -177,8 +168,16 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 	}
 	sCreateRenderTarget();
 
-	// Customization - Create
-	CreateApplication();
+	// Create Scene
+	gScene.Load(kSceneFilename);
+	gScene.Build(gCommandList);
+
+	gCommandList->Close();
+	gCommandQueue->ExecuteCommandLists(1, (ID3D12CommandList* const*)&gCommandList);
+	uint64_t one_shot_fence_value = 0xff;
+	gCommandQueue->Signal(gIncrementalFence, one_shot_fence_value); // abuse fence to wait only during initialization
+	gIncrementalFence->SetEventOnCompletion(one_shot_fence_value, gIncrementalFenceEvent);
+	WaitForSingleObject(gIncrementalFenceEvent, INFINITE);
 
 	// Show the window
 	::ShowWindow(hwnd, SW_SHOWDEFAULT);
@@ -230,7 +229,7 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 		ImGui::DestroyContext();
 
 		// Customization - Cleanup
-		CleanupApplication();
+		gScene.Unload();
 
 		sCleanupRenderTarget();
 		sCleanupDeviceD3D();
@@ -259,7 +258,7 @@ void sRender()
 
 	// Update and Upload
 	{
-		gUpdateScene();
+		gScene.Update(gCommandList);
 	}
 
 	// Upload
@@ -597,7 +596,7 @@ static LRESULT WINAPI sWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam
 		{
 			sWaitForLastSubmittedFrame();
 
-			gRebuildBinding([&]()
+			gScene.RebuildBinding([&]()
 			{
 				sCleanupRenderTarget();
 				// ImGui sample re-create swap chain and stop DXGI_MWA_NO_ALT_ENTER from working

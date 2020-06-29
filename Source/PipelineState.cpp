@@ -1,4 +1,3 @@
-#include "AccelerationStructure.h"
 #include "Common.h"
 
 #include <fstream>

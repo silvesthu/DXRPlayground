@@ -11,7 +11,6 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Source\AccelerationStructure.h" />
     <ClInclude Include="Source\Common.h" />
     <ClInclude Include="Source\ImGui\imgui_impl_dx12.h" />
     <ClInclude Include="Source\ImGui\imgui_impl_win32.h" />
@@ -52,7 +51,6 @@
     <ClInclude Include="Source\Thirdparty\tinyobjloader\tiny_obj_loader.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Source\AccelerationStructure.cpp" />
     <ClCompile Include="Source\Common.cpp" />
     <ClCompile Include="Source\DXRPlayground.cpp" />
     <ClCompile Include="Source\ImGui\imgui_impl_dx12.cpp" />
