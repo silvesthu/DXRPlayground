@@ -51,11 +51,11 @@ static D3D12_RESOURCE_DESC sGetUAVResourceDesc(UINT64 inWidth)
 	return desc;
 }
 
-VertexBuffer::VertexBuffer(void* inData, uint32_t inVertexSize, uint32_t inVertexCount, std::wstring inName)
+Primitive::Primitive(void* inVertexData, uint32_t inVertexSize, uint32_t inVertexCount, void* inIndexData, uint32_t inIndexCount, std::wstring inName)
 {
 	mVertexCount = inVertexCount;
 	mVertexSize = inVertexSize;
-	uint64_t size_in_bytes = mVertexSize * mVertexCount;
+	mIndexCount = inIndexCount;
 
 	D3D12_RESOURCE_DESC desc = {};
 	desc.Alignment = 0;
@@ -68,7 +68,6 @@ VertexBuffer::VertexBuffer(void* inData, uint32_t inVertexSize, uint32_t inVerte
 	desc.MipLevels = 1;
 	desc.SampleDesc.Count = 1;
 	desc.SampleDesc.Quality = 0;
-	desc.Width = size_in_bytes;
 
 	D3D12_HEAP_PROPERTIES props;
 	memset(&props, 0, sizeof(D3D12_HEAP_PROPERTIES));
@@ -76,28 +75,48 @@ VertexBuffer::VertexBuffer(void* inData, uint32_t inVertexSize, uint32_t inVerte
 	props.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
 	props.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
 
-	gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mResource)));
-	gSetName(mResource, inName, L".VertextBuffer");
+	{
+		desc.Width = GetVertexSize() * GetVertexCount();
+		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mVertexBufferResource)));
+		gSetName(mVertexBufferResource, inName, L".VertextBuffer");
 
-	uint8_t* pData = nullptr;
-	mResource->Map(0, nullptr, (void**)&pData);
-	memcpy(pData, inData, size_in_bytes);
-	mResource->Unmap(0, nullptr);
+		uint8_t* pData = nullptr;
+		mVertexBufferResource->Map(0, nullptr, (void**)&pData);
+		memcpy(pData, inVertexData, desc.Width);
+		mVertexBufferResource->Unmap(0, nullptr);
+	}
+
+	{
+		desc.Width = GetIndexSize() * GetIndexCount();
+		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mIndexBufferResource)));
+		gSetName(mIndexBufferResource, inName, L".IndexBuffer");
+
+		uint8_t* pData = nullptr;
+		mIndexBufferResource->Map(0, nullptr, (void**)&pData);
+		memcpy(pData, inIndexData, desc.Width);
+		mIndexBufferResource->Unmap(0, nullptr);
+	}
 }
 
-void BLAS::Initialize(std::vector<VertexBufferRef>&& inVertexBuffers)
+void BLAS::Initialize(std::vector<PrimitiveRef>&& inPrimitives)
 {
-	mVertexBuffers = std::move(inVertexBuffers);
+	mPrimitives = std::move(inPrimitives);
 
 	mDescs.clear();
-	for (auto&& vertex_buffer : mVertexBuffers)
+	for (auto&& primitive : mPrimitives)
 	{
 		D3D12_RAYTRACING_GEOMETRY_DESC desc = {};
 		desc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-		desc.Triangles.VertexBuffer.StartAddress = vertex_buffer->GetResource()->GetGPUVirtualAddress();
-		desc.Triangles.VertexBuffer.StrideInBytes = vertex_buffer->GetVertexSize();
+		desc.Triangles.VertexBuffer.StartAddress = primitive->GetResource()->GetGPUVirtualAddress();
+		desc.Triangles.VertexBuffer.StrideInBytes = primitive->GetVertexSize();
 		desc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-		desc.Triangles.VertexCount = vertex_buffer->GetVertexCount();
+		desc.Triangles.VertexCount = primitive->GetVertexCount();
+		if (primitive->GetIndexCount() > 0)
+		{
+			desc.Triangles.IndexBuffer = primitive->GetIndexBufferResource()->GetGPUVirtualAddress();
+			desc.Triangles.IndexCount = primitive->GetIndexCount();
+			desc.Triangles.IndexFormat = DXGI_FORMAT_R16_UINT;
+		}
 		desc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
 		mDescs.push_back(desc);
 	}
@@ -230,7 +249,7 @@ void TLAS::UpdateObjectInstances()
 	}
 }
 
-void sSetupTestScene(std::vector<ObjectInstanceRef>& object_instances)
+void sSetupTestScene(std::vector<ObjectInstanceRef>& ioObjectInstances)
 {
 	{
 		// triangle
@@ -241,8 +260,15 @@ void sSetupTestScene(std::vector<ObjectInstanceRef>& object_instances)
 			-0.866f,	-0.5f,		+0.0f,
 		};
 
-		std::vector<VertexBufferRef> buffers;
-		buffers.push_back(std::make_shared<VertexBuffer>(vertices, uint32_t(sizeof(float) * 3), 3, L"Triangle"));
+		uint16_t indices[] =
+		{
+			0,
+			1,
+			2
+		};
+
+		std::vector<PrimitiveRef> buffers;
+		buffers.push_back(std::make_shared<Primitive>(vertices, uint32_t(sizeof(float) * 3), 3, indices, 3, L"Triangle"));
 
 		BLASRef blas = std::make_shared<BLAS>(L"Triangle");
 		blas->Initialize(std::move(buffers));
@@ -260,7 +286,7 @@ void sSetupTestScene(std::vector<ObjectInstanceRef>& object_instances)
 				transform = glm::rotate(transform, gTime * rotate_speed, glm::vec3(0.f, 1.f, 0.f));
 				transform = glm::transpose(transform); // Column-major => Row-major
 			});
-			object_instances.push_back(object_instance);
+			ioObjectInstances.push_back(object_instance);
 		}
 	}
 	{
@@ -276,14 +302,25 @@ void sSetupTestScene(std::vector<ObjectInstanceRef>& object_instances)
 			+10.0f,		-1.0f,		+10.0f,
 		};
 
-		std::vector<VertexBufferRef> buffers;
-		buffers.push_back(std::make_shared<VertexBuffer>(vertices, uint32_t(sizeof(float) * 3), 6, L"Plane"));
+		uint16_t indices[] =
+		{
+			0,
+			1,
+			2,
+
+			3,
+			4,
+			5,
+		};
+
+		std::vector<PrimitiveRef> buffers;
+		buffers.push_back(std::make_shared<Primitive>(vertices, uint32_t(sizeof(float) * 3), 6, indices, 6, L"Plane"));
 
 		BLASRef blas = std::make_shared<BLAS>(L"Plane");
 		blas->Initialize(std::move(buffers));
 
 		ObjectInstanceRef object_instance = std::make_shared<ObjectInstance>(blas, glm::mat4(1), 2, 0);
-		object_instances.push_back(object_instance);
+		ioObjectInstances.push_back(object_instance);
 	}
 }
 
@@ -305,7 +342,9 @@ void Scene::Load(const char* inFilename)
 
 	mTLAS = std::make_shared<TLAS>(L"Scene");
 	std::vector<ObjectInstanceRef> object_instances;
+	
 	sSetupTestScene(object_instances);
+	
 	mTLAS->Initialize(std::move(object_instances));
 
 	gCreatePipelineState();

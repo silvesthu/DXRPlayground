@@ -2,22 +2,29 @@
 
 #include "Common.h"
 
-class VertexBuffer final
+class Primitive final
 {
 public:
-	VertexBuffer(void* inData, uint32_t inVertexSize, uint32_t inVertexCount, std::wstring inName);
-	~VertexBuffer() {}
+	Primitive(void* inVertexData, uint32_t inVertexSize, uint32_t inVertexCount, void* inIndexData, uint32_t inIndexCount, std::wstring inName);
+	~Primitive() {}
 
-	const ComPtr<ID3D12Resource>& GetResource() const { return mResource; }
+	const ComPtr<ID3D12Resource>& GetResource() const { return mVertexBufferResource; }
 	uint32_t GetVertexCount() const { return mVertexCount; }
 	uint32_t GetVertexSize() const { return mVertexSize; }
 
+	const ComPtr<ID3D12Resource>& GetIndexBufferResource() const { return mIndexBufferResource; }
+	uint32_t GetIndexCount() const { return mIndexCount; }
+	uint32_t GetIndexSize() const { return sizeof(uint16_t); }
+
 private:
-	ComPtr<ID3D12Resource> mResource = nullptr;
+	ComPtr<ID3D12Resource> mVertexBufferResource = nullptr;
 	uint32_t mVertexCount = 0;
 	uint32_t mVertexSize = 0;
+
+	ComPtr<ID3D12Resource> mIndexBufferResource = nullptr;
+	uint32_t mIndexCount = 0;
 };
-using VertexBufferRef = std::shared_ptr<VertexBuffer>;
+using PrimitiveRef = std::shared_ptr<Primitive>;
 
 class BLAS final
 {
@@ -25,14 +32,14 @@ public:
 	BLAS(std::wstring inName) { mName = inName; }
 	~BLAS() {}
 
-	void Initialize(std::vector<VertexBufferRef>&& inVertexBuffers);
+	void Initialize(std::vector<PrimitiveRef>&& inPrimitives);
 	void Build(ID3D12GraphicsCommandList4* inCommandList);
 
 	D3D12_GPU_VIRTUAL_ADDRESS GetGPUVirtualAddress() const { return mDest->GetGPUVirtualAddress(); }
 
 private:
 
-	std::vector<VertexBufferRef> mVertexBuffers;
+	std::vector<PrimitiveRef> mPrimitives;
 
 	std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> mDescs;
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS mInputs = {};
