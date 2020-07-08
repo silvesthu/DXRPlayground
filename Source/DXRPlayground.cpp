@@ -10,7 +10,30 @@
 #define DX12_ENABLE_DEBUG_LAYER			(1)
 
 static const wchar_t*					kApplicationTitleW = L"DXR Playground";
-static const char*						kSceneFilename = "Asset/raytracing-references/cornellbox/cornellbox.obj";
+
+enum class SCENE_PRESET_TYPE
+{
+	TEST,
+	CORNELL_BOX,
+
+	COUNT,
+};
+
+struct ScenePreset
+{
+	const char* mName;
+	const char* mPath;
+	glm::vec4 mCameraPosition;
+	glm::vec4 mCameraDirection;
+};
+
+static ScenePreset kScenePresets[(int)SCENE_PRESET_TYPE::COUNT] =
+{
+	{ "Test", nullptr, glm::vec4(0.0f, 0.0f, -5.0f, 0.0f), glm::vec4(0.0f, 0.0f, 1.0f, 0.0f) },
+	{ "CornellBox", "Asset/raytracing-references/cornellbox/cornellbox.obj", glm::vec4(0.0f, 1.0f, 3.0f, 0.0f), glm::vec4(0.0f, 0.0f, -1.0f, 0.0f) },
+};
+static SCENE_PRESET_TYPE sCurrentScene = SCENE_PRESET_TYPE::CORNELL_BOX;
+static SCENE_PRESET_TYPE sPreviousScene = SCENE_PRESET_TYPE::CORNELL_BOX;
 
 struct CameraSettings
 {
@@ -39,6 +62,7 @@ static bool sCreateDeviceD3D(HWND hWnd);
 static void sCleanupDeviceD3D();
 static void sCreateRenderTarget();
 static void sCleanupRenderTarget();
+static void sWaitForIdle();
 static void sWaitForLastSubmittedFrame();
 static FrameContext* sWaitForNextFrameResources();
 static void sUpdate();
@@ -121,14 +145,23 @@ static void sUpdate()
 			{
 				if (ImGui::Button("Reset"))
 				{
-					gPerFrameConstantBuffer.mCameraPosition = glm::vec4(0, 0, -5, 0);
-					gPerFrameConstantBuffer.mCameraDirection = glm::vec4(0, 0, 1, 0);
+					gPerFrameConstantBuffer.mCameraPosition = kScenePresets[(int)sCurrentScene].mCameraPosition;
+					gPerFrameConstantBuffer.mCameraDirection = kScenePresets[(int)sCurrentScene].mCameraDirection;
 
 					gCameraSettings.Reset();
 				}
 				ImGui::InputFloat3("Position", (float*)&gPerFrameConstantBuffer.mCameraPosition);
 				ImGui::InputFloat3("Direction", (float*)&gPerFrameConstantBuffer.mCameraDirection);
 				ImGui::SliderFloat("Horz Fov", (float*)&gCameraSettings.mHorizontalFovDegree, 30.0f, 160.0f);
+
+				ImGui::TreePop();
+			}
+
+			if (ImGui::TreeNodeEx("Scene"))
+			{
+				for (int i = 0; i < (int)SCENE_PRESET_TYPE::COUNT; i++)
+					if (ImGui::RadioButton(kScenePresets[i].mName, (int*)&sCurrentScene, i))
+						sCurrentScene = (SCENE_PRESET_TYPE)i;
 
 				ImGui::TreePop();
 			}
@@ -169,8 +202,10 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 	sCreateRenderTarget();
 
 	// Create Scene
-	gScene.Load(kSceneFilename);
+	gScene.Load(kScenePresets[(int)sCurrentScene].mPath);
 	gScene.Build(gCommandList);
+	gPerFrameConstantBuffer.mCameraPosition = kScenePresets[(int)sCurrentScene].mCameraPosition;
+	gPerFrameConstantBuffer.mCameraDirection = kScenePresets[(int)sCurrentScene].mCameraDirection;
 
 	gCommandList->Close();
 	gCommandQueue->ExecuteCommandLists(1, (ID3D12CommandList* const*)&gCommandList);
@@ -258,7 +293,21 @@ void sRender()
 
 	// Update and Upload
 	{
-		gScene.Update(gCommandList);
+		if (sPreviousScene != sCurrentScene)
+		{
+			sPreviousScene = sCurrentScene;
+
+			sWaitForIdle();
+
+			gScene.Unload();
+			gScene.Load(kScenePresets[(int)sCurrentScene].mPath);
+			gScene.Build(gCommandList);
+
+			gPerFrameConstantBuffer.mCameraPosition = kScenePresets[(int)sCurrentScene].mCameraPosition;
+			gPerFrameConstantBuffer.mCameraDirection = kScenePresets[(int)sCurrentScene].mCameraDirection;
+		}
+		else
+			gScene.Update(gCommandList);
 	}
 
 	// Upload
@@ -541,6 +590,12 @@ static void sCleanupRenderTarget()
 {
 	for (UINT i = 0; i < NUM_BACK_BUFFERS; i++)
 		gSafeRelease(gBackBufferRenderTargetResource[i]);
+}
+
+static void sWaitForIdle()
+{
+	gIncrementalFence->SetEventOnCompletion(gFenceLastSignaledValue, gIncrementalFenceEvent);
+	WaitForSingleObject(gIncrementalFenceEvent, INFINITE);
 }
 
 static void sWaitForLastSubmittedFrame()

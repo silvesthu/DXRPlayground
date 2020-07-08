@@ -5,7 +5,7 @@
 class Primitive final
 {
 public:
-	Primitive(void* inVertexData, uint32_t inVertexSize, uint32_t inVertexCount, void* inIndexData, uint32_t inIndexCount, std::wstring inName);
+	Primitive(const void* inVertexData, uint32_t inVertexSize, uint32_t inVertexCount, const void* inIndexData, uint32_t inIndexCount, std::wstring inName);
 	~Primitive() {}
 
 	const ComPtr<ID3D12Resource>& GetResource() const { return mVertexBufferResource; }

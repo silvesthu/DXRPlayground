@@ -51,7 +51,7 @@ static D3D12_RESOURCE_DESC sGetUAVResourceDesc(UINT64 inWidth)
 	return desc;
 }
 
-Primitive::Primitive(void* inVertexData, uint32_t inVertexSize, uint32_t inVertexCount, void* inIndexData, uint32_t inIndexCount, std::wstring inName)
+Primitive::Primitive(const void* inVertexData, uint32_t inVertexSize, uint32_t inVertexCount, const void* inIndexData, uint32_t inIndexCount, std::wstring inName)
 {
 	mVertexCount = inVertexCount;
 	mVertexSize = inVertexSize;
@@ -276,7 +276,7 @@ void sSetupTestScene(std::vector<ObjectInstanceRef>& ioObjectInstances)
 		// TODO: initialize all materials first to get hit group index?
 		for (int i = 0; i < 3; i++)
 		{
-			ObjectInstanceRef object_instance = std::make_shared<ObjectInstance>(blas, glm::mat4(1), 0, i);
+			ObjectInstanceRef object_instance = std::make_shared<ObjectInstance>(blas, glm::mat4(1), kUVHitGroup, i);
 			object_instance->SetUpdater([](ObjectInstance* object_instance)
 			{
 				glm::mat4& transform = object_instance->GetTransform();
@@ -319,31 +319,67 @@ void sSetupTestScene(std::vector<ObjectInstanceRef>& ioObjectInstances)
 		BLASRef blas = std::make_shared<BLAS>(L"Plane");
 		blas->Initialize(std::move(buffers));
 
-		ObjectInstanceRef object_instance = std::make_shared<ObjectInstance>(blas, glm::mat4(1), 2, 0);
+		ObjectInstanceRef object_instance = std::make_shared<ObjectInstance>(blas, glm::mat4(1), kGreyHitGroup, 0);
 		ioObjectInstances.push_back(object_instance);
 	}
 }
 
 void Scene::Load(const char* inFilename)
 {
-	tinyobj::attrib_t attrib;
-	std::vector<tinyobj::shape_t> shapes;
-	std::vector<tinyobj::material_t> materials;
-
-	std::string warn;
-	std::string err;
-	tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, inFilename);
-
-	if (!warn.empty())
-		gDebugPrint(warn.c_str());
-
-	if (!err.empty())
-		gDebugPrint(err.c_str());
-
 	mTLAS = std::make_shared<TLAS>(L"Scene");
 	std::vector<ObjectInstanceRef> object_instances;
-	
-	sSetupTestScene(object_instances);
+
+	if (inFilename != nullptr)
+	{		
+		tinyobj::ObjReader reader;
+		reader.ParseFromFile(inFilename);
+
+		if (!reader.Warning().empty())
+			gDebugPrint(reader.Warning().c_str());
+
+		if (!reader.Error().empty())
+			gDebugPrint(reader.Error().c_str());
+
+		for (auto&& shape : reader.GetShapes())
+		{
+			std::vector<uint16_t> indices;
+			for (size_t face_index = 0; face_index < shape.mesh.num_face_vertices.size(); face_index++)
+			{
+				const int kNumFaceVerticesTriangle = 3;
+				assert(shape.mesh.num_face_vertices[face_index] == kNumFaceVerticesTriangle);
+				for (size_t vertex_index = 0; vertex_index < kNumFaceVerticesTriangle; vertex_index++)
+				{
+					tinyobj::index_t idx = shape.mesh.indices[face_index * kNumFaceVerticesTriangle + vertex_index];
+					indices.push_back(uint16_t(idx.vertex_index));
+
+					// tinyobj::real_t vx = attrib.vertices[3 * idx.vertex_index + 0];
+					// tinyobj::real_t vy = attrib.vertices[3 * idx.vertex_index + 1];
+					// tinyobj::real_t vz = attrib.vertices[3 * idx.vertex_index + 2];
+					// tinyobj::real_t nx = attrib.normals[3 * idx.normal_index + 0];
+					// tinyobj::real_t ny = attrib.normals[3 * idx.normal_index + 1];
+					// tinyobj::real_t nz = attrib.normals[3 * idx.normal_index + 2];
+					// tinyobj::real_t tx = attrib.texcoords[2 * idx.texcoord_index + 0];
+					// tinyobj::real_t ty = attrib.texcoords[2 * idx.texcoord_index + 1];
+					// tinyobj::real_t red = attrib.colors[3*idx.vertex_index+0];
+					// tinyobj::real_t green = attrib.colors[3*idx.vertex_index+1];
+					// tinyobj::real_t blue = attrib.colors[3*idx.vertex_index+2];
+				}
+			}
+
+			std::wstring name(shape.name.begin(), shape.name.end());
+
+			std::vector<PrimitiveRef> buffers;
+			buffers.push_back(std::make_shared<Primitive>(reader.GetAttrib().vertices.data(), uint32_t(sizeof(float) * 3), uint32_t(reader.GetAttrib().vertices.size()), indices.data(), uint32_t(indices.size()), name));
+
+			BLASRef blas = std::make_shared<BLAS>(name);
+			blas->Initialize(std::move(buffers));
+
+			ObjectInstanceRef object_instance = std::make_shared<ObjectInstance>(blas, glm::mat4(1), kUVHitGroup, 0);
+			object_instances.push_back(object_instance);
+		}
+	}
+	else
+		sSetupTestScene(object_instances);
 	
 	mTLAS->Initialize(std::move(object_instances));
 
@@ -354,8 +390,8 @@ void Scene::Load(const char* inFilename)
 
 void Scene::Unload()
 {
-	gCleanupShaderResource();
 	gCleanupShaderTable();
+	gCleanupShaderResource();
 	gCleanupPipelineState();
 
 	mTLAS = nullptr;

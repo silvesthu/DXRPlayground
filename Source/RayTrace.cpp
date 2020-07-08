@@ -1,4 +1,3 @@
-#include "AccelerationStructure.h"
 #include "Common.h"
 
 void gRaytrace(ID3D12Resource* inFrameRenderTargetResource)
