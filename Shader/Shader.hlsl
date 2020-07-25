@@ -1,6 +1,5 @@
-RaytracingAccelerationStructure RaytracingScene : register(t0);
 RWTexture2D<float4> RaytracingOutput : register(u0);
-
+RaytracingAccelerationStructure RaytracingScene : register(t0);
 cbuffer PerFrame : register(b0)
 {
 	float4 BackgroundColor;
@@ -8,13 +7,6 @@ cbuffer PerFrame : register(b0)
 	float4 CameraDirection;
 	float4 CameraRightExtend;
 	float4 CameraUpExtend;
-}
-
-cbuffer PerScene : register(b1)
-{
-	float3 A[3];
-	float3 B[3];
-	float3 C[3];
 }
 
 float3 linearToSrgb(float3 c)
@@ -73,11 +65,8 @@ void miss(inout RayPayload payload)
 [shader("closesthit")]
 void triangleHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attribs)
 {
-	// BuiltInTriangleIntersectionAttributes: hit attributes for fixed-function triangle intersection
-
-	uint instanceID = InstanceID();
 	float3 barycentrics = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y, attribs.barycentrics.x, attribs.barycentrics.y);
-	payload.color = A[instanceID] * barycentrics.x + B[instanceID] * barycentrics.y + C[instanceID] * barycentrics.z;
+	payload.color = barycentrics;
 }
 
 struct ShadowPayload
@@ -100,25 +89,27 @@ void planeHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes
 	ray.TMin = 0.01;
 	ray.TMax = 100000;
 
-	// See also https://sites.google.com/site/monshonosuana/directxno-hanashi-1/directx-153
-	// HitGroup Shader Index in Shader Table = 
-	//	InstanceContributionToHitGroupIndex + RayContributionToHitGroupIndex + (GeometryContributionToHitGroupIndex * MultiplierForGeometryContributionToHitGroupIndex)
-	//
-	// InstanceContributionToHitGroupIndex: TLAS - basically for material
-	// RayContributionToHitGroupIndex: RayDesc - basically for nth ray
-	// GeometryContribution: BLAS - automatically assigned
-	// MultiplierForGeometryContributionToHitGroupIndex: RayDesc - maybe same BLAS but different material set?
+	// http://intro-to-dxr.cwyman.org/presentations/IntroDXR_RaytracingAPI.pdf
+	// HitGroupRecordAddress =
+	// 	start + stride * (rayContribution + (geometryMultiplier * geometryContribution) + instanceContribution)
+	// where:
+	// 	start = D3D12_DISPATCH_RAYS_DESC.HitGroupTable.StartAddress
+	// 	stride = D3D12_DISPATCH_RAYS_DESC.HitGroupTable.StrideInBytes
+	// 	rayContribution = RayContributionToHitGroupIndex (TraceRay parameter)
+	// 	geometryMultiplier = MultiplierForGeometryContributionToHitGroupIndex (TraceRay parameter)
+	// 	geometryContribution = index of geometry in bottom-level acceleration structure (0,1,2,3..)
+	// 	instanceContribution = D3D12_RAYTRACING_INSTANCE_DESC.InstanceContributionToHitGroupIndex
 
 	ShadowPayload shadowPayload;
 	TraceRay(
-			RaytracingScene,	// RaytracingAccelerationStructure
-			0,					// RayFlags 
-			0xFF,				// InstanceInclusionMask
-			1,					// RayContributionToHitGroupIndex, 4bits
-			0,					// MultiplierForGeometryContributuionToHitGroupIndex, 16bits
-			1,					// MissShaderIndex
-			ray,				// RayDesc
-			shadowPayload		// payload_t
+		RaytracingScene,	// RaytracingAccelerationStructure
+		0,					// RayFlags 
+		0xFF,				// InstanceInclusionMask
+		1,					// RayContributionToHitGroupIndex, 4bits
+		0,					// MultiplierForGeometryContributuionToHitGroupIndex, 16bits
+		1,					// MissShaderIndex
+		ray,				// RayDesc
+		shadowPayload		// payload_t
 	);
 
 	float shadow_factor = shadowPayload.hit ? 0.0 : 1.0;

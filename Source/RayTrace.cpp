@@ -31,8 +31,9 @@ void gRaytrace(ID3D12Resource* inFrameRenderTargetResource)
 	}
 
 	// Bind
-	gCommandList->SetComputeRootSignature(gDxrEmptyRootSignature);
+	gCommandList->SetComputeRootSignature(gDxrGlobalRootSignature);
 	gCommandList->SetDescriptorHeaps(1, &gDxrCbvSrvUavHeap);
+	gCommandList->SetComputeRootDescriptorTable(0, gDxrCbvSrvUavHeap->GetGPUDescriptorHandleForHeapStart());
 	gCommandList->SetPipelineState1(gDxrStateObject);
 
 	// Dispatch

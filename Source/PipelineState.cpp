@@ -59,109 +59,46 @@ struct RootSignatureDescriptor
 	std::vector<D3D12_ROOT_PARAMETER> mRootParameters;
 };
 
-void GenerateRayGenLocalRootDesc(RootSignatureDescriptor & outDesc)
+void GenerateGlobalRootSignatureDescriptor(RootSignatureDescriptor& outDesc)
 {
-	// RaytracingOutput - DescriptorRange
+	// u0
 	D3D12_DESCRIPTOR_RANGE descriptor_range = {};
 	descriptor_range.BaseShaderRegister = 0;
 	descriptor_range.NumDescriptors = 1;
 	descriptor_range.RegisterSpace = 0;
 	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-	descriptor_range.OffsetInDescriptorsFromTableStart = 0;
+	descriptor_range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 	outDesc.mDescriptorRanges.push_back(descriptor_range);
 
-	// RaytracingScene - DescriptorRange
+	// t0
 	descriptor_range = {};
 	descriptor_range.BaseShaderRegister = 0;
 	descriptor_range.NumDescriptors = 1;
 	descriptor_range.RegisterSpace = 0;
 	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-	descriptor_range.OffsetInDescriptorsFromTableStart = 1;
+	descriptor_range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 	outDesc.mDescriptorRanges.push_back(descriptor_range);
 
-	// RaytracingScene - DescriptorRange
+	// b0
 	descriptor_range = {};
 	descriptor_range.BaseShaderRegister = 0;
 	descriptor_range.NumDescriptors = 1;
 	descriptor_range.RegisterSpace = 0;
 	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-	descriptor_range.OffsetInDescriptorsFromTableStart = 2;
+	descriptor_range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 	outDesc.mDescriptorRanges.push_back(descriptor_range);
 
-	// RootDescriptor contains entry of DescriptorTable, DescriptorRange within
+	// Table
 	D3D12_ROOT_PARAMETER root_parameter = {};
 	root_parameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	root_parameter.DescriptorTable.NumDescriptorRanges = (UINT)outDesc.mDescriptorRanges.size();
 	root_parameter.DescriptorTable.pDescriptorRanges = outDesc.mDescriptorRanges.data();
 	outDesc.mRootParameters.push_back(root_parameter);
 
-	// Create the RootDescriptor
+	// Descriptor to table
 	outDesc.mDesc.NumParameters = (UINT)outDesc.mRootParameters.size();
 	outDesc.mDesc.pParameters = outDesc.mRootParameters.data();
-	outDesc.mDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
-}
-
-void GenerateMissRootDesc(RootSignatureDescriptor& outDesc)
-{
-	// PerFrame - DescriptorRange
-	D3D12_DESCRIPTOR_RANGE descriptor_range = {};
-	descriptor_range.BaseShaderRegister = 0;
-	descriptor_range.NumDescriptors = 1;
-	descriptor_range.RegisterSpace = 0;
-	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-	descriptor_range.OffsetInDescriptorsFromTableStart = 2;
-	outDesc.mDescriptorRanges.push_back(descriptor_range);
-
-	// RootDescriptor contains entry of DescriptorTable, DescriptorRange within
-	D3D12_ROOT_PARAMETER root_parameter = {};
-	root_parameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	root_parameter.DescriptorTable.NumDescriptorRanges = (UINT)outDesc.mDescriptorRanges.size();
-	root_parameter.DescriptorTable.pDescriptorRanges = outDesc.mDescriptorRanges.data();
-	outDesc.mRootParameters.push_back(root_parameter);
-
-	// Create the RootDescriptor
-	outDesc.mDesc.NumParameters = (UINT)outDesc.mRootParameters.size();
-	outDesc.mDesc.pParameters = outDesc.mRootParameters.data();
-	outDesc.mDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
-}
-
-void GenerateTriangleHitLocalRootDesc(RootSignatureDescriptor& outDesc)
-{
-	// PerScene - Descriptor - RootDescriptor contains descriptor directly
-	D3D12_ROOT_PARAMETER root_parameter = {};
-	root_parameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-	root_parameter.Descriptor.ShaderRegister = 1;
-	root_parameter.Descriptor.RegisterSpace = 0;
-	outDesc.mRootParameters.push_back(root_parameter);
-
-	// Create the RootDescriptor
-	outDesc.mDesc.NumParameters = (UINT)outDesc.mRootParameters.size();
-	outDesc.mDesc.pParameters = outDesc.mRootParameters.data();
-	outDesc.mDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
-}
-
-void GeneratePlaneHitLocalRootDesc(RootSignatureDescriptor& outDesc)
-{
-	// RaytracingScene - DescriptorRange
-	D3D12_DESCRIPTOR_RANGE descriptor_range = {};
-	descriptor_range.BaseShaderRegister = 0;
-	descriptor_range.NumDescriptors = 1;
-	descriptor_range.RegisterSpace = 0;
-	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-	descriptor_range.OffsetInDescriptorsFromTableStart = 0;
-	outDesc.mDescriptorRanges.push_back(descriptor_range);
-
-	// RootDescriptor contains entry of DescriptorTable, DescriptorRange within
-	D3D12_ROOT_PARAMETER root_parameter = {};
-	root_parameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	root_parameter.DescriptorTable.NumDescriptorRanges = (UINT)outDesc.mDescriptorRanges.size();
-	root_parameter.DescriptorTable.pDescriptorRanges = outDesc.mDescriptorRanges.data();
-	outDesc.mRootParameters.push_back(root_parameter);
-
-	// Create the RootDescriptor
-	outDesc.mDesc.NumParameters = (UINT)outDesc.mRootParameters.size();
-	outDesc.mDesc.pParameters = outDesc.mRootParameters.data();
-	outDesc.mDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
+	outDesc.mDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
 }
 
 ComPtr<ID3D12RootSignature> CreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC & desc)
@@ -334,48 +271,12 @@ void gCreatePipelineState()
 	subobjects[index++] = shadow_hit_group.mStateSubobject;
 
 	// Local root signatures and association
-	// Ray-gen shader
-	RootSignatureDescriptor ray_gen_local_root_signature_desc;
-	GenerateRayGenLocalRootDesc(ray_gen_local_root_signature_desc);
-	LocalRootSignature ray_gen_local_root_signature(ray_gen_local_root_signature_desc.mDesc);
-	subobjects[index++] = ray_gen_local_root_signature.mStateSubobject;
-	SubobjectToExportsAssociation ray_gen_association(&kRayGenShader, 1, &(subobjects[index - 1]));
-	subobjects[index++] = ray_gen_association.mStateSubobject;
-
-	// Miss shader
-	RootSignatureDescriptor miss_local_root_signature_desc;
-	GenerateMissRootDesc(miss_local_root_signature_desc);
-	LocalRootSignature miss_local_root_signature(miss_local_root_signature_desc.mDesc);
-	subobjects[index++] = miss_local_root_signature.mStateSubobject;
-	SubobjectToExportsAssociation miss_association(&kMissShader, 1, &(subobjects[index - 1]));
-	subobjects[index++] = miss_association.mStateSubobject;
-
-	// Triangle hit shader
-	RootSignatureDescriptor triangle_hit_local_root_signature_desc;
-	GenerateTriangleHitLocalRootDesc(triangle_hit_local_root_signature_desc);
-	LocalRootSignature triangle_hit_local_root_signature(triangle_hit_local_root_signature_desc.mDesc);
-	subobjects[index++] = triangle_hit_local_root_signature.mStateSubobject;
-	SubobjectToExportsAssociation triangle_hit_association(&kTriangleHitShader, 1, &(subobjects[index - 1]));
-	subobjects[index++] = triangle_hit_association.mStateSubobject;
-
-	// Plane hit shader
-	RootSignatureDescriptor plane_hit_local_root_signature_desc;
-	GeneratePlaneHitLocalRootDesc(plane_hit_local_root_signature_desc);
-	LocalRootSignature plane_hit_local_root_signature(plane_hit_local_root_signature_desc.mDesc);
-	subobjects[index++] = plane_hit_local_root_signature.mStateSubobject;
-	SubobjectToExportsAssociation plane_hit_association(&kPlaneHitShader, 1, &(subobjects[index - 1]));
-	subobjects[index++] = plane_hit_association.mStateSubobject;
-
-#if 0 // Not really needed
-	// Empty local root signature
-	RootSignatureDescriptor empty_local_root_signature_descriptor;
-	empty_local_root_signature_descriptor.mDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
-	LocalRootSignature empty_root_signature(empty_local_root_signature_descriptor.mDesc);
-	subobjects[index++] = empty_root_signature.mStateSubobject;
-	const wchar_t* shader_with_empty_associations[] = { kShadowMissShader, kShadowHitShader };
-	SubobjectToExportsAssociation empty_local_root_signature_association(shader_with_empty_associations, ARRAYSIZE(shader_with_empty_associations), &(subobjects[index - 1]));
-	subobjects[index++] = empty_local_root_signature_association.mStateSubobject;
-#endif
+	RootSignatureDescriptor local_root_signature_descriptor;
+	local_root_signature_descriptor.mDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
+	LocalRootSignature local_root_signature(local_root_signature_descriptor.mDesc);
+	subobjects[index++] = local_root_signature.mStateSubobject;
+	SubobjectToExportsAssociation export_association(entry_points, ARRAYSIZE(entry_points), &(subobjects[index - 1]));
+	subobjects[index++] = export_association.mStateSubobject;
 
 	// Shader config
 	//  sizeof(BuiltInTriangleIntersectionAttributes), depends on interaction type
@@ -392,8 +293,10 @@ void gCreatePipelineState()
 	subobjects[index++] = pipeline_config.mStateSubobject;
 
 	// Global root signature
-	GlobalRootSignature global_root_signature({});
-	gDxrEmptyRootSignature = global_root_signature.mRootSignature.Get();
+	RootSignatureDescriptor global_root_signature_descriptor;
+	GenerateGlobalRootSignatureDescriptor(global_root_signature_descriptor);
+	GlobalRootSignature global_root_signature(global_root_signature_descriptor.mDesc);
+	gDxrGlobalRootSignature = global_root_signature.mRootSignature.Get();
 	subobjects[index++] = global_root_signature.mStateSubobject;
 
 	// Create the state object
@@ -401,10 +304,6 @@ void gCreatePipelineState()
 	desc.NumSubobjects = index;
 	desc.pSubobjects = subobjects.data();
 	desc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
-
-	// Most validation occurs here
-	// Be sure use correct dll for dxc compiler
-	// e.g. Error "Hash check failed for DXILibrary.pShaderBytecode" appears when dxil.dll is missing
 	gValidate(gDevice->CreateStateObject(&desc, IID_PPV_ARGS(&gDxrStateObject)));
 }
 

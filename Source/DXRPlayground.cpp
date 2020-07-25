@@ -387,8 +387,9 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		{
 			dx12Debug->EnableDebugLayer();
 
-			if (SUCCEEDED(dx12Debug->QueryInterface(IID_PPV_ARGS(&dx12Debug1))))
-				dx12Debug1->SetEnableGPUBasedValidation(true);
+			// GBV don't work well with DXR
+// 			if (SUCCEEDED(dx12Debug->QueryInterface(IID_PPV_ARGS(&dx12Debug1))))
+// 				dx12Debug1->SetEnableGPUBasedValidation(true);
 		}
 	}
 

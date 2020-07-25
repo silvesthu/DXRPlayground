@@ -35,7 +35,7 @@ extern D3D12_CPU_DESCRIPTOR_HANDLE			gBackBufferRenderTargetDescriptor[];
 
 extern ID3D12DescriptorHeap* 				gImGuiSrvDescHeap;
 
-extern ID3D12RootSignature*					gDxrEmptyRootSignature;
+extern ID3D12RootSignature*					gDxrGlobalRootSignature;
 extern ID3D12StateObject* 					gDxrStateObject;
 
 struct ShaderTable
@@ -53,7 +53,6 @@ extern ShaderTable							gDxrShaderTable;
 
 extern ID3D12Resource*						gDxrOutputResource;
 extern ID3D12DescriptorHeap*				gDxrCbvSrvUavHeap;
-extern ID3D12Resource*						gDxrHitConstantBufferResource;
 
 extern ID3D12Resource*						gConstantGPUBuffer;
 

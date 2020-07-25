@@ -50,7 +50,6 @@ void gCreateShaderTable()
 			gDxrShaderTable.mRayGenOffset = shader_table_entry_index;
 
 			memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kRayGenShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-			shader_table_entries[shader_table_entry_index].mRootArgument.mHandle = gDxrCbvSrvUavHeap->GetGPUDescriptorHandleForHeapStart().ptr;
 			shader_table_entry_index++;
 
 			gDxrShaderTable.mRayGenCount = shader_table_entry_index - gDxrShaderTable.mRayGenOffset;
@@ -74,14 +73,12 @@ void gCreateShaderTable()
 			gDxrShaderTable.mHitGroupOffset = shader_table_entry_index;
 
 			memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kTriangleHitGroup), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-			shader_table_entries[shader_table_entry_index].mRootArgument.mAddress = gDxrHitConstantBufferResource->GetGPUVirtualAddress();
 			shader_table_entry_index++;
 
 			memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kShadowHitGroup), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 			shader_table_entry_index++;
 
 			memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kPlaneHitGroup), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-			shader_table_entries[shader_table_entry_index].mRootArgument.mHandle = gDxrCbvSrvUavHeap->GetGPUDescriptorHandleForHeapStart().ptr + gDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 			shader_table_entry_index++;
 
 			memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kShadowHitGroup), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
