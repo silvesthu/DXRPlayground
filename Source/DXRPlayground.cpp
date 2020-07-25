@@ -15,6 +15,7 @@ enum class SCENE_PRESET_TYPE
 {
 	TEST,
 	CORNELL_BOX,
+	VEACH_MIS,
 
 	COUNT,
 };
@@ -31,9 +32,10 @@ static ScenePreset kScenePresets[(int)SCENE_PRESET_TYPE::COUNT] =
 {
 	{ "Test", nullptr, glm::vec4(0.0f, 0.0f, -5.0f, 0.0f), glm::vec4(0.0f, 0.0f, 1.0f, 0.0f) },
 	{ "CornellBox", "Asset/raytracing-references/cornellbox/cornellbox.obj", glm::vec4(0.0f, 1.0f, 3.0f, 0.0f), glm::vec4(0.0f, 0.0f, -1.0f, 0.0f) },
+	{ "VeachMIS", "Asset/raytracing-references/veach-mis/veach-mis.obj", glm::vec4(0.0f, 1.0f, 13.0f, 0.0f), glm::vec4(0.0f, 0.0f, -1.0f, 0.0f) },
 };
-static SCENE_PRESET_TYPE sCurrentScene = SCENE_PRESET_TYPE::CORNELL_BOX;
-static SCENE_PRESET_TYPE sPreviousScene = SCENE_PRESET_TYPE::CORNELL_BOX;
+static SCENE_PRESET_TYPE sCurrentScene = SCENE_PRESET_TYPE::VEACH_MIS;
+static SCENE_PRESET_TYPE sPreviousScene = SCENE_PRESET_TYPE::VEACH_MIS;
 
 struct CameraSettings
 {
@@ -453,27 +455,10 @@ static bool sCreateDeviceD3D(HWND hWnd)
 
 		// Create CBV resource
 		{
-			D3D12_RESOURCE_DESC resource_desc = {};
-			resource_desc.Alignment = 0;
-			resource_desc.DepthOrArraySize = 1;
-			resource_desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-			resource_desc.Flags = D3D12_RESOURCE_FLAG_NONE;
-			resource_desc.Format = DXGI_FORMAT_UNKNOWN;
-			resource_desc.Width = gAlignUp((UINT)sizeof(PerFrame), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
-			resource_desc.Height = 1;
-			resource_desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-			resource_desc.MipLevels = 1;
-			resource_desc.SampleDesc.Count = 1;
-			resource_desc.SampleDesc.Quality = 0;
+			D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(gAlignUp((UINT)sizeof(PerFrame), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
+			D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
 
-			D3D12_HEAP_PROPERTIES heap_props;
-			heap_props.Type = D3D12_HEAP_TYPE_UPLOAD; // https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_heap_type#constants
-			heap_props.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-			heap_props.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-			heap_props.CreationNodeMask = 0;
-			heap_props.VisibleNodeMask = 0;
-
-			gValidate(gDevice->CreateCommittedResource(&heap_props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gFrameContext[i].mConstantUploadBuffer)));
+			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gFrameContext[i].mConstantUploadBuffer)));
 			name = L"Constant_Upload_" + i;
 			gFrameContext[i].mConstantUploadBuffer->SetName(name.c_str());
 
@@ -484,32 +469,13 @@ static bool sCreateDeviceD3D(HWND hWnd)
 
 	// GPU
 	{
-		std::wstring name;
-
 		// Create CBV resource
 		{
-			D3D12_RESOURCE_DESC resource_desc = {};
-			resource_desc.Alignment = 0;
-			resource_desc.DepthOrArraySize = 1;
-			resource_desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-			resource_desc.Flags = D3D12_RESOURCE_FLAG_NONE;
-			resource_desc.Format = DXGI_FORMAT_UNKNOWN;
-			resource_desc.Width = gAlignUp((UINT)sizeof(PerFrame), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
-			resource_desc.Height = 1;
-			resource_desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-			resource_desc.MipLevels = 1;
-			resource_desc.SampleDesc.Count = 1;
-			resource_desc.SampleDesc.Quality = 0;
+			D3D12_RESOURCE_DESC resource_desc = gGetBufferResourceDesc(gAlignUp((UINT)sizeof(PerFrame), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
+			D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
 
-			D3D12_HEAP_PROPERTIES heap_props;
-			heap_props.Type = D3D12_HEAP_TYPE_DEFAULT;
-			heap_props.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-			heap_props.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-			heap_props.CreationNodeMask = 0;
-			heap_props.VisibleNodeMask = 0;
-
-			gValidate(gDevice->CreateCommittedResource(&heap_props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&gConstantGPUBuffer)));
-			name = L"Constant_GPU";
+			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&gConstantGPUBuffer)));
+			std::wstring name = L"Constant_GPU";
 			gConstantGPUBuffer->SetName(name.c_str());
 		}
 	}

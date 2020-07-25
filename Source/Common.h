@@ -18,94 +18,6 @@ using Microsoft::WRL::ComPtr;
 
 #include "Thirdparty/glm/glm/gtx/transform.hpp"
 
-// Helper
-template <typename T>
-inline void gSafeRelease(T*& inPointer)
-{
-	if (inPointer != nullptr)
-	{
-		inPointer->Release();
-		inPointer = nullptr;
-	}
-}
-
-inline void gSafeCloseHandle(HANDLE& inHandle)
-{
-	if (inHandle != nullptr)
-	{
-		CloseHandle(inHandle);
-		inHandle = nullptr;
-	}
-}
-
-inline void gValidate(HRESULT in)
-{
-	if (FAILED(in))
-	{
-		char message[512];
-		FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, nullptr, in, 0, message, ARRAYSIZE(message), nullptr);
-		OutputDebugStringA(message);
-		assert(false);
-	}
-}
-
-inline void gDebugPrint(const char* inString)
-{
-	OutputDebugStringA(inString);
-}
-
-template <typename T>
-inline void gDebugPrint(const T& in)
-{
-	std::string str = std::to_string(in) + "\n";
-	OutputDebugStringA(str.c_str());
-}
-
-template <typename T>
-inline void gSetName(ComPtr<T>& inObject, std::wstring inBaseName, std::wstring inName)
-{
-	std::wstring new_name = inBaseName + inName;
-	inObject->SetName(new_name.c_str());
-}
-
-inline void gBarrierTransition(ID3D12GraphicsCommandList4* inCommandList, ID3D12Resource* inResource, D3D12_RESOURCE_STATES inBefore, D3D12_RESOURCE_STATES inAfter)
-{	
-	D3D12_RESOURCE_BARRIER barrier = {};
-	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-	barrier.Transition.pResource = inResource;
-	barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-	barrier.Transition.StateBefore = inBefore;
-	barrier.Transition.StateAfter = inAfter;
-	inCommandList->ResourceBarrier(1, &barrier);
-}
-
-inline void gBarrierUAV(ID3D12GraphicsCommandList4* inCommandList, ID3D12Resource* inResource)
-{
-	D3D12_RESOURCE_BARRIER barrier = {};
-	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-	barrier.UAV.pResource = inResource;
-	inCommandList->ResourceBarrier(1, &barrier);
-}
-
-template <typename T>
-inline T gAlignUp(T inValue, T inAlignment)
-{
-	return (((inValue + inAlignment - 1) / inAlignment) * inAlignment);
-}
-
-template <typename T>
-inline T gMin(T inLhs, T inRhs)
-{
-	return inLhs < inRhs ? inLhs : inRhs;
-}
-
-template <typename T>
-inline T gMax(T inLhs, T inRhs)
-{
-	return inLhs > inRhs ? inLhs : inRhs;
-}
-
 // System
 extern ID3D12Device5*						gDevice;
 extern ID3D12DescriptorHeap* 				gRtvDescHeap;
@@ -184,3 +96,149 @@ static const wchar_t*						kPlaneHitGroup		= L"PlaneHitGroup";
 static const wchar_t*						kShadowHitShader	= L"shadowHit";
 static const wchar_t*						kShadowMissShader	= L"shadowMiss";
 static const wchar_t*						kShadowHitGroup		= L"shadowGroup";
+
+// Helper
+template <typename T>
+inline T gAlignUp(T inValue, T inAlignment)
+{
+	return (((inValue + inAlignment - 1) / inAlignment) * inAlignment);
+}
+
+template <typename T>
+inline T gMin(T inLhs, T inRhs)
+{
+	return inLhs < inRhs ? inLhs : inRhs;
+}
+
+template <typename T>
+inline T gMax(T inLhs, T inRhs)
+{
+	return inLhs > inRhs ? inLhs : inRhs;
+}
+
+inline void gDebugPrint(const char* inString)
+{
+	OutputDebugStringA(inString);
+}
+
+template <typename T>
+inline void gDebugPrint(const T& in)
+{
+	std::string str = std::to_string(in) + "\n";
+	OutputDebugStringA(str.c_str());
+}
+
+// DirectX helper
+template <typename T>
+inline void gSafeRelease(T*& inPointer)
+{
+	if (inPointer != nullptr)
+	{
+		inPointer->Release();
+		inPointer = nullptr;
+	}
+}
+
+inline void gSafeCloseHandle(HANDLE& inHandle)
+{
+	if (inHandle != nullptr)
+	{
+		CloseHandle(inHandle);
+		inHandle = nullptr;
+	}
+}
+
+inline void gValidate(HRESULT in)
+{
+	if (FAILED(in))
+	{
+		char message[512];
+		FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, nullptr, in, 0, message, ARRAYSIZE(message), nullptr);
+		OutputDebugStringA(message);
+		assert(false);
+	}
+}
+
+template <typename T>
+inline void gSetName(ComPtr<T>& inObject, std::wstring inBaseName, std::wstring inName)
+{
+	std::wstring new_name = inBaseName + inName;
+	inObject->SetName(new_name.c_str());
+}
+
+inline void gBarrierTransition(ID3D12GraphicsCommandList4* inCommandList, ID3D12Resource* inResource, D3D12_RESOURCE_STATES inBefore, D3D12_RESOURCE_STATES inAfter)
+{
+	D3D12_RESOURCE_BARRIER barrier = {};
+	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+	barrier.Transition.pResource = inResource;
+	barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+	barrier.Transition.StateBefore = inBefore;
+	barrier.Transition.StateAfter = inAfter;
+	inCommandList->ResourceBarrier(1, &barrier);
+}
+
+inline void gBarrierUAV(ID3D12GraphicsCommandList4* inCommandList, ID3D12Resource* inResource)
+{
+	D3D12_RESOURCE_BARRIER barrier = {};
+	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+	barrier.UAV.pResource = inResource;
+	inCommandList->ResourceBarrier(1, &barrier);
+}
+
+inline D3D12_HEAP_PROPERTIES gGetDefaultHeapProperties()
+{
+	D3D12_HEAP_PROPERTIES props = {};
+	props.Type = D3D12_HEAP_TYPE_DEFAULT;
+	props.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+	props.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+	return props;
+}
+
+inline D3D12_HEAP_PROPERTIES gGetUploadHeapProperties()
+{
+	D3D12_HEAP_PROPERTIES props = {};
+	props.Type = D3D12_HEAP_TYPE_UPLOAD;
+	props.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+	props.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+	return props;
+}
+
+inline D3D12_RESOURCE_DESC gGetBufferResourceDesc(UINT64 inWidth)
+{
+	D3D12_RESOURCE_DESC desc = {};
+	desc.Alignment = 0;
+	desc.DepthOrArraySize = 1;
+	desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	desc.Flags = D3D12_RESOURCE_FLAG_NONE;
+	desc.Format = DXGI_FORMAT_UNKNOWN;
+	desc.Width = inWidth;
+	desc.Height = 1;
+	desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+	desc.MipLevels = 1;
+	desc.SampleDesc.Count = 1;
+	desc.SampleDesc.Quality = 0;
+	return desc;
+}
+
+inline D3D12_RESOURCE_DESC gGetTextureResourceDesc(UINT64 inWidth, UINT inHeight, DXGI_FORMAT inFormat)
+{
+	D3D12_RESOURCE_DESC desc = {};
+	desc.DepthOrArraySize = 1;
+	desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+	desc.Format = inFormat;
+	desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+	desc.Width = inWidth;
+	desc.Height = inHeight;
+	desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+	desc.MipLevels = 1;
+	desc.SampleDesc.Count = 1;
+	return desc;
+}
+
+inline D3D12_RESOURCE_DESC gGetUAVResourceDesc(UINT64 inWidth)
+{
+	D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(inWidth);
+	desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+	return desc;
+}

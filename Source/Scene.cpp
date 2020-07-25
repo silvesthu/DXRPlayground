@@ -9,74 +9,17 @@
 
 Scene gScene;
 
-static D3D12_HEAP_PROPERTIES sGetDefaultHeapProperties()
-{
-	D3D12_HEAP_PROPERTIES props = {};
-	props.Type = D3D12_HEAP_TYPE_DEFAULT;
-	props.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-	props.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-	return props;
-}
-
-static D3D12_HEAP_PROPERTIES sGetUploadHeapProperties()
-{
-	D3D12_HEAP_PROPERTIES props = {};
-	props.Type = D3D12_HEAP_TYPE_UPLOAD;
-	props.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-	props.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-	return props;
-}
-
-static D3D12_RESOURCE_DESC sGetResourceDesc(UINT64 inWidth)
-{
-	D3D12_RESOURCE_DESC desc = {};
-	desc.Alignment = 0;
-	desc.DepthOrArraySize = 1;
-	desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	desc.Flags = D3D12_RESOURCE_FLAG_NONE;
-	desc.Format = DXGI_FORMAT_UNKNOWN;
-	desc.Width = inWidth;
-	desc.Height = 1;
-	desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-	desc.MipLevels = 1;
-	desc.SampleDesc.Count = 1;
-	desc.SampleDesc.Quality = 0;
-	return desc;
-}
-
-static D3D12_RESOURCE_DESC sGetUAVResourceDesc(UINT64 inWidth)
-{
-	D3D12_RESOURCE_DESC desc = sGetResourceDesc(inWidth);
-	desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-	return desc;
-}
-
 Primitive::Primitive(const void* inVertexData, uint32_t inVertexSize, uint32_t inVertexCount, const void* inIndexData, uint32_t inIndexCount, std::wstring inName)
 {
 	mVertexCount = inVertexCount;
 	mVertexSize = inVertexSize;
 	mIndexCount = inIndexCount;
 
-	D3D12_RESOURCE_DESC desc = {};
-	desc.Alignment = 0;
-	desc.DepthOrArraySize = 1;
-	desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	desc.Flags = D3D12_RESOURCE_FLAG_NONE;
-	desc.Format = DXGI_FORMAT_UNKNOWN;
-	desc.Height = 1;
-	desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-	desc.MipLevels = 1;
-	desc.SampleDesc.Count = 1;
-	desc.SampleDesc.Quality = 0;
-
-	D3D12_HEAP_PROPERTIES props;
-	memset(&props, 0, sizeof(D3D12_HEAP_PROPERTIES));
-	props.Type = D3D12_HEAP_TYPE_UPLOAD;
-	props.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-	props.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+	D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(0);
+	D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
 
 	{
-		desc.Width = GetVertexSize() * GetVertexCount();
+		desc.Width = (UINT64)GetVertexSize() * GetVertexCount();
 		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mVertexBufferResource)));
 		gSetName(mVertexBufferResource, inName, L".VertextBuffer");
 
@@ -87,7 +30,7 @@ Primitive::Primitive(const void* inVertexData, uint32_t inVertexSize, uint32_t i
 	}
 
 	{
-		desc.Width = GetIndexSize() * GetIndexCount();
+		desc.Width = (UINT64)GetIndexSize() * GetIndexCount();
 		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mIndexBufferResource)));
 		gSetName(mIndexBufferResource, inName, L".IndexBuffer");
 
@@ -130,13 +73,13 @@ void BLAS::Initialize(std::vector<PrimitiveRef>&& inPrimitives)
 	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO info = {};
 	gDevice->GetRaytracingAccelerationStructurePrebuildInfo(&mInputs, &info);
 
-	D3D12_HEAP_PROPERTIES props = sGetDefaultHeapProperties();
-	D3D12_RESOURCE_DESC desc = sGetUAVResourceDesc(info.ScratchDataSizeInBytes);
+	D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
+	D3D12_RESOURCE_DESC desc = gGetUAVResourceDesc(info.ScratchDataSizeInBytes);
 
 	gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&mScratch)));
 	gSetName(mScratch, mName, L".BLAS.Scratch");
 
-	desc = sGetUAVResourceDesc(info.ResultDataMaxSizeInBytes);
+	desc = gGetUAVResourceDesc(info.ResultDataMaxSizeInBytes);
 	gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, nullptr, IID_PPV_ARGS(&mDest)));
 	gSetName(mDest, mName, L".BLAS.Dest");
 }
@@ -207,22 +150,22 @@ void TLAS::Initialize(std::vector<ObjectInstanceRef>&& inObjectInstances)
 	gDevice->GetRaytracingAccelerationStructurePrebuildInfo(&mInputs, &info);
 
 	{
-		D3D12_HEAP_PROPERTIES props = sGetDefaultHeapProperties();
-		D3D12_RESOURCE_DESC desc = sGetUAVResourceDesc(info.ScratchDataSizeInBytes);
+		D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
+		D3D12_RESOURCE_DESC desc = gGetUAVResourceDesc(info.ScratchDataSizeInBytes);
 		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&mScratch)));
 		gSetName(mScratch, mName, L".TLAS.Scratch");
 	}
 
 	{
-		D3D12_HEAP_PROPERTIES props = sGetDefaultHeapProperties();
-		D3D12_RESOURCE_DESC desc = sGetUAVResourceDesc(info.ResultDataMaxSizeInBytes);
+		D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
+		D3D12_RESOURCE_DESC desc = gGetUAVResourceDesc(info.ResultDataMaxSizeInBytes);
 		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, nullptr, IID_PPV_ARGS(&mDest)));
 		gSetName(mDest, mName, L".TLAS.Dest");
 	}
 
 	{
-		D3D12_HEAP_PROPERTIES props = sGetUploadHeapProperties();
-		D3D12_RESOURCE_DESC desc = sGetResourceDesc(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * mObjectInstances.size());
+		D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
+		D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * mObjectInstances.size());
 		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mInstanceDescs)));
 		gSetName(mInstanceDescs, mName, L".TLAS.InstanceDescs");
 

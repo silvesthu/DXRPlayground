@@ -96,30 +96,11 @@ void gCreateShaderTable()
 
 	// Create the table
 	{
-		// For simplicity, we create the shader-table on the upload heap. You can also create it on the default heap
-		D3D12_HEAP_PROPERTIES heap_props;
-		heap_props.Type = D3D12_HEAP_TYPE_UPLOAD;
-		heap_props.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-		heap_props.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-		heap_props.CreationNodeMask = 0;
-		heap_props.VisibleNodeMask = 0;
+		D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
+		D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(gDxrShaderTable.mEntrySize * shader_table_entry_index);
 
-		// Resource description
-		D3D12_RESOURCE_DESC bufDesc = {};
-		bufDesc.Alignment = 0;
-		bufDesc.DepthOrArraySize = 1;
-		bufDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-		bufDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-		bufDesc.Format = DXGI_FORMAT_UNKNOWN;
-		bufDesc.Height = 1;
-		bufDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-		bufDesc.MipLevels = 1;
-		bufDesc.SampleDesc.Count = 1;
-		bufDesc.SampleDesc.Quality = 0;
-		bufDesc.Width = gDxrShaderTable.mEntrySize * shader_table_entry_index;
-
-		gValidate(gDevice->CreateCommittedResource(&heap_props, D3D12_HEAP_FLAG_NONE, &bufDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gDxrShaderTable.mResource)));
-		gDxrShaderTable.mResource->SetName(L"mResource");
+		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gDxrShaderTable.mResource)));
+		gDxrShaderTable.mResource->SetName(L"gDxrShaderTable");
 	}
  
 	// Copy the table
