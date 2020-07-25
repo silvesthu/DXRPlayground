@@ -620,15 +620,16 @@ static LRESULT WINAPI sWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam
 			gScene.RebuildBinding([&]()
 			{
 				sCleanupRenderTarget();
-				// ImGui sample re-create swap chain and stop DXGI_MWA_NO_ALT_ENTER from working
 				gDisplaySettings.mRenderResolution.x = gMax((UINT)LOWORD(lParam), 8u);
 				gDisplaySettings.mRenderResolution.y = gMax((UINT)HIWORD(lParam), 8u);
+				DXGI_SWAP_CHAIN_DESC1 swap_chain_desc;
+				gSwapChain->GetDesc1(&swap_chain_desc);
 				gSwapChain->ResizeBuffers(
-					NUM_BACK_BUFFERS,
+					swap_chain_desc.BufferCount,
 					gDisplaySettings.mRenderResolution.x,
 					gDisplaySettings.mRenderResolution.y,
-					DXGI_FORMAT_R8G8B8A8_UNORM,
-					DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT | DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING);
+					swap_chain_desc.Format,
+					swap_chain_desc.Flags);
 				sCreateRenderTarget();
 			});
 		}
