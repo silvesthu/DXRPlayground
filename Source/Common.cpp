@@ -15,6 +15,7 @@ HANDLE                       		gSwapChainWaitableObject = nullptr;
 ID3D12Resource*						gBackBufferRenderTargetResource[NUM_BACK_BUFFERS] = {};
 D3D12_CPU_DESCRIPTOR_HANDLE			gBackBufferRenderTargetDescriptor[NUM_BACK_BUFFERS] = {};
 
+// ImGui
 ID3D12DescriptorHeap*				gImGuiSrvDescHeap = nullptr;
 
 // Application
@@ -22,13 +23,11 @@ ID3D12RootSignature*				gDxrGlobalRootSignature = nullptr;
 ID3D12StateObject*					gDxrStateObject = nullptr;
 ShaderTable							gDxrShaderTable = {};
 ID3D12Resource*						gDxrOutputResource = nullptr;
-ID3D12DescriptorHeap*				gDxrCbvSrvUavHeap = nullptr;
-
+ID3D12DescriptorHeap*				gDxrDescriptorHeap = nullptr;
 ID3D12Resource*						gConstantGPUBuffer = nullptr;
 
 // Frame
 FrameContext                		gFrameContext[NUM_FRAMES_IN_FLIGHT] = {};
 UINT                    			gFrameIndex = 0;
 float								gTime = 0.0f;
-
 PerFrame							gPerFrameConstantBuffer = {};

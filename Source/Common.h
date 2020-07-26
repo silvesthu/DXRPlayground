@@ -33,14 +33,13 @@ extern HANDLE                       		gSwapChainWaitableObject;
 extern ID3D12Resource*						gBackBufferRenderTargetResource[];
 extern D3D12_CPU_DESCRIPTOR_HANDLE			gBackBufferRenderTargetDescriptor[];
 
+// ImGui
 extern ID3D12DescriptorHeap* 				gImGuiSrvDescHeap;
 
-extern ID3D12RootSignature*					gDxrGlobalRootSignature;
-extern ID3D12StateObject* 					gDxrStateObject;
-
+// Application
 struct ShaderTable
 {
-	ID3D12Resource*							mResource = nullptr;
+	ID3D12Resource* mResource = nullptr;
 	uint64_t								mEntrySize = 0;
 	uint32_t								mRayGenOffset = 0;
 	uint32_t								mRayGenCount = 0;
@@ -49,11 +48,20 @@ struct ShaderTable
 	uint32_t								mHitGroupOffset = 0;
 	uint32_t								mHitGroupCount = 0;
 };
+
+struct InstanceData
+{
+	glm::vec3								mAlbedo = glm::vec3(0.0f, 0.0f, 0.0f);
+	glm::vec3								mReflectance = glm::vec3(0.0f, 0.0f, 0.0f);
+	glm::vec3								mEmission = glm::vec3(0.0f, 0.0f, 0.0f);
+	glm::vec1								mRoughness = glm::vec1(0.0f);
+};
+
+extern ID3D12RootSignature*					gDxrGlobalRootSignature;
+extern ID3D12StateObject* 					gDxrStateObject;
 extern ShaderTable							gDxrShaderTable;
-
 extern ID3D12Resource*						gDxrOutputResource;
-extern ID3D12DescriptorHeap*				gDxrCbvSrvUavHeap;
-
+extern ID3D12DescriptorHeap*				gDxrDescriptorHeap;
 extern ID3D12Resource*						gConstantGPUBuffer;
 
 // Frame
@@ -75,26 +83,43 @@ extern FrameContext							gFrameContext[];
 extern uint32_t								gFrameIndex;
 extern float								gTime;
 
+enum class DebugMode : uint32_t
+{
+	None = 0,
+	Barycentrics,
+
+	Count
+};
+
+enum class ShadowMode : uint32_t
+{
+	None = 0,
+	Test,
+
+	Count
+};
+
 struct PerFrame
 {
-	glm::vec4 mBackgroundColor				= glm::vec4(0.4f, 0.6f, 0.2f, 1.0f);
-	glm::vec4 mCameraPosition				= glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
-	glm::vec4 mCameraDirection				= glm::vec4(0.0f, 0.0f, 1.0f, 0.0f);
-	glm::vec4 mCameraRightExtend			= glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
-	glm::vec4 mCameraUpExtend				= glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
+	glm::vec4								mBackgroundColor	= glm::vec4(0.4f, 0.6f, 0.2f, 1.0f);
+	glm::vec4								mCameraPosition		= glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
+	glm::vec4								mCameraDirection	= glm::vec4(0.0f, 0.0f, 1.0f, 0.0f);
+	glm::vec4								mCameraRightExtend	= glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
+	glm::vec4								mCameraUpExtend		= glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
+
+	DebugMode								mDebugMode			= DebugMode::None;
+	ShadowMode								mShadowMode			= ShadowMode::None;
 };
 extern PerFrame								gPerFrameConstantBuffer;
 
 // String literals
-static const wchar_t*						kRayGenShader		= L"rayGen";
-static const wchar_t*						kMissShader			= L"miss";
-static const wchar_t*						kTriangleHitShader	= L"triangleHit";
-static const wchar_t*						kPlaneHitShader		= L"planeHit";
-static const wchar_t*						kTriangleHitGroup	= L"TriangleHitGroup";
-static const wchar_t*						kPlaneHitGroup		= L"PlaneHitGroup";
-static const wchar_t*						kShadowHitShader	= L"shadowHit";
-static const wchar_t*						kShadowMissShader	= L"shadowMiss";
-static const wchar_t*						kShadowHitGroup		= L"shadowGroup";
+static const wchar_t*						kDefaultRayGenerationShader	= L"defaultRayGeneration";
+static const wchar_t*						kDefaultMissShader			= L"defaultMiss";
+static const wchar_t*						kDefaultClosestHitShader	= L"defaultClosestHit";
+static const wchar_t*						kDefaultHitGroup			= L"defaultHitGroup";
+static const wchar_t*						kShadowMissShader			= L"shadowMiss";
+static const wchar_t*						kShadowClosestHitShader		= L"shadowClosestHit";
+static const wchar_t*						kShadowHitGroup				= L"shadowHitGroup";
 
 // Helper
 template <typename T>

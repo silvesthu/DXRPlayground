@@ -49,7 +49,7 @@ void gCreateShaderTable()
 		{
 			gDxrShaderTable.mRayGenOffset = shader_table_entry_index;
 
-			memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kRayGenShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+			memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kDefaultRayGenerationShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 			shader_table_entry_index++;
 
 			gDxrShaderTable.mRayGenCount = shader_table_entry_index - gDxrShaderTable.mRayGenOffset;
@@ -59,7 +59,7 @@ void gCreateShaderTable()
 		{
 			gDxrShaderTable.mMissOffset = shader_table_entry_index;
 
-			memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kMissShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+			memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kDefaultMissShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 			shader_table_entry_index++;
 
 			memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kShadowMissShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
@@ -72,13 +72,7 @@ void gCreateShaderTable()
 		{
 			gDxrShaderTable.mHitGroupOffset = shader_table_entry_index;
 
-			memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kTriangleHitGroup), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-			shader_table_entry_index++;
-
-			memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kShadowHitGroup), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-			shader_table_entry_index++;
-
-			memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kPlaneHitGroup), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+			memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kDefaultHitGroup), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 			shader_table_entry_index++;
 
 			memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kShadowHitGroup), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);

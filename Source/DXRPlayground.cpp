@@ -1,4 +1,5 @@
 ﻿#include "Thirdparty/imgui/imgui.h"
+#include "Thirdparty/nameof/include/nameof.hpp"
 #include "ImGui/imgui_impl_win32.h"
 #include "ImGui/imgui_impl_dx12.h"
 
@@ -59,6 +60,16 @@ struct DisplaySettings
 };
 DisplaySettings		gDisplaySettings	= {};
 
+// Helper
+namespace nameof
+{
+	template <typename T>
+	constexpr std::string_view nameof_enum_type() noexcept
+	{
+		return nameof::nameof_type<T>().substr(5);
+	}
+}
+
 // Forward declarations of helper functions
 static bool sCreateDeviceD3D(HWND hWnd);
 static void sCleanupDeviceD3D();
@@ -89,11 +100,11 @@ static void sUpdate()
 		mouse_prev_right_button_pressed = mouse_right_button_pressed;
 
 		glm::vec4 front = gPerFrameConstantBuffer.mCameraDirection;
-		glm::vec4 right = glm::vec4(glm::normalize(glm::cross(glm::vec3(0, 1, 0), glm::vec3(front))), 0);
+		glm::vec4 right = glm::vec4(glm::normalize(glm::cross(glm::vec3(front), glm::vec3(0, 1, 0))), 0);
 		glm::vec4 up = glm::vec4(glm::normalize(glm::cross(glm::vec3(right), glm::vec3(front))), 0);
 
 		front = glm::rotate(-mouse_delta.x * gCameraSettings.mMoveRotateSpeed.y, glm::vec3(up)) * front;
-		front = glm::rotate(mouse_delta.y * gCameraSettings.mMoveRotateSpeed.y, glm::vec3(right)) * front;
+		front = glm::rotate(-mouse_delta.y * gCameraSettings.mMoveRotateSpeed.y, glm::vec3(right)) * front;
 
 		gPerFrameConstantBuffer.mCameraDirection = glm::normalize(front);
 		if (glm::isnan(gPerFrameConstantBuffer.mCameraDirection.x))
@@ -114,7 +125,7 @@ static void sUpdate()
 		if (ImGui::IsKeyDown('S'))
 			gPerFrameConstantBuffer.mCameraPosition -= gPerFrameConstantBuffer.mCameraDirection * move_speed;
 
-		glm::vec4 right = glm::vec4(glm::normalize(glm::cross(glm::vec3(0, 1, 0), glm::vec3(gPerFrameConstantBuffer.mCameraDirection))), 0);
+		glm::vec4 right = glm::vec4(glm::normalize(glm::cross(glm::vec3(gPerFrameConstantBuffer.mCameraDirection), glm::vec3(0, 1, 0))), 0);
 
 		if (ImGui::IsKeyDown('A'))
 			gPerFrameConstantBuffer.mCameraPosition -= right * move_speed;
@@ -126,7 +137,7 @@ static void sUpdate()
 	{
 		float horizontal_tan = glm::tan(gCameraSettings.mHorizontalFovDegree * 0.5f * glm::pi<float>() / 180.0f);
 
-		glm::vec4 right = glm::vec4(glm::normalize(glm::cross(glm::vec3(0, 1, 0), glm::vec3(gPerFrameConstantBuffer.mCameraDirection))), 0);
+		glm::vec4 right = glm::vec4(glm::normalize(glm::cross(glm::vec3(gPerFrameConstantBuffer.mCameraDirection), glm::vec3(0, 1, 0))), 0);
 		gPerFrameConstantBuffer.mCameraRightExtend = right * horizontal_tan;
 
 		glm::vec4 up = glm::vec4(glm::normalize(glm::cross(glm::vec3(right), glm::vec3(gPerFrameConstantBuffer.mCameraDirection))), 0);
@@ -142,6 +153,35 @@ static void sUpdate()
 				ImGui::GetIO().Framerate,
 				gDisplaySettings.mRenderResolution.x,
 				gDisplaySettings.mRenderResolution.y);
+
+			if (ImGui::TreeNodeEx("Render", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				{
+					ImGui::Text(nameof::nameof_enum_type<DebugMode>().data());
+					ImGui::PushID(nameof::nameof_enum_type<DebugMode>().data());
+					for (int i = 0; i < (int)DebugMode::Count; i++)
+					{
+						ImGui::SameLine();
+						if (ImGui::RadioButton(nameof::nameof_enum((DebugMode)i).data(), (int)gPerFrameConstantBuffer.mDebugMode == i))
+							gPerFrameConstantBuffer.mDebugMode = (DebugMode)i;
+					}
+					ImGui::PopID();
+				}
+
+				{
+					ImGui::Text(nameof::nameof_enum_type<ShadowMode>().data());
+					ImGui::PushID(nameof::nameof_enum_type<ShadowMode>().data());
+					for (int i = 0; i < (int)ShadowMode::Count; i++)
+					{
+						ImGui::SameLine();
+						if (ImGui::RadioButton(nameof::nameof_enum((ShadowMode)i).data(), (int)gPerFrameConstantBuffer.mShadowMode == i))
+							gPerFrameConstantBuffer.mShadowMode = (ShadowMode)i;
+					}
+					ImGui::PopID();
+				}
+
+				ImGui::TreePop();
+			}
 
 			if (ImGui::TreeNodeEx("Camera"))
 			{

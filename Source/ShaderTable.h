@@ -1,7 +1,6 @@
 #pragma once
 
-static const int kUVHitGroup = 0;
-static const int kGreyHitGroup = 2;
+static const int kDefaultHitGroupIndex = 0;
 
 void gCreateShaderTable();
 void gCleanupShaderTable();

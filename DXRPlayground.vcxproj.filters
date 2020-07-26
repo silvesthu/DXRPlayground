@@ -28,6 +28,9 @@
     <Filter Include="Source\Thirdparty\tinyobjloader">
       <UniqueIdentifier>{fbe86055-d12a-45fd-924e-e6837332d080}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\Thirdparty\nameof">
+      <UniqueIdentifier>{fb38af67-f2e1-4117-aa26-ca05c53cfec1}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Thirdparty\imgui\imstb_rectpack.h">
@@ -143,6 +146,9 @@
     </ClInclude>
     <ClInclude Include="Source\Thirdparty\tinyobjloader\tiny_obj_loader.h">
       <Filter>Source\Thirdparty\tinyobjloader</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Thirdparty\nameof\include\nameof.hpp">
+      <Filter>Source\Thirdparty\nameof</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

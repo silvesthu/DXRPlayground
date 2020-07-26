@@ -56,10 +56,9 @@ using BLASRef = std::shared_ptr<BLAS>;
 class ObjectInstance
 {
 public:
-	ObjectInstance(BLASRef& inBLAS, const glm::mat4& inTransform, uint32_t inHitGroupIndex, uint32_t inInstanceID)
+	ObjectInstance(BLASRef& inBLAS, const glm::mat4& inTransform, uint32_t inHitGroupIndex)
 		: mBLAS(inBLAS)
 		, mTransform(inTransform)
-		, mInstanceID(inInstanceID)
 		, mHitGroupIndex(inHitGroupIndex)
 	{
 	}
@@ -68,15 +67,15 @@ public:
 	void SetUpdater(std::function<void(ObjectInstance*)> inUpdater) { mUpdater = inUpdater; }
 
 	BLASRef GetBLAS() { return mBLAS; }
-	glm::mat4& GetTransform() { return mTransform; }
-	uint32_t GetInstanceID() const { return mInstanceID; }
+	glm::mat4& Transform() { return mTransform; }
 	uint32_t GetHitGroupIndex() const { return mHitGroupIndex; }
+	InstanceData& Data() { return mInstanceData; }
 
 private:
 	glm::mat4 mTransform = glm::mat4(1);
 	BLASRef mBLAS;
-	uint32_t mInstanceID = 0;
 	uint32_t mHitGroupIndex = 0;
+	InstanceData mInstanceData;
 
 	std::function<void(ObjectInstance*)> mUpdater;
 };
@@ -93,20 +92,24 @@ public:
 	void Update(ID3D12GraphicsCommandList4* inCommandList);
 	void Build(ID3D12GraphicsCommandList4* inCommandList);
 
-	D3D12_GPU_VIRTUAL_ADDRESS GetGPUVirtualAddress() const { return mDest->GetGPUVirtualAddress(); }
+	D3D12_GPU_VIRTUAL_ADDRESS GetGPUVirtualAddress() const	{ return mDest->GetGPUVirtualAddress(); }
+	ID3D12Resource* GetInstanceBuffer()	const				{ return mInstanceBuffer.Get(); }
 
 private:
 	void BuildInternal(ID3D12GraphicsCommandList4* inCommandList, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS inFlags);
 	void UpdateObjectInstances();
 
 	std::vector<ObjectInstanceRef> mObjectInstances;
-	D3D12_RAYTRACING_INSTANCE_DESC* mObjectInstanceDesc = nullptr;
 
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS mInputs = {};
 
 	ComPtr<ID3D12Resource> mScratch = nullptr;
 	ComPtr<ID3D12Resource> mDest = nullptr;
 	ComPtr<ID3D12Resource> mInstanceDescs = nullptr;
+	D3D12_RAYTRACING_INSTANCE_DESC* mInstanceDescsPointer = nullptr;
+
+	ComPtr<ID3D12Resource> mInstanceBuffer = nullptr;
+	InstanceData* mInstanceBufferPointer = nullptr;
 
 	std::wstring mName;
 };

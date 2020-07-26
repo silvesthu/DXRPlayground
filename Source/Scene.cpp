@@ -170,7 +170,17 @@ void TLAS::Initialize(std::vector<ObjectInstanceRef>&& inObjectInstances)
 		gSetName(mInstanceDescs, mName, L".TLAS.InstanceDescs");
 
 		// Map once
-		mInstanceDescs->Map(0, nullptr, (void**)&mObjectInstanceDesc);
+		mInstanceDescs->Map(0, nullptr, (void**)&mInstanceDescsPointer);
+	}
+
+	{
+		D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
+		D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(sizeof(InstanceData) * mObjectInstances.size());
+		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mInstanceBuffer)));
+		gSetName(mDest, mName, L".TLAS.InstanceBuffer");
+
+		// Map once
+		mInstanceBuffer->Map(0, nullptr, (void**)&mInstanceBufferPointer);
 	}
 }
 
@@ -181,12 +191,14 @@ void TLAS::UpdateObjectInstances()
 	{
 		object_instance->Update();
 
-		mObjectInstanceDesc[instance_index].InstanceID = object_instance->GetInstanceID();									// This value will be exposed to the shader via InstanceID()
-		mObjectInstanceDesc[instance_index].InstanceContributionToHitGroupIndex = object_instance->GetHitGroupIndex();		// Match shader table
-		mObjectInstanceDesc[instance_index].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
-		memcpy(mObjectInstanceDesc[instance_index].Transform, &object_instance->GetTransform(), sizeof(mObjectInstanceDesc[instance_index].Transform));
-		mObjectInstanceDesc[instance_index].AccelerationStructure = object_instance->GetBLAS()->GetGPUVirtualAddress();
-		mObjectInstanceDesc[instance_index].InstanceMask = 0xFF;
+		mInstanceDescsPointer[instance_index].InstanceID = instance_index; // This value will be exposed to the shader via InstanceID()
+		mInstanceDescsPointer[instance_index].InstanceContributionToHitGroupIndex = object_instance->GetHitGroupIndex(); // Match shader table
+		mInstanceDescsPointer[instance_index].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
+		memcpy(mInstanceDescsPointer[instance_index].Transform, &object_instance->Transform(), sizeof(mInstanceDescsPointer[instance_index].Transform));
+		mInstanceDescsPointer[instance_index].AccelerationStructure = object_instance->GetBLAS()->GetGPUVirtualAddress();
+		mInstanceDescsPointer[instance_index].InstanceMask = 0xFF;
+
+		mInstanceBufferPointer[instance_index] = object_instance->Data();
 
 		instance_index++;
 	}
@@ -219,12 +231,12 @@ void sSetupTestScene(std::vector<ObjectInstanceRef>& ioObjectInstances)
 		// TODO: initialize all materials first to get hit group index?
 		for (int i = 0; i < 3; i++)
 		{
-			ObjectInstanceRef object_instance = std::make_shared<ObjectInstance>(blas, glm::mat4(1), kUVHitGroup, i);
-			object_instance->SetUpdater([](ObjectInstance* object_instance)
+			ObjectInstanceRef object_instance = std::make_shared<ObjectInstance>(blas, glm::mat4(1), kDefaultHitGroupIndex);
+			object_instance->SetUpdater([i](ObjectInstance* object_instance)
 			{
-				glm::mat4& transform = object_instance->GetTransform();
+				glm::mat4& transform = object_instance->Transform();
 				transform = glm::mat4(1.0f);
-				transform = glm::translate(transform, glm::vec3(-2.0f + 2.0f * object_instance->GetInstanceID(), 0.f, 0.f)); // Instances in a line
+				transform = glm::translate(transform, glm::vec3(-2.0f + 2.0f * i, 0.f, 0.f)); // Instances in a line
 				float rotate_speed = 1.0f;
 				transform = glm::rotate(transform, gTime * rotate_speed, glm::vec3(0.f, 1.f, 0.f));
 				transform = glm::transpose(transform); // Column-major => Row-major
@@ -262,7 +274,7 @@ void sSetupTestScene(std::vector<ObjectInstanceRef>& ioObjectInstances)
 		BLASRef blas = std::make_shared<BLAS>(L"Plane");
 		blas->Initialize(std::move(buffers));
 
-		ObjectInstanceRef object_instance = std::make_shared<ObjectInstance>(blas, glm::mat4(1), kGreyHitGroup, 0);
+		ObjectInstanceRef object_instance = std::make_shared<ObjectInstance>(blas, glm::mat4(1), kDefaultHitGroupIndex);
 		ioObjectInstances.push_back(object_instance);
 	}
 }
@@ -317,8 +329,14 @@ void Scene::Load(const char* inFilename)
 			BLASRef blas = std::make_shared<BLAS>(name);
 			blas->Initialize(std::move(buffers));
 
-			ObjectInstanceRef object_instance = std::make_shared<ObjectInstance>(blas, glm::mat4(1), kUVHitGroup, 0);
+			ObjectInstanceRef object_instance = std::make_shared<ObjectInstance>(blas, glm::mat4(1), kDefaultHitGroupIndex);
 			object_instances.push_back(object_instance);
+
+			if (shape.mesh.material_ids.size() > 0)
+			{
+				const tinyobj::material_t& material = reader.GetMaterials()[shape.mesh.material_ids[0]];
+				object_instance->Data().mEmission = glm::vec4(material.emission[0], material.emission[1], material.emission[2], 0.0f);
+			}
 		}
 	}
 	else
@@ -327,7 +345,7 @@ void Scene::Load(const char* inFilename)
 	mTLAS->Initialize(std::move(object_instances));
 
 	gCreatePipelineState();
-	gCreateShaderResource(mTLAS->GetGPUVirtualAddress());
+	gCreateShaderResource(mTLAS->GetGPUVirtualAddress(), mTLAS->GetInstanceBuffer());
 	gCreateShaderTable();
 }
 
@@ -358,6 +376,6 @@ void Scene::RebuildBinding(std::function<void()> inCallback)
 	if (inCallback)
 		inCallback();
 
-	gCreateShaderResource(mTLAS->GetGPUVirtualAddress());
+	gCreateShaderResource(mTLAS->GetGPUVirtualAddress(), mTLAS->GetInstanceBuffer());
 	gCreateShaderTable();
 }

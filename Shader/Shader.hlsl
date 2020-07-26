@@ -2,12 +2,24 @@ RWTexture2D<float4> RaytracingOutput : register(u0);
 RaytracingAccelerationStructure RaytracingScene : register(t0);
 cbuffer PerFrame : register(b0)
 {
-	float4 BackgroundColor;
-	float4 CameraPosition;
-	float4 CameraDirection;
-	float4 CameraRightExtend;
-	float4 CameraUpExtend;
+	float4	mBackgroundColor;
+	float4	mCameraPosition;
+	float4	mCameraDirection;
+	float4	mCameraRightExtend;
+	float4	mCameraUpExtend;
+
+	uint	mDebugMode;
+	uint	mShadowMode;
 }
+
+struct InstanceData
+{
+	float3 mAlbedo;
+	float3 mReflectance;
+	float3 mEmission;
+	float  mRoughness;
+};
+StructuredBuffer<InstanceData> InstanceDataBuffer : register(t1);
 
 float3 linearToSrgb(float3 c)
 {
@@ -24,8 +36,13 @@ struct RayPayload
 	float3 color;
 };
 
+struct ShadowPayload
+{
+	bool hit;
+};
+
 [shader("raygeneration")]
-void rayGen()
+void defaultRayGeneration()
 {
 	uint3 launchIndex = DispatchRaysIndex();
 	uint3 launchDim = DispatchRaysDimensions();
@@ -34,10 +51,11 @@ void rayGen()
 	float2 dims = float2(launchDim.xy);
 
 	float2 d = ((crd/dims) * 2.f - 1.f); // 0~1 => -1~1
+	d.y = -d.y;
 	
 	RayDesc ray;
-	ray.Origin = CameraPosition;
-	ray.Direction = normalize(CameraDirection + CameraRightExtend * d.x + CameraUpExtend * d.y);
+	ray.Origin = mCameraPosition;
+	ray.Direction = normalize(mCameraDirection + mCameraRightExtend * d.x + mCameraUpExtend * d.y);
 	ray.TMin = 0;				// Near
 	ray.TMax = 100000;			// Far
 
@@ -57,69 +75,71 @@ void rayGen()
 }
 
 [shader("miss")]
-void miss(inout RayPayload payload)
+void defaultMiss(inout RayPayload payload)
 {
-	payload.color = BackgroundColor;
+	payload.color = mBackgroundColor;
 }
 
 [shader("closesthit")]
-void triangleHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attribs)
+void defaultClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attribs)
 {
-	float3 barycentrics = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y, attribs.barycentrics.x, attribs.barycentrics.y);
-	payload.color = barycentrics;
-}
+	if (mDebugMode == 1) // Barycentrics
+	{
+		float3 barycentrics = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y, attribs.barycentrics.x, attribs.barycentrics.y);
+		payload.color = barycentrics;
 
-struct ShadowPayload
-{
-	bool hit;
-};
+		return;
+	}
 
-[shader("closesthit")]
-void planeHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attribs)
-{
 	// See https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html for more system value intrinsics
 
 	// Find the world-space hit position
 	float3 hit_position = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
 
-	// Fire a shadow ray. The direction is hard-coded here, but can be fetched from a constant-buffer
-	RayDesc ray;
-	ray.Origin = hit_position;
-	ray.Direction = normalize(float3(-1, 1, -1));
-	ray.TMin = 0.01;
-	ray.TMax = 100000;
+	float shadow_factor = 1.0;
+	if (mShadowMode == 1) // Test
+	{
+		// Fire a shadow ray. The direction is hard-coded here, but can be fetched from a constant-buffer
+		RayDesc ray;
+		ray.Origin = hit_position;
+		ray.Direction = normalize(float3(-1, 1, -1));
+		ray.TMin = 0.01;
+		ray.TMax = 100000;
 
-	// http://intro-to-dxr.cwyman.org/presentations/IntroDXR_RaytracingAPI.pdf
-	// HitGroupRecordAddress =
-	// 	start + stride * (rayContribution + (geometryMultiplier * geometryContribution) + instanceContribution)
-	// where:
-	// 	start = D3D12_DISPATCH_RAYS_DESC.HitGroupTable.StartAddress
-	// 	stride = D3D12_DISPATCH_RAYS_DESC.HitGroupTable.StrideInBytes
-	// 	rayContribution = RayContributionToHitGroupIndex (TraceRay parameter)
-	// 	geometryMultiplier = MultiplierForGeometryContributionToHitGroupIndex (TraceRay parameter)
-	// 	geometryContribution = index of geometry in bottom-level acceleration structure (0,1,2,3..)
-	// 	instanceContribution = D3D12_RAYTRACING_INSTANCE_DESC.InstanceContributionToHitGroupIndex
+		// http://intro-to-dxr.cwyman.org/presentations/IntroDXR_RaytracingAPI.pdf
+		// HitGroupRecordAddress =
+		// 	start + stride * (rayContribution + (geometryMultiplier * geometryContribution) + instanceContribution)
+		// where:
+		// 	start = D3D12_DISPATCH_RAYS_DESC.HitGroupTable.StartAddress
+		// 	stride = D3D12_DISPATCH_RAYS_DESC.HitGroupTable.StrideInBytes
+		// 	rayContribution = RayContributionToHitGroupIndex (TraceRay parameter)
+		// 	geometryMultiplier = MultiplierForGeometryContributionToHitGroupIndex (TraceRay parameter)
+		// 	geometryContribution = index of geometry in bottom-level acceleration structure (0,1,2,3..)
+		// 	instanceContribution = D3D12_RAYTRACING_INSTANCE_DESC.InstanceContributionToHitGroupIndex
 
-	ShadowPayload shadowPayload;
-	TraceRay(
-		RaytracingScene,	// RaytracingAccelerationStructure
-		0,					// RayFlags 
-		0xFF,				// InstanceInclusionMask
-		1,					// RayContributionToHitGroupIndex, 4bits
-		0,					// MultiplierForGeometryContributuionToHitGroupIndex, 16bits
-		1,					// MissShaderIndex
-		ray,				// RayDesc
-		shadowPayload		// payload_t
-	);
+		ShadowPayload shadowPayload;
+		TraceRay(
+			RaytracingScene,	// RaytracingAccelerationStructure
+			0,					// RayFlags 
+			0xFF,				// InstanceInclusionMask
+			1,					// RayContributionToHitGroupIndex, 4bits
+			0,					// MultiplierForGeometryContributuionToHitGroupIndex, 16bits
+			1,					// MissShaderIndex
+			ray,				// RayDesc
+			shadowPayload		// payload_t
+		);
 
-	float shadow_factor = shadowPayload.hit ? 0.0 : 1.0;
+		if (shadowPayload.hit)
+			shadow_factor = 0.0;
+	}
+
 	float diffuse = 0.18;
 	float ambient = 0.01;
-	payload.color = diffuse * shadow_factor + ambient;
+	payload.color = diffuse * shadow_factor + ambient + InstanceDataBuffer[InstanceID()].mEmission;
 }
 
 [shader("closesthit")]
-void shadowHit(inout ShadowPayload payload, in BuiltInTriangleIntersectionAttributes attribs)
+void shadowClosestHit(inout ShadowPayload payload, in BuiltInTriangleIntersectionAttributes attribs)
 {
 	payload.hit = true;
 }

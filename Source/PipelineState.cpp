@@ -41,7 +41,8 @@ IDxcBlob* CompileShader(const wchar_t* inName, const char* inSource, uint32_t in
 		gValidate(operation_result->GetErrorBuffer(&pPrintBlob));
 		// We can use the library to get our preferred encoding.
 		gValidate(library->GetBlobAsUtf16(pPrintBlob, &pPrintBlob16));
-		wprintf(L"%*s", (int)pPrintBlob16->GetBufferSize() / 2, (LPCWSTR)pPrintBlob16->GetBufferPointer());
+		std::wstring str((LPCWSTR)pPrintBlob16->GetBufferPointer(), (int)pPrintBlob16->GetBufferSize() / 2);
+		OutputDebugStringW(str.c_str());
 		pPrintBlob->Release();
 		pPrintBlob16->Release();
 		return nullptr;
@@ -73,6 +74,15 @@ void GenerateGlobalRootSignatureDescriptor(RootSignatureDescriptor& outDesc)
 	// t0
 	descriptor_range = {};
 	descriptor_range.BaseShaderRegister = 0;
+	descriptor_range.NumDescriptors = 1;
+	descriptor_range.RegisterSpace = 0;
+	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	descriptor_range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	outDesc.mDescriptorRanges.push_back(descriptor_range);
+
+	// t1
+	descriptor_range = {};
+	descriptor_range.BaseShaderRegister = 1;
 	descriptor_range.NumDescriptors = 1;
 	descriptor_range.RegisterSpace = 0;
 	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
@@ -258,16 +268,14 @@ void gCreatePipelineState()
 	shader_stream << shader_file.rdbuf();
 
 	// DXIL library
-	const wchar_t* entry_points[] = { kRayGenShader, kMissShader, kTriangleHitShader, kPlaneHitShader, kShadowMissShader, kShadowHitShader };
+	const wchar_t* entry_points[] = { kDefaultRayGenerationShader, kDefaultMissShader, kDefaultClosestHitShader, kShadowMissShader, kShadowClosestHitShader };
 	DXILLibrary dxilLibrary(CompileShader(L"Shader", shader_stream.str().c_str(), (uint32_t)shader_stream.str().length()), entry_points, ARRAYSIZE(entry_points));
 	subobjects[index++] = dxilLibrary.mStateSubobject;
 
 	// Hit group
-	HitGroup triangle_hit_group(nullptr, kTriangleHitShader, kTriangleHitGroup);
-	subobjects[index++] = triangle_hit_group.mStateSubobject;
-	HitGroup plane_hit_group(nullptr, kPlaneHitShader, kPlaneHitGroup);
-	subobjects[index++] = plane_hit_group.mStateSubobject;
-	HitGroup shadow_hit_group(nullptr, kShadowHitShader, kShadowHitGroup);
+	HitGroup default_hit_group(nullptr, kDefaultClosestHitShader, kDefaultHitGroup);
+	subobjects[index++] = default_hit_group.mStateSubobject;
+	HitGroup shadow_hit_group(nullptr, kShadowClosestHitShader, kShadowHitGroup);
 	subobjects[index++] = shadow_hit_group.mStateSubobject;
 
 	// Local root signatures and association
@@ -283,8 +291,7 @@ void gCreatePipelineState()
 	//  sizeof(RayPayload), fully customized
 	ShaderConfig shader_config(sizeof(float) * 2, sizeof(float) * 3);
 	subobjects[index++] = shader_config.mStateSubobject;
-	const wchar_t* shader_exports[] = { kRayGenShader, kMissShader, kTriangleHitShader, kPlaneHitShader, kShadowHitShader, kShadowMissShader };
-	SubobjectToExportsAssociation shader_configassociation(shader_exports, ARRAYSIZE(shader_exports), &(subobjects[index - 1]));
+	SubobjectToExportsAssociation shader_configassociation(entry_points, ARRAYSIZE(entry_points), &(subobjects[index - 1]));
 	subobjects[index++] = shader_configassociation.mStateSubobject;
 
 	// Pipeline config
