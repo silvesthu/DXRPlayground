@@ -40,13 +40,13 @@ extern ID3D12DescriptorHeap* 				gImGuiSrvDescHeap;
 struct ShaderTable
 {
 	ID3D12Resource* mResource = nullptr;
-	uint64_t								mEntrySize = 0;
-	uint32_t								mRayGenOffset = 0;
-	uint32_t								mRayGenCount = 0;
-	uint32_t								mMissOffset = 0;
-	uint32_t								mMissCount = 0;
-	uint32_t								mHitGroupOffset = 0;
-	uint32_t								mHitGroupCount = 0;
+	glm::uint64								mEntrySize = 0;
+	glm::uint32								mRayGenOffset = 0;
+	glm::uint32								mRayGenCount = 0;
+	glm::uint32								mMissOffset = 0;
+	glm::uint32								mMissCount = 0;
+	glm::uint32								mHitGroupOffset = 0;
+	glm::uint32								mHitGroupCount = 0;
 };
 
 struct InstanceData
@@ -55,6 +55,9 @@ struct InstanceData
 	glm::vec3								mReflectance = glm::vec3(0.0f, 0.0f, 0.0f);
 	glm::vec3								mEmission = glm::vec3(0.0f, 0.0f, 0.0f);
 	glm::vec1								mRoughness = glm::vec1(0.0f);
+
+	glm::uint								mIndexOffset = 0;
+	glm::uint								mVertexOffset = 0;
 };
 
 extern ID3D12RootSignature*					gDxrGlobalRootSignature;
@@ -77,13 +80,13 @@ struct FrameContext
 	ID3D12Resource*							mConstantUploadBuffer	= nullptr;
 	void*									mConstantUploadBufferPointer = nullptr;
 
-	uint64_t								mFenceValue;
+	glm::uint64								mFenceValue;
 };
 extern FrameContext							gFrameContext[];
-extern uint32_t								gFrameIndex;
-extern float								gTime;
+extern glm::uint32							gFrameIndex;
+extern glm::float32							gTime;
 
-enum class DebugMode : uint32_t
+enum class DebugMode : glm::uint32
 {
 	None = 0,
 	Barycentrics,
@@ -91,7 +94,7 @@ enum class DebugMode : uint32_t
 	Count
 };
 
-enum class ShadowMode : uint32_t
+enum class ShadowMode : glm::uint32
 {
 	None = 0,
 	Test,

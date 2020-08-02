@@ -3,7 +3,7 @@
 #include <fstream>
 #include <sstream>
 
-IDxcBlob* CompileShader(const wchar_t* inName, const char* inSource, uint32_t inSize)
+IDxcBlob* CompileShader(const wchar_t* inName, const char* inSource, glm::uint32 inSize)
 {
 	static DxcCreateInstanceProc sDxcCreateInstanceProc = nullptr;
 	if (sDxcCreateInstanceProc == nullptr)
@@ -147,7 +147,7 @@ protected:
 // Shader binary
 struct DXILLibrary : public StateSubobjectHolder<D3D12_DXIL_LIBRARY_DESC, D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY>
 {
-	DXILLibrary(IDxcBlob* inShaderBlob, const wchar_t* inEntryPoint[], uint32_t inEntryPointCount) : mShaderBlob(inShaderBlob)
+	DXILLibrary(IDxcBlob* inShaderBlob, const wchar_t* inEntryPoint[], glm::uint32 inEntryPointCount) : mShaderBlob(inShaderBlob)
 	{
 		mExportDescs.resize(inEntryPointCount);
 		mExportNames.resize(inEntryPointCount);
@@ -159,7 +159,7 @@ struct DXILLibrary : public StateSubobjectHolder<D3D12_DXIL_LIBRARY_DESC, D3D12_
 			mDesc.NumExports = inEntryPointCount;
 			mDesc.pExports = mExportDescs.data();
 
-			for (uint32_t i = 0; i < inEntryPointCount; i++)
+			for (glm::uint32 i = 0; i < inEntryPointCount; i++)
 			{
 				mExportNames[i] = inEntryPoint[i];
 				mExportDescs[i].Name = mExportNames[i].c_str();
@@ -202,7 +202,7 @@ private:
 // Associate subobject to exports - Shader entry point -> Shader input
 struct SubobjectToExportsAssociation : public StateSubobjectHolder<D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION, D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION>
 {
-	SubobjectToExportsAssociation(const wchar_t* inExportNames[], uint32_t inExportCount, const D3D12_STATE_SUBOBJECT* inSubobjectToAssociate)
+	SubobjectToExportsAssociation(const wchar_t* inExportNames[], glm::uint32 inExportCount, const D3D12_STATE_SUBOBJECT* inSubobjectToAssociate)
 	{
 		mDesc.NumExports = inExportCount;
 		mDesc.pExports = inExportNames;
@@ -213,7 +213,7 @@ struct SubobjectToExportsAssociation : public StateSubobjectHolder<D3D12_SUBOBJE
 // Shader config
 struct ShaderConfig : public StateSubobjectHolder<D3D12_RAYTRACING_SHADER_CONFIG, D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG>
 {
-	ShaderConfig(uint32_t inMaxAttributeSizeInBytes, uint32_t inMaxPayloadSizeInBytes)
+	ShaderConfig(glm::uint32 inMaxAttributeSizeInBytes, glm::uint32 inMaxPayloadSizeInBytes)
 	{
 		mDesc.MaxAttributeSizeInBytes = inMaxAttributeSizeInBytes;
 		mDesc.MaxPayloadSizeInBytes = inMaxPayloadSizeInBytes;
@@ -223,7 +223,7 @@ struct ShaderConfig : public StateSubobjectHolder<D3D12_RAYTRACING_SHADER_CONFIG
 // Pipeline config
 struct PipelineConfig : public StateSubobjectHolder<D3D12_RAYTRACING_PIPELINE_CONFIG, D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG>
 {
-	PipelineConfig(uint32_t inMaxTraceRecursionDepth)
+	PipelineConfig(glm::uint32 inMaxTraceRecursionDepth)
 	{
 		mDesc.MaxTraceRecursionDepth = inMaxTraceRecursionDepth;
 	}
@@ -260,7 +260,7 @@ void gCreatePipelineState()
 	//  Shader config
 
 	std::array<D3D12_STATE_SUBOBJECT, 64> subobjects;
-	uint32_t index = 0;
+	glm::uint32 index = 0;
 
 	// Load shader
 	std::ifstream shader_file("Shader/Shader.hlsl");
@@ -269,7 +269,11 @@ void gCreatePipelineState()
 
 	// DXIL library
 	const wchar_t* entry_points[] = { kDefaultRayGenerationShader, kDefaultMissShader, kDefaultClosestHitShader, kShadowMissShader, kShadowClosestHitShader };
-	DXILLibrary dxilLibrary(CompileShader(L"Shader", shader_stream.str().c_str(), (uint32_t)shader_stream.str().length()), entry_points, ARRAYSIZE(entry_points));
+	IDxcBlob* blob = CompileShader(L"Shader", shader_stream.str().c_str(), (glm::uint32)shader_stream.str().length());
+	if (blob == nullptr)
+		return;
+	gDebugPrint("Shader compiled.\n");
+	DXILLibrary dxilLibrary(blob, entry_points, ARRAYSIZE(entry_points));
 	subobjects[index++] = dxilLibrary.mStateSubobject;
 
 	// Hit group
@@ -287,8 +291,8 @@ void gCreatePipelineState()
 	subobjects[index++] = export_association.mStateSubobject;
 
 	// Shader config
-	//  sizeof(BuiltInTriangleIntersectionAttributes), depends on interaction type
-	//  sizeof(RayPayload), fully customized
+	//  sizeof(BuiltInTriangleIntersectionAttributes) = sizeof(float) * 2, depends on interaction type
+	//  max(sizeof(RayPayload), sizeof(ShadowPayload)) = sizeof(float) * 3, fully customized
 	ShaderConfig shader_config(sizeof(float) * 2, sizeof(float) * 3);
 	subobjects[index++] = shader_config.mStateSubobject;
 	SubobjectToExportsAssociation shader_configassociation(entry_points, ARRAYSIZE(entry_points), &(subobjects[index - 1]));

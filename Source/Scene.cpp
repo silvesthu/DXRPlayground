@@ -9,65 +9,26 @@
 
 Scene gScene;
 
-Primitive::Primitive(const void* inVertexData, uint32_t inVertexSize, uint32_t inVertexCount, const void* inIndexData, uint32_t inIndexCount, std::wstring inName)
+void BLAS::Initialize(D3D12_GPU_VIRTUAL_ADDRESS inVertexBaseAddress, D3D12_GPU_VIRTUAL_ADDRESS inIndexBaseAddress)
 {
-	mVertexCount = inVertexCount;
-	mVertexSize = inVertexSize;
-	mIndexCount = inIndexCount;
-
-	D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(0);
-	D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
-
+	mDesc = {};
+	mDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
+	mDesc.Triangles.VertexBuffer.StartAddress = inVertexBaseAddress + mPrimitive->GetVertexOffset() * Primitive::sVertexSize;
+	mDesc.Triangles.VertexBuffer.StrideInBytes = Primitive::sVertexSize;
+	mDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+	mDesc.Triangles.VertexCount = mPrimitive->GetVertexCount();
+	if (mPrimitive->GetIndexCount() > 0)
 	{
-		desc.Width = (UINT64)GetVertexSize() * GetVertexCount();
-		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mVertexBufferResource)));
-		gSetName(mVertexBufferResource, inName, L".VertextBuffer");
-
-		uint8_t* pData = nullptr;
-		mVertexBufferResource->Map(0, nullptr, (void**)&pData);
-		memcpy(pData, inVertexData, desc.Width);
-		mVertexBufferResource->Unmap(0, nullptr);
+		mDesc.Triangles.IndexBuffer = inIndexBaseAddress + mPrimitive->GetIndexOffset() * Primitive::sIndexSize;
+		mDesc.Triangles.IndexCount = mPrimitive->GetIndexCount();
+		mDesc.Triangles.IndexFormat = DXGI_FORMAT_R16_UINT;
 	}
-
-	{
-		desc.Width = (UINT64)GetIndexSize() * GetIndexCount();
-		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mIndexBufferResource)));
-		gSetName(mIndexBufferResource, inName, L".IndexBuffer");
-
-		uint8_t* pData = nullptr;
-		mIndexBufferResource->Map(0, nullptr, (void**)&pData);
-		memcpy(pData, inIndexData, desc.Width);
-		mIndexBufferResource->Unmap(0, nullptr);
-	}
-}
-
-void BLAS::Initialize(std::vector<PrimitiveRef>&& inPrimitives)
-{
-	mPrimitives = std::move(inPrimitives);
-
-	mDescs.clear();
-	for (auto&& primitive : mPrimitives)
-	{
-		D3D12_RAYTRACING_GEOMETRY_DESC desc = {};
-		desc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-		desc.Triangles.VertexBuffer.StartAddress = primitive->GetResource()->GetGPUVirtualAddress();
-		desc.Triangles.VertexBuffer.StrideInBytes = primitive->GetVertexSize();
-		desc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-		desc.Triangles.VertexCount = primitive->GetVertexCount();
-		if (primitive->GetIndexCount() > 0)
-		{
-			desc.Triangles.IndexBuffer = primitive->GetIndexBufferResource()->GetGPUVirtualAddress();
-			desc.Triangles.IndexCount = primitive->GetIndexCount();
-			desc.Triangles.IndexFormat = DXGI_FORMAT_R16_UINT;
-		}
-		desc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
-		mDescs.push_back(desc);
-	}
+	mDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
 
 	mInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
 	mInputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_NONE;
-	mInputs.NumDescs = static_cast<UINT>(mDescs.size());
-	mInputs.pGeometryDescs = mDescs.data();
+	mInputs.NumDescs = 1;
+	mInputs.pGeometryDescs = &mDesc;
 	mInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
 
 	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO info = {};
@@ -204,143 +165,93 @@ void TLAS::UpdateObjectInstances()
 	}
 }
 
-void sSetupTestScene(std::vector<ObjectInstanceRef>& ioObjectInstances)
-{
-	{
-		// triangle
-		float vertices[] =
-		{
-			+0.000f,	+1.0f,		+0.0f,
-			+0.866f,	-0.5f,		+0.0f,
-			-0.866f,	-0.5f,		+0.0f,
-		};
-
-		uint16_t indices[] =
-		{
-			0,
-			1,
-			2
-		};
-
-		std::vector<PrimitiveRef> buffers;
-		buffers.push_back(std::make_shared<Primitive>(vertices, uint32_t(sizeof(float) * 3), 3, indices, 3, L"Triangle"));
-
-		BLASRef blas = std::make_shared<BLAS>(L"Triangle");
-		blas->Initialize(std::move(buffers));
-
-		// TODO: initialize all materials first to get hit group index?
-		for (int i = 0; i < 3; i++)
-		{
-			ObjectInstanceRef object_instance = std::make_shared<ObjectInstance>(blas, glm::mat4(1), kDefaultHitGroupIndex);
-			object_instance->SetUpdater([i](ObjectInstance* object_instance)
-			{
-				glm::mat4& transform = object_instance->Transform();
-				transform = glm::mat4(1.0f);
-				transform = glm::translate(transform, glm::vec3(-2.0f + 2.0f * i, 0.f, 0.f)); // Instances in a line
-				float rotate_speed = 1.0f;
-				transform = glm::rotate(transform, gTime * rotate_speed, glm::vec3(0.f, 1.f, 0.f));
-				transform = glm::transpose(transform); // Column-major => Row-major
-			});
-			ioObjectInstances.push_back(object_instance);
-		}
-	}
-	{
-		// plane
-		float vertices[] =
-		{
-			-10.0f,		-1.0f,		-10.0f,
-			+10.0f,		-1.0f,		+10.0f,
-			-10.0f,		-1.0f,		+10.0f,
-
-			-10.0f,		-1.0f,		-10.0f,
-			+10.0f,		-1.0f,		-10.0f,
-			+10.0f,		-1.0f,		+10.0f,
-		};
-
-		uint16_t indices[] =
-		{
-			0,
-			1,
-			2,
-
-			3,
-			4,
-			5,
-		};
-
-		std::vector<PrimitiveRef> buffers;
-		buffers.push_back(std::make_shared<Primitive>(vertices, uint32_t(sizeof(float) * 3), 6, indices, 6, L"Plane"));
-
-		BLASRef blas = std::make_shared<BLAS>(L"Plane");
-		blas->Initialize(std::move(buffers));
-
-		ObjectInstanceRef object_instance = std::make_shared<ObjectInstance>(blas, glm::mat4(1), kDefaultHitGroupIndex);
-		ioObjectInstances.push_back(object_instance);
-	}
-}
-
 void Scene::Load(const char* inFilename)
 {
 	mTLAS = std::make_shared<TLAS>(L"Scene");
 	std::vector<ObjectInstanceRef> object_instances;
+	std::vector<glm::uint16> indices;
+	std::vector<glm::vec3> vertices;
 
-	if (inFilename != nullptr)
-	{		
-		tinyobj::ObjReader reader;
-		reader.ParseFromFile(inFilename);
+	tinyobj::ObjReader reader;
+	reader.ParseFromFile(inFilename);
 
-		if (!reader.Warning().empty())
-			gDebugPrint(reader.Warning().c_str());
+	if (!reader.Warning().empty())
+		gDebugPrint(reader.Warning().c_str());
 
-		if (!reader.Error().empty())
-			gDebugPrint(reader.Error().c_str());
+	if (!reader.Error().empty())
+		gDebugPrint(reader.Error().c_str());
 
-		for (auto&& shape : reader.GetShapes())
+	// vertices
+	glm::uint32 vertex_offset = (glm::uint32)vertices.size();
+	glm::uint32 vertex_count = (glm::uint32)reader.GetAttrib().vertices.size() / 3;
+	glm::vec3* vertex_pointer_begin = (glm::vec3*)reader.GetAttrib().vertices.data();
+	glm::vec3* vertex_pointer_end = vertex_pointer_begin + vertex_count;
+	vertices.insert(vertices.end(), vertex_pointer_begin, vertex_pointer_end);
+
+	// indices
+	for (auto&& shape : reader.GetShapes())
+	{
+		glm::uint32 index_offset = (glm::uint32)indices.size();
+		
+		const int kNumFaceVerticesTriangle = 3;
+		glm::uint32 index_count = (glm::uint32)shape.mesh.num_face_vertices.size() * kNumFaceVerticesTriangle;
+		for (size_t face_index = 0; face_index < shape.mesh.num_face_vertices.size(); face_index++)
 		{
-			std::vector<uint16_t> indices;
-			for (size_t face_index = 0; face_index < shape.mesh.num_face_vertices.size(); face_index++)
+			assert(shape.mesh.num_face_vertices[face_index] == kNumFaceVerticesTriangle);
+			for (size_t vertex_index = 0; vertex_index < kNumFaceVerticesTriangle; vertex_index++)
 			{
-				const int kNumFaceVerticesTriangle = 3;
-				assert(shape.mesh.num_face_vertices[face_index] == kNumFaceVerticesTriangle);
-				for (size_t vertex_index = 0; vertex_index < kNumFaceVerticesTriangle; vertex_index++)
-				{
-					tinyobj::index_t idx = shape.mesh.indices[face_index * kNumFaceVerticesTriangle + vertex_index];
-					indices.push_back(uint16_t(idx.vertex_index));
-
-					// tinyobj::real_t vx = attrib.vertices[3 * idx.vertex_index + 0];
-					// tinyobj::real_t vy = attrib.vertices[3 * idx.vertex_index + 1];
-					// tinyobj::real_t vz = attrib.vertices[3 * idx.vertex_index + 2];
-					// tinyobj::real_t nx = attrib.normals[3 * idx.normal_index + 0];
-					// tinyobj::real_t ny = attrib.normals[3 * idx.normal_index + 1];
-					// tinyobj::real_t nz = attrib.normals[3 * idx.normal_index + 2];
-					// tinyobj::real_t tx = attrib.texcoords[2 * idx.texcoord_index + 0];
-					// tinyobj::real_t ty = attrib.texcoords[2 * idx.texcoord_index + 1];
-					// tinyobj::real_t red = attrib.colors[3*idx.vertex_index+0];
-					// tinyobj::real_t green = attrib.colors[3*idx.vertex_index+1];
-					// tinyobj::real_t blue = attrib.colors[3*idx.vertex_index+2];
-				}
-			}
-
-			std::wstring name(shape.name.begin(), shape.name.end());
-
-			std::vector<PrimitiveRef> buffers;
-			buffers.push_back(std::make_shared<Primitive>(reader.GetAttrib().vertices.data(), uint32_t(sizeof(float) * 3), uint32_t(reader.GetAttrib().vertices.size()), indices.data(), uint32_t(indices.size()), name));
-
-			BLASRef blas = std::make_shared<BLAS>(name);
-			blas->Initialize(std::move(buffers));
-
-			ObjectInstanceRef object_instance = std::make_shared<ObjectInstance>(blas, glm::mat4(1), kDefaultHitGroupIndex);
-			object_instances.push_back(object_instance);
-
-			if (shape.mesh.material_ids.size() > 0)
-			{
-				const tinyobj::material_t& material = reader.GetMaterials()[shape.mesh.material_ids[0]];
-				object_instance->Data().mEmission = glm::vec4(material.emission[0], material.emission[1], material.emission[2], 0.0f);
+				tinyobj::index_t idx = shape.mesh.indices[face_index * kNumFaceVerticesTriangle + vertex_index];
+				indices.push_back(uint16_t(idx.vertex_index));
 			}
 		}
+
+		assert(vertex_count == (glm::uint32)vertices.size() - vertex_offset);
+		assert(index_count == (glm::uint32)indices.size() - index_offset);
+
+		std::wstring name(shape.name.begin(), shape.name.end());
+		BLASRef blas = std::make_shared<BLAS>(std::make_shared<Primitive>(vertex_offset, vertex_count, index_offset, index_count), name);
+		ObjectInstanceRef object_instance = std::make_shared<ObjectInstance>(blas, glm::mat4(1), kDefaultHitGroupIndex);
+		object_instances.push_back(object_instance);
+
+		if (shape.mesh.material_ids.size() > 0)
+		{
+			const tinyobj::material_t& material = reader.GetMaterials()[shape.mesh.material_ids[0]];
+			object_instance->Data().mAlbedo = glm::vec3(material.diffuse[0], material.diffuse[1], material.diffuse[2]);
+			object_instance->Data().mEmission = glm::vec3(material.emission[0], material.emission[1], material.emission[2]);
+			object_instance->Data().mReflectance = glm::vec3(material.specular[0], material.specular[1], material.specular[2]);
+			object_instance->Data().mRoughness = glm::vec1(material.roughness);
+		}
 	}
-	else
-		sSetupTestScene(object_instances);
+
+	{
+		D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(0);
+		D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
+
+		{
+			desc.Width =  Primitive::sVertexSize * vertices.size();
+			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mVertexBuffer)));
+			gSetName(mVertexBuffer, L"Scene", L".VertextBuffer");
+
+			uint8_t* pData = nullptr;
+			mVertexBuffer->Map(0, nullptr, (void**)&pData);
+			memcpy(pData, vertices.data(), desc.Width);
+			mVertexBuffer->Unmap(0, nullptr);
+		}
+
+		{
+			desc.Width = Primitive::sIndexSize * indices.size();
+			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mIndexBuffer)));
+			gSetName(mIndexBuffer, L"Scene", L".IndexBuffer");
+
+			uint8_t* pData = nullptr;
+			mIndexBuffer->Map(0, nullptr, (void**)&pData);
+			memcpy(pData, indices.data(), desc.Width);
+			mIndexBuffer->Unmap(0, nullptr);
+		}
+
+		for (auto&& object_instance : object_instances)
+			object_instance->GetBLAS()->Initialize(mVertexBuffer->GetGPUVirtualAddress(), mIndexBuffer->GetGPUVirtualAddress());
+	}
 	
 	mTLAS->Initialize(std::move(object_instances));
 
@@ -377,5 +288,14 @@ void Scene::RebuildBinding(std::function<void()> inCallback)
 		inCallback();
 
 	gCreateShaderResource(mTLAS->GetGPUVirtualAddress(), mTLAS->GetInstanceBuffer());
+	gCreateShaderTable();
+}
+
+void Scene::RebuildShader()
+{
+	// gCleanupPipelineState(); // Skip cleanup in case rebuild fails
+	gCreatePipelineState();
+
+	gCleanupShaderTable();
 	gCreateShaderTable();
 }

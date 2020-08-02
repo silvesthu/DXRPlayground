@@ -18,8 +18,18 @@ struct InstanceData
 	float3 mReflectance;
 	float3 mEmission;
 	float  mRoughness;
+
+	uint   mIndexOffset;
+	uint   mVertexOffset;
 };
-StructuredBuffer<InstanceData> InstanceDataBuffer : register(t1);
+StructuredBuffer<InstanceData> InstanceDataBuffer : register(t1, space0);
+ByteAddressBuffer Indices : register(t2, space0);
+struct Vertex
+{
+	float3 mPosition;
+	float3 mNormal;
+};
+StructuredBuffer<Vertex> Vertices : register(t3, space1);
 
 float3 linearToSrgb(float3 c)
 {
@@ -83,6 +93,12 @@ void defaultMiss(inout RayPayload payload)
 [shader("closesthit")]
 void defaultClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attribs)
 {
+	if (false)
+	{
+		payload.color = (PrimitiveIndex() + 1) / 50.0f;
+		return;
+	}
+
 	if (mDebugMode == 1) // Barycentrics
 	{
 		float3 barycentrics = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y, attribs.barycentrics.x, attribs.barycentrics.y);

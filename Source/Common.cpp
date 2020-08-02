@@ -28,6 +28,6 @@ ID3D12Resource*						gConstantGPUBuffer = nullptr;
 
 // Frame
 FrameContext                		gFrameContext[NUM_FRAMES_IN_FLIGHT] = {};
-UINT                    			gFrameIndex = 0;
-float								gTime = 0.0f;
+glm::uint32                			gFrameIndex = 0;
+glm::float32						gTime = 0.0f;
 PerFrame							gPerFrameConstantBuffer = {};

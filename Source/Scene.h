@@ -5,43 +5,45 @@
 class Primitive final
 {
 public:
-	Primitive(const void* inVertexData, uint32_t inVertexSize, uint32_t inVertexCount, const void* inIndexData, uint32_t inIndexCount, std::wstring inName);
-	~Primitive() {}
+	Primitive(glm::uint32 inVertexOffset, glm::uint32 inVertexCount, glm::uint32 inIndexOffset, glm::uint32 inIndexCount) :
+		mVertexOffset(inVertexOffset),
+		mVertexCount(inVertexCount),
+		mIndexOffset(inIndexOffset),
+		mIndexCount(inIndexCount) {}
 
-	const ComPtr<ID3D12Resource>& GetResource() const { return mVertexBufferResource; }
-	uint32_t GetVertexCount() const { return mVertexCount; }
-	uint32_t GetVertexSize() const { return mVertexSize; }
+	glm::uint32 GetVertexOffset() const { return mVertexOffset; }
+	glm::uint32 GetVertexCount() const { return mVertexCount; }
+	constexpr static glm::uint32 sVertexSize = sizeof(glm::vec3);
 
-	const ComPtr<ID3D12Resource>& GetIndexBufferResource() const { return mIndexBufferResource; }
-	uint32_t GetIndexCount() const { return mIndexCount; }
-	uint32_t GetIndexSize() const { return sizeof(uint16_t); }
+	glm::uint32 GetIndexOffset() const { return mIndexOffset; }
+	glm::uint32 GetIndexCount() const { return mIndexCount; }
+	constexpr static glm::uint32 sIndexSize = sizeof(glm::uint16);
 
 private:
-	ComPtr<ID3D12Resource> mVertexBufferResource = nullptr;
-	uint32_t mVertexCount = 0;
-	uint32_t mVertexSize = 0;
+	glm::uint32 mVertexOffset = 0;
+	glm::uint32 mVertexCount = 0;
 
-	ComPtr<ID3D12Resource> mIndexBufferResource = nullptr;
-	uint32_t mIndexCount = 0;
+	glm::uint32 mIndexOffset = 0;
+	glm::uint32 mIndexCount = 0;
 };
 using PrimitiveRef = std::shared_ptr<Primitive>;
 
 class BLAS final
 {
 public:
-	BLAS(std::wstring inName) { mName = inName; }
+	BLAS(PrimitiveRef inPrimitive, std::wstring inName) :
+		mPrimitive(inPrimitive), mName(inName) {}
 	~BLAS() {}
 
-	void Initialize(std::vector<PrimitiveRef>&& inPrimitives);
+	void Initialize(D3D12_GPU_VIRTUAL_ADDRESS inVertexBaseAddress, D3D12_GPU_VIRTUAL_ADDRESS inIndexBaseAddress);
 	void Build(ID3D12GraphicsCommandList4* inCommandList);
 
 	D3D12_GPU_VIRTUAL_ADDRESS GetGPUVirtualAddress() const { return mDest->GetGPUVirtualAddress(); }
 
 private:
+	PrimitiveRef mPrimitive;
 
-	std::vector<PrimitiveRef> mPrimitives;
-
-	std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> mDescs;
+	D3D12_RAYTRACING_GEOMETRY_DESC mDesc;
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS mInputs = {};
 
 	ComPtr<ID3D12Resource> mScratch = nullptr;
@@ -56,7 +58,7 @@ using BLASRef = std::shared_ptr<BLAS>;
 class ObjectInstance
 {
 public:
-	ObjectInstance(BLASRef& inBLAS, const glm::mat4& inTransform, uint32_t inHitGroupIndex)
+	ObjectInstance(BLASRef& inBLAS, const glm::mat4& inTransform, glm::uint32 inHitGroupIndex)
 		: mBLAS(inBLAS)
 		, mTransform(inTransform)
 		, mHitGroupIndex(inHitGroupIndex)
@@ -68,13 +70,13 @@ public:
 
 	BLASRef GetBLAS() { return mBLAS; }
 	glm::mat4& Transform() { return mTransform; }
-	uint32_t GetHitGroupIndex() const { return mHitGroupIndex; }
+	glm::uint32 GetHitGroupIndex() const { return mHitGroupIndex; }
 	InstanceData& Data() { return mInstanceData; }
 
 private:
 	glm::mat4 mTransform = glm::mat4(1);
 	BLASRef mBLAS;
-	uint32_t mHitGroupIndex = 0;
+	glm::uint32 mHitGroupIndex = 0;
 	InstanceData mInstanceData;
 
 	std::function<void(ObjectInstance*)> mUpdater;
@@ -124,9 +126,13 @@ public:
 	void Build(ID3D12GraphicsCommandList4* inCommandList);
 	void Update(ID3D12GraphicsCommandList4* inCommandList);
 	void RebuildBinding(std::function<void()> inCallback);
+	void RebuildShader();
 
 private:
 	TLASRef mTLAS;
+
+	ComPtr<ID3D12Resource> mVertexBuffer = nullptr;
+	ComPtr<ID3D12Resource> mIndexBuffer = nullptr;
 };
 
 extern Scene gScene;

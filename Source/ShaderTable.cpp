@@ -25,8 +25,8 @@ void gCreateShaderTable()
 {
 	// Construct the table
 	ShaderTableEntry shader_table_entries[16];
-	uint32_t shader_table_entry_index = 0;
-	uint32_t shader_table_entry_count = 0;
+	glm::uint32 shader_table_entry_index = 0;
+	glm::uint32 shader_table_entry_count = 0;
 	{
 		// Shader table between all ray tracing shader types, by adding offset when reference the table
 		// So it is necessary to align up to table size rather than record size (entry size)

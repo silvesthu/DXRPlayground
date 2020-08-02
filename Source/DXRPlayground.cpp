@@ -14,7 +14,6 @@ static const wchar_t*					kApplicationTitleW = L"DXR Playground";
 
 enum class SCENE_PRESET_TYPE
 {
-	TEST,
 	CORNELL_BOX,
 	VEACH_MIS,
 
@@ -31,7 +30,6 @@ struct ScenePreset
 
 static ScenePreset kScenePresets[(int)SCENE_PRESET_TYPE::COUNT] =
 {
-	{ "Test", nullptr, glm::vec4(0.0f, 0.0f, -5.0f, 0.0f), glm::vec4(0.0f, 0.0f, 1.0f, 0.0f) },
 	{ "CornellBox", "Asset/raytracing-references/cornellbox/cornellbox.obj", glm::vec4(0.0f, 1.0f, 3.0f, 0.0f), glm::vec4(0.0f, 0.0f, -1.0f, 0.0f) },
 	{ "VeachMIS", "Asset/raytracing-references/veach-mis/veach-mis.obj", glm::vec4(0.0f, 1.0f, 13.0f, 0.0f), glm::vec4(0.0f, 0.0f, -1.0f, 0.0f) },
 };
@@ -180,6 +178,15 @@ static void sUpdate()
 					ImGui::PopID();
 				}
 
+				{
+					if (ImGui::Button("Reload shader"))
+					{
+						sWaitForLastSubmittedFrame();
+
+						gScene.RebuildShader();
+					}
+				}
+
 				ImGui::TreePop();
 			}
 
@@ -321,7 +328,7 @@ void sRender()
 {
 	// Frame context
 	FrameContext* frameCtxt = sWaitForNextFrameResources();
-	uint32_t frame_index = gSwapChain->GetCurrentBackBufferIndex();
+	glm::uint32 frame_index = gSwapChain->GetCurrentBackBufferIndex();
 	ID3D12Resource* frame_render_target_resource = gBackBufferRenderTargetResource[frame_index];
 	D3D12_CPU_DESCRIPTOR_HANDLE& frame_render_target_descriptor = gBackBufferRenderTargetDescriptor[frame_index];
 
