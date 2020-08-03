@@ -180,18 +180,8 @@ void Scene::Load(const char* inFilename)
 	if (!reader.Error().empty())
 		gDebugPrint(reader.Error().c_str());
 
-	// Fetch vertices
-	glm::uint32 vertex_offset = (glm::uint32)vertices.size();
-	glm::uint32 vertex_count = (glm::uint32)reader.GetAttrib().vertices.size() / 3;
-	glm::vec3* vertex_pointer_begin = (glm::vec3*)reader.GetAttrib().vertices.data();
-	glm::vec3* vertex_pointer_end = vertex_pointer_begin + vertex_count;
-	vertices.insert(vertices.end(), vertex_pointer_begin, vertex_pointer_end);
-	static_assert(std::is_same<VertexType, glm::vec3>::value, "Need conversion if format does not matched");
-
-	// Fetch normals (prepare)
-	normals.resize(vertices.size());
-
 	// Fetch indices, normals
+	glm::uint32 index = 0;
 	for (auto&& shape : reader.GetShapes())
 	{
 		glm::uint32 index_offset = (glm::uint32)indices.size();
@@ -204,20 +194,26 @@ void Scene::Load(const char* inFilename)
 			for (size_t vertex_index = 0; vertex_index < kNumFaceVerticesTriangle; vertex_index++)
 			{
 				tinyobj::index_t idx = shape.mesh.indices[face_index * kNumFaceVerticesTriangle + vertex_index];
-				indices.push_back(IndexType(idx.vertex_index));
+				indices.push_back(IndexType(index++));
 
-				// rearrange normals to match vertex_index
-				normals[idx.vertex_index] = glm::vec3(
+				vertices.push_back(glm::vec3(
+					reader.GetAttrib().vertices[3 * idx.vertex_index + 0],
+					reader.GetAttrib().vertices[3 * idx.vertex_index + 1],
+					reader.GetAttrib().vertices[3 * idx.vertex_index + 2]
+				));
+
+				normals.push_back(glm::vec3(
 					reader.GetAttrib().normals[3 * idx.normal_index + 0],
 					reader.GetAttrib().normals[3 * idx.normal_index + 1],
 					reader.GetAttrib().normals[3 * idx.normal_index + 2]
-				);
+				));
 				static_assert(std::is_same<NormalType, glm::vec3>::value, "Need conversion if format does not matched");
 			}
 		}
 
-		assert(vertex_count == (glm::uint32)vertices.size() - vertex_offset);
-		assert(index_count == (glm::uint32)indices.size() - index_offset);
+		// trivial - index count == vertex count
+		glm::uint32 vertex_offset = 0;
+		glm::uint32 vertex_count = index_count;
 
 		std::wstring name(shape.name.begin(), shape.name.end());
 		BLASRef blas = std::make_shared<BLAS>(std::make_shared<Primitive>(vertex_offset, vertex_count, index_offset, index_count), name);
