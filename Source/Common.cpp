@@ -22,8 +22,6 @@ ID3D12DescriptorHeap*				gImGuiSrvDescHeap = nullptr;
 ID3D12RootSignature*				gDxrGlobalRootSignature = nullptr;
 ID3D12StateObject*					gDxrStateObject = nullptr;
 ShaderTable							gDxrShaderTable = {};
-ID3D12Resource*						gDxrOutputResource = nullptr;
-ID3D12DescriptorHeap*				gDxrDescriptorHeap = nullptr;
 ID3D12Resource*						gConstantGPUBuffer = nullptr;
 
 // Frame

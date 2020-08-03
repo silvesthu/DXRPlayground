@@ -1,9 +1,10 @@
 #include "Common.h"
+#include "Scene.h"
 
 void gRaytrace(ID3D12Resource* inFrameRenderTargetResource)
 {
 	// Output - Copy -> UAV
-	gBarrierTransition(gCommandList, gDxrOutputResource, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	gBarrierTransition(gCommandList, gScene.GetOutputResource(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 	// Setup D3D12_DISPATCH_RAYS_DESC
 	D3D12_DISPATCH_RAYS_DESC dispatch_rays_desc = {};
@@ -32,21 +33,22 @@ void gRaytrace(ID3D12Resource* inFrameRenderTargetResource)
 
 	// Bind
 	gCommandList->SetComputeRootSignature(gDxrGlobalRootSignature);
-	gCommandList->SetDescriptorHeaps(1, &gDxrDescriptorHeap);
-	gCommandList->SetComputeRootDescriptorTable(0, gDxrDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+	ID3D12DescriptorHeap* descriptor_heap = gScene.GetDescriptorHeap();
+	gCommandList->SetDescriptorHeaps(1, &descriptor_heap);
+	gCommandList->SetComputeRootDescriptorTable(0, gScene.GetDescriptorHeap()->GetGPUDescriptorHandleForHeapStart());
 	gCommandList->SetPipelineState1(gDxrStateObject);
 
 	// Dispatch
 	gCommandList->DispatchRays(&dispatch_rays_desc);
 
 	// Output: UAV -> Copy
-	gBarrierTransition(gCommandList, gDxrOutputResource, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+	gBarrierTransition(gCommandList, gScene.GetOutputResource(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
 	// RenderTarget: RT -> Dest
 	gBarrierTransition(gCommandList, inFrameRenderTargetResource, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_DEST);
 
 	// Copy output to render target
-	gCommandList->CopyResource(inFrameRenderTargetResource, gDxrOutputResource);
+	gCommandList->CopyResource(inFrameRenderTargetResource, gScene.GetOutputResource());
 
 	// RenderTarget: Dest -> RT
 	gBarrierTransition(gCommandList, inFrameRenderTargetResource, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_RENDER_TARGET);

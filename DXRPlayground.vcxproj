@@ -17,7 +17,6 @@
     <ClInclude Include="Source\PipelineState.h" />
     <ClInclude Include="Source\RayTrace.h" />
     <ClInclude Include="Source\Scene.h" />
-    <ClInclude Include="Source\ShaderResource.h" />
     <ClInclude Include="Source\ShaderTable.h" />
     <ClInclude Include="Source\Thirdparty\glm\glm\common.hpp" />
     <ClInclude Include="Source\Thirdparty\glm\glm\exponential.hpp" />
@@ -59,7 +58,6 @@
     <ClCompile Include="Source\PipelineState.cpp" />
     <ClCompile Include="Source\RayTrace.cpp" />
     <ClCompile Include="Source\Scene.cpp" />
-    <ClCompile Include="Source\ShaderResource.cpp" />
     <ClCompile Include="Source\ShaderTable.cpp" />
     <ClCompile Include="Source\Thirdparty\imgui\imgui.cpp" />
     <ClCompile Include="Source\Thirdparty\imgui\imgui_demo.cpp" />

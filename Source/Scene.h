@@ -13,11 +13,9 @@ public:
 
 	glm::uint32 GetVertexOffset() const { return mVertexOffset; }
 	glm::uint32 GetVertexCount() const { return mVertexCount; }
-	constexpr static glm::uint32 sVertexSize = sizeof(glm::vec3);
 
 	glm::uint32 GetIndexOffset() const { return mIndexOffset; }
 	glm::uint32 GetIndexCount() const { return mIndexCount; }
-	constexpr static glm::uint32 sIndexSize = sizeof(glm::uint16);
 
 private:
 	glm::uint32 mVertexOffset = 0;
@@ -54,6 +52,17 @@ private:
 	bool mBuilt = false;
 };
 using BLASRef = std::shared_ptr<BLAS>;
+
+struct InstanceData
+{
+	glm::vec3	mAlbedo = glm::vec3(0.0f, 0.0f, 0.0f);
+	glm::vec3	mReflectance = glm::vec3(0.0f, 0.0f, 0.0f);
+	glm::vec3	mEmission = glm::vec3(0.0f, 0.0f, 0.0f);
+	glm::vec1	mRoughness = glm::vec1(0.0f);
+
+	glm::uint	mIndexOffset = 0;
+	glm::uint	mVertexOffset = 0;
+};
 
 class ObjectInstance
 {
@@ -120,6 +129,10 @@ using TLASRef = std::shared_ptr<TLAS>;
 class Scene
 {
 public:
+	using IndexType = glm::uint16;
+	using VertexType = glm::vec3;
+	using NormalType = glm::vec3;
+
 	void Load(const char* inFilename);
 	void Unload();
 
@@ -128,11 +141,21 @@ public:
 	void RebuildBinding(std::function<void()> inCallback);
 	void RebuildShader();
 
+	ID3D12Resource* GetOutputResource() { return mOutputResource.Get(); }
+	ID3D12DescriptorHeap* GetDescriptorHeap() { return mDescriptorHeap.Get(); }
+
 private:
+	void CreateShaderResource();
+	void CleanupShaderResource();
+
 	TLASRef mTLAS;
 
-	ComPtr<ID3D12Resource> mVertexBuffer = nullptr;
 	ComPtr<ID3D12Resource> mIndexBuffer = nullptr;
+	ComPtr<ID3D12Resource> mVertexBuffer = nullptr;	
+	ComPtr<ID3D12Resource> mNormalBuffer = nullptr;
+
+	ComPtr<ID3D12Resource> mOutputResource = nullptr;
+	ComPtr<ID3D12DescriptorHeap> mDescriptorHeap = nullptr;
 };
 
 extern Scene gScene;

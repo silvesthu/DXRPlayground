@@ -2,7 +2,6 @@
 
 #include "Common.h"
 #include "PipelineState.h"
-#include "ShaderResource.h"
 #include "ShaderTable.h"
 
 #include "Thirdparty/tinyobjloader/tiny_obj_loader.h"
@@ -13,13 +12,13 @@ void BLAS::Initialize(D3D12_GPU_VIRTUAL_ADDRESS inVertexBaseAddress, D3D12_GPU_V
 {
 	mDesc = {};
 	mDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-	mDesc.Triangles.VertexBuffer.StartAddress = inVertexBaseAddress + mPrimitive->GetVertexOffset() * Primitive::sVertexSize;
-	mDesc.Triangles.VertexBuffer.StrideInBytes = Primitive::sVertexSize;
+	mDesc.Triangles.VertexBuffer.StartAddress = inVertexBaseAddress + mPrimitive->GetVertexOffset() * sizeof(Scene::VertexType);
+	mDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(Scene::VertexType);
 	mDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
 	mDesc.Triangles.VertexCount = mPrimitive->GetVertexCount();
 	if (mPrimitive->GetIndexCount() > 0)
 	{
-		mDesc.Triangles.IndexBuffer = inIndexBaseAddress + mPrimitive->GetIndexOffset() * Primitive::sIndexSize;
+		mDesc.Triangles.IndexBuffer = inIndexBaseAddress + mPrimitive->GetIndexOffset() * sizeof(Scene::IndexType);
 		mDesc.Triangles.IndexCount = mPrimitive->GetIndexCount();
 		mDesc.Triangles.IndexFormat = DXGI_FORMAT_R16_UINT;
 	}
@@ -167,10 +166,10 @@ void TLAS::UpdateObjectInstances()
 
 void Scene::Load(const char* inFilename)
 {
-	mTLAS = std::make_shared<TLAS>(L"Scene");
 	std::vector<ObjectInstanceRef> object_instances;
-	std::vector<glm::uint16> indices;
-	std::vector<glm::vec3> vertices;
+	std::vector<IndexType> indices;
+	std::vector<VertexType> vertices;
+	std::vector<NormalType> normals;
 
 	tinyobj::ObjReader reader;
 	reader.ParseFromFile(inFilename);
@@ -181,14 +180,18 @@ void Scene::Load(const char* inFilename)
 	if (!reader.Error().empty())
 		gDebugPrint(reader.Error().c_str());
 
-	// vertices
+	// Fetch vertices
 	glm::uint32 vertex_offset = (glm::uint32)vertices.size();
 	glm::uint32 vertex_count = (glm::uint32)reader.GetAttrib().vertices.size() / 3;
 	glm::vec3* vertex_pointer_begin = (glm::vec3*)reader.GetAttrib().vertices.data();
 	glm::vec3* vertex_pointer_end = vertex_pointer_begin + vertex_count;
 	vertices.insert(vertices.end(), vertex_pointer_begin, vertex_pointer_end);
+	static_assert(std::is_same<VertexType, glm::vec3>::value, "Need conversion if format does not matched");
 
-	// indices
+	// Fetch normals (prepare)
+	normals.resize(vertices.size());
+
+	// Fetch indices, normals
 	for (auto&& shape : reader.GetShapes())
 	{
 		glm::uint32 index_offset = (glm::uint32)indices.size();
@@ -201,7 +204,15 @@ void Scene::Load(const char* inFilename)
 			for (size_t vertex_index = 0; vertex_index < kNumFaceVerticesTriangle; vertex_index++)
 			{
 				tinyobj::index_t idx = shape.mesh.indices[face_index * kNumFaceVerticesTriangle + vertex_index];
-				indices.push_back(uint16_t(idx.vertex_index));
+				indices.push_back(IndexType(idx.vertex_index));
+
+				// rearrange normals to match vertex_index
+				normals[idx.vertex_index] = glm::vec3(
+					reader.GetAttrib().normals[3 * idx.normal_index + 0],
+					reader.GetAttrib().normals[3 * idx.normal_index + 1],
+					reader.GetAttrib().normals[3 * idx.normal_index + 2]
+				);
+				static_assert(std::is_same<NormalType, glm::vec3>::value, "Need conversion if format does not matched");
 			}
 		}
 
@@ -220,15 +231,30 @@ void Scene::Load(const char* inFilename)
 			object_instance->Data().mEmission = glm::vec3(material.emission[0], material.emission[1], material.emission[2]);
 			object_instance->Data().mReflectance = glm::vec3(material.specular[0], material.specular[1], material.specular[2]);
 			object_instance->Data().mRoughness = glm::vec1(material.roughness);
+
+			object_instance->Data().mIndexOffset = index_offset;
+			object_instance->Data().mVertexOffset = vertex_offset;
 		}
 	}
 
+	// Construct acceleration structure
 	{
 		D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(0);
 		D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
 
 		{
-			desc.Width =  Primitive::sVertexSize * vertices.size();
+			desc.Width = sizeof(IndexType) * indices.size();
+			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mIndexBuffer)));
+			gSetName(mIndexBuffer, L"Scene", L".IndexBuffer");
+
+			uint8_t* pData = nullptr;
+			mIndexBuffer->Map(0, nullptr, (void**)&pData);
+			memcpy(pData, indices.data(), desc.Width);
+			mIndexBuffer->Unmap(0, nullptr);
+		}
+
+		{
+			desc.Width =  sizeof(VertexType) * vertices.size();
 			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mVertexBuffer)));
 			gSetName(mVertexBuffer, L"Scene", L".VertextBuffer");
 
@@ -239,34 +265,39 @@ void Scene::Load(const char* inFilename)
 		}
 
 		{
-			desc.Width = Primitive::sIndexSize * indices.size();
-			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mIndexBuffer)));
-			gSetName(mIndexBuffer, L"Scene", L".IndexBuffer");
+			desc.Width = sizeof(NormalType) * normals.size();
+			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mNormalBuffer)));
+			gSetName(mNormalBuffer, L"Scene", L".NormalBuffer");
 
 			uint8_t* pData = nullptr;
-			mIndexBuffer->Map(0, nullptr, (void**)&pData);
-			memcpy(pData, indices.data(), desc.Width);
-			mIndexBuffer->Unmap(0, nullptr);
+			mNormalBuffer->Map(0, nullptr, (void**)&pData);
+			memcpy(pData, normals.data(), desc.Width);
+			mNormalBuffer->Unmap(0, nullptr);
 		}
 
 		for (auto&& object_instance : object_instances)
 			object_instance->GetBLAS()->Initialize(mVertexBuffer->GetGPUVirtualAddress(), mIndexBuffer->GetGPUVirtualAddress());
-	}
-	
-	mTLAS->Initialize(std::move(object_instances));
 
+		mTLAS = std::make_shared<TLAS>(L"Scene");
+		mTLAS->Initialize(std::move(object_instances));
+	}
+
+	CreateShaderResource();
 	gCreatePipelineState();
-	gCreateShaderResource(mTLAS->GetGPUVirtualAddress(), mTLAS->GetInstanceBuffer());
 	gCreateShaderTable();
 }
 
 void Scene::Unload()
 {
 	gCleanupShaderTable();
-	gCleanupShaderResource();
 	gCleanupPipelineState();
+	CleanupShaderResource();
 
 	mTLAS = nullptr;
+
+	mNormalBuffer = nullptr;
+	mIndexBuffer = nullptr;
+	mVertexBuffer = nullptr;
 }
 
 void Scene::Build(ID3D12GraphicsCommandList4* inCommandList)
@@ -282,12 +313,11 @@ void Scene::Update(ID3D12GraphicsCommandList4* inCommandList)
 void Scene::RebuildBinding(std::function<void()> inCallback)
 {
 	gCleanupShaderTable();
-	gCleanupShaderResource();
 
 	if (inCallback)
 		inCallback();
 
-	gCreateShaderResource(mTLAS->GetGPUVirtualAddress(), mTLAS->GetInstanceBuffer());
+	CreateShaderResource();
 	gCreateShaderTable();
 }
 
@@ -298,4 +328,122 @@ void Scene::RebuildShader()
 
 	gCleanupShaderTable();
 	gCreateShaderTable();
+}
+
+void Scene::CreateShaderResource()
+{
+	// Raytrace output (UAV)
+	{
+		DXGI_SWAP_CHAIN_DESC1 swap_chain_desc;
+		gSwapChain->GetDesc1(&swap_chain_desc);
+
+		D3D12_RESOURCE_DESC resource_desc = gGetTextureResourceDesc(swap_chain_desc.Width, swap_chain_desc.Height, swap_chain_desc.Format);
+		D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
+
+		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_COPY_SOURCE, nullptr, IID_PPV_ARGS(&mOutputResource)));
+		mOutputResource->SetName(L"Scene.OutputResource");
+	}
+
+	// DescriptorHeap
+	{
+		D3D12_DESCRIPTOR_HEAP_DESC desc = {};
+		desc.NumDescriptors = 64;
+		desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+		desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+		gValidate(gDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&mDescriptorHeap)));
+	}
+
+	// DescriptorTable
+	{
+		D3D12_CPU_DESCRIPTOR_HANDLE handle = mDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+		UINT increment_size = gDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+		// u0
+		{
+			D3D12_UNORDERED_ACCESS_VIEW_DESC desc = {};
+			desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+			gDevice->CreateUnorderedAccessView(mOutputResource.Get(), nullptr, &desc, handle);
+		}
+
+		handle.ptr += increment_size;
+
+		// b0
+		{
+			D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
+			desc.BufferLocation = gConstantGPUBuffer->GetGPUVirtualAddress();
+			desc.SizeInBytes = gAlignUp((UINT)sizeof(PerFrame), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+			gDevice->CreateConstantBufferView(&desc, handle);
+		}
+
+		handle.ptr += increment_size;
+
+		// t0
+		{
+			D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
+			desc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
+			desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+			desc.RaytracingAccelerationStructure.Location = mTLAS->GetGPUVirtualAddress();
+			gDevice->CreateShaderResourceView(nullptr, &desc, handle);
+		}
+
+		handle.ptr += increment_size;
+
+		// t1
+		{
+			D3D12_RESOURCE_DESC resource_desc = mTLAS->GetInstanceBuffer()->GetDesc();
+			D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
+			desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+			desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+			desc.Buffer.NumElements = (UINT)(resource_desc.Width / sizeof(InstanceData));
+			desc.Buffer.StructureByteStride = sizeof(InstanceData);
+			desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+			gDevice->CreateShaderResourceView(mTLAS->GetInstanceBuffer(), &desc, handle);
+		}
+
+		handle.ptr += increment_size;
+
+		// t2
+		{
+			D3D12_RESOURCE_DESC resource_desc = mIndexBuffer->GetDesc();
+			D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
+			desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+			desc.Format = DXGI_FORMAT_R32_TYPELESS;
+			desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+			desc.Buffer.NumElements = (UINT)(resource_desc.Width / sizeof(glm::uint32)); // RAW is counted as 32-bit typeless
+			desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
+			gDevice->CreateShaderResourceView(mIndexBuffer.Get(), &desc, handle);
+		}
+
+		handle.ptr += increment_size;
+
+		// t3
+		{
+			D3D12_RESOURCE_DESC resource_desc = mVertexBuffer->GetDesc();
+			D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
+			desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+			desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+			desc.Buffer.NumElements = (UINT)(resource_desc.Width / sizeof(Scene::VertexType));
+			desc.Buffer.StructureByteStride = sizeof(Scene::VertexType);
+			gDevice->CreateShaderResourceView(mVertexBuffer.Get(), &desc, handle);
+		}
+
+		handle.ptr += increment_size;
+
+		// t4
+		{
+			D3D12_RESOURCE_DESC resource_desc = mNormalBuffer->GetDesc();
+			D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
+			desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+			desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+			desc.Buffer.NumElements = (UINT)(resource_desc.Width / sizeof(Scene::NormalType));
+			desc.Buffer.StructureByteStride = sizeof(Scene::NormalType);
+			gDevice->CreateShaderResourceView(mNormalBuffer.Get(), &desc, handle);
+		}
+	}
+}
+
+void Scene::CleanupShaderResource()
+{
+	mOutputResource = nullptr;
+	mDescriptorHeap = nullptr;
 }

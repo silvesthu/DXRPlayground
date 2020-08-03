@@ -1,6 +1,5 @@
-RWTexture2D<float4> RaytracingOutput : register(u0);
-RaytracingAccelerationStructure RaytracingScene : register(t0);
-cbuffer PerFrame : register(b0)
+RWTexture2D<float4> RaytracingOutput : register(u0, space0);
+cbuffer PerFrame : register(b0, space0)
 {
 	float4	mBackgroundColor;
 	float4	mCameraPosition;
@@ -12,6 +11,7 @@ cbuffer PerFrame : register(b0)
 	uint	mShadowMode;
 }
 
+RaytracingAccelerationStructure RaytracingScene : register(t0, space0);
 struct InstanceData
 {
 	float3 mAlbedo;
@@ -24,12 +24,18 @@ struct InstanceData
 };
 StructuredBuffer<InstanceData> InstanceDataBuffer : register(t1, space0);
 ByteAddressBuffer Indices : register(t2, space0);
-struct Vertex
+StructuredBuffer<float3> Vertices : register(t3, space0);
+StructuredBuffer<float3> Normals : register(t4, space0);
+
+struct RayPayload
 {
-	float3 mPosition;
-	float3 mNormal;
+	float3 color;
 };
-StructuredBuffer<Vertex> Vertices : register(t3, space1);
+
+struct ShadowPayload
+{
+	bool hit;
+};
 
 float3 linearToSrgb(float3 c)
 {
@@ -41,15 +47,39 @@ float3 linearToSrgb(float3 c)
 	return srgb;
 }
 
-struct RayPayload
+// From D3D12Raytracing
+// Load three 16 bit indices from a byte addressed buffer.
+static
+uint3 Load3x16BitIndices(uint offsetBytes)
 {
-	float3 color;
-};
+    uint3 indices;
 
-struct ShadowPayload
-{
-	bool hit;
-};
+    // ByteAdressBuffer loads must be aligned at a 4 byte boundary.
+    // Since we need to read three 16 bit indices: { 0, 1, 2 } 
+    // aligned at a 4 byte boundary as: { 0 1 } { 2 0 } { 1 2 } { 0 1 } ...
+    // we will load 8 bytes (~ 4 indices { a b | c d }) to handle two possible index triplet layouts,
+    // based on first index's offsetBytes being aligned at the 4 byte boundary or not:
+    //  Aligned:     { 0 1 | 2 - }
+    //  Not aligned: { - 0 | 1 2 }
+    const uint dwordAlignedOffset = offsetBytes & ~3;
+    const uint2 four16BitIndices = Indices.Load2(dwordAlignedOffset);
+
+    // Aligned: { 0 1 | 2 - } => retrieve first three 16bit indices
+    if (dwordAlignedOffset == offsetBytes)
+    {
+        indices.x = four16BitIndices.x & 0xffff;
+        indices.y = (four16BitIndices.x >> 16) & 0xffff;
+        indices.z = four16BitIndices.y & 0xffff;
+    }
+    else // Not aligned: { - 0 | 1 2 } => retrieve last three 16bit indices
+    {
+        indices.x = (four16BitIndices.x >> 16) & 0xffff;
+        indices.y = four16BitIndices.y & 0xffff;
+        indices.z = (four16BitIndices.y >> 16) & 0xffff;
+    }
+
+    return indices;
+}
 
 [shader("raygeneration")]
 void defaultRayGeneration()
@@ -93,17 +123,50 @@ void defaultMiss(inout RayPayload payload)
 [shader("closesthit")]
 void defaultClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attribs)
 {
-	if (false)
-	{
-		payload.color = (PrimitiveIndex() + 1) / 50.0f;
-		return;
-	}
+	float3 barycentrics = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y, attribs.barycentrics.x, attribs.barycentrics.y);
+
+	// Get the base index of the triangle's first 16 bit index.
+    uint indexSizeInBytes = 2;
+    uint indicesPerTriangle = 3;
+    uint triangleIndexStride = indicesPerTriangle * indexSizeInBytes;
+    uint baseIndex = PrimitiveIndex() * triangleIndexStride + InstanceDataBuffer[InstanceID()].mIndexOffset * indexSizeInBytes;
+
+    // Load up 3 16 bit indices for the triangle.
+    const uint3 indices = Load3x16BitIndices(baseIndex);
+
+    // Retrieve corresponding vertex normals for the triangle vertices.
+    float3 normals[3] = { 
+        Normals[indices[0]], 
+        Normals[indices[1]], 
+        Normals[indices[2]] 
+    };
+
+    float3 normal = normals[0] * barycentrics.x + normals[1] * barycentrics.y + normals[2] * barycentrics.z;
+
+    // Retrieve corresponding vertex normals for the triangle vertices.
+    float3 vertices[3] = { 
+        Vertices[indices[0]], 
+        Vertices[indices[1]], 
+        Vertices[indices[2]] 
+    };
+
+    float3 vertex = vertices[0] * barycentrics.x + vertices[1] * barycentrics.y + vertices[2] * barycentrics.z;
 
 	if (mDebugMode == 1) // Barycentrics
 	{
-		float3 barycentrics = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y, attribs.barycentrics.x, attribs.barycentrics.y);
 		payload.color = barycentrics;
+		return;
+	}
 
+	if (mDebugMode == 2) // Vertex
+	{
+		payload.color = vertex;
+		return;
+	}
+
+	if (mDebugMode == 3) // Normal
+	{
+		payload.color = normal;
 		return;
 	}
 

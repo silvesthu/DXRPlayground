@@ -71,6 +71,15 @@ void GenerateGlobalRootSignatureDescriptor(RootSignatureDescriptor& outDesc)
 	descriptor_range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 	outDesc.mDescriptorRanges.push_back(descriptor_range);
 
+	// b0
+	descriptor_range = {};
+	descriptor_range.BaseShaderRegister = 0;
+	descriptor_range.NumDescriptors = 1;
+	descriptor_range.RegisterSpace = 0;
+	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+	descriptor_range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	outDesc.mDescriptorRanges.push_back(descriptor_range);
+
 	// t0
 	descriptor_range = {};
 	descriptor_range.BaseShaderRegister = 0;
@@ -81,21 +90,19 @@ void GenerateGlobalRootSignatureDescriptor(RootSignatureDescriptor& outDesc)
 	outDesc.mDescriptorRanges.push_back(descriptor_range);
 
 	// t1
-	descriptor_range = {};
 	descriptor_range.BaseShaderRegister = 1;
-	descriptor_range.NumDescriptors = 1;
-	descriptor_range.RegisterSpace = 0;
-	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-	descriptor_range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 	outDesc.mDescriptorRanges.push_back(descriptor_range);
 
-	// b0
-	descriptor_range = {};
-	descriptor_range.BaseShaderRegister = 0;
-	descriptor_range.NumDescriptors = 1;
-	descriptor_range.RegisterSpace = 0;
-	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-	descriptor_range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	// t2
+	descriptor_range.BaseShaderRegister = 2;
+	outDesc.mDescriptorRanges.push_back(descriptor_range);
+
+	// t3
+	descriptor_range.BaseShaderRegister = 3;
+	outDesc.mDescriptorRanges.push_back(descriptor_range);
+
+	// t4
+	descriptor_range.BaseShaderRegister = 4;
 	outDesc.mDescriptorRanges.push_back(descriptor_range);
 
 	// Table

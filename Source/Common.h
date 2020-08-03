@@ -15,6 +15,7 @@ using Microsoft::WRL::ComPtr;
 #include <vector>
 #include <memory>
 #include <functional>
+#include <type_traits>
 
 #include "Thirdparty/glm/glm/gtx/transform.hpp"
 
@@ -49,22 +50,9 @@ struct ShaderTable
 	glm::uint32								mHitGroupCount = 0;
 };
 
-struct InstanceData
-{
-	glm::vec3								mAlbedo = glm::vec3(0.0f, 0.0f, 0.0f);
-	glm::vec3								mReflectance = glm::vec3(0.0f, 0.0f, 0.0f);
-	glm::vec3								mEmission = glm::vec3(0.0f, 0.0f, 0.0f);
-	glm::vec1								mRoughness = glm::vec1(0.0f);
-
-	glm::uint								mIndexOffset = 0;
-	glm::uint								mVertexOffset = 0;
-};
-
 extern ID3D12RootSignature*					gDxrGlobalRootSignature;
 extern ID3D12StateObject* 					gDxrStateObject;
 extern ShaderTable							gDxrShaderTable;
-extern ID3D12Resource*						gDxrOutputResource;
-extern ID3D12DescriptorHeap*				gDxrDescriptorHeap;
 extern ID3D12Resource*						gConstantGPUBuffer;
 
 // Frame
@@ -90,6 +78,8 @@ enum class DebugMode : glm::uint32
 {
 	None = 0,
 	Barycentrics,
+	Vertex,
+	Normal,
 
 	Count
 };

@@ -16,6 +16,7 @@ enum class SCENE_PRESET_TYPE
 {
 	CORNELL_BOX,
 	VEACH_MIS,
+	FURNANCE,
 
 	COUNT,
 };
@@ -32,6 +33,7 @@ static ScenePreset kScenePresets[(int)SCENE_PRESET_TYPE::COUNT] =
 {
 	{ "CornellBox", "Asset/raytracing-references/cornellbox/cornellbox.obj", glm::vec4(0.0f, 1.0f, 3.0f, 0.0f), glm::vec4(0.0f, 0.0f, -1.0f, 0.0f) },
 	{ "VeachMIS", "Asset/raytracing-references/veach-mis/veach-mis.obj", glm::vec4(0.0f, 1.0f, 13.0f, 0.0f), glm::vec4(0.0f, 0.0f, -1.0f, 0.0f) },
+	{ "Furnance", "Asset/raytracing-references/furnace-light-sampling/furnace-light-sampling.obj", glm::vec4(0.0f, 1.0f, 13.0f, 0.0f), glm::vec4(0.0f, 0.0f, -1.0f, 0.0f) },
 };
 static SCENE_PRESET_TYPE sCurrentScene = SCENE_PRESET_TYPE::VEACH_MIS;
 static SCENE_PRESET_TYPE sPreviousScene = SCENE_PRESET_TYPE::VEACH_MIS;
