@@ -3,33 +3,42 @@
 #include <fstream>
 #include <sstream>
 
-IDxcBlob* CompileShader(const wchar_t* inName, const char* inSource, glm::uint32 inSize)
+IDxcBlob* CompileShader(const char* inFilename, const char* inSource, glm::uint32 inSize)
 {
-	static DxcCreateInstanceProc sDxcCreateInstanceProc = nullptr;
-	if (sDxcCreateInstanceProc == nullptr)
+	// GetProcAddress to eliminate dependency on .lib. Make updating .dll easier.
+	DxcCreateInstanceProc DxcCreateInstance = nullptr;
+	if (DxcCreateInstance == nullptr)
 	{
 		HMODULE dll = LoadLibraryW(L"dxcompiler.dll");
 		assert(dll != nullptr);
-		sDxcCreateInstanceProc = (DxcCreateInstanceProc)GetProcAddress(dll, "DxcCreateInstance");
+		DxcCreateInstance = (DxcCreateInstanceProc)GetProcAddress(dll, "DxcCreateInstance");
 	}
 
-	IDxcLibrary* library;
-	IDxcBlobEncoding* blob_encoding;
-	sDxcCreateInstanceProc(CLSID_DxcLibrary, __uuidof(IDxcLibrary), (void**)& library);
-	gValidate(library->CreateBlobWithEncodingFromPinned(inSource, inSize, CP_UTF8, &blob_encoding));
+	// See https://simoncoenen.com/blog/programming/graphics/DxcRevised.html
+	ComPtr<IDxcUtils> utils;
+	DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(utils.GetAddressOf()));
 
-	IDxcCompiler* compiler;
-	sDxcCreateInstanceProc(CLSID_DxcCompiler, __uuidof(IDxcCompiler), (void**)& compiler);
+	IDxcBlobEncoding* blob_encoding;
+	gValidate(utils->CreateBlobFromPinned(inSource, inSize, CP_UTF8, &blob_encoding));
+
+	ComPtr<IDxcCompiler> compiler;
+	DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(compiler.GetAddressOf()));
+
+	ComPtr<IDxcIncludeHandler> include_handler;
+	utils->CreateDefaultIncludeHandler(include_handler.GetAddressOf());
+
+	std::string filename(inFilename);
+	std::wstring wfilename(filename.begin(), filename.end());
 
 	IDxcOperationResult* operation_result;
 	assert(SUCCEEDED(compiler->Compile(
-		blob_encoding,		// program text
-		inName,				// file name, mostly for error messages
-		L"",				// entry point function
-		L"lib_6_3",			// target profile
-		nullptr, 0,			// compilation arguments and their count
-		nullptr, 0,			// name/value defines and their count
-		nullptr,			// handler for #include directives
+		blob_encoding,								// program text
+		wfilename.c_str(),							// file name, mostly for error messages
+		L"",										// entry point function
+		L"lib_6_3",									// target profile
+		nullptr, 0,									// compilation arguments and their count
+		nullptr, 0,									// name/value defines and their count
+		include_handler.Get(),						// handler for #include directives
 		&operation_result)));
 
 	HRESULT compile_result;
@@ -37,14 +46,15 @@ IDxcBlob* CompileShader(const wchar_t* inName, const char* inSource, glm::uint32
 
 	if (FAILED(compile_result))
 	{
-		IDxcBlobEncoding* pPrintBlob, * pPrintBlob16;
-		gValidate(operation_result->GetErrorBuffer(&pPrintBlob));
+		IDxcBlobEncoding* blob = nullptr;
+		IDxcBlobUtf16* blob_16 = nullptr;
+		gValidate(operation_result->GetErrorBuffer(&blob));
 		// We can use the library to get our preferred encoding.
-		gValidate(library->GetBlobAsUtf16(pPrintBlob, &pPrintBlob16));
-		std::wstring str((LPCWSTR)pPrintBlob16->GetBufferPointer(), (int)pPrintBlob16->GetBufferSize() / 2);
+		gValidate(utils->GetBlobAsUtf16(blob, &blob_16));
+		std::wstring str((LPCWSTR)blob_16->GetBufferPointer(), (int)blob_16->GetBufferSize() / 2);
 		OutputDebugStringW(str.c_str());
-		pPrintBlob->Release();
-		pPrintBlob16->Release();
+		blob->Release();
+		blob_16->Release();
 		return nullptr;
 	}
 
@@ -270,13 +280,14 @@ void gCreatePipelineState()
 	glm::uint32 index = 0;
 
 	// Load shader
-	std::ifstream shader_file("Shader/Shader.hlsl");
+	const char* filename = "Shader/Shader.hlsl";
+	std::ifstream shader_file(filename);
 	std::stringstream shader_stream;
 	shader_stream << shader_file.rdbuf();
 
 	// DXIL library
 	const wchar_t* entry_points[] = { kDefaultRayGenerationShader, kDefaultMissShader, kDefaultClosestHitShader, kShadowMissShader, kShadowClosestHitShader };
-	IDxcBlob* blob = CompileShader(L"Shader", shader_stream.str().c_str(), (glm::uint32)shader_stream.str().length());
+	IDxcBlob* blob = CompileShader(filename, shader_stream.str().c_str(), (glm::uint32)shader_stream.str().length());
 	if (blob == nullptr)
 		return;
 	gDebugPrint("Shader compiled.\n");
