@@ -310,15 +310,15 @@ void gCreatePipelineState()
 
 	// Shader config
 	//  sizeof(BuiltInTriangleIntersectionAttributes) = sizeof(float) * 2, depends on interaction type
-	//  max(sizeof(RayPayload), sizeof(ShadowPayload)) = sizeof(float) * 3, fully customized
-	ShaderConfig shader_config(sizeof(float) * 2, sizeof(float) * 3);
+	//  max(sizeof(RayPayload), sizeof(ShadowPayload)), fully customized
+	ShaderConfig shader_config(sizeof(float) * 2, sizeof(float) * 3 + sizeof(glm::uint32));
 	subobjects[index++] = shader_config.mStateSubobject;
 	SubobjectToExportsAssociation shader_configassociation(entry_points, ARRAYSIZE(entry_points), &(subobjects[index - 1]));
 	subobjects[index++] = shader_configassociation.mStateSubobject;
 
 	// Pipeline config
 	//  MaxTraceRecursionDepth
-	PipelineConfig pipeline_config(2); // Primary, Shadow
+	PipelineConfig pipeline_config(PerFrame::sRecursionCountMax + 1);
 	subobjects[index++] = pipeline_config.mStateSubobject;
 
 	// Global root signature

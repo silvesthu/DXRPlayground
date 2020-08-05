@@ -77,9 +77,23 @@ extern glm::float32							gTime;
 enum class DebugMode : glm::uint32
 {
 	None = 0,
+
+	_Newline0,
+
 	Barycentrics,
 	Vertex,
 	Normal,
+
+	_Newline1,
+
+	Albedo,
+	Reflectance,
+	Emission,
+	Roughness,
+
+	_Newline2,
+
+	RecursionCount,
 
 	Count
 };
@@ -102,6 +116,12 @@ struct PerFrame
 
 	DebugMode								mDebugMode			= DebugMode::None;
 	ShadowMode								mShadowMode			= ShadowMode::None;
+
+	static constexpr glm::uint32			sRecursionCountMax	= 8;
+	glm::uint32								mRecursionCountMax	= sRecursionCountMax;
+	
+	glm::uint32								mFrameIndex			= 0;
+	glm::uint32								mAccumulationFrameCount = 1;
 };
 extern PerFrame								gPerFrameConstantBuffer;
 
