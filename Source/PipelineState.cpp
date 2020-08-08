@@ -3,7 +3,7 @@
 #include <fstream>
 #include <sstream>
 
-IDxcBlob* CompileShader(const char* inFilename, const char* inSource, glm::uint32 inSize)
+static IDxcBlob* sCompileShader(const char* inFilename, const char* inSource, glm::uint32 inSize, const wchar_t* inEntryPoint, const wchar_t* inProfile)
 {
 	// GetProcAddress to eliminate dependency on .lib. Make updating .dll easier.
 	DxcCreateInstanceProc DxcCreateInstance = nullptr;
@@ -34,8 +34,8 @@ IDxcBlob* CompileShader(const char* inFilename, const char* inSource, glm::uint3
 	assert(SUCCEEDED(compiler->Compile(
 		blob_encoding,								// program text
 		wfilename.c_str(),							// file name, mostly for error messages
-		L"",										// entry point function
-		L"lib_6_3",									// target profile
+		inEntryPoint,								// entry point function
+		inProfile,									// target profile
 		nullptr, 0,									// compilation arguments and their count
 		nullptr, 0,									// name/value defines and their count
 		include_handler.Get(),						// handler for #include directives
@@ -254,7 +254,7 @@ struct GlobalRootSignature : public StateSubobjectHolder<ID3D12RootSignature*, D
 		mRootSignature = CreateRootSignature(inDesc);
 		mDesc = mRootSignature.Get();
 	}
-	ComPtr<ID3D12RootSignature> mRootSignature; // Necessary?
+	ComPtr<ID3D12RootSignature> mRootSignature;
 };
 
 void gCreatePipelineState()
@@ -285,11 +285,44 @@ void gCreatePipelineState()
 	std::stringstream shader_stream;
 	shader_stream << shader_file.rdbuf();
 
-	// DXIL library
+	// Create copy texture shader
+	IDxcBlob* copy_texture_vs_blob = sCompileShader(filename, shader_stream.str().c_str(), (glm::uint32)shader_stream.str().length(), L"CopyTextureVS", L"vs_6_3");
+	IDxcBlob* copy_texture_ps_blob = sCompileShader(filename, shader_stream.str().c_str(), (glm::uint32)shader_stream.str().length(), L"CopyTexturePS", L"ps_6_3");
+	if (copy_texture_vs_blob == nullptr || copy_texture_ps_blob == nullptr)
+		return;
+
+	gDevice->CreateRootSignature(0, copy_texture_ps_blob->GetBufferPointer(), copy_texture_ps_blob->GetBufferSize(), IID_PPV_ARGS(&gCopyTextureRootSignature));
+	
+	D3D12_RASTERIZER_DESC rasterizer_desc = {};
+	rasterizer_desc.FillMode = D3D12_FILL_MODE_SOLID;
+	rasterizer_desc.CullMode = D3D12_CULL_MODE_NONE;
+
+	D3D12_BLEND_DESC blend_desc = {};
+	blend_desc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC copy_texture_pso_desc = {};
+	copy_texture_pso_desc.VS.pShaderBytecode = copy_texture_vs_blob->GetBufferPointer();
+	copy_texture_pso_desc.VS.BytecodeLength = copy_texture_vs_blob->GetBufferSize();
+	copy_texture_pso_desc.PS.pShaderBytecode = copy_texture_ps_blob->GetBufferPointer();
+	copy_texture_pso_desc.PS.BytecodeLength = copy_texture_ps_blob->GetBufferSize();
+	copy_texture_pso_desc.pRootSignature = gCopyTextureRootSignature.Get();
+	copy_texture_pso_desc.RasterizerState = rasterizer_desc;
+	copy_texture_pso_desc.BlendState = blend_desc;
+	copy_texture_pso_desc.DepthStencilState.DepthEnable = FALSE;
+	copy_texture_pso_desc.DepthStencilState.StencilEnable = FALSE;
+	copy_texture_pso_desc.SampleMask = UINT_MAX;
+	copy_texture_pso_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	copy_texture_pso_desc.NumRenderTargets = 1;
+	copy_texture_pso_desc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+	copy_texture_pso_desc.SampleDesc.Count = 1;
+	gDevice->CreateGraphicsPipelineState(&copy_texture_pso_desc, IID_PPV_ARGS(&gCopyTexturePipelineState));
+
+	// Create DXR shaders
 	const wchar_t* entry_points[] = { kDefaultRayGenerationShader, kDefaultMissShader, kDefaultClosestHitShader, kShadowMissShader, kShadowClosestHitShader };
-	IDxcBlob* blob = CompileShader(filename, shader_stream.str().c_str(), (glm::uint32)shader_stream.str().length());
+	IDxcBlob* blob = sCompileShader(filename, shader_stream.str().c_str(), (glm::uint32)shader_stream.str().length(), L"", L"lib_6_3");
 	if (blob == nullptr)
 		return;
+
 	gDebugPrint("Shader compiled.\n");
 	DXILLibrary dxilLibrary(blob, entry_points, ARRAYSIZE(entry_points));
 	subobjects[index++] = dxilLibrary.mStateSubobject;
@@ -311,7 +344,7 @@ void gCreatePipelineState()
 	// Shader config
 	//  sizeof(BuiltInTriangleIntersectionAttributes) = sizeof(float) * 2, depends on interaction type
 	//  max(sizeof(RayPayload), sizeof(ShadowPayload)), fully customized
-	ShaderConfig shader_config(sizeof(float) * 2, sizeof(float) * 3 + sizeof(glm::uint32));
+	ShaderConfig shader_config(sizeof(float) * 2, sizeof(float) * 3 + sizeof(glm::uint32) * 2);
 	subobjects[index++] = shader_config.mStateSubobject;
 	SubobjectToExportsAssociation shader_configassociation(entry_points, ARRAYSIZE(entry_points), &(subobjects[index - 1]));
 	subobjects[index++] = shader_configassociation.mStateSubobject;
@@ -325,7 +358,7 @@ void gCreatePipelineState()
 	RootSignatureDescriptor global_root_signature_descriptor;
 	GenerateGlobalRootSignatureDescriptor(global_root_signature_descriptor);
 	GlobalRootSignature global_root_signature(global_root_signature_descriptor.mDesc);
-	gDxrGlobalRootSignature = global_root_signature.mRootSignature.Get();
+	gDXRGlobalRootSignature = global_root_signature.mRootSignature;
 	subobjects[index++] = global_root_signature.mStateSubobject;
 
 	// Create the state object
@@ -333,10 +366,11 @@ void gCreatePipelineState()
 	desc.NumSubobjects = index;
 	desc.pSubobjects = subobjects.data();
 	desc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
-	gValidate(gDevice->CreateStateObject(&desc, IID_PPV_ARGS(&gDxrStateObject)));
+	gValidate(gDevice->CreateStateObject(&desc, IID_PPV_ARGS(&gDXRStateObject)));
 }
 
 void gCleanupPipelineState()
 {
-	gSafeRelease(gDxrStateObject);
+	gDXRStateObject = nullptr;
+	gDXRGlobalRootSignature = nullptr;
 }

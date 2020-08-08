@@ -333,25 +333,52 @@ void Scene::CreateShaderResource()
 		DXGI_SWAP_CHAIN_DESC1 swap_chain_desc;
 		gSwapChain->GetDesc1(&swap_chain_desc);
 
-		D3D12_RESOURCE_DESC resource_desc = gGetTextureResourceDesc(swap_chain_desc.Width, swap_chain_desc.Height, swap_chain_desc.Format);
+		D3D12_RESOURCE_DESC resource_desc = gGetTextureResourceDesc(swap_chain_desc.Width, swap_chain_desc.Height, DXGI_FORMAT_R32G32B32A32_FLOAT);
 		D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
 
-		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_COPY_SOURCE, nullptr, IID_PPV_ARGS(&mOutputResource)));
+		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&mOutputResource)));
 		mOutputResource->SetName(L"Scene.OutputResource");
 	}
 
-	// DescriptorHeap
+	// CopyTexture DescriptorHeap
+	{
+		D3D12_DESCRIPTOR_HEAP_DESC desc = {};
+		desc.NumDescriptors = 1;
+		desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+		desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+		gValidate(gDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&mCopyTextureDescriptorHeap)));
+	}
+
+	// DXR DescriptorTable
+	{
+		D3D12_CPU_DESCRIPTOR_HANDLE handle = mCopyTextureDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+		UINT increment_size = gDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+		// t0
+		{
+			D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
+			desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+			desc.Texture2D.MipLevels = 1;
+			desc.Texture2D.MostDetailedMip = 0;
+			desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+			gDevice->CreateShaderResourceView(mOutputResource.Get(), &desc, handle);
+		}
+
+		handle.ptr += increment_size;
+	}
+
+	// DXR DescriptorHeap
 	{
 		D3D12_DESCRIPTOR_HEAP_DESC desc = {};
 		desc.NumDescriptors = 64;
 		desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 		desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-		gValidate(gDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&mDescriptorHeap)));
+		gValidate(gDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&mDXRDescriptorHeap)));
 	}
 
-	// DescriptorTable
+	// DXR DescriptorTable
 	{
-		D3D12_CPU_DESCRIPTOR_HANDLE handle = mDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+		D3D12_CPU_DESCRIPTOR_HANDLE handle = mDXRDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
 		UINT increment_size = gDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 		// u0
@@ -441,5 +468,7 @@ void Scene::CreateShaderResource()
 void Scene::CleanupShaderResource()
 {
 	mOutputResource = nullptr;
-	mDescriptorHeap = nullptr;
+
+	mCopyTextureDescriptorHeap = nullptr;
+	mDXRDescriptorHeap = nullptr;
 }

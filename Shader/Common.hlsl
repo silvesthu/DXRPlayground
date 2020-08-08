@@ -34,3 +34,16 @@ float3 hsv2rgb( in float3 c )
 
     return c.z * lerp(1.0, rgb, c.y);
 }
+
+// From https://github.com/microsoft/DirectX-Graphics-Samples/blob/master/MiniEngine/Core/Shaders/ColorSpaceUtility.hlsli
+float3 ApplySRGBCurve( float3 x )
+{
+    // Approximately pow(x, 1.0 / 2.2)
+    return x < 0.0031308 ? 12.92 * x : 1.055 * pow(x, 1.0 / 2.4) - 0.055;
+}
+
+float3 RemoveSRGBCurve( float3 x )
+{
+    // Approximately pow(x, 2.2)
+    return x < 0.04045 ? x / 12.92 : pow( (x + 0.055) / 1.055, 2.4 );
+}

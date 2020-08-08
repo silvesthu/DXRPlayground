@@ -103,6 +103,8 @@ public:
 	void Update(ID3D12GraphicsCommandList4* inCommandList);
 	void Build(ID3D12GraphicsCommandList4* inCommandList);
 
+	glm::uint32 GetInstanceCount() const { return (glm::uint32)mObjectInstances.size(); }
+
 	D3D12_GPU_VIRTUAL_ADDRESS GetGPUVirtualAddress() const	{ return mDest->GetGPUVirtualAddress(); }
 	ID3D12Resource* GetInstanceBuffer()	const				{ return mInstanceBuffer.Get(); }
 
@@ -141,8 +143,12 @@ public:
 	void RebuildBinding(std::function<void()> inCallback);
 	void RebuildShader();
 
+	glm::uint32 GetInstanceCount() const { return mTLAS->GetInstanceCount(); }
+
 	ID3D12Resource* GetOutputResource() { return mOutputResource.Get(); }
-	ID3D12DescriptorHeap* GetDescriptorHeap() { return mDescriptorHeap.Get(); }
+
+	ID3D12DescriptorHeap* GetDXRDescriptorHeap() { return mDXRDescriptorHeap.Get(); }
+	ID3D12DescriptorHeap* GetCopyTextureDescriptorHeap() { return mCopyTextureDescriptorHeap.Get(); }
 
 private:
 	void CreateShaderResource();
@@ -155,7 +161,9 @@ private:
 	ComPtr<ID3D12Resource> mNormalBuffer = nullptr;
 
 	ComPtr<ID3D12Resource> mOutputResource = nullptr;
-	ComPtr<ID3D12DescriptorHeap> mDescriptorHeap = nullptr;
+
+	ComPtr<ID3D12DescriptorHeap> mDXRDescriptorHeap = nullptr;
+	ComPtr<ID3D12DescriptorHeap> mCopyTextureDescriptorHeap = nullptr;
 };
 
 extern Scene gScene;

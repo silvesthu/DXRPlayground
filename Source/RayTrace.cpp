@@ -1,11 +1,8 @@
 #include "Common.h"
 #include "Scene.h"
 
-void gRaytrace(ID3D12Resource* inFrameRenderTargetResource)
+void gRaytrace()
 {
-	// Output - Copy -> UAV
-	gBarrierTransition(gCommandList, gScene.GetOutputResource(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-
 	// Setup D3D12_DISPATCH_RAYS_DESC
 	D3D12_DISPATCH_RAYS_DESC dispatch_rays_desc = {};
 	{
@@ -17,39 +14,27 @@ void gRaytrace(ID3D12Resource* inFrameRenderTargetResource)
 		dispatch_rays_desc.Depth = 1;
 
 		// RayGen
-		dispatch_rays_desc.RayGenerationShaderRecord.StartAddress = gDxrShaderTable.mResource->GetGPUVirtualAddress() + gDxrShaderTable.mEntrySize * gDxrShaderTable.mRayGenOffset;
-		dispatch_rays_desc.RayGenerationShaderRecord.SizeInBytes = gDxrShaderTable.mEntrySize;
+		dispatch_rays_desc.RayGenerationShaderRecord.StartAddress = gDXRShaderTable.mResource->GetGPUVirtualAddress() + gDXRShaderTable.mEntrySize * gDXRShaderTable.mRayGenOffset;
+		dispatch_rays_desc.RayGenerationShaderRecord.SizeInBytes = gDXRShaderTable.mEntrySize;
 
 		// Miss
-		dispatch_rays_desc.MissShaderTable.StartAddress = gDxrShaderTable.mResource->GetGPUVirtualAddress() + gDxrShaderTable.mEntrySize * gDxrShaderTable.mMissOffset;
-		dispatch_rays_desc.MissShaderTable.StrideInBytes = gDxrShaderTable.mEntrySize;
-		dispatch_rays_desc.MissShaderTable.SizeInBytes = gDxrShaderTable.mEntrySize * gDxrShaderTable.mMissCount;
+		dispatch_rays_desc.MissShaderTable.StartAddress = gDXRShaderTable.mResource->GetGPUVirtualAddress() + gDXRShaderTable.mEntrySize * gDXRShaderTable.mMissOffset;
+		dispatch_rays_desc.MissShaderTable.StrideInBytes = gDXRShaderTable.mEntrySize;
+		dispatch_rays_desc.MissShaderTable.SizeInBytes = gDXRShaderTable.mEntrySize * gDXRShaderTable.mMissCount;
 
 		// HitGroup
-		dispatch_rays_desc.HitGroupTable.StartAddress = gDxrShaderTable.mResource->GetGPUVirtualAddress() + gDxrShaderTable.mEntrySize * gDxrShaderTable.mHitGroupOffset;
-		dispatch_rays_desc.HitGroupTable.StrideInBytes = gDxrShaderTable.mEntrySize;
-		dispatch_rays_desc.HitGroupTable.SizeInBytes = gDxrShaderTable.mEntrySize * gDxrShaderTable.mHitGroupCount;
+		dispatch_rays_desc.HitGroupTable.StartAddress = gDXRShaderTable.mResource->GetGPUVirtualAddress() + gDXRShaderTable.mEntrySize * gDXRShaderTable.mHitGroupOffset;
+		dispatch_rays_desc.HitGroupTable.StrideInBytes = gDXRShaderTable.mEntrySize;
+		dispatch_rays_desc.HitGroupTable.SizeInBytes = gDXRShaderTable.mEntrySize * gDXRShaderTable.mHitGroupCount;
 	}
 
 	// Bind
-	gCommandList->SetComputeRootSignature(gDxrGlobalRootSignature);
-	ID3D12DescriptorHeap* descriptor_heap = gScene.GetDescriptorHeap();
+	gCommandList->SetComputeRootSignature(gDXRGlobalRootSignature.Get());
+	ID3D12DescriptorHeap* descriptor_heap = gScene.GetDXRDescriptorHeap();
 	gCommandList->SetDescriptorHeaps(1, &descriptor_heap);
-	gCommandList->SetComputeRootDescriptorTable(0, gScene.GetDescriptorHeap()->GetGPUDescriptorHandleForHeapStart());
-	gCommandList->SetPipelineState1(gDxrStateObject);
+	gCommandList->SetComputeRootDescriptorTable(0, gScene.GetDXRDescriptorHeap()->GetGPUDescriptorHandleForHeapStart());
+	gCommandList->SetPipelineState1(gDXRStateObject.Get());
 
 	// Dispatch
 	gCommandList->DispatchRays(&dispatch_rays_desc);
-
-	// Output: UAV -> Copy
-	gBarrierTransition(gCommandList, gScene.GetOutputResource(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
-
-	// RenderTarget: RT -> Dest
-	gBarrierTransition(gCommandList, inFrameRenderTargetResource, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_DEST);
-
-	// Copy output to render target
-	gCommandList->CopyResource(inFrameRenderTargetResource, gScene.GetOutputResource());
-
-	// RenderTarget: Dest -> RT
-	gBarrierTransition(gCommandList, inFrameRenderTargetResource, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_RENDER_TARGET);
 }

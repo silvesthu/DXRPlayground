@@ -35,7 +35,7 @@ extern ID3D12Resource*						gBackBufferRenderTargetResource[];
 extern D3D12_CPU_DESCRIPTOR_HANDLE			gBackBufferRenderTargetDescriptor[];
 
 // ImGui
-extern ID3D12DescriptorHeap* 				gImGuiSrvDescHeap;
+extern ID3D12DescriptorHeap* 				gImGuiDescriptorHeap;
 
 // Application
 struct ShaderTable
@@ -50,10 +50,14 @@ struct ShaderTable
 	glm::uint32								mHitGroupCount = 0;
 };
 
-extern ID3D12RootSignature*					gDxrGlobalRootSignature;
-extern ID3D12StateObject* 					gDxrStateObject;
-extern ShaderTable							gDxrShaderTable;
-extern ID3D12Resource*						gConstantGPUBuffer;
+extern ComPtr<ID3D12Resource>				gConstantGPUBuffer;
+
+extern ComPtr<ID3D12RootSignature>			gDXRGlobalRootSignature;
+extern ComPtr<ID3D12StateObject>			gDXRStateObject;
+extern ShaderTable							gDXRShaderTable;
+
+extern ComPtr<ID3D12RootSignature>			gCopyTextureRootSignature;
+extern ComPtr<ID3D12PipelineState>			gCopyTexturePipelineState;
 
 // Frame
 enum
@@ -98,6 +102,16 @@ enum class DebugMode : glm::uint32
 	Count
 };
 
+enum class DebugInstanceMode : glm::uint32
+{
+	None = 0,
+
+	Barycentrics,
+	Mirror,
+
+	Count
+};
+
 enum class ShadowMode : glm::uint32
 {
 	None = 0,
@@ -108,31 +122,36 @@ enum class ShadowMode : glm::uint32
 
 struct PerFrame
 {
-	glm::vec4								mBackgroundColor	= glm::vec4(0.4f, 0.6f, 0.2f, 1.0f);
+	glm::vec4								mBackgroundColor	= glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
 	glm::vec4								mCameraPosition		= glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
 	glm::vec4								mCameraDirection	= glm::vec4(0.0f, 0.0f, 1.0f, 0.0f);
 	glm::vec4								mCameraRightExtend	= glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
 	glm::vec4								mCameraUpExtend		= glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
 
 	DebugMode								mDebugMode			= DebugMode::None;
+	DebugInstanceMode						mDebugInstanceMode  = DebugInstanceMode::None;
+	glm::uint32								mDebugInstanceIndex = 0;
 	ShadowMode								mShadowMode			= ShadowMode::None;
 
 	static constexpr glm::uint32			sRecursionCountMax	= 8;
 	glm::uint32								mRecursionCountMax	= sRecursionCountMax;
-	
 	glm::uint32								mFrameIndex			= 0;
 	glm::uint32								mAccumulationFrameCount = 1;
+
+	glm::uint32								mReset				= 0;
+
+	glm::uvec2								mDebugCoord			= glm::uvec2(0, 0);
 };
 extern PerFrame								gPerFrameConstantBuffer;
 
 // String literals
-static const wchar_t*						kDefaultRayGenerationShader	= L"defaultRayGeneration";
-static const wchar_t*						kDefaultMissShader			= L"defaultMiss";
-static const wchar_t*						kDefaultClosestHitShader	= L"defaultClosestHit";
-static const wchar_t*						kDefaultHitGroup			= L"defaultHitGroup";
-static const wchar_t*						kShadowMissShader			= L"shadowMiss";
-static const wchar_t*						kShadowClosestHitShader		= L"shadowClosestHit";
-static const wchar_t*						kShadowHitGroup				= L"shadowHitGroup";
+static const wchar_t*						kDefaultRayGenerationShader	= L"DefaultRayGeneration";
+static const wchar_t*						kDefaultMissShader			= L"DefaultMiss";
+static const wchar_t*						kDefaultClosestHitShader	= L"DefaultClosestHit";
+static const wchar_t*						kDefaultHitGroup			= L"DefaultHitGroup";
+static const wchar_t*						kShadowMissShader			= L"ShadowMiss";
+static const wchar_t*						kShadowClosestHitShader		= L"ShadowClosestHit";
+static const wchar_t*						kShadowHitGroup				= L"ShadowHitGroup";
 
 // Helper
 template <typename T>

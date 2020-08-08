@@ -35,8 +35,8 @@ static ScenePreset kScenePresets[(int)SCENE_PRESET_TYPE::COUNT] =
 	{ "VeachMIS", "Asset/raytracing-references/veach-mis/veach-mis.obj", glm::vec4(0.0f, 1.0f, 13.0f, 0.0f), glm::vec4(0.0f, 0.0f, -1.0f, 0.0f) },
 	{ "Furnance", "Asset/raytracing-references/furnace-light-sampling/furnace-light-sampling.obj", glm::vec4(0.0f, 1.0f, 13.0f, 0.0f), glm::vec4(0.0f, 0.0f, -1.0f, 0.0f) },
 };
-static SCENE_PRESET_TYPE sCurrentScene = SCENE_PRESET_TYPE::VEACH_MIS;
-static SCENE_PRESET_TYPE sPreviousScene = SCENE_PRESET_TYPE::VEACH_MIS;
+static SCENE_PRESET_TYPE sCurrentScene = SCENE_PRESET_TYPE::CORNELL_BOX;
+static SCENE_PRESET_TYPE sPreviousScene = SCENE_PRESET_TYPE::CORNELL_BOX;
 
 struct CameraSettings
 {
@@ -56,7 +56,7 @@ CameraSettings		gCameraSettings = {};
 struct DisplaySettings
 {
 	glm::ivec2		mRenderResolution	= glm::ivec2(0, 0);
-	bool			mVsync				= false;
+	bool			mVsync				= true;
 };
 DisplaySettings		gDisplaySettings	= {};
 
@@ -169,13 +169,13 @@ static void sUpdate()
 
 				ImGui::SameLine();
 
-				if (ImGui::Button("Reload shader"))
+				if (ImGui::Button("Reload shader") || ImGui::IsKeyPressed(VK_F5))
 				{
 					sWaitForLastSubmittedFrame();
 
 					gScene.RebuildShader();
 
-					gPerFrameConstantBuffer.mAccumulationFrameCount = 1;
+					gPerFrameConstantBuffer.mReset = 1;
 				}
 
 				ImGui::SliderInt("RecursionCountMax", (int*)&gPerFrameConstantBuffer.mRecursionCountMax, 0, PerFrame::sRecursionCountMax);
@@ -183,6 +183,8 @@ static void sUpdate()
 
 			if (ImGui::TreeNodeEx("Render", ImGuiTreeNodeFlags_DefaultOpen))
 			{
+				ImGui::Text("Debug"); ImGui::SameLine();
+
 				for (int i = 0; i < (int)DebugMode::Count; i++)
 				{
 					const auto& name = nameof::nameof_enum((DebugMode)i);
@@ -196,6 +198,30 @@ static void sUpdate()
 					if (ImGui::RadioButton(name.data(), (int)gPerFrameConstantBuffer.mDebugMode == i))
 						gPerFrameConstantBuffer.mDebugMode = (DebugMode)i;
 				}
+
+				ImGui::TreePop();
+			}
+
+			if (ImGui::TreeNodeEx("Instance", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				ImGui::Text("Debug"); ImGui::SameLine();
+
+				for (int i = 0; i < (int)DebugInstanceMode::Count; i++)
+				{
+					const auto& name = nameof::nameof_enum((DebugInstanceMode)i);
+					if (name[0] == '_')
+					{
+						ImGui::NewLine();
+						continue;
+					}
+
+					ImGui::SameLine();
+					if (ImGui::RadioButton(name.data(), (int)gPerFrameConstantBuffer.mDebugInstanceMode == i))
+						gPerFrameConstantBuffer.mDebugInstanceMode = (DebugInstanceMode)i;
+				}
+
+				ImGui::SliderInt("DebugInstanceIndex", (int*)&gPerFrameConstantBuffer.mDebugInstanceIndex, 0u, gScene.GetInstanceCount() - 1);
+				gPerFrameConstantBuffer.mDebugInstanceIndex = std::clamp(gPerFrameConstantBuffer.mDebugInstanceIndex, 0u, gScene.GetInstanceCount() - 1);
 
 				ImGui::TreePop();
 			}
@@ -296,8 +322,8 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 	ImGui_ImplWin32_Init(hwnd);
 	ImGui_ImplDX12_Init(gDevice, NUM_FRAMES_IN_FLIGHT,
 		DXGI_FORMAT_R8G8B8A8_UNORM,
-		gImGuiSrvDescHeap->GetCPUDescriptorHandleForHeapStart(),
-		gImGuiSrvDescHeap->GetGPUDescriptorHandleForHeapStart());
+		gImGuiDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
+		gImGuiDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 
 	// Main loop
 	MSG msg;
@@ -345,7 +371,7 @@ void sRender()
 	FrameContext* frameCtxt = sWaitForNextFrameResources();
 	glm::uint32 frame_index = gSwapChain->GetCurrentBackBufferIndex();
 	ID3D12Resource* frame_render_target_resource = gBackBufferRenderTargetResource[frame_index];
-	D3D12_CPU_DESCRIPTOR_HANDLE& frame_render_target_descriptor = gBackBufferRenderTargetDescriptor[frame_index];
+	D3D12_CPU_DESCRIPTOR_HANDLE& frame_render_target_descriptor_handle = gBackBufferRenderTargetDescriptor[frame_index];
 
 	// Frame begin
 	{
@@ -380,33 +406,69 @@ void sRender()
 		{
 			static PerFrame sPerFrameCopy = gPerFrameConstantBuffer;
 
+			sPerFrameCopy.mDebugCoord = gPerFrameConstantBuffer.mDebugCoord = glm::uvec2((glm::uint32)ImGui::GetMousePos().x, (glm::uint32)ImGui::GetMousePos().y);
 			sPerFrameCopy.mAccumulationFrameCount = gPerFrameConstantBuffer.mAccumulationFrameCount;
 			sPerFrameCopy.mFrameIndex = gPerFrameConstantBuffer.mFrameIndex;
 
-			if (memcmp(&sPerFrameCopy, &gPerFrameConstantBuffer, sizeof(PerFrame)) == 0)
+			if (gPerFrameConstantBuffer.mReset == 0 && memcmp(&sPerFrameCopy, &gPerFrameConstantBuffer, sizeof(PerFrame)) == 0)
 				gPerFrameConstantBuffer.mAccumulationFrameCount++;
 			else
 				gPerFrameConstantBuffer.mAccumulationFrameCount = 1;
 
+			gPerFrameConstantBuffer.mReset = 0;
 			sPerFrameCopy = gPerFrameConstantBuffer;
 		}
 		
 		memcpy(frameCtxt->mConstantUploadBufferPointer, &gPerFrameConstantBuffer, sizeof(gPerFrameConstantBuffer));
 
-		gBarrierTransition(gCommandList, gConstantGPUBuffer, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
-		gCommandList->CopyResource(gConstantGPUBuffer, frameCtxt->mConstantUploadBuffer);
-		gBarrierTransition(gCommandList, gConstantGPUBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE);
+		gBarrierTransition(gCommandList, gConstantGPUBuffer.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
+		gCommandList->CopyResource(gConstantGPUBuffer.Get(), frameCtxt->mConstantUploadBuffer);
+		gBarrierTransition(gCommandList, gConstantGPUBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE);
 	}
 
 	// Raytrace
 	{
-		gRaytrace(frame_render_target_resource);
+		gRaytrace();
+	}
+
+	// Copy
+	{
+		// Output: UAV -> Copy
+		gBarrierTransition(gCommandList, gScene.GetOutputResource(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE);
+
+		// Draw
+		D3D12_RESOURCE_DESC desc = frame_render_target_resource->GetDesc();
+		D3D12_VIEWPORT viewport = {};
+		viewport.Width = (float)desc.Width;
+		viewport.Height = (float)desc.Height;
+		viewport.MinDepth = 0.0f;
+		viewport.MaxDepth = 1.0f;
+		viewport.TopLeftX = 0.0f;
+		viewport.TopLeftY = 0.0f;
+		gCommandList->RSSetViewports(1, &viewport);
+		D3D12_RECT rect = {};
+		rect.left = 0;
+		rect.top = 0;
+		rect.right = (LONG)desc.Width;
+		rect.bottom = (LONG)desc.Height;
+		gCommandList->RSSetScissorRects(1, &rect);
+		gCommandList->OMSetRenderTargets(1, &frame_render_target_descriptor_handle, false, nullptr);
+		gCommandList->SetGraphicsRootSignature(gCopyTextureRootSignature.Get());
+		ID3D12DescriptorHeap* descriptor_heap = gScene.GetCopyTextureDescriptorHeap();
+		gCommandList->SetDescriptorHeaps(1, &descriptor_heap);
+		gCommandList->SetGraphicsRootDescriptorTable(0, gScene.GetCopyTextureDescriptorHeap()->GetGPUDescriptorHandleForHeapStart());
+		gCommandList->SetPipelineState(gCopyTexturePipelineState.Get());
+		gCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		gCommandList->DrawInstanced(3, 1, 0, 0);
+
+		// Output - Copy -> UAV
+		gBarrierTransition(gCommandList, gScene.GetOutputResource(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 	}
 
 	// Draw ImGui
 	{
-		gCommandList->OMSetRenderTargets(1, &frame_render_target_descriptor, FALSE, nullptr);
-		gCommandList->SetDescriptorHeaps(1, &gImGuiSrvDescHeap);
+		gCommandList->OMSetRenderTargets(1, &frame_render_target_descriptor_handle, false, nullptr);
+		gCommandList->SetDescriptorHeaps(1, &gImGuiDescriptorHeap);
 
 		ImGui::Render();
 		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), gCommandList);
@@ -510,7 +572,7 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 		desc.NumDescriptors = 1;
 		desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-		if (gDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&gImGuiSrvDescHeap)) != S_OK)
+		if (gDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&gImGuiDescriptorHeap)) != S_OK)
 			return false;
 	}
 
@@ -603,11 +665,11 @@ static void sCleanupDeviceD3D()
 		gSafeRelease(gFrameContext[i].mConstantUploadBuffer);
 	}
 
-	gSafeRelease(gConstantGPUBuffer);
+	gConstantGPUBuffer = nullptr;
 	gSafeRelease(gCommandQueue);
 	gSafeRelease(gCommandList);
 	gSafeRelease(gRtvDescHeap);
-	gSafeRelease(gImGuiSrvDescHeap);
+	gSafeRelease(gImGuiDescriptorHeap);
 	gSafeRelease(gIncrementalFence);
 	gSafeCloseHandle(gIncrementalFenceEvent);
 	gSafeRelease(gDevice);
