@@ -178,7 +178,7 @@ static void sUpdate()
 					gPerFrameConstantBuffer.mReset = 1;
 				}
 
-				ImGui::SliderInt("RecursionCountMax", (int*)&gPerFrameConstantBuffer.mRecursionCountMax, 0, PerFrame::sRecursionCountMax);
+				ImGui::SliderInt("RecursionCountMax", (int*)&gPerFrameConstantBuffer.mRecursionCountMax, 0, ShaderType::sRecursionCountMax);
 			}
 
 			if (ImGui::TreeNodeEx("Render", ImGuiTreeNodeFlags_DefaultOpen))
@@ -404,13 +404,13 @@ void sRender()
 	{
 		// Accumulation reset check
 		{
-			static PerFrame sPerFrameCopy = gPerFrameConstantBuffer;
+			static ShaderType::PerFrame sPerFrameCopy = gPerFrameConstantBuffer;
 
 			sPerFrameCopy.mDebugCoord = gPerFrameConstantBuffer.mDebugCoord = glm::uvec2((glm::uint32)ImGui::GetMousePos().x, (glm::uint32)ImGui::GetMousePos().y);
 			sPerFrameCopy.mAccumulationFrameCount = gPerFrameConstantBuffer.mAccumulationFrameCount;
 			sPerFrameCopy.mFrameIndex = gPerFrameConstantBuffer.mFrameIndex;
 
-			if (gPerFrameConstantBuffer.mReset == 0 && memcmp(&sPerFrameCopy, &gPerFrameConstantBuffer, sizeof(PerFrame)) == 0)
+			if (gPerFrameConstantBuffer.mReset == 0 && memcmp(&sPerFrameCopy, &gPerFrameConstantBuffer, sizeof(ShaderType::PerFrame)) == 0)
 				gPerFrameConstantBuffer.mAccumulationFrameCount++;
 			else
 				gPerFrameConstantBuffer.mAccumulationFrameCount = 1;
@@ -596,7 +596,7 @@ static bool sCreateDeviceD3D(HWND hWnd)
 
 		// Create CBV resource
 		{
-			D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(gAlignUp((UINT)sizeof(PerFrame), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
+			D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(gAlignUp((UINT)sizeof(ShaderType::PerFrame), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
 			D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
 
 			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gFrameContext[i].mConstantUploadBuffer)));
@@ -612,7 +612,7 @@ static bool sCreateDeviceD3D(HWND hWnd)
 	{
 		// Create CBV resource
 		{
-			D3D12_RESOURCE_DESC resource_desc = gGetBufferResourceDesc(gAlignUp((UINT)sizeof(PerFrame), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
+			D3D12_RESOURCE_DESC resource_desc = gGetBufferResourceDesc(gAlignUp((UINT)sizeof(ShaderType::PerFrame), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
 			D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
 
 			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&gConstantGPUBuffer)));

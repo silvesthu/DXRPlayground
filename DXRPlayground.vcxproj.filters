@@ -194,4 +194,12 @@
       <Filter>Shader</Filter>
     </CopyFileToFolders>
   </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="Shader\Common.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Shader\Type.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+  </ItemGroup>
 </Project>

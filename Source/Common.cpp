@@ -32,4 +32,4 @@ ComPtr<ID3D12PipelineState>			gCopyTexturePipelineState = nullptr;
 FrameContext                		gFrameContext[NUM_FRAMES_IN_FLIGHT] = {};
 glm::uint32                			gFrameIndex = 0;
 glm::float32						gTime = 0.0f;
-PerFrame							gPerFrameConstantBuffer = {};
+ShaderType::PerFrame				gPerFrameConstantBuffer = {};

@@ -135,7 +135,7 @@ void TLAS::Initialize(std::vector<ObjectInstanceRef>&& inObjectInstances)
 
 	{
 		D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
-		D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(sizeof(InstanceData) * mObjectInstances.size());
+		D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(sizeof(ShaderType::InstanceData) * mObjectInstances.size());
 		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mInstanceBuffer)));
 		gSetName(mDest, mName, L".TLAS.InstanceBuffer");
 
@@ -226,7 +226,7 @@ void Scene::Load(const char* inFilename)
 			object_instance->Data().mAlbedo = glm::vec3(material.diffuse[0], material.diffuse[1], material.diffuse[2]);
 			object_instance->Data().mEmission = glm::vec3(material.emission[0], material.emission[1], material.emission[2]);
 			object_instance->Data().mReflectance = glm::vec3(material.specular[0], material.specular[1], material.specular[2]);
-			object_instance->Data().mRoughness = glm::vec1(material.roughness);
+			object_instance->Data().mRoughness = material.roughness;
 
 			object_instance->Data().mIndexOffset = index_offset;
 			object_instance->Data().mVertexOffset = vertex_offset;
@@ -394,7 +394,7 @@ void Scene::CreateShaderResource()
 		{
 			D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
 			desc.BufferLocation = gConstantGPUBuffer->GetGPUVirtualAddress();
-			desc.SizeInBytes = gAlignUp((UINT)sizeof(PerFrame), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+			desc.SizeInBytes = gAlignUp((UINT)sizeof(ShaderType::PerFrame), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
 			gDevice->CreateConstantBufferView(&desc, handle);
 		}
 
@@ -417,8 +417,8 @@ void Scene::CreateShaderResource()
 			D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
 			desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
 			desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			desc.Buffer.NumElements = (UINT)(resource_desc.Width / sizeof(InstanceData));
-			desc.Buffer.StructureByteStride = sizeof(InstanceData);
+			desc.Buffer.NumElements = (UINT)(resource_desc.Width / sizeof(ShaderType::InstanceData));
+			desc.Buffer.StructureByteStride = sizeof(ShaderType::InstanceData);
 			desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
 			gDevice->CreateShaderResourceView(mTLAS->GetInstanceBuffer(), &desc, handle);
 		}

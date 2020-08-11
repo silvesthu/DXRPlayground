@@ -120,29 +120,21 @@ enum class ShadowMode : glm::uint32
 	Count
 };
 
-struct PerFrame
+namespace ShaderType
 {
-	glm::vec4								mBackgroundColor	= glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
-	glm::vec4								mCameraPosition		= glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
-	glm::vec4								mCameraDirection	= glm::vec4(0.0f, 0.0f, 1.0f, 0.0f);
-	glm::vec4								mCameraRightExtend	= glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
-	glm::vec4								mCameraUpExtend		= glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
+	using float2 = glm::vec2;
+	using float3 = glm::vec3;
+	using float4 = glm::vec4;
 
-	DebugMode								mDebugMode			= DebugMode::None;
-	DebugInstanceMode						mDebugInstanceMode  = DebugInstanceMode::None;
-	glm::uint32								mDebugInstanceIndex = 0;
-	ShadowMode								mShadowMode			= ShadowMode::None;
+	using uint = glm::uint;
+	using uint2 = glm::uvec2;
+	using uint3 = glm::uvec3;
+	using uint4 = glm::uvec4;
 
-	static constexpr glm::uint32			sRecursionCountMax	= 8;
-	glm::uint32								mRecursionCountMax	= sRecursionCountMax;
-	glm::uint32								mFrameIndex			= 0;
-	glm::uint32								mAccumulationFrameCount = 1;
-
-	glm::uint32								mReset				= 0;
-
-	glm::uvec2								mDebugCoord			= glm::uvec2(0, 0);
+	#define CONSTANT_DEFAULT(x) =x
+	#include "../Shader/ShaderType.hlsl"
 };
-extern PerFrame								gPerFrameConstantBuffer;
+extern ShaderType::PerFrame					gPerFrameConstantBuffer;
 
 // String literals
 static const wchar_t*						kDefaultRayGenerationShader	= L"DefaultRayGeneration";

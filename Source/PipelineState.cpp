@@ -289,7 +289,10 @@ void gCreatePipelineState()
 	IDxcBlob* copy_texture_vs_blob = sCompileShader(filename, shader_stream.str().c_str(), (glm::uint32)shader_stream.str().length(), L"CopyTextureVS", L"vs_6_3");
 	IDxcBlob* copy_texture_ps_blob = sCompileShader(filename, shader_stream.str().c_str(), (glm::uint32)shader_stream.str().length(), L"CopyTexturePS", L"ps_6_3");
 	if (copy_texture_vs_blob == nullptr || copy_texture_ps_blob == nullptr)
+	{
+		assert(gDXRStateObject != nullptr);
 		return;
+	}
 
 	gDevice->CreateRootSignature(0, copy_texture_ps_blob->GetBufferPointer(), copy_texture_ps_blob->GetBufferSize(), IID_PPV_ARGS(&gCopyTextureRootSignature));
 	
@@ -321,7 +324,10 @@ void gCreatePipelineState()
 	const wchar_t* entry_points[] = { kDefaultRayGenerationShader, kDefaultMissShader, kDefaultClosestHitShader, kShadowMissShader, kShadowClosestHitShader };
 	IDxcBlob* blob = sCompileShader(filename, shader_stream.str().c_str(), (glm::uint32)shader_stream.str().length(), L"", L"lib_6_3");
 	if (blob == nullptr)
+	{
+		assert(gDXRStateObject != nullptr);
 		return;
+	}
 
 	gDebugPrint("Shader compiled.\n");
 	DXILLibrary dxilLibrary(blob, entry_points, ARRAYSIZE(entry_points));
@@ -343,15 +349,15 @@ void gCreatePipelineState()
 
 	// Shader config
 	//  sizeof(BuiltInTriangleIntersectionAttributes) = sizeof(float) * 2, depends on interaction type
-	//  max(sizeof(RayPayload), sizeof(ShadowPayload)), fully customized
-	ShaderConfig shader_config(sizeof(float) * 2, sizeof(float) * 3 + sizeof(glm::uint32) * 2);
+	//  sizeof(Payload), fully customized
+	ShaderConfig shader_config(sizeof(float) * 2, (glm::uint32)std::max(sizeof(ShaderType::RayPayload), sizeof(ShaderType::ShadowPayload)));
 	subobjects[index++] = shader_config.mStateSubobject;
 	SubobjectToExportsAssociation shader_configassociation(entry_points, ARRAYSIZE(entry_points), &(subobjects[index - 1]));
 	subobjects[index++] = shader_configassociation.mStateSubobject;
 
 	// Pipeline config
 	//  MaxTraceRecursionDepth
-	PipelineConfig pipeline_config(PerFrame::sRecursionCountMax + 1);
+	PipelineConfig pipeline_config(ShaderType::sRecursionCountMax + 1);
 	subobjects[index++] = pipeline_config.mStateSubobject;
 
 	// Global root signature
@@ -373,4 +379,7 @@ void gCleanupPipelineState()
 {
 	gDXRStateObject = nullptr;
 	gDXRGlobalRootSignature = nullptr;
+
+	gCopyTexturePipelineState = nullptr;
+	gCopyTextureRootSignature = nullptr;
 }

@@ -53,17 +53,6 @@ private:
 };
 using BLASRef = std::shared_ptr<BLAS>;
 
-struct InstanceData
-{
-	glm::vec3	mAlbedo = glm::vec3(0.0f, 0.0f, 0.0f);
-	glm::vec3	mReflectance = glm::vec3(0.0f, 0.0f, 0.0f);
-	glm::vec3	mEmission = glm::vec3(0.0f, 0.0f, 0.0f);
-	glm::vec1	mRoughness = glm::vec1(0.0f);
-
-	glm::uint	mIndexOffset = 0;
-	glm::uint	mVertexOffset = 0;
-};
-
 class ObjectInstance
 {
 public:
@@ -80,13 +69,13 @@ public:
 	BLASRef GetBLAS() { return mBLAS; }
 	glm::mat4& Transform() { return mTransform; }
 	glm::uint32 GetHitGroupIndex() const { return mHitGroupIndex; }
-	InstanceData& Data() { return mInstanceData; }
+	ShaderType::InstanceData& Data() { return mInstanceData; }
 
 private:
 	glm::mat4 mTransform = glm::mat4(1);
 	BLASRef mBLAS;
 	glm::uint32 mHitGroupIndex = 0;
-	InstanceData mInstanceData;
+	ShaderType::InstanceData mInstanceData;
 
 	std::function<void(ObjectInstance*)> mUpdater;
 };
@@ -122,7 +111,7 @@ private:
 	D3D12_RAYTRACING_INSTANCE_DESC* mInstanceDescsPointer = nullptr;
 
 	ComPtr<ID3D12Resource> mInstanceBuffer = nullptr;
-	InstanceData* mInstanceBufferPointer = nullptr;
+	ShaderType::InstanceData* mInstanceBufferPointer = nullptr;
 
 	std::wstring mName;
 };

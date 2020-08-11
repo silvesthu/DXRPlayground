@@ -1,57 +1,24 @@
 #include "Common.hlsl"
 
+typedef uint DebugMode;
+typedef uint DebugInstanceMode;
+typedef uint ShadowMode;
+#define CONSTANT_DEFAULT(x)
+#include "ShaderType.hlsl"
+
 RWTexture2D<float4> RaytracingOutput : register(u0, space0);
-cbuffer PerFrame : register(b0, space0)
+cbuffer CBuffer : register(b0, space0)
 {
-	float4	mBackgroundColor;
-	float4	mCameraPosition;
-	float4	mCameraDirection;
-	float4	mCameraRightExtend;
-	float4	mCameraUpExtend;
-
-	uint	mDebugMode;
-	uint 	mDebugInstanceMode;
-	uint 	mDebugInstanceIndex;
-	uint	mShadowMode;
-
-	uint 	mRecursionCountMax;
-	uint 	mFrameIndex;
-	uint 	mAccumulationFrameCount;
-
-	uint 	mReset;
-
-	uint2   mDebugCoord;
+    PerFrame mPerFrame;
 }
 
 RaytracingAccelerationStructure RaytracingScene : register(t0, space0);
-struct InstanceData
-{
-	float3 mAlbedo;
-	float3 mReflectance;
-	float3 mEmission;
-	float  mRoughness;
-
-	uint   mIndexOffset;
-	uint   mVertexOffset;
-};
 StructuredBuffer<InstanceData> InstanceDataBuffer : register(t1, space0);
 ByteAddressBuffer Indices : register(t2, space0);
 StructuredBuffer<float3> Vertices : register(t3, space0);
 StructuredBuffer<float3> Normals : register(t4, space0);
 
 #define DEBUG_PIXEL_RADIUS (3)
-
-struct RayPayload
-{
-	float3 mColor;
-	uint mRandomState;
-	uint mRecursionDepth;
-};
-
-struct ShadowPayload
-{
-	bool hit;
-};
 
 // From D3D12Raytracing
 // Load three 16 bit indices from a byte addressed buffer.
@@ -100,14 +67,14 @@ void DefaultRayGeneration()
 	d.y = -d.y;
 	
 	RayDesc ray;
-	ray.Origin = mCameraPosition.xyz;
-	ray.Direction = normalize(mCameraDirection.xyz + mCameraRightExtend.xyz * d.x + mCameraUpExtend.xyz * d.y);
+	ray.Origin = mPerFrame.mCameraPosition.xyz;
+	ray.Direction = normalize(mPerFrame.mCameraDirection.xyz + mPerFrame.mCameraRightExtend.xyz * d.x + mPerFrame.mCameraUpExtend.xyz * d.y);
 	ray.TMin = 0;				// Near
 	ray.TMax = 100000;			// Far
 
 	RayPayload payload;
 	payload.mRecursionDepth = 0;
-	payload.mRandomState = uint(uint(DispatchRaysIndex().x) * uint(1973) + uint(DispatchRaysIndex().y) * uint(9277) + uint(mAccumulationFrameCount) * uint(26699)) | uint(1); // From https://www.shadertoy.com/view/tsBBWW
+	payload.mRandomState = uint(uint(DispatchRaysIndex().x) * uint(1973) + uint(DispatchRaysIndex().y) * uint(9277) + uint(mPerFrame.mAccumulationFrameCount) * uint(26699)) | uint(1); // From https://www.shadertoy.com/view/tsBBWW
 	TraceRay(
 		RaytracingScene, 		// RaytracingAccelerationStructure
 		0,						// RayFlags 
@@ -121,10 +88,10 @@ void DefaultRayGeneration()
 
 	float3 current_frame_color = payload.mColor;
 	float3 previous_frame_color = RaytracingOutput[DispatchRaysIndex().xy].xyz;
-	float3 mixed_color = lerp(previous_frame_color, current_frame_color, 1.0f / (float)(mAccumulationFrameCount));
+	float3 mixed_color = lerp(previous_frame_color, current_frame_color, 1.0f / (float)(mPerFrame.mAccumulationFrameCount));
 
-	if (mDebugMode == 11)
-		mixed_color = hsv2rgb(float3((payload.mRecursionDepth) * 1.0 / (mRecursionCountMax + 1), 1, 1));
+	if (mPerFrame.mDebugMode == 11)
+		mixed_color = hsv2rgb(float3((payload.mRecursionDepth) * 1.0 / (mPerFrame.mRecursionCountMax + 1), 1, 1));
 
 	// [TODO] Ray visualization ?
 	// if (all(abs((int2)DispatchRaysIndex().xy - (int2)mDebugCoord) < DEBUG_PIXEL_RADIUS))
@@ -136,7 +103,7 @@ void DefaultRayGeneration()
 [shader("miss")]
 void DefaultMiss(inout RayPayload payload)
 {
-	payload.mColor = mBackgroundColor.xyz;
+	payload.mColor = mPerFrame.mBackgroundColor.xyz;
 }
 
 [shader("closesthit")]
@@ -173,7 +140,7 @@ void DefaultClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionA
 
     float3 vertex = vertices[0] * barycentrics.x + vertices[1] * barycentrics.y + vertices[2] * barycentrics.z;
 
-    switch (mDebugMode)
+    switch (mPerFrame.mDebugMode)
     {
     	case 0: break;
     	case 1: break;
@@ -194,7 +161,7 @@ void DefaultClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionA
 	// Find the world-space hit position
 	float3 hit_position = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
 
-	if (payload.mRecursionDepth >= mRecursionCountMax)
+	if (payload.mRecursionDepth >= mPerFrame.mRecursionCountMax)
 	{
 		payload.mColor = InstanceDataBuffer[InstanceID()].mEmission;
 		return;
@@ -239,9 +206,9 @@ void DefaultClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionA
 			// direction = aa.x * axis[0] + aa.y * axis[1] + aa.z * axis[2];
 		}
 
-		if (mDebugInstanceIndex == InstanceID())
+		if (mPerFrame.mDebugInstanceIndex == InstanceID())
 		{
-			switch (mDebugInstanceMode)
+			switch (mPerFrame.mDebugInstanceMode)
 			{
 				case 1: payload.mColor = barycentrics; return;						// Barycentrics
 				case 2: direction = reflect(WorldRayDirection(), normal); break; 	// Mirror
@@ -279,7 +246,7 @@ void DefaultClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionA
 	// Test
 	{
 		float shadow_factor = 1.0;
-		if (mShadowMode == 1) // Test
+		if (mPerFrame.mShadowMode == 1) // Test
 		{
 			// Fire a shadow ray. The direction is hard-coded here, but can be fetched from a constant-buffer
 			RayDesc ray;
