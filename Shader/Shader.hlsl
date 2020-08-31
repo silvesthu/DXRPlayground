@@ -3,6 +3,7 @@
 typedef uint DebugMode;
 typedef uint DebugInstanceMode;
 typedef uint ShadowMode;
+typedef uint BackgroundMode;
 #define CONSTANT_DEFAULT(x)
 #include "ShaderType.hlsl"
 
@@ -100,10 +101,17 @@ void DefaultRayGeneration()
 	RaytracingOutput[DispatchRaysIndex().xy] = float4(mixed_color, 1);
 }
 
+#include "AtmosphericScattering.hlsl"
+
 [shader("miss")]
 void DefaultMiss(inout RayPayload payload)
 {
-	payload.mColor = mPerFrame.mBackgroundColor.xyz;
+	switch (mPerFrame.mBackgroundMode)
+	{
+		default:
+		case 0: payload.mColor = mPerFrame.mBackgroundColor.xyz; return;
+		case 1: payload.mColor = AtmosphereScattering(WorldRayOrigin() * 1e-3 /* 1e3m -> 1e6m, suffer from precision loss if treat origin as meter */, WorldRayDirection()); return;
+	}
 }
 
 [shader("closesthit")]
@@ -198,7 +206,7 @@ void DefaultClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionA
 			// float r2 = RandomFloat01(random_state);
 			// float z = sqrt(1 - r2);
 
-			// float phi = 2 * M_PI * r1;
+			// float phi = 2 * MATH_PI * r1;
 			// float x = cos(phi) * sqrt(r2);
 			// float y = sin(phi) * sqrt(r2);
 		

@@ -112,6 +112,15 @@ enum class DebugInstanceMode : glm::uint32
 	Count
 };
 
+enum class BackgroundMode : glm::uint32
+{
+	Color = 0,
+
+	Atmosphere,
+
+	Count
+};
+
 enum class ShadowMode : glm::uint32
 {
 	None = 0,
@@ -132,6 +141,7 @@ namespace ShaderType
 	using uint4 = glm::uvec4;
 
 	#define CONSTANT_DEFAULT(x) =x
+	const static float MATH_PI = glm::pi<float>();
 	#include "../Shader/ShaderType.hlsl"
 };
 extern ShaderType::PerFrame					gPerFrameConstantBuffer;

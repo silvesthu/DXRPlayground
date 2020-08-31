@@ -193,13 +193,11 @@
     <CopyFileToFolders Include="Shader\Shader.hlsl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
-  </ItemGroup>
-  <ItemGroup>
-    <FxCompile Include="Shader\Common.hlsl">
+    <CopyFileToFolders Include="Shader\Common.hlsl">
       <Filter>Shader</Filter>
-    </FxCompile>
-    <FxCompile Include="Shader\Type.hlsl">
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Shader\ShaderType.hlsl">
       <Filter>Shader</Filter>
-    </FxCompile>
+    </CopyFileToFolders>
   </ItemGroup>
 </Project>

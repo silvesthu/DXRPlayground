@@ -235,9 +235,26 @@ static void sUpdate()
 				ImGui::TreePop();
 			}
 
-			if (ImGui::TreeNodeEx("Background"))
+			if (ImGui::TreeNodeEx("Background", ImGuiTreeNodeFlags_DefaultOpen))
 			{
-				ImGui::ColorEdit3("Color", (float*)&gPerFrameConstantBuffer.mBackgroundColor);
+				ImGui::Text("Mode"); ImGui::SameLine();
+				for (int i = 0; i < (int)BackgroundMode::Count; i++)
+				{
+					const auto& name = nameof::nameof_enum((BackgroundMode)i);
+
+					ImGui::SameLine();
+					if (ImGui::RadioButton(name.data(), (int)gPerFrameConstantBuffer.mBackgroundMode == i))
+						gPerFrameConstantBuffer.mBackgroundMode = (BackgroundMode)i;
+				}
+
+				if (gPerFrameConstantBuffer.mBackgroundMode == BackgroundMode::Color)
+					ImGui::ColorEdit3("Color", (float*)&gPerFrameConstantBuffer.mBackgroundColor);
+
+				if (gPerFrameConstantBuffer.mBackgroundMode == BackgroundMode::Atmosphere)
+				{
+					ImGui::SliderAngle("Sun Azimuth Angle", &gPerFrameConstantBuffer.mSunAzimuth, 0, 360.0f);
+					ImGui::SliderAngle("Sun Zenith Angle", &gPerFrameConstantBuffer.mSunZenith, 0, 180.0f);
+				}
 
 				ImGui::TreePop();
 			}
@@ -402,6 +419,11 @@ void sRender()
 
 	// Upload
 	{
+		{
+			gPerFrameConstantBuffer.mSunDirection = 
+				glm::vec4(0,1,0,0) * glm::rotate(gPerFrameConstantBuffer.mSunZenith, glm::vec3(0, 0, 1)) * glm::rotate(gPerFrameConstantBuffer.mSunAzimuth, glm::vec3(0, 1, 0));
+		}
+
 		// Accumulation reset check
 		{
 			static ShaderType::PerFrame sPerFrameCopy = gPerFrameConstantBuffer;
