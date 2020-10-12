@@ -119,7 +119,8 @@ float3 AtmosphereScattering(float3 inPosition, float3 inDirection)
 {
 	float3 output = 0;
 
-	float3 eye = inPosition + float3(0, EARTH_RADIUS, 0);
+	float3 base_altitude = float3(0, 1000, 0);
+	float3 eye = (base_altitude + inPosition) * 1e-6 + float3(0, EARTH_RADIUS, 0);
 	float3 dir = inDirection;
 
 	float2 atmosphere_hit = ray_vs_sphere( eye, dir, ATMOSPHERE_RADIUS );
@@ -171,5 +172,5 @@ float3 AtmosphereScattering(float3 inPosition, float3 inDirection)
 			return float3(0,1,0);
 	}
 
-	return in_scatter( eye, dir, from_to, mPerFrame.mSunDirection );
+	return in_scatter( eye, dir, from_to, mPerFrame.mSunDirection.xyz );
 }

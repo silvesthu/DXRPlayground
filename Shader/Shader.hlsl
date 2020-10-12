@@ -2,10 +2,10 @@
 
 typedef uint DebugMode;
 typedef uint DebugInstanceMode;
-typedef uint ShadowMode;
 typedef uint BackgroundMode;
 #define CONSTANT_DEFAULT(x)
 #include "ShaderType.hlsl"
+#include "Generated/Enum.hlsl"
 
 RWTexture2D<float4> RaytracingOutput : register(u0, space0);
 cbuffer CBuffer : register(b0, space0)
@@ -70,29 +70,40 @@ void DefaultRayGeneration()
 	RayDesc ray;
 	ray.Origin = mPerFrame.mCameraPosition.xyz;
 	ray.Direction = normalize(mPerFrame.mCameraDirection.xyz + mPerFrame.mCameraRightExtend.xyz * d.x + mPerFrame.mCameraUpExtend.xyz * d.y);
-	ray.TMin = 0;				// Near
-	ray.TMax = 100000;			// Far
+	ray.TMin = 0.001;				// Near
+	ray.TMax = 100000;				// Far
 
-	RayPayload payload;
-	payload.mRecursionDepth = 0;
+	RayPayload payload = (RayPayload)0;
+	payload.mAlbedo = 1; // camera gather 100% light
 	payload.mRandomState = uint(uint(DispatchRaysIndex().x) * uint(1973) + uint(DispatchRaysIndex().y) * uint(9277) + uint(mPerFrame.mAccumulationFrameCount) * uint(26699)) | uint(1); // From https://www.shadertoy.com/view/tsBBWW
-	TraceRay(
-		RaytracingScene, 		// RaytracingAccelerationStructure
-		0,						// RayFlags 
-		0xFF,					// InstanceInclusionMask
-		0,						// RayContributionToHitGroupIndex, 4bits
-		0,						// MultiplierForGeometryContributuionToHitGroupIndex, 16bits
-		0,						// MissShaderIndex
-		ray,					// RayDesc
-		payload					// payload_t
-	);
 
-	float3 current_frame_color = payload.mColor;
+	uint recursion = 0;
+	for (; recursion <= mPerFrame.mRecursionCountMax; recursion++)
+	{
+		TraceRay(
+			RaytracingScene, 		// RaytracingAccelerationStructure
+			0,						// RayFlags 
+			0xFF,					// InstanceInclusionMask
+			0,						// RayContributionToHitGroupIndex, 4bits
+			0,						// MultiplierForGeometryContributuionToHitGroupIndex, 16bits
+			0,						// MissShaderIndex
+			ray,					// RayDesc
+			payload					// payload_t
+		);
+
+		if (payload.mDone)
+			break;
+
+		ray.Origin = payload.mPosition;
+		ray.Direction = payload.mReflectionDirection;
+	}
+
+	float3 current_frame_color = payload.mEmission;
 	float3 previous_frame_color = RaytracingOutput[DispatchRaysIndex().xy].xyz;
 	float3 mixed_color = lerp(previous_frame_color, current_frame_color, 1.0f / (float)(mPerFrame.mAccumulationFrameCount));
 
-	if (mPerFrame.mDebugMode == 11)
-		mixed_color = hsv2rgb(float3((payload.mRecursionDepth) * 1.0 / (mPerFrame.mRecursionCountMax + 1), 1, 1));
+	if (mPerFrame.mDebugMode == DebugMode_RecursionCount)
+		mixed_color = hsv2rgb(float3(recursion * 1.0 / (mPerFrame.mRecursionCountMax + 1), 1, 1));
 
 	// [TODO] Ray visualization ?
 	// if (all(abs((int2)DispatchRaysIndex().xy - (int2)mDebugCoord) < DEBUG_PIXEL_RADIUS))
@@ -106,19 +117,21 @@ void DefaultRayGeneration()
 [shader("miss")]
 void DefaultMiss(inout RayPayload payload)
 {
+	payload.mDone = true;
+
 	switch (mPerFrame.mBackgroundMode)
 	{
 		default:
-		case 0: payload.mColor = mPerFrame.mBackgroundColor.xyz; return;
-		case 1: payload.mColor = AtmosphereScattering(WorldRayOrigin() * 1e-3 /* 1e3m -> 1e6m, suffer from precision loss if treat origin as meter */, WorldRayDirection()); return;
+		case BackgroundMode_Color: 			payload.mEmission = payload.mEmission + payload.mAlbedo * mPerFrame.mBackgroundColor.xyz; return;
+		case BackgroundMode_Atmosphere: 	payload.mEmission = payload.mEmission + payload.mAlbedo * AtmosphereScattering(WorldRayOrigin(), WorldRayDirection()); return;
 	}
 }
 
-[shader("closesthit")]
-void DefaultClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attribs)
+HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attribs)
 {
-	// See https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html for more system value intrinsics
+	HitInfo hit_info = (HitInfo)0;
 
+	// See https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html for more system value intrinsics
 	float3 barycentrics = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y, attribs.barycentrics.x, attribs.barycentrics.y);
 
 	// Get the base index of the triangle's first 16 bit index.
@@ -130,68 +143,63 @@ void DefaultClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionA
     // Load up 3 16 bit indices for the triangle.
     const uint3 indices = Load3x16BitIndices(base_index);
 
-    // Retrieve corresponding vertex normals for the triangle vertices.
-    float3 normals[3] = { 
-        Normals[indices[0]], 
-        Normals[indices[1]], 
-        Normals[indices[2]] 
-    };
-
+    // Attributes
+    float3 normals[3] = { Normals[indices[0]], Normals[indices[1]], Normals[indices[2]] };
     float3 normal = normals[0] * barycentrics.x + normals[1] * barycentrics.y + normals[2] * barycentrics.z;
 
-    // Retrieve corresponding vertex normals for the triangle vertices.
-    float3 vertices[3] = { 
-        Vertices[indices[0]], 
-        Vertices[indices[1]], 
-        Vertices[indices[2]] 
-    };
-
+    float3 vertices[3] = { Vertices[indices[0]], Vertices[indices[1]], Vertices[indices[2]] };
     float3 vertex = vertices[0] * barycentrics.x + vertices[1] * barycentrics.y + vertices[2] * barycentrics.z;
 
-    switch (mPerFrame.mDebugMode)
-    {
-    	case 0: break;
-    	case 1: break;
-    	case 2: payload.mColor = barycentrics; return;
-    	case 3: payload.mColor = vertex; return;
-    	case 4: payload.mColor = normal * 0.5 + 0.5; return;
-    	case 5: break;
-    	case 6: payload.mColor = InstanceDataBuffer[InstanceID()].mAlbedo; return;
-    	case 7: payload.mColor = InstanceDataBuffer[InstanceID()].mReflectance; return;
-    	case 8: payload.mColor = InstanceDataBuffer[InstanceID()].mEmission; return;
-    	case 9: payload.mColor = InstanceDataBuffer[InstanceID()].mRoughness; return;
-    	case 10: break;
-    	case 11: break;
-    	default:
-    		break;
-    }
-
-	// Find the world-space hit position
-	float3 hit_position = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
-
-	if (payload.mRecursionDepth >= mPerFrame.mRecursionCountMax)
-	{
-		payload.mColor = InstanceDataBuffer[InstanceID()].mEmission;
-		return;
-	}
-
+    // Handle front face only
 	if (dot(normal, -WorldRayDirection()) < 0)
 	{
-		payload.mColor = 0;
-		return;
+	    hit_info.mDone = true;
+	    return hit_info;
+	}
+
+	// Hit position
+	float3 raw_hit_position = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
+	hit_info.mPosition = raw_hit_position + normal * 0.001;
+
+    // Debug - Global
+	if (mPerFrame.mDebugMode != DebugMode_None && mPerFrame.mDebugMode != DebugMode_RecursionCount)
+	{
+		switch (mPerFrame.mDebugMode)
+	    {
+	    	case DebugMode_Barycentrics: 			hit_info.mEmission = barycentrics; break;
+	    	case DebugMode_Vertex: 					hit_info.mEmission = vertex; break;
+	    	case DebugMode_Normal: 					hit_info.mEmission = normal * 0.5 + 0.5; break;
+	    	case DebugMode_Albedo: 					hit_info.mEmission = InstanceDataBuffer[InstanceID()].mAlbedo; break;
+	    	case DebugMode_Reflectance: 			hit_info.mEmission = InstanceDataBuffer[InstanceID()].mReflectance; break;
+	    	case DebugMode_Emission: 				hit_info.mEmission = InstanceDataBuffer[InstanceID()].mEmission; break;
+	    	case DebugMode_Roughness: 				hit_info.mEmission = InstanceDataBuffer[InstanceID()].mRoughness; break;
+	    	default:
+	    		break;
+	    }
+
+	    hit_info.mDone = true;
+	    return hit_info;
+	}
+
+	// Debug - Per instance
+	if (mPerFrame.mDebugInstanceIndex == InstanceID())
+	{
+		switch (mPerFrame.mDebugInstanceMode)
+		{
+			case DebugInstanceMode_Barycentrics: 	hit_info.mEmission = barycentrics; hit_info.mDone = true; return hit_info;										// Barycentrics
+			case DebugInstanceMode_Mirror: 			hit_info.mAlbedo = 1; hit_info.mReflectionDirection = reflect(WorldRayDirection(), normal); return hit_info;	// Mirror
+			default: break;
+		}
 	}
 
 	// Lambertian
 	{
-		float3 origin = hit_position + normal * 0.001;
-		float3 direction = 0;
-
 		// random
 		{
 			float3 random_vector = RandomUnitVector(payload.mRandomState);
 			if (dot(normal, random_vector) < 0)
 				random_vector = -random_vector;
-			direction = random_vector;
+			hit_info.mReflectionDirection = random_vector;
 		}
 
 		// onb
@@ -211,101 +219,43 @@ void DefaultClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionA
 			// float y = sin(phi) * sqrt(r2);
 		
 			// float3 aa = float3(x, y, z);
-			// direction = aa.x * axis[0] + aa.y * axis[1] + aa.z * axis[2];
+			// hit_info.mReflectionDirection = aa.x * axis[0] + aa.y * axis[1] + aa.z * axis[2];
 		}
-
-		if (mPerFrame.mDebugInstanceIndex == InstanceID())
-		{
-			switch (mPerFrame.mDebugInstanceMode)
-			{
-				case 1: payload.mColor = barycentrics; return;						// Barycentrics
-				case 2: direction = reflect(WorldRayDirection(), normal); break; 	// Mirror
-				default: break;
-			}
-		}
-
-		RayDesc ray;
-		ray.Origin = origin;
-		ray.Direction = direction;
-		ray.TMin = 0.0001;			// Near
-		ray.TMax = 100000;			// Far
-
-		uint current_recursion_depth = payload.mRecursionDepth;
-		payload.mRecursionDepth += 1;
-
-		// Should this be a recursive call or a loop ?
-		// - optixPathTracer use a loop with Ray in Payload
-		TraceRay(
-			RaytracingScene, 		// RaytracingAccelerationStructure
-			0,						// RayFlags 
-			0xFF,					// InstanceInclusionMask
-			0,						// RayContributionToHitGroupIndex, 4bits
-			0,						// MultiplierForGeometryContributuionToHitGroupIndex, 16bits
-			0,						// MissShaderIndex
-			ray,					// RayDesc
-			payload					// payload_t
-		);
-
-		payload.mColor = InstanceDataBuffer[InstanceID()].mAlbedo * payload.mColor + InstanceDataBuffer[InstanceID()].mEmission;
-
-		return;
+		
+		hit_info.mAlbedo = InstanceDataBuffer[InstanceID()].mAlbedo;
+		hit_info.mEmission = InstanceDataBuffer[InstanceID()].mEmission;
 	}
 
-	// Test
-	{
-		float shadow_factor = 1.0;
-		if (mPerFrame.mShadowMode == 1) // Test
-		{
-			// Fire a shadow ray. The direction is hard-coded here, but can be fetched from a constant-buffer
-			RayDesc ray;
-			ray.Origin = hit_position;
-			ray.Direction = normalize(float3(-1, 1, -1));
-			ray.TMin = 0.0001;
-			ray.TMax = 100000;
+	return hit_info;
+}
 
-			// http://intro-to-dxr.cwyman.org/presentations/IntroDXR_RaytracingAPI.pdf
-			// HitGroupRecordAddress =
-			// 	start + stride * (rayContribution + (geometryMultiplier * geometryContribution) + instanceContribution)
-			// where:
-			// 	start = D3D12_DISPATCH_RAYS_DESC.HitGroupTable.StartAddress
-			// 	stride = D3D12_DISPATCH_RAYS_DESC.HitGroupTable.StrideInBytes
-			// 	rayContribution = RayContributionToHitGroupIndex (TraceRay parameter)
-			// 	geometryMultiplier = MultiplierForGeometryContributionToHitGroupIndex (TraceRay parameter)
-			// 	geometryContribution = index of geometry in bottom-level acceleration structure (0,1,2,3..)
-			// 	instanceContribution = D3D12_RAYTRACING_INSTANCE_DESC.InstanceContributionToHitGroupIndex
+[shader("closesthit")]
+void DefaultClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attribs)
+{
+	HitInfo hit_info = HitInternal(payload, attribs);
 
-			ShadowPayload shadowPayload;
-			TraceRay(
-				RaytracingScene,	// RaytracingAccelerationStructure
-				0,					// RayFlags 
-				0xFF,				// InstanceInclusionMask
-				1,					// RayContributionToHitGroupIndex, 4bits
-				0,					// MultiplierForGeometryContributuionToHitGroupIndex, 16bits
-				1,					// MissShaderIndex
-				ray,				// RayDesc
-				shadowPayload		// payload_t
-			);
+	// State
+	payload.mDone = hit_info.mDone;
 
-			if (shadowPayload.hit)
-				shadow_factor = 0.0;
-		}
+	// Geometry
+	payload.mPosition = hit_info.mPosition;
+	payload.mReflectionDirection = hit_info.mReflectionDirection;
 
-		float diffuse = 0.18;
-		float ambient = 0.01;
-		payload.mColor = diffuse * shadow_factor + ambient + InstanceDataBuffer[InstanceID()].mEmission;
-	}
+	// Material
+	payload.mEmission = payload.mEmission + payload.mAlbedo * hit_info.mEmission;
+	payload.mAlbedo = payload.mAlbedo * hit_info.mAlbedo; 
 }
 
 [shader("closesthit")]
 void ShadowClosestHit(inout ShadowPayload payload, in BuiltInTriangleIntersectionAttributes attribs)
 {
-	payload.hit = true;
+	payload.mHit = true;
 }
 
 [shader("miss")]
 void ShadowMiss(inout ShadowPayload payload)
 {
-	payload.hit = false;
+	payload.mHit = false;
 }
 
 float4 CopyTextureVS(uint id : SV_VertexID) : SV_POSITION
@@ -321,6 +271,6 @@ Texture2D<float4> CopyFromTexture : register(t0, space1);
 [RootSignature("DescriptorTable(SRV(t0, numDescriptors = 1, space = 1), visibility = SHADER_VISIBILITY_PIXEL)")]
 float4 CopyTexturePS(float4 position : SV_POSITION) : SV_TARGET
 {
-	float3 srgb = ApplySRGBCurve(CopyFromTexture.Load(int3(position.xy, 0)));
+	float3 srgb = ApplySRGBCurve(CopyFromTexture.Load(int3(position.xy, 0)).xyz);
 	return float4(srgb, 1);
 }

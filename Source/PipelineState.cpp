@@ -257,37 +257,48 @@ struct GlobalRootSignature : public StateSubobjectHolder<ID3D12RootSignature*, D
 	ComPtr<ID3D12RootSignature> mRootSignature;
 };
 
+template <typename T>
+static void sWriteEnum(std::ofstream& ioEnumFile)
+{
+	ioEnumFile << "// enum " << nameof::nameof_enum_type<T>().data() << "\n";
+
+	for (int i = 0; i < (int)T::Count; i++)
+	{
+		const auto& name = nameof::nameof_enum((T)i);
+		if (name[0] == '_')
+			continue;
+
+		ioEnumFile << "const static uint " << nameof::nameof_enum_type<T>().data() << "_" << name.data() << " = " << i << ";\n";
+	}
+
+	ioEnumFile << "\n";
+}
+
 void gCreatePipelineState()
 {
-	// See D3D12_STATE_SUBOBJECT_TYPE
-	// Note that all pointers should be valid until CreateStateObject
-	
-	// Subobjects:
-	//  DXIL library
-	//  Hit group
-	//  Local root signature and association for each shader
-	//  Shader config and association
-	//  Pipeline config
-	//  Global root signature
+	// Generate enum
+	const char* enum_filename = "Shader/Generated/Enum.hlsl";
+	::CreateDirectoryA("Shader/Generated", nullptr);
+	std::ofstream enum_file(enum_filename);
+	{
+		enum_file << "// Auto-generated for enum\n";
+		enum_file << "\n";
 
-	// When add new shader:
-	//  DXIL library (for shader binary)
-	//  Hit group
-	//  Local root signature and association
-	//  Shader config
-
-	std::array<D3D12_STATE_SUBOBJECT, 64> subobjects;
-	glm::uint32 index = 0;
+		sWriteEnum<DebugMode>(enum_file);
+		sWriteEnum<DebugInstanceMode>(enum_file);
+		sWriteEnum<BackgroundMode>(enum_file);
+	}
+	enum_file.close();
 
 	// Load shader
-	const char* filename = "Shader/Shader.hlsl";
-	std::ifstream shader_file(filename);
+	const char* shader_filename = "Shader/Shader.hlsl";
+	std::ifstream shader_file(shader_filename);
 	std::stringstream shader_stream;
 	shader_stream << shader_file.rdbuf();
 
 	// Create copy texture shader
-	IDxcBlob* copy_texture_vs_blob = sCompileShader(filename, shader_stream.str().c_str(), (glm::uint32)shader_stream.str().length(), L"CopyTextureVS", L"vs_6_3");
-	IDxcBlob* copy_texture_ps_blob = sCompileShader(filename, shader_stream.str().c_str(), (glm::uint32)shader_stream.str().length(), L"CopyTexturePS", L"ps_6_3");
+	IDxcBlob* copy_texture_vs_blob = sCompileShader(shader_filename, shader_stream.str().c_str(), (glm::uint32)shader_stream.str().length(), L"CopyTextureVS", L"vs_6_3");
+	IDxcBlob* copy_texture_ps_blob = sCompileShader(shader_filename, shader_stream.str().c_str(), (glm::uint32)shader_stream.str().length(), L"CopyTexturePS", L"ps_6_3");
 	if (copy_texture_vs_blob == nullptr || copy_texture_ps_blob == nullptr)
 	{
 		assert(gDXRStateObject != nullptr);
@@ -322,12 +333,32 @@ void gCreatePipelineState()
 
 	// Create DXR shaders
 	const wchar_t* entry_points[] = { kDefaultRayGenerationShader, kDefaultMissShader, kDefaultClosestHitShader, kShadowMissShader, kShadowClosestHitShader };
-	IDxcBlob* blob = sCompileShader(filename, shader_stream.str().c_str(), (glm::uint32)shader_stream.str().length(), L"", L"lib_6_3");
+	IDxcBlob* blob = sCompileShader(shader_filename, shader_stream.str().c_str(), (glm::uint32)shader_stream.str().length(), L"", L"lib_6_3");
 	if (blob == nullptr)
 	{
 		assert(gDXRStateObject != nullptr);
 		return;
 	}
+
+	// See D3D12_STATE_SUBOBJECT_TYPE
+	// Note that all pointers should be valid until CreateStateObject
+	
+	// Subobjects:
+	//  DXIL library
+	//  Hit group
+	//  Local root signature and association for each shader
+	//  Shader config and association
+	//  Pipeline config
+	//  Global root signature
+
+	// When add new shader:
+	//  DXIL library (for shader binary)
+	//  Hit group
+	//  Local root signature and association
+	//  Shader config
+
+	std::array<D3D12_STATE_SUBOBJECT, 64> subobjects;
+	glm::uint32 index = 0;
 
 	gDebugPrint("Shader compiled.\n");
 	DXILLibrary dxilLibrary(blob, entry_points, ARRAYSIZE(entry_points));

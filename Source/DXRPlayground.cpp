@@ -1,5 +1,4 @@
 ﻿#include "Thirdparty/imgui/imgui.h"
-#include "Thirdparty/nameof/include/nameof.hpp"
 #include "ImGui/imgui_impl_win32.h"
 #include "ImGui/imgui_impl_dx12.h"
 
@@ -59,16 +58,6 @@ struct DisplaySettings
 	bool			mVsync				= true;
 };
 DisplaySettings		gDisplaySettings	= {};
-
-// Helper
-namespace nameof
-{
-	template <typename T>
-	constexpr std::string_view nameof_enum_type() noexcept
-	{
-		return nameof::nameof_type<T>().substr(5);
-	}
-}
 
 // Forward declarations of helper functions
 static bool sCreateDeviceD3D(HWND hWnd);
@@ -221,7 +210,7 @@ static void sUpdate()
 				}
 
 				ImGui::SliderInt("DebugInstanceIndex", (int*)&gPerFrameConstantBuffer.mDebugInstanceIndex, 0u, gScene.GetInstanceCount() - 1);
-				gPerFrameConstantBuffer.mDebugInstanceIndex = std::clamp(gPerFrameConstantBuffer.mDebugInstanceIndex, 0u, gScene.GetInstanceCount() - 1);
+				gPerFrameConstantBuffer.mDebugInstanceIndex = glm::clamp(gPerFrameConstantBuffer.mDebugInstanceIndex, 0u, gScene.GetInstanceCount() - 1);
 
 				ImGui::TreePop();
 			}
@@ -264,18 +253,6 @@ static void sUpdate()
 				ImGui::InputFloat3("Position", (float*)&gPerFrameConstantBuffer.mCameraPosition);
 				ImGui::InputFloat3("Direction", (float*)&gPerFrameConstantBuffer.mCameraDirection);
 				ImGui::SliderFloat("Horz Fov", (float*)&gCameraSettings.mHorizontalFovDegree, 30.0f, 160.0f);
-
-				ImGui::TreePop();
-			}
-
-			if (ImGui::TreeNodeEx("Shadow"))
-			{
-				for (int i = 0; i < (int)ShadowMode::Count; i++)
-				{
-					ImGui::SameLine();
-					if (ImGui::RadioButton(nameof::nameof_enum((ShadowMode)i).data(), (int)gPerFrameConstantBuffer.mShadowMode == i))
-						gPerFrameConstantBuffer.mShadowMode = (ShadowMode)i;
-				}
 
 				ImGui::TreePop();
 			}

@@ -18,6 +18,7 @@ using Microsoft::WRL::ComPtr;
 #include <type_traits>
 
 #include "Thirdparty/glm/glm/gtx/transform.hpp"
+#include "Thirdparty/nameof/include/nameof.hpp"
 
 // System
 extern ID3D12Device5*						gDevice;
@@ -121,14 +122,6 @@ enum class BackgroundMode : glm::uint32
 	Count
 };
 
-enum class ShadowMode : glm::uint32
-{
-	None = 0,
-	Test,
-
-	Count
-};
-
 namespace ShaderType
 {
 	using float2 = glm::vec2;
@@ -184,6 +177,15 @@ inline void gDebugPrint(const T& in)
 {
 	std::string str = std::to_string(in) + "\n";
 	OutputDebugStringA(str.c_str());
+}
+
+namespace nameof
+{
+	template <typename T>
+	constexpr std::string_view nameof_enum_type() noexcept
+	{
+		return nameof::nameof_type<T>().substr(5);
+	}
 }
 
 // DirectX helper

@@ -18,7 +18,7 @@ struct PerFrame
 	DebugMode				mDebugMode				CONSTANT_DEFAULT(DebugMode::None);
 	DebugInstanceMode		mDebugInstanceMode		CONSTANT_DEFAULT(DebugInstanceMode::None);
 	uint					mDebugInstanceIndex		CONSTANT_DEFAULT(0);
-	ShadowMode				mShadowMode				CONSTANT_DEFAULT(ShadowMode::None);
+	uint					_mDummy					CONSTANT_DEFAULT(0);
 
 	uint					mRecursionCountMax		CONSTANT_DEFAULT(sRecursionCountMax);
 	uint					mFrameIndex				CONSTANT_DEFAULT(0);
@@ -39,14 +39,31 @@ struct InstanceData
     uint					mVertexOffset			CONSTANT_DEFAULT(0);
 };
 
+struct HitInfo
+{
+	float3 mAlbedo;
+	float3 mEmission;
+
+	float3 mPosition;
+	float3 mReflectionDirection;
+
+	bool mDone;
+};
+
 struct RayPayload
 {
-    float3 mColor;
     uint mRandomState;
-    uint mRecursionDepth;
+
+	float3 mAlbedo;
+	float3 mEmission;
+	
+    float3 mPosition;
+    float3 mReflectionDirection;
+
+	bool mDone;
 };
 
 struct ShadowPayload
 {
-    bool hit;
+    bool mHit;
 };
