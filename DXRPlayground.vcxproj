@@ -13,6 +13,7 @@
   <ItemGroup>
     <ClInclude Include="Source\Common.h" />
     <ClInclude Include="Source\ImGui\imgui_impl_dx12.h" />
+    <ClInclude Include="Source\ImGui\imgui_impl_helper.h" />
     <ClInclude Include="Source\ImGui\imgui_impl_win32.h" />
     <ClInclude Include="Source\PipelineState.h" />
     <ClInclude Include="Source\RayTrace.h" />
@@ -54,6 +55,7 @@
     <ClCompile Include="Source\Common.cpp" />
     <ClCompile Include="Source\DXRPlayground.cpp" />
     <ClCompile Include="Source\ImGui\imgui_impl_dx12.cpp" />
+    <ClCompile Include="Source\ImGui\imgui_impl_helper.cpp" />
     <ClCompile Include="Source\ImGui\imgui_impl_win32.cpp" />
     <ClCompile Include="Source\PipelineState.cpp" />
     <ClCompile Include="Source\RayTrace.cpp" />

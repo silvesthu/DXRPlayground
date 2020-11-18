@@ -130,6 +130,8 @@ void DefaultMiss(inout RayPayload payload)
 HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attribs)
 {
 	HitInfo hit_info = (HitInfo)0;
+	hit_info.mPDF = 1.0;
+	hit_info.mScatteringPDF = 1.0;
 
 	// See https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html for more system value intrinsics
 	float3 barycentrics = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y, attribs.barycentrics.x, attribs.barycentrics.y);
@@ -145,7 +147,7 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 
     // Attributes
     float3 normals[3] = { Normals[indices[0]], Normals[indices[1]], Normals[indices[2]] };
-    float3 normal = normals[0] * barycentrics.x + normals[1] * barycentrics.y + normals[2] * barycentrics.z;
+    float3 normal = normalize(normals[0] * barycentrics.x + normals[1] * barycentrics.y + normals[2] * barycentrics.z);
 
     float3 vertices[3] = { Vertices[indices[0]], Vertices[indices[1]], Vertices[indices[2]] };
     float3 vertex = vertices[0] * barycentrics.x + vertices[1] * barycentrics.y + vertices[2] * barycentrics.z;
@@ -194,32 +196,41 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 
 	// Lambertian
 	{
-		// random
+		if (false)
 		{
+			// random direction
+
 			float3 random_vector = RandomUnitVector(payload.mRandomState);
 			if (dot(normal, random_vector) < 0)
 				random_vector = -random_vector;
 			hit_info.mReflectionDirection = random_vector;
+
+			// pdf - simple distribution
+			float cosine = dot(normal, hit_info.mReflectionDirection);
+			hit_info.mScatteringPDF = cosine <= 0 ? 0 : cosine / MATH_PI;
+			hit_info.mPDF = 1 / (2 * MATH_PI); // hemisphere
 		}
-
-		// onb
+		else
 		{
-			// float3 axis[3];			
-			// axis[2] = normalize(normal);
-			// float3 a = (abs(axis[2].x) > 0.9) ? float3(0, 1, 0) : float3(1, 0, 0);
-			// axis[1] = normalize(cross(axis[2], a));
-			// axis[0] = cross(axis[2], axis[1]);
+			// random cosine direction
 
-			// float r1 = RandomFloat01(random_state);
-			// float r2 = RandomFloat01(random_state);
-			// float z = sqrt(1 - r2);
+			// onb - build_from_w
+			float3 axis[3];			
+			axis[2] = normal;
+			float3 a = (abs(axis[2].x) > 0.9) ? float3(0, 1, 0) : float3(1, 0, 0);
+			axis[1] = normalize(cross(axis[2], a));
+			axis[0] = cross(axis[2], axis[1]);
 
-			// float phi = 2 * MATH_PI * r1;
-			// float x = cos(phi) * sqrt(r2);
-			// float y = sin(phi) * sqrt(r2);
-		
-			// float3 aa = float3(x, y, z);
-			// hit_info.mReflectionDirection = aa.x * axis[0] + aa.y * axis[1] + aa.z * axis[2];
+			// random
+			float3 direction = RandomCosineDirection(payload.mRandomState);
+
+			// onb - local
+			hit_info.mReflectionDirection = normalize(direction.x * axis[0] + direction.y * axis[1] + direction.z * axis[2]);
+
+			// pdf - exact distribution - should cancel out
+			float cosine = dot(normal, hit_info.mReflectionDirection);
+			hit_info.mScatteringPDF = cosine <= 0 ? 0 : cosine / MATH_PI;
+			hit_info.mPDF = cosine <= 0 ? 0 : cosine / MATH_PI;
 		}
 		
 		hit_info.mAlbedo = InstanceDataBuffer[InstanceID()].mAlbedo;
@@ -243,7 +254,11 @@ void DefaultClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionA
 
 	// Material
 	payload.mEmission = payload.mEmission + payload.mAlbedo * hit_info.mEmission;
-	payload.mAlbedo = payload.mAlbedo * hit_info.mAlbedo; 
+	bool use_pdf = true;
+	if (use_pdf)
+		payload.mAlbedo = hit_info.mPDF <= 0 ? 0 : payload.mAlbedo * hit_info.mAlbedo * hit_info.mScatteringPDF / hit_info.mPDF;
+	else
+		payload.mAlbedo = payload.mAlbedo * hit_info.mAlbedo;	
 }
 
 [shader("closesthit")]

@@ -47,6 +47,9 @@ struct HitInfo
 	float3 mPosition;
 	float3 mReflectionDirection;
 
+	float mScatteringPDF;
+	float mPDF;
+
 	bool mDone;
 };
 

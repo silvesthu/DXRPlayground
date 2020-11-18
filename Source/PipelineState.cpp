@@ -47,14 +47,14 @@ static IDxcBlob* sCompileShader(const char* inFilename, const char* inSource, gl
 	if (FAILED(compile_result))
 	{
 		IDxcBlobEncoding* blob = nullptr;
-		IDxcBlobUtf16* blob_16 = nullptr;
+		IDxcBlobUtf8* blob_8 = nullptr;
 		gValidate(operation_result->GetErrorBuffer(&blob));
 		// We can use the library to get our preferred encoding.
-		gValidate(utils->GetBlobAsUtf16(blob, &blob_16));
-		std::wstring str((LPCWSTR)blob_16->GetBufferPointer(), (int)blob_16->GetBufferSize() / 2);
-		OutputDebugStringW(str.c_str());
+		gValidate(utils->GetBlobAsUtf8(blob, &blob_8));
+		std::string str((LPCSTR)blob_8->GetBufferPointer(), (int)blob_8->GetBufferSize() / 2);
+		gDebugPrint(str.c_str());
 		blob->Release();
-		blob_16->Release();
+		blob_8->Release();
 		return nullptr;
 	}
 
@@ -136,7 +136,7 @@ ComPtr<ID3D12RootSignature> CreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC 
 	if (FAILED(hr))
 	{
 		std::string str((char*)error_blob->GetBufferPointer(), error_blob->GetBufferSize());
-		OutputDebugStringA(str.c_str());
+		gDebugPrint(str.c_str());
 		assert(false);
 		return nullptr;
 	}

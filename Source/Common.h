@@ -19,6 +19,7 @@ using Microsoft::WRL::ComPtr;
 
 #include "Thirdparty/glm/glm/gtx/transform.hpp"
 #include "Thirdparty/nameof/include/nameof.hpp"
+#include "ImGui/imgui_impl_helper.h"
 
 // System
 extern ID3D12Device5*						gDevice;
@@ -170,6 +171,7 @@ inline T gMax(T inLhs, T inRhs)
 inline void gDebugPrint(const char* inString)
 {
 	OutputDebugStringA(inString);
+	gLog.AddLog(inString);
 }
 
 template <typename T>
@@ -177,6 +179,7 @@ inline void gDebugPrint(const T& in)
 {
 	std::string str = std::to_string(in) + "\n";
 	OutputDebugStringA(str.c_str());
+	gLog.AddLog(str.c_str());
 }
 
 namespace nameof

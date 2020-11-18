@@ -1,6 +1,7 @@
 ﻿#include "Thirdparty/imgui/imgui.h"
 #include "ImGui/imgui_impl_win32.h"
 #include "ImGui/imgui_impl_dx12.h"
+#include "ImGui/imgui_impl_helper.h"
 
 #include "Common.h"
 
@@ -105,6 +106,7 @@ static void sUpdate()
 	}
 
 	// Move Camera
+	if (!ImGui::IsAnyItemActive())
 	{
 		float frame_speed_scale = ImGui::GetIO().DeltaTime / (1.0f / 60.0f);
 		float move_speed = gCameraSettings.mMoveRotateSpeed.x * frame_speed_scale;
@@ -224,7 +226,7 @@ static void sUpdate()
 				ImGui::TreePop();
 			}
 
-			if (ImGui::TreeNodeEx("Background", ImGuiTreeNodeFlags_DefaultOpen))
+			if (ImGui::TreeNodeEx("Background"))
 			{
 				ImGui::Text("Mode"); ImGui::SameLine();
 				for (int i = 0; i < (int)BackgroundMode::Count; i++)
@@ -260,6 +262,13 @@ static void sUpdate()
 			if (ImGui::TreeNodeEx("Display"))
 			{
 				ImGui::Checkbox("Vsync", &gDisplaySettings.mVsync);
+
+				ImGui::TreePop();
+			}
+
+			if (ImGui::TreeNodeEx("Log", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				gLog.Draw();
 
 				ImGui::TreePop();
 			}

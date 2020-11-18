@@ -147,6 +147,9 @@
     <ClInclude Include="Source\Thirdparty\nameof\include\nameof.hpp">
       <Filter>Source\Thirdparty\nameof</Filter>
     </ClInclude>
+    <ClInclude Include="Source\ImGui\imgui_impl_helper.h">
+      <Filter>Source\ImGui</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Thirdparty\imgui\imgui_widgets.cpp">
@@ -187,6 +190,9 @@
     </ClCompile>
     <ClCompile Include="Source\Thirdparty\tinyobjloader\tiny_obj_loader.cc">
       <Filter>Source\Thirdparty\tinyobjloader</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\ImGui\imgui_impl_helper.cpp">
+      <Filter>Source\ImGui</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

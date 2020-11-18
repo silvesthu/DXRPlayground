@@ -24,6 +24,19 @@ float3 RandomUnitVector(inout uint state)
     return float3(x, y, z);
 }
 
+float3 RandomCosineDirection(inout uint state)
+{
+    float r1 = RandomFloat01(state);
+    float r2 = RandomFloat01(state);
+    float z = sqrt(1 - r2);
+
+    float phi = 2 * MATH_PI * r1;
+    float x = cos(phi) * sqrt(r2);
+    float y = sin(phi) * sqrt(r2);
+
+    return float3(x, y, z);
+}
+
 // From https://www.shadertoy.com/view/lsdGzN
 float3 hsv2rgb( in float3 c )
 {
