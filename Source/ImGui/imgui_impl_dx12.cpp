@@ -46,6 +46,11 @@ static ID3D12Resource*              g_FontTextureResource = NULL;
 static D3D12_CPU_DESCRIPTOR_HANDLE  g_FontSrvCpuDescHandle = {};
 static D3D12_GPU_DESCRIPTOR_HANDLE  g_FontSrvGpuDescHandle = {};
 
+// DirectX data - Customization
+static ID3D12DescriptorHeap*        g_DescriptorHeap = NULL;
+static int                          g_DescriptorHeapNextIndex = 0;
+static UINT                         g_DescriptorHeapIncrementSize = 0;
+
 struct FrameResources
 {
     ID3D12Resource*     IndexBuffer;
@@ -124,6 +129,8 @@ void ImGui_ImplDX12_RenderDrawData(ImDrawData* draw_data, ID3D12GraphicsCommandL
     // Avoid rendering when minimized
     if (draw_data->DisplaySize.x <= 0.0f || draw_data->DisplaySize.y <= 0.0f)
         return;
+
+    ctx->SetDescriptorHeaps(1, &g_DescriptorHeap);
 
     // FIXME: I'm assuming that this only gets called once per frame!
     // If not, we can't just re-allocate the IB or VB, we'll have to do a proper allocator.
@@ -579,6 +586,26 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
         return false;
 	g_PipelineState->SetName(L"g_PipelineState");
 
+    // Create descriptor heap - Customization
+    {
+		D3D12_DESCRIPTOR_HEAP_DESC desc = {};
+		desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+		desc.NumDescriptors = 1000000; // maximum
+		desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+		if (g_D3DDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&g_DescriptorHeap)) != S_OK)
+			return false;
+
+        g_DescriptorHeapIncrementSize = g_D3DDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    }
+
+    // Allocate font descriptor handle
+    {
+        IM_ASSERT(g_DescriptorHeapNextIndex == 0);
+        g_FontSrvCpuDescHandle = g_DescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+        g_FontSrvGpuDescHandle = g_DescriptorHeap->GetGPUDescriptorHandleForHeapStart();
+        g_DescriptorHeapNextIndex++;
+    }
+
     ImGui_ImplDX12_CreateFontsTexture();
 
     return true;
@@ -601,18 +628,19 @@ void    ImGui_ImplDX12_InvalidateDeviceObjects()
         if (fr->IndexBuffer)  { fr->IndexBuffer->Release();  fr->IndexBuffer = NULL; }
         if (fr->VertexBuffer) { fr->VertexBuffer->Release(); fr->VertexBuffer = NULL; }
     }
+
+	g_FontSrvCpuDescHandle.ptr = 0;
+	g_FontSrvGpuDescHandle.ptr = 0;
+    if (g_DescriptorHeap) { g_DescriptorHeap->Release(); g_DescriptorHeap = NULL; }
 }
 
-bool ImGui_ImplDX12_Init(ID3D12Device* device, int num_frames_in_flight, DXGI_FORMAT rtv_format,
-                         D3D12_CPU_DESCRIPTOR_HANDLE font_srv_cpu_desc_handle, D3D12_GPU_DESCRIPTOR_HANDLE font_srv_gpu_desc_handle)
+bool ImGui_ImplDX12_Init(ID3D12Device* device, int num_frames_in_flight, DXGI_FORMAT rtv_format)
 {
     ImGuiIO& io = ImGui::GetIO();
     io.BackendRendererName = "imgui_impl_dx12";
 
     g_D3DDevice = device;
     g_RTVFormat = rtv_format;
-    g_FontSrvCpuDescHandle = font_srv_cpu_desc_handle;
-    g_FontSrvGpuDescHandle = font_srv_gpu_desc_handle;
     g_FrameResources = new FrameResources[num_frames_in_flight];
     g_NumFramesInFlight = num_frames_in_flight;
     g_FrameIndex = UINT_MAX;
@@ -636,8 +664,6 @@ void ImGui_ImplDX12_Shutdown()
     delete[] g_FrameResources;
     g_FrameResources = NULL;
     g_D3DDevice = NULL;
-    g_FontSrvCpuDescHandle.ptr = 0;
-    g_FontSrvGpuDescHandle.ptr = 0;
     g_NumFramesInFlight = 0;
     g_FrameIndex = UINT_MAX;
 }
@@ -646,4 +672,14 @@ void ImGui_ImplDX12_NewFrame()
 {
     if (!g_PipelineState)
         ImGui_ImplDX12_CreateDeviceObjects();
+}
+
+void ImGui_ImplDX12_AllocateDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE& out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE& out_gpu_handle)
+{
+    out_cpu_handle = g_DescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+    out_cpu_handle.ptr += g_DescriptorHeapNextIndex * g_DescriptorHeapIncrementSize;
+    out_gpu_handle = g_DescriptorHeap->GetGPUDescriptorHandleForHeapStart();
+    out_gpu_handle.ptr += g_DescriptorHeapNextIndex * g_DescriptorHeapIncrementSize;
+
+	g_DescriptorHeapNextIndex++;
 }

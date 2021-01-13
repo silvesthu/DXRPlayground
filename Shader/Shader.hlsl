@@ -8,7 +8,7 @@ typedef uint BackgroundMode;
 #include "Generated/Enum.hlsl"
 
 RWTexture2D<float4> RaytracingOutput : register(u0, space0);
-cbuffer CBuffer : register(b0, space0)
+cbuffer PerFrameBuffer : register(b0, space0)
 {
     PerFrame mPerFrame;
 }
@@ -273,7 +273,9 @@ void ShadowMiss(inout ShadowPayload payload)
 	payload.mHit = false;
 }
 
-float4 CopyTextureVS(uint id : SV_VertexID) : SV_POSITION
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+float4 ScreenspaceTriangleVS(uint id : SV_VertexID) : SV_POSITION
 {
 	// From https://anteru.net/blog/2012/minimal-setup-screen-space-quads-no-buffers-layouts-required/
 	// Generate screen space triangle
@@ -282,10 +284,122 @@ float4 CopyTextureVS(uint id : SV_VertexID) : SV_POSITION
 	return float4 (x, y, 0, 1);
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 Texture2D<float4> CopyFromTexture : register(t0, space1);
 [RootSignature("DescriptorTable(SRV(t0, numDescriptors = 1, space = 1), visibility = SHADER_VISIBILITY_PIXEL)")]
 float4 CopyTexturePS(float4 position : SV_POSITION) : SV_TARGET
 {
 	float3 srgb = ApplySRGBCurve(CopyFromTexture.Load(int3(position.xy, 0)).xyz);
 	return float4(srgb, 1);
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+cbuffer AtmosphereBuffer : register(b0, space2)
+{
+	Atmosphere mAtmosphere;
+}
+RWTexture2D<float4> TransmittanceTexture : register(u0, space2);
+
+float DistanceToTopAtmosphereBoundary(float r, float mu)
+{
+	float discriminant = max(0.0, r * r * (mu * mu - 1.0) + mAtmosphere.mTopRadius * mAtmosphere.mTopRadius);
+	return max(0.0, -r * mu + sqrt(discriminant));
+}
+
+float ComputeOpticalLengthToTopAtmosphereBoundary(DensityProfile inProfile, float r, float mu)
+{
+	// Number of intervals for the numerical integration.
+	const int SAMPLE_COUNT = 500;
+
+	// The integration step, i.e. the length of each integration interval.
+	float dx = DistanceToTopAtmosphereBoundary(r, mu) / float(SAMPLE_COUNT);
+
+	// Integration loop.
+	float result = 0.0;
+
+	for (int i = 0; i <= SAMPLE_COUNT; ++i) 
+	{
+		float d_i = float(i) * dx;
+
+		// Distance between the current sample point and the planet center.
+		float r_i = sqrt(d_i * d_i + 2.0 * r * mu * d_i + r * r);
+
+		// Number density at the current sample point (divided by the number density
+		// at the bottom of the atmosphere, yielding a dimensionless number).
+		float y_i = GetProfileDensity(inProfile, r_i - mAtmosphere.mBottomRadius);
+
+		// Sample weight (from the trapezoidal rule).
+		float weight_i = i == 0 || i == SAMPLE_COUNT ? 0.5 : 1.0;
+
+		result += y_i * weight_i * dx;
+	}
+
+	return result;
+}
+
+[RootSignature("DescriptorTable(CBV(b0, space = 2), UAV(u0, space = 2))")]
+[numthreads(8, 8, 1)]
+void ComputeTransmittanceCS(
+	uint3 inGroupThreadID : SV_GroupThreadID,
+	uint3 inGroupID : SV_GroupID,
+	uint3 inDispatchThreadID : SV_DispatchThreadID,
+	uint inGroupIndex : SV_GroupIndex)
+{
+	// UV
+	uint width = 0;
+	uint height = 0;
+	TransmittanceTexture.GetDimensions(width, height);
+	float2 uv = inDispatchThreadID.xy / (float2(width, height) - 1);
+
+	// eye ----> p ----> Horizon
+	//  ^
+	//  |
+	//  |
+	// center
+
+	// Y - eye to p distance
+	float y = uv.y;
+	float top_radius = mAtmosphere.mTopRadius;
+	float bottom_radius = mAtmosphere.mBottomRadius;
+	float eye_to_horizon_distance = sqrt(top_radius * top_radius - bottom_radius * bottom_radius);
+	float eye_to_p_distance = y * eye_to_horizon_distance;
+	float center_to_p_distance = sqrt(eye_to_p_distance * eye_to_p_distance + bottom_radius * bottom_radius);
+
+	// Y -> r
+	float r = center_to_p_distance;
+	
+	// X - p to top distance
+	// mu - encoding x to 
+	//// Distance to the top atmosphere boundary for the ray (r,mu), and its minimum
+	//// and maximum values over all mu - obtained for (r,1) and (r,mu_horizon) -
+	//// from which we can recover mu:
+	float x = uv.x;
+	float p_to_top_min_distance = top_radius - center_to_p_distance; // p -> top
+	float p_to_top_max_distance = eye_to_p_distance + eye_to_horizon_distance; // p -> eye -> horizon(top)
+	float p_to_top_distance = p_to_top_min_distance + x * (p_to_top_max_distance - p_to_top_min_distance);
+
+	// X -> mu
+	float mu = 1.0;
+	if (p_to_top_distance != 0.0)
+		mu = (eye_to_horizon_distance * eye_to_horizon_distance - eye_to_p_distance * eye_to_p_distance - p_to_top_distance * p_to_top_distance) / (2.0 * center_to_p_distance * p_to_top_distance);
+	mu = clamp(mu, -1.0, 1.0); // clamp cosine
+
+	// [TODO] Beer-Lambert Law
+	// [TODO] Trapezoidal rule
+
+	// Transmittance - Equation 5
+	float3 ray_leigh = mAtmosphere.mRayleighScattering * ComputeOpticalLengthToTopAtmosphereBoundary(mAtmosphere.mRayleighDensity, r, mu);
+
+	// [TODO] Why not mie scattering ???
+	float3 mie = mAtmosphere.mMieExtinction * ComputeOpticalLengthToTopAtmosphereBoundary(mAtmosphere.mMieDensity, r, mu);
+	float3 absorption = mAtmosphere.mAbsorptionExtinction * ComputeOpticalLengthToTopAtmosphereBoundary(mAtmosphere.mAbsorptionDensity, r, mu);
+	float3 transmittance = exp(-(ray_leigh + mie + absorption));
+
+	// Output
+	TransmittanceTexture[inDispatchThreadID.xy] = float4(transmittance, 1.0);
+
+	// Debug
+	TransmittanceTexture[inDispatchThreadID.xy] = float4(uv, 0.0, 1.0);
 }

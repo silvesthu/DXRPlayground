@@ -150,6 +150,9 @@
     <ClInclude Include="Source\ImGui\imgui_impl_helper.h">
       <Filter>Source\ImGui</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Atmosphere.h">
+      <Filter>Source</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Thirdparty\imgui\imgui_widgets.cpp">
@@ -193,6 +196,9 @@
     </ClCompile>
     <ClCompile Include="Source\ImGui\imgui_impl_helper.cpp">
       <Filter>Source\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Atmosphere.cpp">
+      <Filter>Source</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

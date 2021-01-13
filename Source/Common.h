@@ -36,9 +36,6 @@ extern HANDLE                       		gSwapChainWaitableObject;
 extern ID3D12Resource*						gBackBufferRenderTargetResource[];
 extern D3D12_CPU_DESCRIPTOR_HANDLE			gBackBufferRenderTargetDescriptor[];
 
-// ImGui
-extern ID3D12DescriptorHeap* 				gImGuiDescriptorHeap;
-
 // Application
 struct ShaderTable
 {
@@ -60,6 +57,14 @@ extern ShaderTable							gDXRShaderTable;
 
 extern ComPtr<ID3D12RootSignature>			gCopyTextureRootSignature;
 extern ComPtr<ID3D12PipelineState>			gCopyTexturePipelineState;
+
+struct SystemShader
+{
+	ComPtr<ID3D12RootSignatureDeserializer> mRootSignatureDeserializer;
+	ComPtr<ID3D12RootSignature> mRootSignature;
+	ComPtr<ID3D12PipelineState> mPipelineState;
+	ComPtr<ID3D12DescriptorHeap> mDescriptorHeap;
+};
 
 // Frame
 enum
@@ -134,6 +139,7 @@ namespace ShaderType
 	using uint3 = glm::uvec3;
 	using uint4 = glm::uvec4;
 
+	#define HLSL_AS_CPP
 	#define CONSTANT_DEFAULT(x) =x
 	const static float MATH_PI = glm::pi<float>();
 	#include "../Shader/ShaderType.hlsl"

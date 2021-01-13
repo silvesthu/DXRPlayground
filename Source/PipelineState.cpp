@@ -1,4 +1,5 @@
 #include "Common.h"
+#include "Atmosphere.h"
 
 #include <fstream>
 #include <sstream>
@@ -274,6 +275,79 @@ static void sWriteEnum(std::ofstream& ioEnumFile)
 	ioEnumFile << "\n";
 }
 
+bool sCreateVSPSPipelineState(const char* inShaderFileName, std::stringstream& inShaderStream, 
+						  const wchar_t* inVSName, const wchar_t* inPSName,
+						  ComPtr<ID3D12RootSignature>& outRootSignature, ComPtr<ID3D12PipelineState>& outPipelineState)
+{
+	IDxcBlob* vs_blob = sCompileShader(inShaderFileName, inShaderStream.str().c_str(), (glm::uint32)inShaderStream.str().length(), inVSName, L"vs_6_3");
+	IDxcBlob* ps_blob = sCompileShader(inShaderFileName, inShaderStream.str().c_str(), (glm::uint32)inShaderStream.str().length(), inPSName, L"ps_6_3");
+	if (vs_blob == nullptr || ps_blob == nullptr)
+		return false;
+
+	if (FAILED(gDevice->CreateRootSignature(0, ps_blob->GetBufferPointer(), ps_blob->GetBufferSize(), IID_PPV_ARGS(&outRootSignature))))
+		return false;
+
+	D3D12_RASTERIZER_DESC rasterizer_desc = {};
+	rasterizer_desc.FillMode = D3D12_FILL_MODE_SOLID;
+	rasterizer_desc.CullMode = D3D12_CULL_MODE_NONE;
+
+	D3D12_BLEND_DESC blend_desc = {};
+	blend_desc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC pipeline_state_desc = {};
+	pipeline_state_desc.VS.pShaderBytecode = vs_blob->GetBufferPointer();
+	pipeline_state_desc.VS.BytecodeLength = vs_blob->GetBufferSize();
+	pipeline_state_desc.PS.pShaderBytecode = ps_blob->GetBufferPointer();
+	pipeline_state_desc.PS.BytecodeLength = ps_blob->GetBufferSize();
+	pipeline_state_desc.pRootSignature = outRootSignature.Get();
+	pipeline_state_desc.RasterizerState = rasterizer_desc;
+	pipeline_state_desc.BlendState = blend_desc;
+	pipeline_state_desc.DepthStencilState.DepthEnable = FALSE;
+	pipeline_state_desc.DepthStencilState.StencilEnable = FALSE;
+	pipeline_state_desc.SampleMask = UINT_MAX;
+	pipeline_state_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	pipeline_state_desc.NumRenderTargets = 1;
+	pipeline_state_desc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+	pipeline_state_desc.SampleDesc.Count = 1;
+	
+	if (FAILED(gDevice->CreateGraphicsPipelineState(&pipeline_state_desc, IID_PPV_ARGS(&outPipelineState))))
+		return false;
+
+	return true;
+}
+
+bool sCreateCSPipelineState(const char* inShaderFileName, std::stringstream& inShaderStream,
+	const wchar_t* inCSName, SystemShader& ioSystemShader)
+{
+	IDxcBlob* cs_blob = sCompileShader(inShaderFileName, inShaderStream.str().c_str(), (glm::uint32)inShaderStream.str().length(), inCSName, L"cs_6_3");
+	if (cs_blob == nullptr)
+		return false;
+
+	if (FAILED(gDevice->CreateRootSignature(0, cs_blob->GetBufferPointer(), cs_blob->GetBufferSize(), IID_PPV_ARGS(&ioSystemShader.mRootSignature))))
+		return false;
+
+	ComPtr<ID3D12RootSignatureDeserializer> deserializer;
+	if (FAILED(D3D12CreateRootSignatureDeserializer(cs_blob->GetBufferPointer(), cs_blob->GetBufferSize(), IID_PPV_ARGS(&ioSystemShader.mRootSignatureDeserializer))))
+		return false;
+
+	D3D12_RASTERIZER_DESC rasterizer_desc = {};
+	rasterizer_desc.FillMode = D3D12_FILL_MODE_SOLID;
+	rasterizer_desc.CullMode = D3D12_CULL_MODE_NONE;
+
+	D3D12_BLEND_DESC blend_desc = {};
+	blend_desc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+
+	D3D12_COMPUTE_PIPELINE_STATE_DESC pipeline_state_desc = {};
+	pipeline_state_desc.CS.pShaderBytecode = cs_blob->GetBufferPointer();
+	pipeline_state_desc.CS.BytecodeLength = cs_blob->GetBufferSize();
+	pipeline_state_desc.pRootSignature = ioSystemShader.mRootSignature.Get();
+
+	if (FAILED(gDevice->CreateComputePipelineState(&pipeline_state_desc, IID_PPV_ARGS(&ioSystemShader.mPipelineState))))
+		return false;
+
+	return true;
+}
+
 void gCreatePipelineState()
 {
 	// Generate enum
@@ -295,48 +369,32 @@ void gCreatePipelineState()
 	std::ifstream shader_file(shader_filename);
 	std::stringstream shader_stream;
 	shader_stream << shader_file.rdbuf();
-
-	// Create copy texture shader
-	IDxcBlob* copy_texture_vs_blob = sCompileShader(shader_filename, shader_stream.str().c_str(), (glm::uint32)shader_stream.str().length(), L"CopyTextureVS", L"vs_6_3");
-	IDxcBlob* copy_texture_ps_blob = sCompileShader(shader_filename, shader_stream.str().c_str(), (glm::uint32)shader_stream.str().length(), L"CopyTexturePS", L"ps_6_3");
-	if (copy_texture_vs_blob == nullptr || copy_texture_ps_blob == nullptr)
-	{
-		assert(gDXRStateObject != nullptr);
-		return;
-	}
-
-	gDevice->CreateRootSignature(0, copy_texture_ps_blob->GetBufferPointer(), copy_texture_ps_blob->GetBufferSize(), IID_PPV_ARGS(&gCopyTextureRootSignature));
 	
-	D3D12_RASTERIZER_DESC rasterizer_desc = {};
-	rasterizer_desc.FillMode = D3D12_FILL_MODE_SOLID;
-	rasterizer_desc.CullMode = D3D12_CULL_MODE_NONE;
+	// Create ad-hoc shaders
+	{
+		bool succeed = true;
 
-	D3D12_BLEND_DESC blend_desc = {};
-	blend_desc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+		succeed &= sCreateVSPSPipelineState(shader_filename, shader_stream,
+			L"ScreenspaceTriangleVS", L"CopyTexturePS", 
+			gCopyTextureRootSignature, gCopyTexturePipelineState);
 
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC copy_texture_pso_desc = {};
-	copy_texture_pso_desc.VS.pShaderBytecode = copy_texture_vs_blob->GetBufferPointer();
-	copy_texture_pso_desc.VS.BytecodeLength = copy_texture_vs_blob->GetBufferSize();
-	copy_texture_pso_desc.PS.pShaderBytecode = copy_texture_ps_blob->GetBufferPointer();
-	copy_texture_pso_desc.PS.BytecodeLength = copy_texture_ps_blob->GetBufferSize();
-	copy_texture_pso_desc.pRootSignature = gCopyTextureRootSignature.Get();
-	copy_texture_pso_desc.RasterizerState = rasterizer_desc;
-	copy_texture_pso_desc.BlendState = blend_desc;
-	copy_texture_pso_desc.DepthStencilState.DepthEnable = FALSE;
-	copy_texture_pso_desc.DepthStencilState.StencilEnable = FALSE;
-	copy_texture_pso_desc.SampleMask = UINT_MAX;
-	copy_texture_pso_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-	copy_texture_pso_desc.NumRenderTargets = 1;
-	copy_texture_pso_desc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-	copy_texture_pso_desc.SampleDesc.Count = 1;
-	gDevice->CreateGraphicsPipelineState(&copy_texture_pso_desc, IID_PPV_ARGS(&gCopyTexturePipelineState));
+		succeed &= sCreateCSPipelineState(shader_filename, shader_stream,
+			L"ComputeTransmittanceCS",
+			gPrecomputedAtmosphereScatteringResources.mComputeTransmittanceShader);
+
+		if (!succeed)
+		{
+			assert(gDXRStateObject != nullptr); // Check fail on startup
+			return;
+		}
+	}
 
 	// Create DXR shaders
 	const wchar_t* entry_points[] = { kDefaultRayGenerationShader, kDefaultMissShader, kDefaultClosestHitShader, kShadowMissShader, kShadowClosestHitShader };
 	IDxcBlob* blob = sCompileShader(shader_filename, shader_stream.str().c_str(), (glm::uint32)shader_stream.str().length(), L"", L"lib_6_3");
 	if (blob == nullptr)
 	{
-		assert(gDXRStateObject != nullptr);
+		assert(gDXRStateObject != nullptr); // Check fail on startup
 		return;
 	}
 
@@ -413,4 +471,6 @@ void gCleanupPipelineState()
 
 	gCopyTexturePipelineState = nullptr;
 	gCopyTextureRootSignature = nullptr;
+
+	gPrecomputedAtmosphereScatteringResources.Reset();
 }

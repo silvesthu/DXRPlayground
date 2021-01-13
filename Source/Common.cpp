@@ -15,9 +15,6 @@ HANDLE                       		gSwapChainWaitableObject = nullptr;
 ID3D12Resource*						gBackBufferRenderTargetResource[NUM_BACK_BUFFERS] = {};
 D3D12_CPU_DESCRIPTOR_HANDLE			gBackBufferRenderTargetDescriptor[NUM_BACK_BUFFERS] = {};
 
-// ImGui
-ID3D12DescriptorHeap*				gImGuiDescriptorHeap = nullptr;
-
 // Application
 ComPtr<ID3D12Resource>				gConstantGPUBuffer = nullptr;
 

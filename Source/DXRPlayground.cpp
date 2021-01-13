@@ -8,6 +8,8 @@
 #include "Scene.h"
 #include "RayTrace.h"
 
+#include "Atmosphere.h"
+
 #define DX12_ENABLE_DEBUG_LAYER			(1)
 
 static const wchar_t*					kApplicationTitleW = L"DXR Playground";
@@ -226,6 +228,32 @@ static void sUpdate()
 				ImGui::TreePop();
 			}
 
+			if (ImGui::TreeNodeEx("Atmosphere"))
+			{
+				if (ImGui::TreeNodeEx("Profile"))
+				{
+					glm::f64 earth_radius_min = 1000.0;
+					glm::f64 earth_radius_max = 10000000.0;
+					ImGui::SliderScalar("Earth Radius (m)", ImGuiDataType_Double, &gAtmosphereProfile.mEarthRadius, &earth_radius_min, &earth_radius_max);
+					glm::f64 atmosphere_thickness_min = 1000.0;
+					glm::f64 atmosphere_thickness_max = 100000.0;
+					ImGui::SliderScalar("Atmosphere Thickness (m)", ImGuiDataType_Double, &gAtmosphereProfile.mAtmosphereThickness, &atmosphere_thickness_min, &atmosphere_thickness_max);
+
+					ImGui::TreePop();
+				}
+
+				if (ImGui::TreeNodeEx("Textures"))
+				{
+					ImGui::Text("Transmittance");
+					ImGui::Image((ImTextureID)gPrecomputedAtmosphereScatteringResources.mTransmittanceTextureGPUHandle.ptr,
+						ImVec2(gPrecomputedAtmosphereScatteringResources.mTransmittanceTextureWidth * 1.0f, gPrecomputedAtmosphereScatteringResources.mTransmittanceTextureHeight * 1.0f));
+
+					ImGui::TreePop();
+				}
+
+				ImGui::TreePop();
+			}
+
 			if (ImGui::TreeNodeEx("Background"))
 			{
 				ImGui::Text("Mode"); ImGui::SameLine();
@@ -294,6 +322,24 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 	}
 	sCreateRenderTarget();
 
+	// Setup Dear ImGui context
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGuiIO& io = ImGui::GetIO(); (void)io;
+	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
+	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;   // Enable Gamepad Controls
+
+	// Setup Dear ImGui style
+	ImGui::StyleColorsDark();
+
+	// Setup Platform/Renderer bindings
+	ImGui_ImplWin32_Init(hwnd);
+	ImGui_ImplDX12_Init(gDevice, NUM_FRAMES_IN_FLIGHT, DXGI_FORMAT_R8G8B8A8_UNORM);
+	ImGui_ImplDX12_CreateDeviceObjects();
+
+	// Features (may rely on ImGui)
+	gPrecomputedAtmosphereScattering.Initialize();
+
 	// Create Scene
 	gScene.Load(kScenePresets[(int)sCurrentScene].mPath);
 	gScene.Build(gCommandList);
@@ -310,23 +356,6 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 	// Show the window
 	::ShowWindow(hwnd, SW_SHOWDEFAULT);
 	::UpdateWindow(hwnd);
-
-	// Setup Dear ImGui context
-	IMGUI_CHECKVERSION();
-	ImGui::CreateContext();
-	ImGuiIO& io = ImGui::GetIO(); (void)io;
-	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
-	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;   // Enable Gamepad Controls
-
-	// Setup Dear ImGui style
-	ImGui::StyleColorsDark();
-
-	// Setup Platform/Renderer bindings
-	ImGui_ImplWin32_Init(hwnd);
-	ImGui_ImplDX12_Init(gDevice, NUM_FRAMES_IN_FLIGHT,
-		DXGI_FORMAT_R8G8B8A8_UNORM,
-		gImGuiDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
-		gImGuiDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 
 	// Main loop
 	MSG msg;
@@ -403,7 +432,7 @@ void sRender()
 			gScene.Update(gCommandList);
 	}
 
-	// Upload
+	// Upload - PerFrame
 	{
 		{
 			gPerFrameConstantBuffer.mSunDirection = 
@@ -432,6 +461,16 @@ void sRender()
 		gBarrierTransition(gCommandList, gConstantGPUBuffer.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
 		gCommandList->CopyResource(gConstantGPUBuffer.Get(), frameCtxt->mConstantUploadBuffer);
 		gBarrierTransition(gCommandList, gConstantGPUBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE);
+	}
+
+	// Atmosphere
+	{
+		gCommandList->SetComputeRootSignature(gPrecomputedAtmosphereScatteringResources.mComputeTransmittanceShader.mRootSignature.Get());
+		ID3D12DescriptorHeap* descriptor_heap = gPrecomputedAtmosphereScatteringResources.mComputeTransmittanceShader.mDescriptorHeap.Get();
+		gCommandList->SetDescriptorHeaps(1, &descriptor_heap);
+		gCommandList->SetComputeRootDescriptorTable(0, gPrecomputedAtmosphereScatteringResources.mComputeTransmittanceShader.mDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+		gCommandList->SetPipelineState(gPrecomputedAtmosphereScatteringResources.mComputeTransmittanceShader.mPipelineState.Get());
+		gCommandList->Dispatch(gPrecomputedAtmosphereScatteringResources.mTransmittanceTextureWidth / 8, gPrecomputedAtmosphereScatteringResources.mTransmittanceTextureHeight / 8, 1);
 	}
 
 	// Raytrace
@@ -475,10 +514,10 @@ void sRender()
 
 	// Draw ImGui
 	{
-		gCommandList->OMSetRenderTargets(1, &frame_render_target_descriptor_handle, false, nullptr);
-		gCommandList->SetDescriptorHeaps(1, &gImGuiDescriptorHeap);
-
 		ImGui::Render();
+
+		gCommandList->OMSetRenderTargets(1, &frame_render_target_descriptor_handle, false, nullptr);
+
 		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), gCommandList);
 	}
 
@@ -576,15 +615,6 @@ static bool sCreateDeviceD3D(HWND hWnd)
 	}
 
 	{
-		D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-		desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-		desc.NumDescriptors = 1;
-		desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-		if (gDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&gImGuiDescriptorHeap)) != S_OK)
-			return false;
-	}
-
-	{
 		D3D12_COMMAND_QUEUE_DESC desc = {};
 		desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 		desc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
@@ -602,7 +632,7 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		name = L"CommandAllocator_" + i;
 		gFrameContext[i].mCommandAllocator->SetName(name.c_str());
 
-		// Create CBV resource
+		// Buffer
 		{
 			D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(gAlignUp((UINT)sizeof(ShaderType::PerFrame), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
 			D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
@@ -616,9 +646,9 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		}
 	}
 
-	// GPU
+	// PerFrame (GPU)
 	{
-		// Create CBV resource
+		// Buffer
 		{
 			D3D12_RESOURCE_DESC resource_desc = gGetBufferResourceDesc(gAlignUp((UINT)sizeof(ShaderType::PerFrame), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
 			D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
@@ -677,7 +707,6 @@ static void sCleanupDeviceD3D()
 	gSafeRelease(gCommandQueue);
 	gSafeRelease(gCommandList);
 	gSafeRelease(gRtvDescHeap);
-	gSafeRelease(gImGuiDescriptorHeap);
 	gSafeRelease(gIncrementalFence);
 	gSafeCloseHandle(gIncrementalFenceEvent);
 	gSafeRelease(gDevice);

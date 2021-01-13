@@ -4,6 +4,8 @@
 #include "PipelineState.h"
 #include "ShaderTable.h"
 
+#include "Atmosphere.h"
+
 #include "Thirdparty/tinyobjloader/tiny_obj_loader.h"
 
 Scene gScene;
@@ -278,16 +280,16 @@ void Scene::Load(const char* inFilename)
 		mTLAS->Initialize(std::move(object_instances));
 	}
 
-	CreateShaderResource();
 	gCreatePipelineState();
+	CreateShaderResource();
 	gCreateShaderTable();
 }
 
 void Scene::Unload()
 {
 	gCleanupShaderTable();
-	gCleanupPipelineState();
 	CleanupShaderResource();
+	gCleanupPipelineState();
 
 	mTLAS = nullptr;
 
@@ -340,6 +342,85 @@ void Scene::CreateShaderResource()
 		mOutputResource->SetName(L"Scene.OutputResource");
 	}
 
+	struct Entry
+	{
+		Entry(ID3D12Resource* inResource) { mResource = inResource; }
+		Entry(D3D12_GPU_VIRTUAL_ADDRESS inAddress) { mAddress = inAddress; }
+
+		ID3D12Resource* mResource = nullptr;
+		D3D12_GPU_VIRTUAL_ADDRESS mAddress = 0;
+	};
+
+	auto generate_descriptor_heap = [](std::vector<Entry> inEntries, SystemShader& ioShader)
+	{
+		// Check if root signature is supported
+		const D3D12_ROOT_SIGNATURE_DESC* root_signature_desc = ioShader.mRootSignatureDeserializer->GetRootSignatureDesc();
+
+		assert(root_signature_desc->NumParameters == 1);
+		assert(root_signature_desc->pParameters[0].ParameterType == D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE);
+		const D3D12_ROOT_DESCRIPTOR_TABLE& table = root_signature_desc->pParameters[0].DescriptorTable;
+
+		// DescriptorHeap
+		{
+			D3D12_DESCRIPTOR_HEAP_DESC desc = {};
+			desc.NumDescriptors = table.NumDescriptorRanges;
+			desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+			desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+			gValidate(gDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&ioShader.mDescriptorHeap)));
+		}
+
+		// DescriptorTable
+		{
+			D3D12_CPU_DESCRIPTOR_HANDLE handle = ioShader.mDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+			UINT increment_size = gDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+			for (UINT i = 0; i < table.NumDescriptorRanges; i++)
+			{
+				const D3D12_DESCRIPTOR_RANGE& range = table.pDescriptorRanges[i];
+				switch (range.RangeType)
+				{
+				case D3D12_DESCRIPTOR_RANGE_TYPE_SRV: 
+				{
+					D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
+					desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+					desc.Texture2D.MipLevels = 1;
+					desc.Texture2D.MostDetailedMip = 0;
+					desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+					gDevice->CreateShaderResourceView(inEntries[i].mResource, &desc, handle);
+				}
+				break;
+				case D3D12_DESCRIPTOR_RANGE_TYPE_UAV: 
+				{
+					D3D12_UNORDERED_ACCESS_VIEW_DESC desc = {};
+					desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+					gDevice->CreateUnorderedAccessView(inEntries[i].mResource, nullptr, &desc, handle);
+				}
+				break;
+				case D3D12_DESCRIPTOR_RANGE_TYPE_CBV: 
+				{
+					D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
+					desc.BufferLocation = inEntries[i].mAddress;
+					desc.SizeInBytes = gAlignUp((UINT)sizeof(ShaderType::Atmosphere), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+					gDevice->CreateConstantBufferView(&desc, handle);
+				}
+				break;
+				default: assert(false); break;
+				}
+
+				handle.ptr += increment_size;
+			}
+		}
+	};
+
+	// Atmosphere
+	{
+		generate_descriptor_heap(
+		{
+			gPrecomputedAtmosphereScatteringResources.mConstantUploadBuffer->GetGPUVirtualAddress(),
+			gPrecomputedAtmosphereScatteringResources.mTransmittanceTexture.Get()
+		}, gPrecomputedAtmosphereScatteringResources.mComputeTransmittanceShader);
+	}
+
 	// CopyTexture DescriptorHeap
 	{
 		D3D12_DESCRIPTOR_HEAP_DESC desc = {};
@@ -349,7 +430,7 @@ void Scene::CreateShaderResource()
 		gValidate(gDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&mCopyTextureDescriptorHeap)));
 	}
 
-	// DXR DescriptorTable
+	// CopyTexture DescriptorTable
 	{
 		D3D12_CPU_DESCRIPTOR_HANDLE handle = mCopyTextureDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
 		UINT increment_size = gDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
