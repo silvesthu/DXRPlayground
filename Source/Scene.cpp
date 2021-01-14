@@ -421,31 +421,12 @@ void Scene::CreateShaderResource()
 		}, gPrecomputedAtmosphereScatteringResources.mComputeTransmittanceShader);
 	}
 
-	// CopyTexture DescriptorHeap
+	// Composite 
 	{
-		D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-		desc.NumDescriptors = 1;
-		desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-		desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-		gValidate(gDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&mCopyTextureDescriptorHeap)));
-	}
-
-	// CopyTexture DescriptorTable
-	{
-		D3D12_CPU_DESCRIPTOR_HANDLE handle = mCopyTextureDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-		UINT increment_size = gDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
-		// t0
+		generate_descriptor_heap(
 		{
-			D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
-			desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-			desc.Texture2D.MipLevels = 1;
-			desc.Texture2D.MostDetailedMip = 0;
-			desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			gDevice->CreateShaderResourceView(mOutputResource.Get(), &desc, handle);
-		}
-
-		handle.ptr += increment_size;
+			mOutputResource.Get()
+		}, gCompositeShader);
 	}
 
 	// DXR DescriptorHeap
@@ -549,7 +530,5 @@ void Scene::CreateShaderResource()
 void Scene::CleanupShaderResource()
 {
 	mOutputResource = nullptr;
-
-	mCopyTextureDescriptorHeap = nullptr;
 	mDXRDescriptorHeap = nullptr;
 }

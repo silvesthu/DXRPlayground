@@ -2,7 +2,7 @@
 
 // System
 ID3D12Device5*						gDevice = nullptr;
-ID3D12DescriptorHeap*				gRtvDescHeap = nullptr;
+ID3D12DescriptorHeap*				gRTVDescriptorHeap = nullptr;
 ID3D12CommandQueue*					gCommandQueue = nullptr;
 ID3D12GraphicsCommandList4*			gCommandList = nullptr;
 
@@ -13,7 +13,7 @@ UINT64                       		gFenceLastSignaledValue = 0;
 IDXGISwapChain3*					gSwapChain = nullptr;
 HANDLE                       		gSwapChainWaitableObject = nullptr;
 ID3D12Resource*						gBackBufferRenderTargetResource[NUM_BACK_BUFFERS] = {};
-D3D12_CPU_DESCRIPTOR_HANDLE			gBackBufferRenderTargetDescriptor[NUM_BACK_BUFFERS] = {};
+D3D12_CPU_DESCRIPTOR_HANDLE			gBackBufferRenderTargetRTV[NUM_BACK_BUFFERS] = {};
 
 // Application
 ComPtr<ID3D12Resource>				gConstantGPUBuffer = nullptr;
@@ -22,8 +22,7 @@ ComPtr<ID3D12RootSignature>			gDXRGlobalRootSignature = nullptr;
 ComPtr<ID3D12StateObject>			gDXRStateObject = nullptr;
 ShaderTable							gDXRShaderTable = {};
 
-ComPtr<ID3D12RootSignature>			gCopyTextureRootSignature = nullptr;
-ComPtr<ID3D12PipelineState>			gCopyTexturePipelineState = nullptr;
+SystemShader						gCompositeShader;
 
 // Frame
 FrameContext                		gFrameContext[NUM_FRAMES_IN_FLIGHT] = {};

@@ -275,16 +275,18 @@ static void sWriteEnum(std::ofstream& ioEnumFile)
 	ioEnumFile << "\n";
 }
 
-bool sCreateVSPSPipelineState(const char* inShaderFileName, std::stringstream& inShaderStream, 
-						  const wchar_t* inVSName, const wchar_t* inPSName,
-						  ComPtr<ID3D12RootSignature>& outRootSignature, ComPtr<ID3D12PipelineState>& outPipelineState)
+bool sCreateVSPSPipelineState(const char* inShaderFileName, std::stringstream& inShaderStream, const wchar_t* inVSName, const wchar_t* inPSName, SystemShader& ioSystemShader)
 {
 	IDxcBlob* vs_blob = sCompileShader(inShaderFileName, inShaderStream.str().c_str(), (glm::uint32)inShaderStream.str().length(), inVSName, L"vs_6_3");
 	IDxcBlob* ps_blob = sCompileShader(inShaderFileName, inShaderStream.str().c_str(), (glm::uint32)inShaderStream.str().length(), inPSName, L"ps_6_3");
 	if (vs_blob == nullptr || ps_blob == nullptr)
 		return false;
 
-	if (FAILED(gDevice->CreateRootSignature(0, ps_blob->GetBufferPointer(), ps_blob->GetBufferSize(), IID_PPV_ARGS(&outRootSignature))))
+	if (FAILED(gDevice->CreateRootSignature(0, ps_blob->GetBufferPointer(), ps_blob->GetBufferSize(), IID_PPV_ARGS(&ioSystemShader.mRootSignature))))
+		return false;
+
+	ComPtr<ID3D12RootSignatureDeserializer> deserializer;
+	if (FAILED(D3D12CreateRootSignatureDeserializer(ps_blob->GetBufferPointer(), ps_blob->GetBufferSize(), IID_PPV_ARGS(&ioSystemShader.mRootSignatureDeserializer))))
 		return false;
 
 	D3D12_RASTERIZER_DESC rasterizer_desc = {};
@@ -299,7 +301,7 @@ bool sCreateVSPSPipelineState(const char* inShaderFileName, std::stringstream& i
 	pipeline_state_desc.VS.BytecodeLength = vs_blob->GetBufferSize();
 	pipeline_state_desc.PS.pShaderBytecode = ps_blob->GetBufferPointer();
 	pipeline_state_desc.PS.BytecodeLength = ps_blob->GetBufferSize();
-	pipeline_state_desc.pRootSignature = outRootSignature.Get();
+	pipeline_state_desc.pRootSignature = ioSystemShader.mRootSignature.Get();
 	pipeline_state_desc.RasterizerState = rasterizer_desc;
 	pipeline_state_desc.BlendState = blend_desc;
 	pipeline_state_desc.DepthStencilState.DepthEnable = FALSE;
@@ -310,14 +312,13 @@ bool sCreateVSPSPipelineState(const char* inShaderFileName, std::stringstream& i
 	pipeline_state_desc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
 	pipeline_state_desc.SampleDesc.Count = 1;
 	
-	if (FAILED(gDevice->CreateGraphicsPipelineState(&pipeline_state_desc, IID_PPV_ARGS(&outPipelineState))))
+	if (FAILED(gDevice->CreateGraphicsPipelineState(&pipeline_state_desc, IID_PPV_ARGS(&ioSystemShader.mPipelineState))))
 		return false;
 
 	return true;
 }
 
-bool sCreateCSPipelineState(const char* inShaderFileName, std::stringstream& inShaderStream,
-	const wchar_t* inCSName, SystemShader& ioSystemShader)
+bool sCreateCSPipelineState(const char* inShaderFileName, std::stringstream& inShaderStream, const wchar_t* inCSName, SystemShader& ioSystemShader)
 {
 	IDxcBlob* cs_blob = sCompileShader(inShaderFileName, inShaderStream.str().c_str(), (glm::uint32)inShaderStream.str().length(), inCSName, L"cs_6_3");
 	if (cs_blob == nullptr)
@@ -370,13 +371,13 @@ void gCreatePipelineState()
 	std::stringstream shader_stream;
 	shader_stream << shader_file.rdbuf();
 	
-	// Create ad-hoc shaders
+	// Create non-DXR shaders
 	{
 		bool succeed = true;
 
 		succeed &= sCreateVSPSPipelineState(shader_filename, shader_stream,
-			L"ScreenspaceTriangleVS", L"CopyTexturePS", 
-			gCopyTextureRootSignature, gCopyTexturePipelineState);
+			L"ScreenspaceTriangleVS", L"CompositePS", 
+			gCompositeShader);
 
 		succeed &= sCreateCSPipelineState(shader_filename, shader_stream,
 			L"ComputeTransmittanceCS",
@@ -469,8 +470,7 @@ void gCleanupPipelineState()
 	gDXRStateObject = nullptr;
 	gDXRGlobalRootSignature = nullptr;
 
-	gCopyTexturePipelineState = nullptr;
-	gCopyTextureRootSignature = nullptr;
+	gCompositeShader = {};
 
 	gPrecomputedAtmosphereScatteringResources.Reset();
 }

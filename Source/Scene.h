@@ -137,7 +137,6 @@ public:
 	ID3D12Resource* GetOutputResource() { return mOutputResource.Get(); }
 
 	ID3D12DescriptorHeap* GetDXRDescriptorHeap() { return mDXRDescriptorHeap.Get(); }
-	ID3D12DescriptorHeap* GetCopyTextureDescriptorHeap() { return mCopyTextureDescriptorHeap.Get(); }
 
 private:
 	void CreateShaderResource();
@@ -152,7 +151,6 @@ private:
 	ComPtr<ID3D12Resource> mOutputResource = nullptr;
 
 	ComPtr<ID3D12DescriptorHeap> mDXRDescriptorHeap = nullptr;
-	ComPtr<ID3D12DescriptorHeap> mCopyTextureDescriptorHeap = nullptr;
 };
 
 extern Scene gScene;

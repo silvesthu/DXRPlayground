@@ -403,7 +403,7 @@ void sRender()
 	FrameContext* frameCtxt = sWaitForNextFrameResources();
 	glm::uint32 frame_index = gSwapChain->GetCurrentBackBufferIndex();
 	ID3D12Resource* frame_render_target_resource = gBackBufferRenderTargetResource[frame_index];
-	D3D12_CPU_DESCRIPTOR_HANDLE& frame_render_target_descriptor_handle = gBackBufferRenderTargetDescriptor[frame_index];
+	D3D12_CPU_DESCRIPTOR_HANDLE& frame_render_target_descriptor_handle = gBackBufferRenderTargetRTV[frame_index];
 
 	// Frame begin
 	{
@@ -500,11 +500,11 @@ void sRender()
 		rect.bottom = (LONG)desc.Height;
 		gCommandList->RSSetScissorRects(1, &rect);
 		gCommandList->OMSetRenderTargets(1, &frame_render_target_descriptor_handle, false, nullptr);
-		gCommandList->SetGraphicsRootSignature(gCopyTextureRootSignature.Get());
-		ID3D12DescriptorHeap* descriptor_heap = gScene.GetCopyTextureDescriptorHeap();
+		gCommandList->SetGraphicsRootSignature(gCompositeShader.mRootSignature.Get());
+		ID3D12DescriptorHeap* descriptor_heap = gCompositeShader.mDescriptorHeap.Get();
 		gCommandList->SetDescriptorHeaps(1, &descriptor_heap);
-		gCommandList->SetGraphicsRootDescriptorTable(0, gScene.GetCopyTextureDescriptorHeap()->GetGPUDescriptorHandleForHeapStart());
-		gCommandList->SetPipelineState(gCopyTexturePipelineState.Get());
+		gCommandList->SetGraphicsRootDescriptorTable(0, gCompositeShader.mDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+		gCommandList->SetPipelineState(gCompositeShader.mPipelineState.Get());
 		gCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		gCommandList->DrawInstanced(3, 1, 0, 0);
 
@@ -596,24 +596,26 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		}
 	}
 
+	// RTV Descriptor Heap
 	{
 		D3D12_DESCRIPTOR_HEAP_DESC desc = {};
 		desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 		desc.NumDescriptors = NUM_BACK_BUFFERS;
 		desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 		desc.NodeMask = 1;
-		if (gDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&gRtvDescHeap)) != S_OK)
+		if (gDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&gRTVDescriptorHeap)) != S_OK)
 			return false;
 
 		SIZE_T rtvDescriptorSize = gDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = gRtvDescHeap->GetCPUDescriptorHandleForHeapStart();
+		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = gRTVDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
 		for (UINT i = 0; i < NUM_BACK_BUFFERS; i++)
 		{
-			gBackBufferRenderTargetDescriptor[i] = rtvHandle;
+			gBackBufferRenderTargetRTV[i] = rtvHandle;
 			rtvHandle.ptr += rtvDescriptorSize;
 		}
 	}
 
+	// CommandQueue
 	{
 		D3D12_COMMAND_QUEUE_DESC desc = {};
 		desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
@@ -706,7 +708,7 @@ static void sCleanupDeviceD3D()
 	gConstantGPUBuffer = nullptr;
 	gSafeRelease(gCommandQueue);
 	gSafeRelease(gCommandList);
-	gSafeRelease(gRtvDescHeap);
+	gSafeRelease(gRTVDescriptorHeap);
 	gSafeRelease(gIncrementalFence);
 	gSafeCloseHandle(gIncrementalFenceEvent);
 	gSafeRelease(gDevice);
@@ -725,7 +727,7 @@ static void sCreateRenderTarget()
 	for (UINT i = 0; i < NUM_BACK_BUFFERS; i++)
 	{
 		gSwapChain->GetBuffer(i, IID_PPV_ARGS(&pBackBuffer));
-		gDevice->CreateRenderTargetView(pBackBuffer, nullptr, gBackBufferRenderTargetDescriptor[i]);
+		gDevice->CreateRenderTargetView(pBackBuffer, nullptr, gBackBufferRenderTargetRTV[i]);
 		gBackBufferRenderTargetResource[i] = pBackBuffer;
 	}
 }

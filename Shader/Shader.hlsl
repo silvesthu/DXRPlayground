@@ -287,8 +287,8 @@ float4 ScreenspaceTriangleVS(uint id : SV_VertexID) : SV_POSITION
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 Texture2D<float4> CopyFromTexture : register(t0, space1);
-[RootSignature("DescriptorTable(SRV(t0, numDescriptors = 1, space = 1), visibility = SHADER_VISIBILITY_PIXEL)")]
-float4 CopyTexturePS(float4 position : SV_POSITION) : SV_TARGET
+[RootSignature("DescriptorTable(SRV(t0, numDescriptors = 1, space = 1))")]
+float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 {
 	float3 srgb = ApplySRGBCurve(CopyFromTexture.Load(int3(position.xy, 0)).xyz);
 	return float4(srgb, 1);

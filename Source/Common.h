@@ -23,7 +23,7 @@ using Microsoft::WRL::ComPtr;
 
 // System
 extern ID3D12Device5*						gDevice;
-extern ID3D12DescriptorHeap* 				gRtvDescHeap;
+extern ID3D12DescriptorHeap* 				gRTVDescriptorHeap;
 extern ID3D12CommandQueue* 					gCommandQueue;
 extern ID3D12GraphicsCommandList4* 			gCommandList;
 
@@ -34,7 +34,7 @@ extern uint64_t                       		gFenceLastSignaledValue;
 extern IDXGISwapChain3* 					gSwapChain;
 extern HANDLE                       		gSwapChainWaitableObject;
 extern ID3D12Resource*						gBackBufferRenderTargetResource[];
-extern D3D12_CPU_DESCRIPTOR_HANDLE			gBackBufferRenderTargetDescriptor[];
+extern D3D12_CPU_DESCRIPTOR_HANDLE			gBackBufferRenderTargetRTV[];
 
 // Application
 struct ShaderTable
@@ -55,9 +55,6 @@ extern ComPtr<ID3D12RootSignature>			gDXRGlobalRootSignature;
 extern ComPtr<ID3D12StateObject>			gDXRStateObject;
 extern ShaderTable							gDXRShaderTable;
 
-extern ComPtr<ID3D12RootSignature>			gCopyTextureRootSignature;
-extern ComPtr<ID3D12PipelineState>			gCopyTexturePipelineState;
-
 struct SystemShader
 {
 	ComPtr<ID3D12RootSignatureDeserializer> mRootSignatureDeserializer;
@@ -65,6 +62,8 @@ struct SystemShader
 	ComPtr<ID3D12PipelineState> mPipelineState;
 	ComPtr<ID3D12DescriptorHeap> mDescriptorHeap;
 };
+
+extern SystemShader							gCompositeShader;;
 
 // Frame
 enum
