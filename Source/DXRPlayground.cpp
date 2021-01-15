@@ -1,4 +1,5 @@
 ﻿#include "Thirdparty/imgui/imgui.h"
+#include "Thirdparty/filewatch/FileWatch.hpp"
 #include "ImGui/imgui_impl_win32.h"
 #include "ImGui/imgui_impl_dx12.h"
 #include "ImGui/imgui_impl_helper.h"
@@ -39,6 +40,8 @@ static ScenePreset kScenePresets[(int)SCENE_PRESET_TYPE::COUNT] =
 };
 static SCENE_PRESET_TYPE sCurrentScene = SCENE_PRESET_TYPE::CORNELL_BOX;
 static SCENE_PRESET_TYPE sPreviousScene = SCENE_PRESET_TYPE::CORNELL_BOX;
+
+static bool sReloadRequested = false;
 
 struct CameraSettings
 {
@@ -163,13 +166,7 @@ static void sUpdate()
 				ImGui::SameLine();
 
 				if (ImGui::Button("Reload shader") || ImGui::IsKeyPressed(VK_F5))
-				{
-					sWaitForLastSubmittedFrame();
-
-					gScene.RebuildShader();
-
-					gPerFrameConstantBuffer.mReset = 1;
-				}
+					sReloadRequested = true;
 
 				ImGui::SliderInt("RecursionCountMax", (int*)&gPerFrameConstantBuffer.mRecursionCountMax, 0, ShaderType::sRecursionCountMax);
 			}
@@ -204,8 +201,8 @@ static void sUpdate()
 					const auto& name = nameof::nameof_enum((DebugInstanceMode)i);
 					if (name[0] == '_')
 					{
-						ImGui::NewLine();
-						continue;
+ImGui::NewLine();
+continue;
 					}
 
 					ImGui::SameLine();
@@ -228,21 +225,21 @@ static void sUpdate()
 				ImGui::TreePop();
 			}
 
-			if (ImGui::TreeNodeEx("Atmosphere"))
+			if (ImGui::TreeNodeEx("Atmosphere", ImGuiTreeNodeFlags_DefaultOpen))
 			{
 				if (ImGui::TreeNodeEx("Profile"))
 				{
 					glm::f64 earth_radius_min = 1000.0;
 					glm::f64 earth_radius_max = 10000000.0;
-					ImGui::SliderScalar("Earth Radius (m)", ImGuiDataType_Double, &gAtmosphereProfile.mEarthRadius, &earth_radius_min, &earth_radius_max);
+					ImGui::SliderScalar("Earth Radius (m)", ImGuiDataType_Double, &gAtmosphereProfile.kBottomRadius, &earth_radius_min, &earth_radius_max);
 					glm::f64 atmosphere_thickness_min = 1000.0;
 					glm::f64 atmosphere_thickness_max = 100000.0;
-					ImGui::SliderScalar("Atmosphere Thickness (m)", ImGuiDataType_Double, &gAtmosphereProfile.mAtmosphereThickness, &atmosphere_thickness_min, &atmosphere_thickness_max);
+					ImGui::SliderScalar("Atmosphere Thickness (m)", ImGuiDataType_Double, &gAtmosphereProfile.kAtmosphereThickness, &atmosphere_thickness_min, &atmosphere_thickness_max);
 
 					ImGui::TreePop();
 				}
 
-				if (ImGui::TreeNodeEx("Textures"))
+				if (ImGui::TreeNodeEx("Textures", ImGuiTreeNodeFlags_DefaultOpen))
 				{
 					ImGui::Text("Transmittance");
 					ImGui::Image((ImTextureID)gPrecomputedAtmosphereScatteringResources.mTransmittanceTextureGPUHandle.ptr,
@@ -303,6 +300,18 @@ static void sUpdate()
 		}
 		ImGui::End();
 	}
+
+	{
+		// Reload
+		if (sReloadRequested)
+		{
+			sReloadRequested = false;
+
+			sWaitForLastSubmittedFrame();
+			gScene.RebuildShader();
+			gPerFrameConstantBuffer.mReset = 1;
+		}
+	}
 }
 
 // Main code
@@ -345,6 +354,19 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 	gScene.Build(gCommandList);
 	gPerFrameConstantBuffer.mCameraPosition = kScenePresets[(int)sCurrentScene].mCameraPosition;
 	gPerFrameConstantBuffer.mCameraDirection = kScenePresets[(int)sCurrentScene].mCameraDirection;
+
+	// File watch
+	filewatch::FileWatch<std::string> file_watch("Shader/", 
+		[] (const std::string& inPath, const filewatch::Event /*inChangeType*/) 
+		{
+			std::regex pattern(".*\\.hlsl");
+			if (std::regex_match(inPath, pattern) && inPath.find("Generated") == std::string::npos)
+			{
+				std::string msg = "Reload triggered by " + inPath + "\n";
+				gLog.AddLog(msg.c_str());
+				sReloadRequested = true;
+			}
+		});
 
 	gCommandList->Close();
 	gCommandQueue->ExecuteCommandLists(1, (ID3D12CommandList* const*)&gCommandList);
@@ -465,6 +487,8 @@ void sRender()
 
 	// Atmosphere
 	{
+		gPrecomputedAtmosphereScatteringResources.Update();
+
 		gCommandList->SetComputeRootSignature(gPrecomputedAtmosphereScatteringResources.mComputeTransmittanceShader.mRootSignature.Get());
 		ID3D12DescriptorHeap* descriptor_heap = gPrecomputedAtmosphereScatteringResources.mComputeTransmittanceShader.mDescriptorHeap.Get();
 		gCommandList->SetDescriptorHeaps(1, &descriptor_heap);

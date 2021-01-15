@@ -390,16 +390,18 @@ void ComputeTransmittanceCS(
 	// [TODO] Trapezoidal rule
 
 	// Transmittance - Equation 5
-	float3 ray_leigh = mAtmosphere.mRayleighScattering * ComputeOpticalLengthToTopAtmosphereBoundary(mAtmosphere.mRayleighDensity, r, mu);
-
-	// [TODO] Why not mie scattering ???
-	float3 mie = mAtmosphere.mMieExtinction * ComputeOpticalLengthToTopAtmosphereBoundary(mAtmosphere.mMieDensity, r, mu);
-	float3 absorption = mAtmosphere.mAbsorptionExtinction * ComputeOpticalLengthToTopAtmosphereBoundary(mAtmosphere.mAbsorptionDensity, r, mu);
+	float3 ray_leigh = mAtmosphere.mRayleighScattering.xyz * ComputeOpticalLengthToTopAtmosphereBoundary(mAtmosphere.mRayleighDensity, r, mu);
+	float3 mie = mAtmosphere.mMieExtinction.xyz * ComputeOpticalLengthToTopAtmosphereBoundary(mAtmosphere.mMieDensity, r, mu); // [TODO] Why no mie scattering ???
+	float3 absorption = mAtmosphere.mAbsorptionExtinction.xyz * ComputeOpticalLengthToTopAtmosphereBoundary(mAtmosphere.mAbsorptionDensity, r, mu);
 	float3 transmittance = exp(-(ray_leigh + mie + absorption));
 
 	// Output
 	TransmittanceTexture[inDispatchThreadID.xy] = float4(transmittance, 1.0);
 
 	// Debug
-	TransmittanceTexture[inDispatchThreadID.xy] = float4(uv, 0.0, 1.0);
+	// float3 debug = float3(uv, 0);
+	// debug = (r - 6360) / 60.0;
+	// debug = mu.xxx;
+	// debug = ComputeOpticalLengthToTopAtmosphereBoundary(mAtmosphere.mRayleighDensity, r, mu).xxx;
+	// TransmittanceTexture[inDispatchThreadID.xy] = float4(debug, 1.0);
 }

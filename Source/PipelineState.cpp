@@ -53,6 +53,7 @@ static IDxcBlob* sCompileShader(const char* inFilename, const char* inSource, gl
 		// We can use the library to get our preferred encoding.
 		gValidate(utils->GetBlobAsUtf8(blob, &blob_8));
 		std::string str((LPCSTR)blob_8->GetBufferPointer(), (int)blob_8->GetBufferSize() / 2);
+		str += '\n';
 		gDebugPrint(str.c_str());
 		blob->Release();
 		blob_8->Release();

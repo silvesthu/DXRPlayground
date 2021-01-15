@@ -72,7 +72,7 @@ struct ShadowPayload
     bool mHit;
 };
 
-/////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct DensityProfileLayer 
 {
@@ -80,29 +80,33 @@ struct DensityProfileLayer
 	float mExpTerm									CONSTANT_DEFAULT(0);
 	float mExpScale									CONSTANT_DEFAULT(0);
 	float mLinearTerm								CONSTANT_DEFAULT(0);
+
 	float mConstantTerm								CONSTANT_DEFAULT(0);
+	float3 mPad;
 };
 
 #ifndef HLSL_AS_CPP
+// Altitude -> Density
 float GetLayerDensity(DensityProfileLayer inLayer, float inAltitude)
 {
-	return inLayer.mExpTerm * exp(inLayer.mExpScale * inAltitude) + inLayer.mLinearTerm * inAltitude + inLayer.mConstantTerm;
+	float density = inLayer.mExpTerm * exp(inLayer.mExpScale * inAltitude) + inLayer.mLinearTerm * inAltitude + inLayer.mConstantTerm;
+	return clamp(density, 0.0, 1.0);
 }
 #endif // HLSL_AS_CPP
 
 struct DensityProfile 
 {
-	DensityProfileLayer mNullDensity;
-	DensityProfileLayer mMaxDensity;
+	DensityProfileLayer mLayer0;
+	DensityProfileLayer mLayer1;
 };
 
 #ifndef HLSL_AS_CPP
 float GetProfileDensity(DensityProfile inProfile, float inAltitude)
 {
-	if (inAltitude < inProfile.mNullDensity.mWidth)
-		return GetLayerDensity(inProfile.mNullDensity, inAltitude);
+	if (inAltitude < inProfile.mLayer0.mWidth)
+		return GetLayerDensity(inProfile.mLayer0, inAltitude);
 	else
-		return GetLayerDensity(inProfile.mMaxDensity, inAltitude);
+		return GetLayerDensity(inProfile.mLayer1, inAltitude);
 }
 #endif // HLSL_AS_CPP
 
@@ -110,12 +114,15 @@ struct Atmosphere
 {
 	float					mBottomRadius			CONSTANT_DEFAULT(0);	// km
 	float					mTopRadius				CONSTANT_DEFAULT(0);	// km
+	float2					mPad;
 
-	float3					mRayleighScattering		CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	float4					mRayleighScattering		CONSTANT_DEFAULT(float4(0.0f, 0.0f, 0.0f, 0.0f));
 	DensityProfile			mRayleighDensity;
+
 	// MieScattering ?
-	float3					mMieExtinction			CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	float4					mMieExtinction			CONSTANT_DEFAULT(float4(0.0f, 0.0f, 0.0f, 0.0f));
 	DensityProfile			mMieDensity;
-	float3					mAbsorptionExtinction	CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+
+	float4					mAbsorptionExtinction	CONSTANT_DEFAULT(float4(0.0f, 0.0f, 0.0f, 0.0f));
 	DensityProfile			mAbsorptionDensity;
 };
