@@ -114,15 +114,19 @@ struct Atmosphere
 {
 	float					mBottomRadius			CONSTANT_DEFAULT(0);	// km
 	float					mTopRadius				CONSTANT_DEFAULT(0);	// km
-	float2					mPad;
+	float2					mPad0;
 
-	float4					mRayleighScattering		CONSTANT_DEFAULT(float4(0.0f, 0.0f, 0.0f, 0.0f));
+	float3					mRayleighScattering		CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	float					mPad1;
 	DensityProfile			mRayleighDensity;
 
-	// MieScattering ?
-	float4					mMieExtinction			CONSTANT_DEFAULT(float4(0.0f, 0.0f, 0.0f, 0.0f));
+	float3					mMieScattering			CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	float					mPad2;
+	float3					mMieExtinction			CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	float					mPad3;
 	DensityProfile			mMieDensity;
 
-	float4					mAbsorptionExtinction	CONSTANT_DEFAULT(float4(0.0f, 0.0f, 0.0f, 0.0f));
+	float3					mAbsorptionExtinction	CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	float					mPad4;
 	DensityProfile			mAbsorptionDensity;
 };
