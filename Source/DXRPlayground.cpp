@@ -185,8 +185,7 @@ static void sUpdate()
 					}
 
 					ImGui::SameLine();
-					if (ImGui::RadioButton(name.data(), (int)gPerFrameConstantBuffer.mDebugMode == i))
-						gPerFrameConstantBuffer.mDebugMode = (DebugMode)i;
+					ImGui::RadioButton(name.data(), (int*)&gPerFrameConstantBuffer.mDebugMode, i);
 				}
 
 				ImGui::TreePop();
@@ -201,13 +200,12 @@ static void sUpdate()
 					const auto& name = nameof::nameof_enum((DebugInstanceMode)i);
 					if (name[0] == '_')
 					{
-ImGui::NewLine();
-continue;
+						ImGui::NewLine();
+						continue;
 					}
 
 					ImGui::SameLine();
-					if (ImGui::RadioButton(name.data(), (int)gPerFrameConstantBuffer.mDebugInstanceMode == i))
-						gPerFrameConstantBuffer.mDebugInstanceMode = (DebugInstanceMode)i;
+					ImGui::RadioButton(name.data(), (int*)&gPerFrameConstantBuffer.mDebugInstanceMode, i);
 				}
 
 				ImGui::SliderInt("DebugInstanceIndex", (int*)&gPerFrameConstantBuffer.mDebugInstanceIndex, 0u, gScene.GetInstanceCount() - 1);
@@ -219,34 +217,14 @@ continue;
 			if (ImGui::TreeNodeEx("Scene"))
 			{
 				for (int i = 0; i < (int)SCENE_PRESET_TYPE::COUNT; i++)
-					if (ImGui::RadioButton(kScenePresets[i].mName, (int*)&sCurrentScene, i))
-						sCurrentScene = (SCENE_PRESET_TYPE)i;
+					ImGui::RadioButton(kScenePresets[i].mName, (int*)&sCurrentScene, i);
 
 				ImGui::TreePop();
 			}
 
 			if (ImGui::TreeNodeEx("Atmosphere", ImGuiTreeNodeFlags_DefaultOpen))
 			{
-				if (ImGui::TreeNodeEx("Profile"))
-				{
-					glm::f64 earth_radius_min = 1000.0;
-					glm::f64 earth_radius_max = 10000000.0;
-					ImGui::SliderScalar("Earth Radius (m)", ImGuiDataType_Double, &gAtmosphereProfile.kBottomRadius, &earth_radius_min, &earth_radius_max);
-					glm::f64 atmosphere_thickness_min = 1000.0;
-					glm::f64 atmosphere_thickness_max = 100000.0;
-					ImGui::SliderScalar("Atmosphere Thickness (m)", ImGuiDataType_Double, &gAtmosphereProfile.kAtmosphereThickness, &atmosphere_thickness_min, &atmosphere_thickness_max);
-
-					ImGui::TreePop();
-				}
-
-				if (ImGui::TreeNodeEx("Textures", ImGuiTreeNodeFlags_DefaultOpen))
-				{
-					ImGui::Text("Transmittance");
-					ImGui::Image((ImTextureID)gPrecomputedAtmosphereScatteringResources.mTransmittanceTextureGPUHandle.ptr,
-						ImVec2(gPrecomputedAtmosphereScatteringResources.mTransmittanceTextureWidth * 1.0f, gPrecomputedAtmosphereScatteringResources.mTransmittanceTextureHeight * 1.0f));
-
-					ImGui::TreePop();
-				}
+				gPrecomputedAtmosphereScattering.UpdateImGui();
 
 				ImGui::TreePop();
 			}
@@ -346,14 +324,14 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 	ImGui_ImplDX12_Init(gDevice, NUM_FRAMES_IN_FLIGHT, DXGI_FORMAT_R8G8B8A8_UNORM);
 	ImGui_ImplDX12_CreateDeviceObjects();
 
-	// Features (may rely on ImGui)
-	gPrecomputedAtmosphereScattering.Initialize();
-
 	// Create Scene
 	gScene.Load(kScenePresets[(int)sCurrentScene].mPath);
 	gScene.Build(gCommandList);
 	gPerFrameConstantBuffer.mCameraPosition = kScenePresets[(int)sCurrentScene].mCameraPosition;
 	gPerFrameConstantBuffer.mCameraDirection = kScenePresets[(int)sCurrentScene].mCameraDirection;
+
+	// Features (rely on ImGui, Scene)
+	gPrecomputedAtmosphereScattering.Initialize();
 
 	// File watch
 	filewatch::FileWatch<std::string> file_watch("Shader/", 
@@ -403,6 +381,9 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 	// Shutdown
 	{
 		sWaitForLastSubmittedFrame();
+
+		gPrecomputedAtmosphereScattering.Finalize();
+
 		ImGui_ImplDX12_Shutdown();
 		ImGui_ImplWin32_Shutdown();
 		ImGui::DestroyContext();
@@ -487,14 +468,7 @@ void sRender()
 
 	// Atmosphere
 	{
-		gPrecomputedAtmosphereScatteringResources.Update();
-
-		gCommandList->SetComputeRootSignature(gPrecomputedAtmosphereScatteringResources.mComputeTransmittanceShader.mRootSignature.Get());
-		ID3D12DescriptorHeap* descriptor_heap = gPrecomputedAtmosphereScatteringResources.mComputeTransmittanceShader.mDescriptorHeap.Get();
-		gCommandList->SetDescriptorHeaps(1, &descriptor_heap);
-		gCommandList->SetComputeRootDescriptorTable(0, gPrecomputedAtmosphereScatteringResources.mComputeTransmittanceShader.mDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
-		gCommandList->SetPipelineState(gPrecomputedAtmosphereScatteringResources.mComputeTransmittanceShader.mPipelineState.Get());
-		gCommandList->Dispatch(gPrecomputedAtmosphereScatteringResources.mTransmittanceTextureWidth / 8, gPrecomputedAtmosphereScatteringResources.mTransmittanceTextureHeight / 8, 1);
+		gPrecomputedAtmosphereScattering.Render();
 	}
 
 	// Raytrace

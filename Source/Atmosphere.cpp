@@ -34,9 +34,9 @@ namespace UnitHelper
 	}
 }
 
-void PrecomputedAtmosphereScatteringResources::Update()
+void PrecomputedAtmosphereScattering::Update()
 {
-	ShaderType::Atmosphere* atmosphere = static_cast<ShaderType::Atmosphere*>(mConstantUploadBufferPointer);
+	ShaderType::Atmosphere* atmosphere = static_cast<ShaderType::Atmosphere*>(gPrecomputedAtmosphereScatteringResources.mConstantUploadBufferPointer);
 
 	auto inv_m_to_inv_km							= [](glm::f64 inInvM) { return static_cast<float>(inInvM * 1000.0); };
 
@@ -49,31 +49,36 @@ void PrecomputedAtmosphereScatteringResources::Update()
 
 	// Rayleigh
 	{
-		// Wavelength -> Scattering Coeffient
-		if (gAtmosphereProfile.kWavelengthToCoefficient)
+		switch (gAtmosphereProfile.mRayleighMode)
 		{
-			// Calculate kRayleigh
-			if (gAtmosphereProfile.kUsePSS99)
+		case AtmosphereProfile::RayleighMode::BN08Impl:
+			gAtmosphereProfile.mRayleighScatteringCoefficient = gAtmosphereProfile.mRayleighScatteringCoefficient_;
+			break;
+		case AtmosphereProfile::RayleighMode::BN08:
+			gAtmosphereProfile.mRayleighScatteringCoefficient = gAtmosphereProfile.kRayleigh / glm::pow(UnitHelper::sNanometerToMeter<glm::dvec3>(gAtmosphereProfile.kLambda), glm::dvec3(4.0));
+			break;
+		case AtmosphereProfile::RayleighMode::PSS99:
 			{
 				// [PSS99] A.3
 				constexpr double pi = glm::pi<double>();
 				double n = 1.0003; // index of refraction of air
 				double N = 2.545e25; // number of molecules per unit volume
 				double p_n = 0.035; // depolarization factor
-				gAtmosphereProfile.kRayleigh = 
-					( ( 8.0 * glm::pow(pi, 3.0) * glm::pow((n *  n - 1.0), 2.0) ) * ( 6.0 + 3.0 * p_n ) )
+				double kRayleigh =
+					((8.0 * glm::pow(pi, 3.0) * glm::pow((n * n - 1.0), 2.0)) * (6.0 + 3.0 * p_n))
 					/ // -----------------------------------------------------------------------------------------
-					( ( 3.0 * N ) * (6.0 - 7.0 * p_n) );
+					((3.0 * N) * (6.0 - 7.0 * p_n));
+				gAtmosphereProfile.mRayleighScatteringCoefficient = kRayleigh / glm::pow(UnitHelper::sNanometerToMeter<glm::dvec3>(gAtmosphereProfile.kLambda), glm::dvec3(4.0));
 
 				// Total scattering coefficient = gAtmosphereProfile.mRayleighScatteringCoefficient = integral of angular scattering coefficient in all directions
 				// Angular scattering coefficient = Total scattering coefficient * (1 + cos(theta)^2) * 3.0 / 2.0
 			}
-
-			// Scattering Coefficient
-			gAtmosphereProfile.mRayleighScatteringCoefficient = gAtmosphereProfile.kRayleigh / glm::pow(UnitHelper::sNanometerToMeter<glm::dvec3>(gAtmosphereProfile.kLambda), glm::dvec3(4.0));
+			break;
+		default:
+			break;
 		}
 
-		// Scattering Coefficient
+		// Coefficient
 		atmosphere->mRayleighScattering				= UnitHelper::sInverseMeterToInverseKilometer<glm::vec3>(gAtmosphereProfile.mRayleighScatteringCoefficient);
 
 		// Extinction Coefficient
@@ -88,18 +93,30 @@ void PrecomputedAtmosphereScatteringResources::Update()
 	{
 		// [TODO] mie scattering 0.003996,0.003996,0.003996
 
-		if (gAtmosphereProfile.kWavelengthToCoefficient)
+		switch (gAtmosphereProfile.mMieMode)
 		{
-			// [TODO] Further reference? Micrometer? Why different from [BN08]
-			gAtmosphereProfile.mMieExtinctionCoefficient = gAtmosphereProfile.kMieAngstromBeta / gAtmosphereProfile.kMieScaleHeight * glm::pow(gAtmosphereProfile.kLambda, glm::dvec3(-gAtmosphereProfile.kMieAngstromAlpha));
-			gAtmosphereProfile.mMieScatteringCoefficient = gAtmosphereProfile.mMieExtinctionCoefficient * gAtmosphereProfile.kMieSingleScatteringAlbedo;
+		case AtmosphereProfile::MieMode::BN08Impl:
+			{
+				// [TODO] Further reference?
+				gAtmosphereProfile.mMieExtinctionCoefficient = gAtmosphereProfile.kMieAngstromBeta / gAtmosphereProfile.kMieScaleHeight * glm::pow(gAtmosphereProfile.kLambda, glm::dvec3(-gAtmosphereProfile.kMieAngstromAlpha));
+
+				// [TODO] Why this is different from the paper
+				gAtmosphereProfile.mMieScatteringCoefficient = gAtmosphereProfile.mMieExtinctionCoefficient * gAtmosphereProfile.kMieSingleScatteringAlbedo;
+			}
+			break;
+		case AtmosphereProfile::MieMode::BN08:
+			{
+				gAtmosphereProfile.mMieExtinctionCoefficient = gAtmosphereProfile.mMieExtinctionCoefficientPaper;
+				gAtmosphereProfile.mMieScatteringCoefficient = gAtmosphereProfile.mMieScatteringCoefficientPaper;
+			}
+			break;
+		default:
+			break;
 		}
 
-		// Scattering Coefficient
-		atmosphere->mMieScattering					= UnitHelper::sInverseMeterToInverseKilometer<glm::vec3>(gAtmosphereProfile.mMieScatteringCoefficient);
-
-		// Extinction Coefficient
+		// Coefficient
 		atmosphere->mMieExtinction					= UnitHelper::sInverseMeterToInverseKilometer<glm::vec3>(gAtmosphereProfile.mMieExtinctionCoefficient);
+		atmosphere->mMieScattering					= UnitHelper::sInverseMeterToInverseKilometer<glm::vec3>(gAtmosphereProfile.mMieScatteringCoefficient);
 
 		// Density: decrease exponentially
 		atmosphere->mMieDensity.mLayer0				= { dummy, dummy, dummy, dummy, dummy };
@@ -108,6 +125,7 @@ void PrecomputedAtmosphereScatteringResources::Update()
 
 	// Ozone
 	{
+		// [TODO] Further reference [BN08]
 		atmosphere->mAbsorptionExtinction			= glm::vec4(0.000650f, 0.001881f, 0.000085f, 0.0f);
 
 		// Density: increase linearly, then decrease linearly
@@ -126,7 +144,7 @@ void PrecomputedAtmosphereScatteringResources::Update()
 			calculate_linear_term(ozone_top_altitude, ozone_mid_altitude, layer_1_linear_term, layer_1_constant_term);
 		}
 
-		if (gAtmosphereProfile.kUseOzone)
+		if (gAtmosphereProfile.kEnableOzone)
 		{
 			atmosphere->mAbsorptionDensity.mLayer0 = { ozone_bottom_altitude, 0.0f, 0.0f, layer_0_linear_term, layer_0_constant_term };
 			atmosphere->mAbsorptionDensity.mLayer1 = { dummy, 0.0f, 0.0f, layer_1_linear_term, layer_1_constant_term };
@@ -139,27 +157,46 @@ void PrecomputedAtmosphereScatteringResources::Update()
 	}
 }
 
+void PrecomputedAtmosphereScattering::Render()
+{
+	Update();
+	Precompute();
+}
+
+void PrecomputedAtmosphereScattering::ComputeTransmittance()
+{
+	gPrecomputedAtmosphereScatteringResources.mComputeTransmittanceShader.Setup();
+	gCommandList->Dispatch(gPrecomputedAtmosphereScatteringResources.mTransmittanceTexture.mWidth / 8, gPrecomputedAtmosphereScatteringResources.mTransmittanceTexture.mHeight / 8, 1);
+}
+
+void PrecomputedAtmosphereScattering::ComputeDirectIrradiance()
+{
+	gPrecomputedAtmosphereScatteringResources.mComputeDirectIrradianceShader.Setup();
+	gCommandList->Dispatch(gPrecomputedAtmosphereScatteringResources.mIrradianceTexture.mWidth / 8, gPrecomputedAtmosphereScatteringResources.mIrradianceTexture.mHeight / 8, 1);
+}
+
+void PrecomputedAtmosphereScattering::ComputeSingleScattering()
+{
+
+}
+
+void PrecomputedAtmosphereScattering::ComputeScatteringDensity()
+{
+
+}
+
+void PrecomputedAtmosphereScattering::ComputeIndirectIrradiance()
+{
+
+}
+
+void PrecomputedAtmosphereScattering::AccumulateMultipleScattering()
+{
+
+}
+
 void PrecomputedAtmosphereScattering::Initialize()
 {
-	// Texture
-	{
-		D3D12_RESOURCE_DESC resource_desc = gGetTextureResourceDesc(256, 64, DXGI_FORMAT_R32G32B32A32_FLOAT);
-		D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
-
-		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&gPrecomputedAtmosphereScatteringResources.mTransmittanceTexture)));
-		gPrecomputedAtmosphereScatteringResources.mTransmittanceTexture->SetName(L"Atmosphere.Transmittance");
-
-		// SRV for ImGui
-		ImGui_ImplDX12_AllocateDescriptor(gPrecomputedAtmosphereScatteringResources.mTransmittanceTextureCPUHandle, gPrecomputedAtmosphereScatteringResources.mTransmittanceTextureGPUHandle);
-		D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
-		srv_desc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-		srv_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-		srv_desc.Texture2D.MipLevels = (UINT)-1;
-		srv_desc.Texture2D.MostDetailedMip = 0;
-		srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		gDevice->CreateShaderResourceView(gPrecomputedAtmosphereScatteringResources.mTransmittanceTexture.Get(), &srv_desc, gPrecomputedAtmosphereScatteringResources.mTransmittanceTextureCPUHandle);
-	}
-
 	// Buffer
 	{
 		D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(gAlignUp((UINT)sizeof(ShaderType::Atmosphere), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
@@ -168,5 +205,99 @@ void PrecomputedAtmosphereScattering::Initialize()
 		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gPrecomputedAtmosphereScatteringResources.mConstantUploadBuffer)));
 		gPrecomputedAtmosphereScatteringResources.mConstantUploadBuffer->SetName(L"Atmosphere.Constant");
 		gPrecomputedAtmosphereScatteringResources.mConstantUploadBuffer->Map(0, nullptr, (void**)&gPrecomputedAtmosphereScatteringResources.mConstantUploadBufferPointer);
+	}
+
+	// Texture
+	{
+		for (auto&& texture : gPrecomputedAtmosphereScatteringResources.mTextures)
+			texture->Initialize();
+	}
+
+	// Shader Binding
+	{
+		std::vector<Shader::DescriptorEntry> common_binding =
+		{
+			gPrecomputedAtmosphereScatteringResources.mConstantUploadBuffer->GetGPUVirtualAddress(),
+			gPrecomputedAtmosphereScatteringResources.mTransmittanceTexture.mResource.Get(),
+			gPrecomputedAtmosphereScatteringResources.mDeltaIrradianceTexture.mResource.Get(),
+			gPrecomputedAtmosphereScatteringResources.mIrradianceTexture.mResource.Get(),
+		};
+
+		for (auto&& shader : gPrecomputedAtmosphereScatteringResources.mShaders)
+			shader->Initialize(common_binding);
+	}
+}
+
+void PrecomputedAtmosphereScattering::Finalize()
+{
+	gPrecomputedAtmosphereScatteringResources = {};
+}
+
+void PrecomputedAtmosphereScattering::UpdateImGui()
+{
+	if (ImGui::TreeNodeEx("Profile"))
+	{
+		glm::f64 earth_radius_min = 1000.0;
+		glm::f64 earth_radius_max = 10000000.0;
+		ImGui::SliderScalar("Earth Radius (m)", ImGuiDataType_Double, &gAtmosphereProfile.kBottomRadius, &earth_radius_min, &earth_radius_max);
+		glm::f64 atmosphere_thickness_min = 1000.0;
+		glm::f64 atmosphere_thickness_max = 100000.0;
+		ImGui::SliderScalar("Atmosphere Thickness (m)", ImGuiDataType_Double, &gAtmosphereProfile.kAtmosphereThickness, &atmosphere_thickness_min, &atmosphere_thickness_max);
+
+		ImGui::TreePop();
+	}
+
+	if (ImGui::TreeNodeEx("Parameters", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		if (ImGui::TreeNodeEx("Rayleigh", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			glm::vec3 scattering_coefficient = gAtmosphereProfile.mRayleighScatteringCoefficient * 1e6;
+			ImGui::InputFloat3("Scattering 1e-6", &scattering_coefficient.x);
+			ImGui::RadioButton("BN08Impl", (int*)&gAtmosphereProfile.mRayleighMode, (int)AtmosphereProfile::RayleighMode::BN08Impl);
+			ImGui::SameLine();
+			ImGui::RadioButton("BN08", (int*)&gAtmosphereProfile.mRayleighMode, (int)AtmosphereProfile::RayleighMode::BN08);
+			ImGui::SameLine();
+			ImGui::RadioButton("PSS99", (int*)&gAtmosphereProfile.mRayleighMode, (int)AtmosphereProfile::RayleighMode::PSS99);
+
+			ImGui::TreePop();
+		}
+
+		if (ImGui::TreeNodeEx("Mie", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			glm::vec3 extinction_coefficient = gAtmosphereProfile.mMieExtinctionCoefficient * 1e6;
+			ImGui::InputFloat3("Extinction 1e-6 (/m)", &extinction_coefficient.x);
+			glm::vec3 scattering_coefficient = gAtmosphereProfile.mMieScatteringCoefficient * 1e6;
+			ImGui::InputFloat3("Scattering 1e-6 (/m)", &scattering_coefficient.x);
+			ImGui::RadioButton("BN08Impl", (int*)&gAtmosphereProfile.mMieMode, (int)AtmosphereProfile::MieMode::BN08Impl);
+			ImGui::SameLine();
+			ImGui::RadioButton("BN08", (int*)&gAtmosphereProfile.mMieMode, (int)AtmosphereProfile::MieMode::BN08);
+
+			ImGui::TreePop();
+		}
+
+		if (ImGui::TreeNodeEx("Ozone", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			ImGui::Checkbox("Enable", &gAtmosphereProfile.kEnableOzone);
+
+			ImGui::TreePop();
+		}
+
+		ImGui::TreePop();
+	}
+
+	if (ImGui::TreeNodeEx("Textures", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		auto add_texture = [](Texture& inTexture)
+		{
+			ImGui::Image((ImTextureID)inTexture.mGPUHandle.ptr,
+				ImVec2(inTexture.mWidth * inTexture.mUIScale, inTexture.mHeight * inTexture.mUIScale));
+			ImGui::SameLine();
+			ImGui::Text(inTexture.mName);
+		};
+
+		for (auto&& texture : gPrecomputedAtmosphereScatteringResources.mTextures)
+			add_texture(*texture);
+
+		ImGui::TreePop();
 	}
 }

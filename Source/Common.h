@@ -55,15 +55,54 @@ extern ComPtr<ID3D12RootSignature>			gDXRGlobalRootSignature;
 extern ComPtr<ID3D12StateObject>			gDXRStateObject;
 extern ShaderTable							gDXRShaderTable;
 
-struct SystemShader
+#define MEMBER(parent_type, type, name, default_value) \
+	parent_type& name(type in##name) { m##name = in##name; return *this; } \
+	type m##name = default_value;
+
+struct Shader
 {
+#define SHADER_MEMBER(type, name, default_value) MEMBER(Shader, type, name, default_value)
+
+	SHADER_MEMBER(const wchar_t*, VSName, nullptr);
+	SHADER_MEMBER(const wchar_t*, PSName, nullptr);
+	SHADER_MEMBER(const wchar_t*, CSName, nullptr);
+
+	struct DescriptorEntry
+	{
+		DescriptorEntry(ID3D12Resource* inResource) { mResource = inResource; }
+		DescriptorEntry(D3D12_GPU_VIRTUAL_ADDRESS inAddress) { mAddress = inAddress; }
+
+		ID3D12Resource* mResource = nullptr;
+		D3D12_GPU_VIRTUAL_ADDRESS mAddress = 0;
+	};
+
+	void Initialize(const std::vector<Shader::DescriptorEntry>& inEntries);
+	void Setup();
+
 	ComPtr<ID3D12RootSignatureDeserializer> mRootSignatureDeserializer;
 	ComPtr<ID3D12RootSignature> mRootSignature;
 	ComPtr<ID3D12PipelineState> mPipelineState;
 	ComPtr<ID3D12DescriptorHeap> mDescriptorHeap;
 };
 
-extern SystemShader							gCompositeShader;;
+struct Texture
+{
+#define TEXTURE_MEMBER(type, name, default_value) MEMBER(Texture, type, name, default_value)
+
+	TEXTURE_MEMBER(glm::uint32, Width, 0);
+	TEXTURE_MEMBER(glm::uint32, Height, 0);
+	TEXTURE_MEMBER(const char*, Name, nullptr);
+	TEXTURE_MEMBER(float, UIScale, 1.0f);
+
+	void Initialize();
+
+	DXGI_FORMAT mFormat = DXGI_FORMAT_R32G32B32A32_FLOAT;
+	ComPtr<ID3D12Resource> mResource;
+	D3D12_CPU_DESCRIPTOR_HANDLE mCPUHandle = {};
+	D3D12_GPU_DESCRIPTOR_HANDLE mGPUHandle = {};
+};
+
+extern Shader								gCompositeShader;
 
 // Frame
 enum

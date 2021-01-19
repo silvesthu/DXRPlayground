@@ -276,7 +276,7 @@ static void sWriteEnum(std::ofstream& ioEnumFile)
 	ioEnumFile << "\n";
 }
 
-bool sCreateVSPSPipelineState(const char* inShaderFileName, std::stringstream& inShaderStream, const wchar_t* inVSName, const wchar_t* inPSName, SystemShader& ioSystemShader)
+bool sCreateVSPSPipelineState(const char* inShaderFileName, std::stringstream& inShaderStream, const wchar_t* inVSName, const wchar_t* inPSName, Shader& ioSystemShader)
 {
 	IDxcBlob* vs_blob = sCompileShader(inShaderFileName, inShaderStream.str().c_str(), (glm::uint32)inShaderStream.str().length(), inVSName, L"vs_6_3");
 	IDxcBlob* ps_blob = sCompileShader(inShaderFileName, inShaderStream.str().c_str(), (glm::uint32)inShaderStream.str().length(), inPSName, L"ps_6_3");
@@ -319,7 +319,7 @@ bool sCreateVSPSPipelineState(const char* inShaderFileName, std::stringstream& i
 	return true;
 }
 
-bool sCreateCSPipelineState(const char* inShaderFileName, std::stringstream& inShaderStream, const wchar_t* inCSName, SystemShader& ioSystemShader)
+bool sCreateCSPipelineState(const char* inShaderFileName, std::stringstream& inShaderStream, const wchar_t* inCSName, Shader& ioSystemShader)
 {
 	IDxcBlob* cs_blob = sCompileShader(inShaderFileName, inShaderStream.str().c_str(), (glm::uint32)inShaderStream.str().length(), inCSName, L"cs_6_3");
 	if (cs_blob == nullptr)
@@ -350,6 +350,14 @@ bool sCreateCSPipelineState(const char* inShaderFileName, std::stringstream& inS
 	return true;
 }
 
+bool sCreatePipelineState(const char* inShaderFileName, std::stringstream& inShaderStream, Shader& ioSystemShader)
+{
+	if (ioSystemShader.mCSName != nullptr)
+		return sCreateCSPipelineState(inShaderFileName, inShaderStream, ioSystemShader.mCSName, ioSystemShader);
+	else
+		return sCreateVSPSPipelineState(inShaderFileName, inShaderStream, ioSystemShader.mVSName, ioSystemShader.mPSName, ioSystemShader);
+}
+
 void gCreatePipelineState()
 {
 	// Generate enum
@@ -376,13 +384,10 @@ void gCreatePipelineState()
 	{
 		bool succeed = true;
 
-		succeed &= sCreateVSPSPipelineState(shader_filename, shader_stream,
-			L"ScreenspaceTriangleVS", L"CompositePS", 
-			gCompositeShader);
+		succeed &= sCreatePipelineState(shader_filename, shader_stream,	gCompositeShader);
 
-		succeed &= sCreateCSPipelineState(shader_filename, shader_stream,
-			L"ComputeTransmittanceCS",
-			gPrecomputedAtmosphereScatteringResources.mComputeTransmittanceShader);
+		for (auto&& shader : gPrecomputedAtmosphereScatteringResources.mShaders)
+			succeed &= sCreatePipelineState(shader_filename, shader_stream, *shader);
 
 		if (!succeed)
 		{
@@ -472,6 +477,4 @@ void gCleanupPipelineState()
 	gDXRGlobalRootSignature = nullptr;
 
 	gCompositeShader = {};
-
-	gPrecomputedAtmosphereScatteringResources.Reset();
 }

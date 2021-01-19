@@ -301,6 +301,16 @@ cbuffer AtmosphereBuffer : register(b0, space2)
 	Atmosphere mAtmosphere;
 }
 RWTexture2D<float4> TransmittanceTexture : register(u0, space2);
+RWTexture2D<float4> DeltaIrradianceTexture : register(u1, space2);
+RWTexture2D<float4> IrradianceTexture : register(u2, space2);
+
+#define AtmosphereRootSignature \
+"DescriptorTable(" \
+	"CBV(b0, space = 2)," \
+	"UAV(u0, space = 2)," \
+	"UAV(u1, space = 2)," \
+	"UAV(u2, space = 2)" \
+")"
 
 float DistanceToTopAtmosphereBoundary(float r, float mu)
 {
@@ -339,7 +349,7 @@ float ComputeOpticalLengthToTopAtmosphereBoundary(DensityProfile inProfile, floa
 	return result;
 }
 
-[RootSignature("DescriptorTable(CBV(b0, space = 2), UAV(u0, space = 2))")]
+[RootSignature(AtmosphereRootSignature)]
 [numthreads(8, 8, 1)]
 void ComputeTransmittanceCS(
 	uint3 inGroupThreadID : SV_GroupThreadID,
@@ -404,4 +414,23 @@ void ComputeTransmittanceCS(
 	// debug = mu.xxx;
 	// debug = ComputeOpticalLengthToTopAtmosphereBoundary(mAtmosphere.mRayleighDensity, r, mu).xxx;
 	// TransmittanceTexture[inDispatchThreadID.xy] = float4(debug, 1.0);
+}
+
+[RootSignature(AtmosphereRootSignature)]
+[numthreads(8, 8, 1)]
+void ComputeDirectIrradianceCS(
+	uint3 inGroupThreadID : SV_GroupThreadID,
+	uint3 inGroupID : SV_GroupID,
+	uint3 inDispatchThreadID : SV_DispatchThreadID,
+	uint inGroupIndex : SV_GroupIndex)
+{
+	// UV
+	uint width = 0;
+	uint height = 0;
+	IrradianceTexture.GetDimensions(width, height);
+	float2 uv = inDispatchThreadID.xy / (float2(width, height) - 1);
+
+	// Debug
+	DeltaIrradianceTexture[inDispatchThreadID.xy] = float4(uv, 0, 1);
+	IrradianceTexture[inDispatchThreadID.xy] = float4(uv, 0, 1);
 }
