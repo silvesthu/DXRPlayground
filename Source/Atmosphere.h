@@ -91,6 +91,10 @@ public:
 		ComputeSingleScattering();
 		ComputeMultipleScattering();
 	}
+
+	float mUIScale = 1.0f;
+	bool mUIFlipY = false;
+	bool mUnifyXYEncode = false;
 };
 
 struct PrecomputedAtmosphereScatteringResources
@@ -106,7 +110,7 @@ struct PrecomputedAtmosphereScatteringResources
 		&mComputeTransmittanceShader, 
 		&mComputeDirectIrradianceShader 
 	};
-
+	 
 	Texture mTransmittanceTexture = Texture().Width(256).Height(64).Name("Transmittance");
 	Texture mDeltaIrradianceTexture = Texture().Width(64).Height(16).Name("DeltaIrradiance").UIScale(4.0f);
 	Texture mIrradianceTexture = Texture().Width(64).Height(16).Name("Irradiance").UIScale(4.0f);

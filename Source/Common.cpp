@@ -54,6 +54,8 @@ void Shader::Initialize(const std::vector<Shader::DescriptorEntry>& inEntries)
 		D3D12_CPU_DESCRIPTOR_HANDLE handle = mDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
 		UINT increment_size = gDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
+		assert(inEntries.size() == table.NumDescriptorRanges);
+
 		for (UINT i = 0; i < table.NumDescriptorRanges; i++)
 		{
 			const D3D12_DESCRIPTOR_RANGE& range = table.pDescriptorRanges[i];

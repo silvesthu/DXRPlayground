@@ -38,26 +38,31 @@ void PrecomputedAtmosphereScattering::Update()
 {
 	ShaderType::Atmosphere* atmosphere = static_cast<ShaderType::Atmosphere*>(gPrecomputedAtmosphereScatteringResources.mConstantUploadBufferPointer);
 
+	float dummy = 0.0f;
+
 	auto inv_m_to_inv_km							= [](glm::f64 inInvM) { return static_cast<float>(inInvM * 1000.0); };
 
 	atmosphere->mBottomRadius						= UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.BottomRadius());
 	atmosphere->mTopRadius							= UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.TopRadius());
 
+	atmosphere->mSolarIrradiance					= glm::vec3(1.474000f, 1.850400f, 1.911980f);
+	atmosphere->mSunAngularRadius					= 0.004675f;
+
+	atmosphere->mUnifyXYEncode						= mUnifyXYEncode ? 1 : 0;
+
 	// Density Profile: { Width, ExpTerm, ExpScale, LinearTerm, ConstantTerm }
-
-	float dummy = 0.0f;
-
-	// Rayleigh
 	{
-		switch (gAtmosphereProfile.mRayleighMode)
+		// Rayleigh
 		{
-		case AtmosphereProfile::RayleighMode::BN08Impl:
-			gAtmosphereProfile.mRayleighScatteringCoefficient = gAtmosphereProfile.mRayleighScatteringCoefficient_;
-			break;
-		case AtmosphereProfile::RayleighMode::BN08:
-			gAtmosphereProfile.mRayleighScatteringCoefficient = gAtmosphereProfile.kRayleigh / glm::pow(UnitHelper::sNanometerToMeter<glm::dvec3>(gAtmosphereProfile.kLambda), glm::dvec3(4.0));
-			break;
-		case AtmosphereProfile::RayleighMode::PSS99:
+			switch (gAtmosphereProfile.mRayleighMode)
+			{
+			case AtmosphereProfile::RayleighMode::BN08Impl:
+				gAtmosphereProfile.mRayleighScatteringCoefficient = gAtmosphereProfile.mRayleighScatteringCoefficient_;
+				break;
+			case AtmosphereProfile::RayleighMode::BN08:
+				gAtmosphereProfile.mRayleighScatteringCoefficient = gAtmosphereProfile.kRayleigh / glm::pow(UnitHelper::sNanometerToMeter<glm::dvec3>(gAtmosphereProfile.kLambda), glm::dvec3(4.0));
+				break;
+			case AtmosphereProfile::RayleighMode::PSS99:
 			{
 				// [PSS99] A.3
 				constexpr double pi = glm::pi<double>();
@@ -74,28 +79,28 @@ void PrecomputedAtmosphereScattering::Update()
 				// Angular scattering coefficient = Total scattering coefficient * (1 + cos(theta)^2) * 3.0 / 2.0
 			}
 			break;
-		default:
-			break;
+			default:
+				break;
+			}
+
+			// Coefficient
+			atmosphere->mRayleighScattering = UnitHelper::sInverseMeterToInverseKilometer<glm::vec3>(gAtmosphereProfile.mRayleighScatteringCoefficient);
+
+			// Extinction Coefficient
+			// Air molecules do not absorb light
+
+			// Density: decrease exponentially
+			atmosphere->mRayleighDensity.mLayer0 = { dummy, dummy, dummy, dummy, dummy };
+			atmosphere->mRayleighDensity.mLayer1 = { dummy, 1.0f, -1.0f / UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.kRayleighScaleHeight), 0.0f, 0.0f };
 		}
 
-		// Coefficient
-		atmosphere->mRayleighScattering				= UnitHelper::sInverseMeterToInverseKilometer<glm::vec3>(gAtmosphereProfile.mRayleighScatteringCoefficient);
-
-		// Extinction Coefficient
-		// Air molecules do not absorb light
-
-		// Density: decrease exponentially
-		atmosphere->mRayleighDensity.mLayer0		= { dummy, dummy, dummy, dummy, dummy };
-		atmosphere->mRayleighDensity.mLayer1		= { dummy, 1.0f, -1.0f / UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.kRayleighScaleHeight), 0.0f, 0.0f };
-	}
-
-	// Mie
-	{
-		// [TODO] mie scattering 0.003996,0.003996,0.003996
-
-		switch (gAtmosphereProfile.mMieMode)
+		// Mie
 		{
-		case AtmosphereProfile::MieMode::BN08Impl:
+			// [TODO] mie scattering 0.003996,0.003996,0.003996
+
+			switch (gAtmosphereProfile.mMieMode)
+			{
+			case AtmosphereProfile::MieMode::BN08Impl:
 			{
 				// [TODO] Further reference?
 				gAtmosphereProfile.mMieExtinctionCoefficient = gAtmosphereProfile.kMieAngstromBeta / gAtmosphereProfile.kMieScaleHeight * glm::pow(gAtmosphereProfile.kLambda, glm::dvec3(-gAtmosphereProfile.kMieAngstromAlpha));
@@ -104,57 +109,58 @@ void PrecomputedAtmosphereScattering::Update()
 				gAtmosphereProfile.mMieScatteringCoefficient = gAtmosphereProfile.mMieExtinctionCoefficient * gAtmosphereProfile.kMieSingleScatteringAlbedo;
 			}
 			break;
-		case AtmosphereProfile::MieMode::BN08:
+			case AtmosphereProfile::MieMode::BN08:
 			{
 				gAtmosphereProfile.mMieExtinctionCoefficient = gAtmosphereProfile.mMieExtinctionCoefficientPaper;
 				gAtmosphereProfile.mMieScatteringCoefficient = gAtmosphereProfile.mMieScatteringCoefficientPaper;
 			}
 			break;
-		default:
-			break;
+			default:
+				break;
+			}
+
+			// Coefficient
+			atmosphere->mMieExtinction = UnitHelper::sInverseMeterToInverseKilometer<glm::vec3>(gAtmosphereProfile.mMieExtinctionCoefficient);
+			atmosphere->mMieScattering = UnitHelper::sInverseMeterToInverseKilometer<glm::vec3>(gAtmosphereProfile.mMieScatteringCoefficient);
+
+			// Density: decrease exponentially
+			atmosphere->mMieDensity.mLayer0 = { dummy, dummy, dummy, dummy, dummy };
+			atmosphere->mMieDensity.mLayer1 = { dummy, 1.0f, -1.0f / UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.kRayleighScaleHeight), 0.0f, 0.0f };
 		}
 
-		// Coefficient
-		atmosphere->mMieExtinction					= UnitHelper::sInverseMeterToInverseKilometer<glm::vec3>(gAtmosphereProfile.mMieExtinctionCoefficient);
-		atmosphere->mMieScattering					= UnitHelper::sInverseMeterToInverseKilometer<glm::vec3>(gAtmosphereProfile.mMieScatteringCoefficient);
-
-		// Density: decrease exponentially
-		atmosphere->mMieDensity.mLayer0				= { dummy, dummy, dummy, dummy, dummy };
-		atmosphere->mMieDensity.mLayer1				= { dummy, 1.0f, -1.0f / UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.kRayleighScaleHeight), 0.0f, 0.0f };
-	}
-
-	// Ozone
-	{
-		// [TODO] Further reference [BN08]
-		atmosphere->mAbsorptionExtinction			= glm::vec4(0.000650f, 0.001881f, 0.000085f, 0.0f);
-
-		// Density: increase linearly, then decrease linearly
-		float ozone_bottom_altitude					= UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.kOzoneBottomAltitude);
-		float ozone_mid_altitude					= UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.kOzoneMidAltitude);
-		float ozone_top_altitude					= UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.kOzoneTopAltitude);
-		float layer_0_linear_term, layer_0_constant_term, layer_1_linear_term, layer_1_constant_term;
+		// Ozone
 		{
-			// Altitude -> Density
-			auto calculate_linear_term = [](float inX0, float inX1, float& outLinearTerm, float& outConstantTerm)
+			// [TODO] Further reference [BN08]
+			atmosphere->mAbsorptionExtinction = glm::vec4(0.000650f, 0.001881f, 0.000085f, 0.0f);
+
+			// Density: increase linearly, then decrease linearly
+			float ozone_bottom_altitude = UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.kOzoneBottomAltitude);
+			float ozone_mid_altitude = UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.kOzoneMidAltitude);
+			float ozone_top_altitude = UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.kOzoneTopAltitude);
+			float layer_0_linear_term, layer_0_constant_term, layer_1_linear_term, layer_1_constant_term;
 			{
-				outLinearTerm = 1.0f / (inX1 - inX0);
-				outConstantTerm = 1.0f * (0.0f - inX0) / (inX1 - inX0);
-			};
-			calculate_linear_term(ozone_bottom_altitude, ozone_mid_altitude, layer_0_linear_term, layer_0_constant_term);
-			calculate_linear_term(ozone_top_altitude, ozone_mid_altitude, layer_1_linear_term, layer_1_constant_term);
-		}
+				// Altitude -> Density
+				auto calculate_linear_term = [](float inX0, float inX1, float& outLinearTerm, float& outConstantTerm)
+				{
+					outLinearTerm = 1.0f / (inX1 - inX0);
+					outConstantTerm = 1.0f * (0.0f - inX0) / (inX1 - inX0);
+				};
+				calculate_linear_term(ozone_bottom_altitude, ozone_mid_altitude, layer_0_linear_term, layer_0_constant_term);
+				calculate_linear_term(ozone_top_altitude, ozone_mid_altitude, layer_1_linear_term, layer_1_constant_term);
+			}
 
-		if (gAtmosphereProfile.kEnableOzone)
-		{
-			atmosphere->mAbsorptionDensity.mLayer0 = { ozone_bottom_altitude, 0.0f, 0.0f, layer_0_linear_term, layer_0_constant_term };
-			atmosphere->mAbsorptionDensity.mLayer1 = { dummy, 0.0f, 0.0f, layer_1_linear_term, layer_1_constant_term };
+			if (gAtmosphereProfile.kEnableOzone)
+			{
+				atmosphere->mAbsorptionDensity.mLayer0 = { ozone_bottom_altitude, 0.0f, 0.0f, layer_0_linear_term, layer_0_constant_term };
+				atmosphere->mAbsorptionDensity.mLayer1 = { dummy, 0.0f, 0.0f, layer_1_linear_term, layer_1_constant_term };
+			}
+			else
+			{
+				atmosphere->mAbsorptionDensity.mLayer0 = { dummy, 0.0f, 0.0f, 0.0f, 0.0f };
+				atmosphere->mAbsorptionDensity.mLayer1 = { dummy, 0.0f, 0.0f, 0.0f, 0.0f };
+			}
 		}
-		else
-		{
-			atmosphere->mAbsorptionDensity.mLayer0 = { dummy, 0.0f, 0.0f, 0.0f, 0.0f };
-			atmosphere->mAbsorptionDensity.mLayer1 = { dummy, 0.0f, 0.0f, 0.0f, 0.0f };
-		}
-	}
+	} // Density Profile
 }
 
 void PrecomputedAtmosphereScattering::Render()
@@ -217,10 +223,16 @@ void PrecomputedAtmosphereScattering::Initialize()
 	{
 		std::vector<Shader::DescriptorEntry> common_binding =
 		{
+			// CBV
 			gPrecomputedAtmosphereScatteringResources.mConstantUploadBuffer->GetGPUVirtualAddress(),
+
+			// UAV
 			gPrecomputedAtmosphereScatteringResources.mTransmittanceTexture.mResource.Get(),
 			gPrecomputedAtmosphereScatteringResources.mDeltaIrradianceTexture.mResource.Get(),
 			gPrecomputedAtmosphereScatteringResources.mIrradianceTexture.mResource.Get(),
+
+			// SRV
+			gPrecomputedAtmosphereScatteringResources.mTransmittanceTexture.mResource.Get(),
 		};
 
 		for (auto&& shader : gPrecomputedAtmosphereScatteringResources.mShaders)
@@ -287,12 +299,29 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 
 	if (ImGui::TreeNodeEx("Textures", ImGuiTreeNodeFlags_DefaultOpen))
 	{
-		auto add_texture = [](Texture& inTexture)
+		ImGui::PushItemWidth(100);
+		ImGui::SliderFloat("UI Scale", &mUIScale, 1.0, 4.0f);
+		ImGui::PopItemWidth();
+		ImGui::SameLine();
+		ImGui::Checkbox("UI Flip Y", &mUIFlipY);
+
+		ImGui::Checkbox("Unify XY Encode", &mUnifyXYEncode);
+
+		auto add_texture = [&](Texture& inTexture)
 		{
+			ImVec2 uv0 = ImVec2(0, 0);
+			ImVec2 uv1 = ImVec2(1, 1);
+			
+			if (mUIFlipY)
+				std::swap(uv0.y, uv1.y);
+
 			ImGui::Image((ImTextureID)inTexture.mGPUHandle.ptr,
-				ImVec2(inTexture.mWidth * inTexture.mUIScale, inTexture.mHeight * inTexture.mUIScale));
+				ImVec2(inTexture.mWidth * inTexture.mUIScale * mUIScale, inTexture.mHeight * inTexture.mUIScale * mUIScale), uv0, uv1);
 			ImGui::SameLine();
-			ImGui::Text(inTexture.mName);
+			std::string text = inTexture.mName;
+			text += "\n";
+			text += std::to_string(inTexture.mWidth) + "x" + std::to_string(inTexture.mHeight);
+			ImGui::Text(text.c_str());
 		};
 
 		for (auto&& texture : gPrecomputedAtmosphereScatteringResources.mTextures)

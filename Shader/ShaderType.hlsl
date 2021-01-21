@@ -116,6 +116,9 @@ struct Atmosphere
 	float					mTopRadius				CONSTANT_DEFAULT(0);	// km
 	float2					mPad0;
 
+	uint					mUnifyXYEncode			CONSTANT_DEFAULT(0);
+	uint3					mPadFlags;
+
 	float3					mRayleighScattering		CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	float					mPad1;
 	DensityProfile			mRayleighDensity;
@@ -129,4 +132,7 @@ struct Atmosphere
 	float3					mAbsorptionExtinction	CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	float					mPad4;
 	DensityProfile			mAbsorptionDensity;
+
+	float3					mSolarIrradiance		CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	float					mSunAngularRadius		CONSTANT_DEFAULT(0);
 };
