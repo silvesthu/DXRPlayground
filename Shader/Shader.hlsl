@@ -296,10 +296,9 @@ float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// mu
-// mu_s
+// mu_s = [-1, 1] = Cosine of Sun zenith
 // mu_r
-// r = [mAtmosphere.mBottomRadius, mAtmosphere.mTopRadius]
+// r = [mAtmosphere.mBottomRadius, mAtmosphere.mTopRadius] = Altitude
 
 cbuffer AtmosphereBuffer : register(b0, space2)
 {
@@ -562,11 +561,11 @@ void ComputeDirectIrradianceCS(
 	// Approximate average of the cosine factor mu_s over the visible fraction of the Sun disc.
 	float alpha_s = mAtmosphere.mSunAngularRadius;
 	float average_cosine_factor = 0.0;
-	if (mu_s < -alpha_s)
+	if (mu_s < -alpha_s) // Sun below horizon
 		average_cosine_factor = 0.0;
-	else if (mu_s > alpha_s)
+	else if (mu_s > alpha_s) // Sun above horizon
 		average_cosine_factor = mu_s;
-	else // [-alpha_s, alpha_s]
+	else // [-alpha_s, alpha_s] Sun behind horizon
 		average_cosine_factor = (mu_s + alpha_s) * (mu_s + alpha_s) / (4.0 * alpha_s);
 
 	// Direct Irradiance

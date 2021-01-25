@@ -475,6 +475,4 @@ void gCleanupPipelineState()
 {
 	gDXRStateObject = nullptr;
 	gDXRGlobalRootSignature = nullptr;
-
-	gCompositeShader = {};
 }

@@ -5,7 +5,7 @@
 struct AtmosphereProfile
 {
 	// [BN08] https://hal.inria.fr/inria-00288758/document
-	// [BN08 Code] https://github.com/ebruneton/precomputed_atmospheric_scattering
+	// [BN08 Impl] https://github.com/ebruneton/precomputed_atmospheric_scattering
 	// [REK*04] https://people.cs.clemson.edu/~jtessen/reports/papers_files/Atmos_EGSR_Elec.pdf
 	// [PSS99] https://www2.cs.duke.edu/courses/cps124/spring08/assign/07_papers/p91-preetham.pdf
 	// [ZWP07] A Critical Review of the Preetham Skylight Model https://www.cg.tuwien.ac.at/research/publications/2007/zotti-2007-wscg/zotti-2007-wscg-paper.pdf
@@ -21,7 +21,7 @@ struct AtmosphereProfile
 	double kOzoneMidAltitude						= 25000.0;											// m
 	double kOzoneTopAltitude						= 40000.0;											// m
 
-	// Rayleigh [BN08][BN08 Code]
+	// Rayleigh [BN08][BN08 Impl]
 	enum class RayleighMode
 	{
 		Precomputed,
@@ -45,8 +45,8 @@ struct AtmosphereProfile
 		BN08,
 	};
 	MieMode mMieMode								= MieMode::BN08Impl;
-	glm::dvec3 mMieExtinctionCoefficient			= glm::dvec3(0.0);									// Assign during update
-	glm::dvec3 mMieScatteringCoefficient			= glm::dvec3(0.0);									// Assign during update	
+	glm::dvec3 mMieExtinctionCoefficient			= glm::dvec3(0.0);									// m^-1
+	glm::dvec3 mMieScatteringCoefficient			= glm::dvec3(0.0);									// m^-1
 
 	double kMieAngstromAlpha						= 0.0;
 	double kMieAngstromBeta							= 5.328e-3;
@@ -55,10 +55,30 @@ struct AtmosphereProfile
 	glm::dvec3 mMieScatteringCoefficientPaper		= glm::dvec3(20.0, 20.0, 20.0) * 1e-6;				// m^-1
 	glm::dvec3 mMieExtinctionCoefficientPaper		= mMieScatteringCoefficientPaper / 0.9;				// m^-1
 
-	bool kEnableOzone								= true;
+	// Ozone 
+	// [BN08 Impl]
+	bool mEnableOzone								= true;
+	double kDobsonUnit								= 2.687e20;											// m^-2
+	double kMaxOzoneNumberDensity					= 300.0 * kDobsonUnit / 15000.0;					// m^-2
+	glm::dvec3 kOzoneCrossSection					= glm::dvec3(1.209e-25, 3.5e-25, 1.582e-26);		// m^2
+
+	glm::dvec3 mOZoneAbsorptionCoefficient			= glm::dvec3(0);									// m^-1
 
 	// Turbidity [PSS99][ZWP07]
 	double kTurbidity								= 1;												// 1 ~ Pure air, >= 10 ~ Haze
+
+	// Solar 
+	// [BN08 Impl] demo.cc http://rredc.nrel.gov/solar/spectra/am1.5/ASTMG173/ASTMG173.html
+	bool mUseConstantSolarIrradiance				= false;
+	glm::dvec3 kConstantSolarIrradiance				= glm::dvec3(1.5);									// W.m^-2
+	glm::dvec3 kSolarIrradiance						= glm::dvec3(1.474000, 1.850400, 1.911980);			// W.m^-2
+
+	// Sun
+	// [BN08 Impl] demo.cc
+	double kSunAngularRadius						= 0.00935f / 2.0f;									// Radian
+	// [Note] This is calculated based on Sun seen from Earth
+	// https://sciencing.com/calculate-angular-diameter-sun-8592633.html
+	// Angular Radius = Angular Diameter / 2.0 = arctan(Sun radius / Sun-Earth distance)
 };
 
 class PrecomputedAtmosphereScattering

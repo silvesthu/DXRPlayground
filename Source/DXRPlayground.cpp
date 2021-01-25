@@ -167,13 +167,11 @@ static void sUpdate()
 
 				if (ImGui::Button("Reload shader") || ImGui::IsKeyPressed(VK_F5))
 					sReloadRequested = true;
-
-				ImGui::SliderInt("RecursionCountMax", (int*)&gPerFrameConstantBuffer.mRecursionCountMax, 0, ShaderType::sRecursionCountMax);
 			}
 
-			if (ImGui::TreeNodeEx("Render", ImGuiTreeNodeFlags_DefaultOpen))
+			if (ImGui::TreeNodeEx("Render"))
 			{
-				ImGui::Text("Debug"); ImGui::SameLine();
+				ImGui::SliderInt("Recursion Count Max", (int*)&gPerFrameConstantBuffer.mRecursionCountMax, 0, ShaderType::sRecursionCountMax);
 
 				for (int i = 0; i < (int)DebugMode::Count; i++)
 				{
@@ -184,17 +182,17 @@ static void sUpdate()
 						continue;
 					}
 
-					ImGui::SameLine();
+					if (i != 0)
+						ImGui::SameLine();
+
 					ImGui::RadioButton(name.data(), (int*)&gPerFrameConstantBuffer.mDebugMode, i);
 				}
 
 				ImGui::TreePop();
 			}
 
-			if (ImGui::TreeNodeEx("Instance", ImGuiTreeNodeFlags_DefaultOpen))
+			if (ImGui::TreeNodeEx("Instance"))
 			{
-				ImGui::Text("Debug"); ImGui::SameLine();
-
 				for (int i = 0; i < (int)DebugInstanceMode::Count; i++)
 				{
 					const auto& name = nameof::nameof_enum((DebugInstanceMode)i);
@@ -204,7 +202,9 @@ static void sUpdate()
 						continue;
 					}
 
-					ImGui::SameLine();
+					if (i != 0)
+						ImGui::SameLine();
+
 					ImGui::RadioButton(name.data(), (int*)&gPerFrameConstantBuffer.mDebugInstanceMode, i);
 				}
 
