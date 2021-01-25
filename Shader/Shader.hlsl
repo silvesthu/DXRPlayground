@@ -296,6 +296,11 @@ float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// mu
+// mu_s
+// mu_r
+// r = [mAtmosphere.mBottomRadius, mAtmosphere.mTopRadius]
+
 cbuffer AtmosphereBuffer : register(b0, space2)
 {
 	Atmosphere mAtmosphere;
@@ -304,19 +309,21 @@ RWTexture2D<float4> TransmittanceUAV : register(u0, space2); // X: [mAtmosphere.
 RWTexture2D<float4> DeltaIrradianceUAV : register(u1, space2);
 RWTexture2D<float4> IrradianceUAV : register(u2, space2);
 
+RWTexture3D<float4> DeltaRayleighScatteringUAV : register(u3, space2);
+RWTexture3D<float4> DeltaMieScatteringUAV : register(u4, space2);
+RWTexture3D<float4> ScatteringUAV : register(u5, space2);
+
 Texture2D<float4> TransmittanceSRV : register(t0, space2);
 
 SamplerState PointSampler : register(s0);
 SamplerState BilinearSampler : register(s1);
 
-#define AtmosphereRootSignature \
-"DescriptorTable("				\
-	"  CBV(b0, space = 2)"		\
-	", UAV(u0, space = 2)"		\
-	", UAV(u1, space = 2)"		\
-	", UAV(u2, space = 2)"		\
-	", SRV(t0, space = 2)"		\
-")"								\
+#define AtmosphereRootSignature					\
+"DescriptorTable("								\
+	"  CBV(b0, space = 2)"						\
+	", UAV(u0, space = 2, numDescriptors = 7)"	\
+	", SRV(t0, space = 2, numDescriptors = 7)"	\
+")"												\
 ", StaticSampler(s0, filter = FILTER_MIN_MAG_MIP_POINT, addressU = TEXTURE_ADDRESS_CLAMP, addressV = TEXTURE_ADDRESS_CLAMP, addressW = TEXTURE_ADDRESS_CLAMP)"	\
 ", StaticSampler(s1, filter = FILTER_MIN_MAG_MIP_LINEAR, addressU = TEXTURE_ADDRESS_CLAMP, addressV = TEXTURE_ADDRESS_CLAMP, addressW = TEXTURE_ADDRESS_CLAMP)"
 
@@ -338,6 +345,13 @@ float2 DispatchThreadID_to_XY(uint2 inDispatchThreadID, RWTexture2D<float4> inTe
 	return inDispatchThreadID.xy / (size - 1.0);
 }
 
+float3 DispatchThreadID_to_XYZ(uint3 inDispatchThreadID, RWTexture3D<float4> inTexture)
+{
+	uint3 size;
+	inTexture.GetDimensions(size.x, size.y, size.z);
+	return inDispatchThreadID.xyz / (size - 1.0);
+}
+
 float2 XY_to_UV(float2 xy, Texture2D<float4> texture) // GetTextureCoordFromUnitRange
 {
 	uint2 size;
@@ -352,24 +366,24 @@ float2 UV_to_XY(float2 uv, Texture2D<float4> texture) // GetUnitRangeFromTexture
 	return (uv - 0.5 / size) / (1.0 - 1.0 / size);
 }
 
-float2 EncodeXY(float2 xy)
+float2 Decode2D(float2 xy)
 {
 	float mu = lerp(-1, 1, xy.x);
 	float r = lerp(mAtmosphere.mBottomRadius, mAtmosphere.mTopRadius, xy.y);
 	return float2(mu, r);
 }
 
-float2 DecodeXY(float2 mu_r)
+float2 Encode2D(float2 mu_r)
 {
 	float x = invlerp(-1, 1, mu_r.x);
 	float y = invlerp(mAtmosphere.mBottomRadius, mAtmosphere.mTopRadius, mu_r.y);
 	return float2(x, y);
 }
 
-float2 EncodeXY_Transmittance(float2 xy)
+float2 Decode2D_Transmittance(float2 xy)
 {
 	if (mAtmosphere.mUnifyXYEncode)
-		return EncodeXY(xy);
+		return Decode2D(xy);
 
 	float x_mu = xy.x;
 	float x_r = xy.y;
@@ -414,10 +428,10 @@ float2 EncodeXY_Transmittance(float2 xy)
 	return float2(mu, r);
 }
 
-float2 DecodeXY_Transmittance(float2 mu_r)
+float2 Encode2D_Transmittance(float2 mu_r)
 {
 	if (mAtmosphere.mUnifyXYEncode)
-		return DecodeXY(mu_r);
+		return Encode2D(mu_r);
 
 	float mu = mu_r.x;
 	float r = mu_r.y;
@@ -433,17 +447,33 @@ float2 DecodeXY_Transmittance(float2 mu_r)
 	return float2(x_mu, x_r);
 }
 
-float2 EncodeXY_Irradiance(float2 xy)
+float2 Decode2D_Irradiance(float2 xy)
 {
-	return EncodeXY(xy);
+	return Decode2D(xy);
 }
 
-float2 DecodeXY_Irradiance(float2 mu_r)
+float2 Encode2D_Irradiance(float2 mu_r)
 {
-	return DecodeXY(mu_r);
+	return Encode2D(mu_r);
 }
 
-float ComputeOpticalLengthToTopAtmosphereBoundary(DensityProfile inProfile, float2 mu_r)
+float4 Decode4D_Scattering(float3 xyz, out bool ray_r_mu_intersects_ground)
+{
+	// dummy
+
+	ray_r_mu_intersects_ground = true;
+
+	return 0;
+}
+
+float3 Encode4D_Scattering(float4 r_mu_mu_s_nu)
+{
+	// dummy
+
+	return 0;
+}
+
+float IntegrateExtinctionCoefficient(DensityProfile inProfile, float2 mu_r)
 {
 	const int SAMPLE_COUNT = 500;
 
@@ -459,14 +489,14 @@ float ComputeOpticalLengthToTopAtmosphereBoundary(DensityProfile inProfile, floa
 		// Distance between the current sample point and the planet center.
 		float r_i = sqrt(d_i * d_i + 2.0 * r * mu * d_i + r * r);
 
-		// Density based on altitude.
+		// Extinction Coefficient (Density) based on altitude.
 		float altitude = r_i - mAtmosphere.mBottomRadius;
-		float y_i = GetProfileDensity(inProfile, altitude);
+		float beta_i = GetProfileDensity(inProfile, altitude);
 
 		// Sample weight (from the trapezoidal rule).
 		float weight_i = (i == 0 || i == SAMPLE_COUNT) ? 0.5 : 1.0;
 
-		result += y_i * weight_i * step_distance;
+		result += beta_i * weight_i * step_distance;
 	}
 
 	return result;
@@ -474,11 +504,11 @@ float ComputeOpticalLengthToTopAtmosphereBoundary(DensityProfile inProfile, floa
 
 float3 ComputeTransmittance(float2 mu_r)
 {
-	// Equation 5
-	
-	float3 ray_leigh = mAtmosphere.mRayleighScattering.xyz * ComputeOpticalLengthToTopAtmosphereBoundary(mAtmosphere.mRayleighDensity, mu_r);
-	float3 mie = mAtmosphere.mMieExtinction.xyz* ComputeOpticalLengthToTopAtmosphereBoundary(mAtmosphere.mMieDensity, mu_r); // [TODO] Why no mie scattering ??? included ?
-	float3 absorption = mAtmosphere.mAbsorptionExtinction.xyz* ComputeOpticalLengthToTopAtmosphereBoundary(mAtmosphere.mAbsorptionDensity, mu_r);
+	// See [BN08] 2.2 (5)
+
+	float3 ray_leigh = mAtmosphere.mRayleighScattering.xyz * IntegrateExtinctionCoefficient(mAtmosphere.mRayleighDensity, mu_r);
+	float3 mie = mAtmosphere.mMieExtinction.xyz* IntegrateExtinctionCoefficient(mAtmosphere.mMieDensity, mu_r); // [TODO] Why no mie scattering ??? included ?
+	float3 absorption = mAtmosphere.mAbsorptionExtinction.xyz* IntegrateExtinctionCoefficient(mAtmosphere.mAbsorptionDensity, mu_r);
 	float3 transmittance = exp(-(ray_leigh + mie + absorption));
 
 	return transmittance;
@@ -495,8 +525,8 @@ void ComputeTransmittanceCS(
 	// XY
 	float2 xy = DispatchThreadID_to_XY(inDispatchThreadID.xy, TransmittanceUAV);
 
-	// Encode
-	float2 mu_r = EncodeXY_Transmittance(xy);
+	// Decode
+	float2 mu_r = Decode2D_Transmittance(xy);
 
 	// Transmittance
 	float3 transmittance = ComputeTransmittance(mu_r);
@@ -508,7 +538,7 @@ void ComputeTransmittanceCS(
 	// float3 debug = float3(uv, 0);
 	// debug = (r - 6360) / 60.0;
 	// debug = mu.xxx;
-	// debug = ComputeOpticalLengthToTopAtmosphereBoundary(mAtmosphere.mRayleighDensity, r, mu).xxx;
+	// debug = IntegrateExtinctionCoefficient(mAtmosphere.mRayleighDensity, r, mu).xxx;
 	// TransmittanceUAV[inDispatchThreadID.xy] = float4(debug, 1.0);
 	// TransmittanceUAV[inDispatchThreadID.xy] = float4(xy, 0, 1);
 }
@@ -524,8 +554,8 @@ void ComputeDirectIrradianceCS(
 	// xy
 	float2 xy = DispatchThreadID_to_XY(inDispatchThreadID.xy, IrradianceUAV);
 
-	// Encode
-	float2 mu_r = EncodeXY_Irradiance(xy);
+	// Decode
+	float2 mu_r = Decode2D_Irradiance(xy);
 	float mu_s = mu_r.x;
 	float r = mu_r.y;
 
@@ -540,9 +570,9 @@ void ComputeDirectIrradianceCS(
 		average_cosine_factor = (mu_s + alpha_s) * (mu_s + alpha_s) / (4.0 * alpha_s);
 
 	// Direct Irradiance
-	float2 transmittance_uv = XY_to_UV(DecodeXY_Transmittance(mu_r), TransmittanceSRV);
+	float2 transmittance_uv = XY_to_UV(Encode2D_Transmittance(mu_r), TransmittanceSRV);
 	float3 transmittance = TransmittanceSRV.SampleLevel(BilinearSampler, transmittance_uv, 0).xyz;
-	// transmittance = ComputeTransmittance(mu_r); // compute transmittance again
+	// transmittance = ComputeTransmittance(mu_r); // compute transmittance directly
 	float3 direct_irradiance = mAtmosphere.mSolarIrradiance * transmittance * average_cosine_factor;
 
 	// Output
@@ -552,7 +582,74 @@ void ComputeDirectIrradianceCS(
 	// Debug
 	// DeltaIrradianceUAV[inDispatchThreadID.xy] = float4(xy, 0, 1);
 	// DeltaIrradianceUAV[inDispatchThreadID.xy] = float4(mu_r, 0, 1);
-	// DeltaIrradianceUAV[inDispatchThreadID.xy] = float4(DecodeXY_Transmittance(mu_r), 0, 1);
+	// DeltaIrradianceUAV[inDispatchThreadID.xy] = float4(Encode2D_Transmittance(mu_r), 0, 1);
 	// DeltaIrradianceUAV[inDispatchThreadID.xy] = float4(transmittance, 1);
 	// IrradianceUAV[inDispatchThreadID.xy] = float4(uv, 0, 1);
+}
+
+void ComputeSingleScattering(float4 r_mu_mu_s_nu, bool ray_r_mu_intersects_ground, out float3 rayleigh, out float3 mie)
+{
+	rayleigh = 0;
+	mie = 0;
+
+	//assert(r >= atmosphere.bottom_radius && r <= atmosphere.top_radius);
+	//assert(mu >= -1.0 && mu <= 1.0);
+	//assert(mu_s >= -1.0 && mu_s <= 1.0);
+	//assert(nu >= -1.0 && nu <= 1.0);
+
+	//// Number of intervals for the numerical integration.
+	//const int SAMPLE_COUNT = 50;
+	//// The integration step, i.e. the length of each integration interval.
+	//Length dx =
+	//	DistanceToNearestAtmosphereBoundary(atmosphere, r, mu,
+	//		ray_r_mu_intersects_ground) / Number(SAMPLE_COUNT);
+	//// Integration loop.
+	//DimensionlessSpectrum rayleigh_sum = DimensionlessSpectrum(0.0);
+	//DimensionlessSpectrum mie_sum = DimensionlessSpectrum(0.0);
+	//for (int i = 0; i <= SAMPLE_COUNT; ++i) {
+	//	Length d_i = Number(i) * dx;
+	//	// The Rayleigh and Mie single scattering at the current sample point.
+	//	DimensionlessSpectrum rayleigh_i;
+	//	DimensionlessSpectrum mie_i;
+	//	ComputeSingleScatteringIntegrand(atmosphere, transmittance_texture,
+	//		r, mu, mu_s, nu, d_i, ray_r_mu_intersects_ground, rayleigh_i, mie_i);
+	//	// Sample weight (from the trapezoidal rule).
+	//	Number weight_i = (i == 0 || i == SAMPLE_COUNT) ? 0.5 : 1.0;
+	//	rayleigh_sum += rayleigh_i * weight_i;
+	//	mie_sum += mie_i * weight_i;
+	//}
+	//rayleigh = rayleigh_sum * dx * atmosphere.solar_irradiance *
+	//	atmosphere.rayleigh_scattering;
+	//mie = mie_sum * dx * atmosphere.solar_irradiance * atmosphere.mie_scattering;
+}
+
+[RootSignature(AtmosphereRootSignature)]
+[numthreads(8, 8, 1)]
+void ComputeSingleScatteringCS(
+	uint3 inGroupThreadID : SV_GroupThreadID,
+	uint3 inGroupID : SV_GroupID,
+	uint3 inDispatchThreadID : SV_DispatchThreadID,
+	uint inGroupIndex : SV_GroupIndex)
+{
+	// xyz
+	float3 xyz = DispatchThreadID_to_XYZ(inDispatchThreadID.xyz, ScatteringUAV);
+
+	// Decode
+	bool ray_r_mu_intersects_ground = false;
+	float4 r_mu_mu_s_nu = Decode4D_Scattering(xyz, ray_r_mu_intersects_ground);
+
+	// Compute
+	float3 delta_rayleigh = 0;
+	float3 delta_mie = 0;
+	ComputeSingleScattering(r_mu_mu_s_nu, ray_r_mu_intersects_ground, delta_rayleigh, delta_mie);
+
+	// Output
+	DeltaRayleighScatteringUAV[inDispatchThreadID.xyz] = float4(delta_rayleigh, 1);
+	DeltaMieScatteringUAV[inDispatchThreadID.xyz] = float4(delta_mie, 1);
+	ScatteringUAV[inDispatchThreadID.xyz] = float4(delta_rayleigh.xyz, delta_mie.x);
+
+	// Debug
+	DeltaRayleighScatteringUAV[inDispatchThreadID.xyz] = float4(xyz, xyz.x);
+	DeltaMieScatteringUAV[inDispatchThreadID.xyz] = float4(xyz, xyz.y);
+	ScatteringUAV[inDispatchThreadID.xyz] = float4(xyz, xyz.z);
 }

@@ -1,6 +1,16 @@
 #pragma once
 
 #include "../Thirdparty/imgui/imgui.h"
+#include "../Thirdparty/nameof/include/nameof.hpp"
+
+namespace ImGui
+{
+	template <typename T>
+	bool EnumRadioButton(const T& inEnum, T* inPointer)
+	{
+		return ImGui::RadioButton(nameof::nameof_enum(inEnum).data(), (int*)inPointer, (int)inEnum);
+	}
+}
 
 struct ExampleAppLog
 {

@@ -16,6 +16,8 @@ using Microsoft::WRL::ComPtr;
 #include <memory>
 #include <functional>
 #include <type_traits>
+#include <locale>
+#include <codecvt>
 
 #include "Thirdparty/glm/glm/gtx/transform.hpp"
 #include "Thirdparty/nameof/include/nameof.hpp"
@@ -89,14 +91,15 @@ struct Texture
 {
 #define TEXTURE_MEMBER(type, name, default_value) MEMBER(Texture, type, name, default_value)
 
-	TEXTURE_MEMBER(glm::uint32, Width, 0);
-	TEXTURE_MEMBER(glm::uint32, Height, 0);
+	TEXTURE_MEMBER(glm::uint32, Width, 1);
+	TEXTURE_MEMBER(glm::uint32, Height, 1);
+	TEXTURE_MEMBER(glm::uint32, Depth, 1);
+	TEXTURE_MEMBER(DXGI_FORMAT, Format, DXGI_FORMAT_R32G32B32A32_FLOAT);
 	TEXTURE_MEMBER(const char*, Name, nullptr);
 	TEXTURE_MEMBER(float, UIScale, 1.0f);
 
 	void Initialize();
 
-	DXGI_FORMAT mFormat = DXGI_FORMAT_R32G32B32A32_FLOAT;
 	ComPtr<ID3D12Resource> mResource;
 	D3D12_CPU_DESCRIPTOR_HANDLE mCPUHandle = {};
 	D3D12_GPU_DESCRIPTOR_HANDLE mGPUHandle = {};
@@ -328,11 +331,11 @@ inline D3D12_RESOURCE_DESC gGetBufferResourceDesc(UINT64 inWidth)
 	return desc;
 }
 
-inline D3D12_RESOURCE_DESC gGetTextureResourceDesc(UINT64 inWidth, UINT inHeight, DXGI_FORMAT inFormat)
+inline D3D12_RESOURCE_DESC gGetTextureResourceDesc(UINT inWidth, UINT inHeight, UINT inDepth, DXGI_FORMAT inFormat)
 {
 	D3D12_RESOURCE_DESC desc = {};
-	desc.DepthOrArraySize = 1;
-	desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+	desc.DepthOrArraySize = (UINT16)inDepth;
+	desc.Dimension = inDepth == 1 ? D3D12_RESOURCE_DIMENSION_TEXTURE2D : D3D12_RESOURCE_DIMENSION_TEXTURE3D;
 	desc.Format = inFormat;
 	desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 	desc.Width = inWidth;

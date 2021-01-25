@@ -51,6 +51,10 @@ static ID3D12DescriptorHeap*        g_DescriptorHeap = NULL;
 static int                          g_DescriptorHeapNextIndex = 0;
 static UINT                         g_DescriptorHeapIncrementSize = 0;
 
+// Customization
+float                               g_TextureDepth = 0;
+bool                                g_TextureAlpha = false;
+
 struct FrameResources
 {
     ID3D12Resource*     IndexBuffer;
@@ -62,16 +66,21 @@ static FrameResources*  g_FrameResources = NULL;
 static UINT             g_NumFramesInFlight = 0;
 static UINT             g_FrameIndex = UINT_MAX;
 
-struct VERTEX_CONSTANT_BUFFER
+struct CONSTANT_BUFFER
 {
     float   mvp[4][4];
+
+    float   mTextureDepth = 0;
+    float   mTextureAlpha = 0;
+    float   mPad1;
+    float   mPad2;
 };
 
 static void ImGui_ImplDX12_SetupRenderState(ImDrawData* draw_data, ID3D12GraphicsCommandList* ctx, FrameResources* fr)
 {
     // Setup orthographic projection matrix into our constant buffer
     // Our visible imgui space lies from draw_data->DisplayPos (top left) to draw_data->DisplayPos+data_data->DisplaySize (bottom right).
-    VERTEX_CONSTANT_BUFFER vertex_constant_buffer;
+    CONSTANT_BUFFER constant_buffer;
     {
         float L = draw_data->DisplayPos.x;
         float R = draw_data->DisplayPos.x + draw_data->DisplaySize.x;
@@ -84,7 +93,10 @@ static void ImGui_ImplDX12_SetupRenderState(ImDrawData* draw_data, ID3D12Graphic
             { 0.0f,         0.0f,           0.5f,       0.0f },
             { (R+L)/(L-R),  (T+B)/(B-T),    0.5f,       1.0f },
         };
-        memcpy(&vertex_constant_buffer.mvp, mvp, sizeof(mvp));
+        memcpy(&constant_buffer.mvp, mvp, sizeof(mvp));
+
+        constant_buffer.mTextureDepth = g_TextureDepth;
+        constant_buffer.mTextureAlpha = g_TextureAlpha ? 1.0f : 0.0f;
     }
 
     // Setup viewport
@@ -115,7 +127,7 @@ static void ImGui_ImplDX12_SetupRenderState(ImDrawData* draw_data, ID3D12Graphic
     ctx->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     ctx->SetPipelineState(g_PipelineState);
     ctx->SetGraphicsRootSignature(g_RootSignature);
-    ctx->SetGraphicsRoot32BitConstants(0, 16, &vertex_constant_buffer, 0);
+    ctx->SetGraphicsRoot32BitConstants(0, sizeof(CONSTANT_BUFFER) / 4, &constant_buffer, 0);
 
     // Setup blend factor
     const float blend_factor[4] = { 0.f, 0.f, 0.f, 0.f };
@@ -233,6 +245,7 @@ void ImGui_ImplDX12_RenderDrawData(ImDrawData* draw_data, ID3D12GraphicsCommandL
                 // Apply Scissor, Bind texture, Draw
                 const D3D12_RECT r = { (LONG)(pcmd->ClipRect.x - clip_off.x), (LONG)(pcmd->ClipRect.y - clip_off.y), (LONG)(pcmd->ClipRect.z - clip_off.x), (LONG)(pcmd->ClipRect.w - clip_off.y) };
                 ctx->SetGraphicsRootDescriptorTable(1, *(D3D12_GPU_DESCRIPTOR_HANDLE*)&pcmd->TextureId);
+                ctx->SetGraphicsRootDescriptorTable(2, *(D3D12_GPU_DESCRIPTOR_HANDLE*)&pcmd->TextureId);
                 ctx->RSSetScissorRects(1, &r);
                 ctx->DrawIndexedInstanced(pcmd->ElemCount, 1, idx_offset, vtx_offset, 0);
             }
@@ -408,18 +421,30 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
         descRange.RegisterSpace = 0;
         descRange.OffsetInDescriptorsFromTableStart = 0;
 
-        D3D12_ROOT_PARAMETER param[2] = {};
+        D3D12_ROOT_PARAMETER param[3] = {};
 
         param[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
         param[0].Constants.ShaderRegister = 0;
         param[0].Constants.RegisterSpace = 0;
-        param[0].Constants.Num32BitValues = 16;
-        param[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+        param[0].Constants.Num32BitValues = sizeof(CONSTANT_BUFFER) / 4;
+        param[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
         param[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
         param[1].DescriptorTable.NumDescriptorRanges = 1;
         param[1].DescriptorTable.pDescriptorRanges = &descRange;
         param[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+		D3D12_DESCRIPTOR_RANGE descRange_space1 = {};
+        descRange_space1.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+        descRange_space1.NumDescriptors = 1;
+        descRange_space1.BaseShaderRegister = 0;
+        descRange_space1.RegisterSpace = 1;
+        descRange_space1.OffsetInDescriptorsFromTableStart = 0;
+
+		param[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		param[2].DescriptorTable.NumDescriptorRanges = 1;
+		param[2].DescriptorTable.pDescriptorRanges = &descRange_space1;
+		param[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
         D3D12_STATIC_SAMPLER_DESC staticSampler = {};
         staticSampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
@@ -478,6 +503,10 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
             "cbuffer vertexBuffer : register(b0) \
             {\
               float4x4 ProjectionMatrix; \
+              float    TextureDepthSlice; \
+              float    TextureAlpha; \
+              float    Pad1; \
+              float    Pad2; \
             };\
             struct VS_INPUT\
             {\
@@ -502,7 +531,7 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
               return output;\
             }";
 
-        D3DCompile(vertexShader, strlen(vertexShader), NULL, NULL, NULL, "main", "vs_5_0", 0, 0, &g_VertexShaderBlob, NULL);
+        D3DCompile(vertexShader, strlen(vertexShader), NULL, NULL, NULL, "main", "vs_5_1", 0, 0, &g_VertexShaderBlob, NULL);
         if (g_VertexShaderBlob == NULL) // NB: Pass ID3D10Blob* pErrorBlob to D3DCompile() to get error showing in (const char*)pErrorBlob->GetBufferPointer(). Make sure to Release() the blob!
             return false;
         psoDesc.VS = { g_VertexShaderBlob->GetBufferPointer(), g_VertexShaderBlob->GetBufferSize() };
@@ -519,22 +548,38 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
     // Create the pixel shader
     {
         static const char* pixelShader =
-            "struct PS_INPUT\
+			"cbuffer vertexBuffer : register(b0) \
+            {\
+              float4x4 ProjectionMatrix; \
+              float    TextureDepthSlice; \
+              float    TextureAlpha; \
+              float    Pad1; \
+              float    Pad2; \
+            };\
+            struct PS_INPUT\
             {\
               float4 pos : SV_POSITION;\
               float4 col : COLOR0;\
               float2 uv  : TEXCOORD0;\
             };\
             SamplerState sampler0 : register(s0);\
-            Texture2D texture0 : register(t0);\
+            Texture2D texture0 : register(t0, space0);\
+            Texture3D texture1 : register(t0, space1);\
             \
             float4 main(PS_INPUT input) : SV_Target\
             {\
-              float4 out_col = input.col * texture0.Sample(sampler0, input.uv); \
-              return out_col; \
+              float4 col = texture0.Sample(sampler0, input.uv) + texture1.Sample(sampler0, float3(input.uv, TextureDepthSlice)); \
+              if (TextureAlpha != 0) \
+                col = float4(col.aaa, 1); \
+              else \
+                { uint x,y,z = 0; texture1.GetDimensions(x,y,z); if (z > 1) col.a = 1; } \
+              return input.col * col; \
             }";
 
-        D3DCompile(pixelShader, strlen(pixelShader), NULL, NULL, NULL, "main", "ps_5_0", 0, 0, &g_PixelShaderBlob, NULL);
+        // [Note] This shader is also used to render text
+        // [Hack] Show alpha, otherwise discard alpha of Texture3D
+
+        D3DCompile(pixelShader, strlen(pixelShader), NULL, NULL, NULL, "main", "ps_5_1", 0, 0, &g_PixelShaderBlob, NULL);
         if (g_PixelShaderBlob == NULL)  // NB: Pass ID3D10Blob* pErrorBlob to D3DCompile() to get error showing in (const char*)pErrorBlob->GetBufferPointer(). Make sure to Release() the blob!
             return false;
         psoDesc.PS = { g_PixelShaderBlob->GetBufferPointer(), g_PixelShaderBlob->GetBufferSize() };

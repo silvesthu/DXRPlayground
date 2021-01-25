@@ -43,7 +43,7 @@ void Shader::Initialize(const std::vector<Shader::DescriptorEntry>& inEntries)
 	// DescriptorHeap
 	{
 		D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-		desc.NumDescriptors = table.NumDescriptorRanges;
+		desc.NumDescriptors = 1000000;
 		desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 		desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 		gValidate(gDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&mDescriptorHeap)));
@@ -54,8 +54,7 @@ void Shader::Initialize(const std::vector<Shader::DescriptorEntry>& inEntries)
 		D3D12_CPU_DESCRIPTOR_HANDLE handle = mDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
 		UINT increment_size = gDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-		assert(inEntries.size() == table.NumDescriptorRanges);
-
+		int entry_index = 0;
 		for (UINT i = 0; i < table.NumDescriptorRanges; i++)
 		{
 			const D3D12_DESCRIPTOR_RANGE& range = table.pDescriptorRanges[i];
@@ -63,33 +62,70 @@ void Shader::Initialize(const std::vector<Shader::DescriptorEntry>& inEntries)
 			{
 			case D3D12_DESCRIPTOR_RANGE_TYPE_SRV:
 			{
-				D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
-				desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-				desc.Texture2D.MipLevels = 1;
-				desc.Texture2D.MostDetailedMip = 0;
-				desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-				gDevice->CreateShaderResourceView(inEntries[i].mResource, &desc, handle);
+				for (UINT j = 0; j < range.NumDescriptors; j++)
+				{
+					D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
+					desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+					if (inEntries[entry_index].mResource->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D)
+					{
+						desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+						desc.Texture2D.MipLevels = (UINT)-1;
+						desc.Texture2D.MostDetailedMip = 0;
+					}
+					else
+					{
+						desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
+						desc.Texture3D.MipLevels = (UINT)-1;
+						desc.Texture3D.MostDetailedMip = 0;
+					}
+					gDevice->CreateShaderResourceView(inEntries[entry_index].mResource, &desc, handle);
+
+					entry_index++;
+					handle.ptr += increment_size;
+				}
 			}
 			break;
 			case D3D12_DESCRIPTOR_RANGE_TYPE_UAV:
 			{
-				D3D12_UNORDERED_ACCESS_VIEW_DESC desc = {};
-				desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-				gDevice->CreateUnorderedAccessView(inEntries[i].mResource, nullptr, &desc, handle);
+				for (UINT j = 0; j < range.NumDescriptors; j++)
+				{
+					D3D12_UNORDERED_ACCESS_VIEW_DESC desc = {};
+					if (inEntries[entry_index].mResource->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D)
+					{
+						desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+						desc.Texture2D.MipSlice = 0;
+						desc.Texture2D.PlaneSlice = 0;
+					}
+					else
+					{
+						desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE3D;
+						desc.Texture3D.MipSlice = 0;
+						desc.Texture3D.FirstWSlice = 0;
+						desc.Texture3D.WSize = inEntries[entry_index].mResource->GetDesc().DepthOrArraySize;
+					}
+					gDevice->CreateUnorderedAccessView(inEntries[entry_index].mResource, nullptr, &desc, handle);
+
+					entry_index++;
+					handle.ptr += increment_size;
+				}
 			}
 			break;
 			case D3D12_DESCRIPTOR_RANGE_TYPE_CBV:
 			{
-				D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
-				desc.BufferLocation = inEntries[i].mAddress;
-				desc.SizeInBytes = gAlignUp((UINT)sizeof(ShaderType::Atmosphere), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
-				gDevice->CreateConstantBufferView(&desc, handle);
+				for (UINT j = 0; j < range.NumDescriptors; j++)
+				{
+					D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
+					desc.SizeInBytes = gAlignUp((UINT)sizeof(ShaderType::Atmosphere), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+					desc.BufferLocation = inEntries[entry_index].mAddress;
+					gDevice->CreateConstantBufferView(&desc, handle);
+
+					entry_index++;
+					handle.ptr += increment_size;
+				}
 			}
 			break;
 			default: assert(false); break;
 			}
-
-			handle.ptr += increment_size;
 		}
 	}
 }
@@ -105,17 +141,23 @@ void Shader::Setup()
 
 void Texture::Initialize()
 {
-	D3D12_RESOURCE_DESC resource_desc = gGetTextureResourceDesc(mWidth, mHeight, mFormat);
+	D3D12_RESOURCE_DESC resource_desc = gGetTextureResourceDesc(mWidth, mHeight, mDepth, mFormat);
 	D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
 
-	gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&mResource)));
-	mResource->SetName(L"Atmosphere.Transmittance");
+	gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&mResource)));
+
+	std::string narrow_name(mName);
+	int wide_size = MultiByteToWideChar(CP_UTF8, 0, narrow_name.c_str(), (int)narrow_name.size(), NULL, 0);
+	std::wstring wide_name(wide_size, 0);
+	MultiByteToWideChar(CP_UTF8, 0, narrow_name.c_str(), (int)narrow_name.size(), &wide_name[0], wide_size);
+	mResource->SetName(wide_name.c_str());
 
 	// SRV for ImGui
 	ImGui_ImplDX12_AllocateDescriptor(mCPUHandle, mGPUHandle);
+
 	D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
-	srv_desc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-	srv_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	srv_desc.Format = mFormat;
+	srv_desc.ViewDimension = mDepth == 1 ? D3D12_SRV_DIMENSION_TEXTURE2D : D3D12_SRV_DIMENSION_TEXTURE3D;
 	srv_desc.Texture2D.MipLevels = (UINT)-1;
 	srv_desc.Texture2D.MostDetailedMip = 0;
 	srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;

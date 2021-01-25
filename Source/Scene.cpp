@@ -335,7 +335,7 @@ void Scene::CreateShaderResource()
 		DXGI_SWAP_CHAIN_DESC1 swap_chain_desc;
 		gSwapChain->GetDesc1(&swap_chain_desc);
 
-		D3D12_RESOURCE_DESC resource_desc = gGetTextureResourceDesc(swap_chain_desc.Width, swap_chain_desc.Height, DXGI_FORMAT_R32G32B32A32_FLOAT);
+		D3D12_RESOURCE_DESC resource_desc = gGetTextureResourceDesc(swap_chain_desc.Width, swap_chain_desc.Height, 1, DXGI_FORMAT_R32G32B32A32_FLOAT);
 		D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
 
 		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&mOutputResource)));

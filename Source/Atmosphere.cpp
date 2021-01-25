@@ -2,6 +2,7 @@
 #include "Atmosphere.h"
 
 #include "ImGui/imgui_impl_dx12.h"
+#include "ImGui/imgui_impl_helper.h"
 
 AtmosphereProfile gAtmosphereProfile;
 PrecomputedAtmosphereScattering gPrecomputedAtmosphereScattering;
@@ -56,10 +57,12 @@ void PrecomputedAtmosphereScattering::Update()
 		{
 			switch (gAtmosphereProfile.mRayleighMode)
 			{
-			case AtmosphereProfile::RayleighMode::BN08Impl:
+			case AtmosphereProfile::RayleighMode::Precomputed:
+				// [BN08] 2.1 [REK*04] Table 3
 				gAtmosphereProfile.mRayleighScatteringCoefficient = gAtmosphereProfile.mRayleighScatteringCoefficient_;
 				break;
-			case AtmosphereProfile::RayleighMode::BN08:
+			case AtmosphereProfile::RayleighMode::BN08Impl:
+				// demo.cc
 				gAtmosphereProfile.mRayleighScatteringCoefficient = gAtmosphereProfile.kRayleigh / glm::pow(UnitHelper::sNanometerToMeter<glm::dvec3>(gAtmosphereProfile.kLambda), glm::dvec3(4.0));
 				break;
 			case AtmosphereProfile::RayleighMode::PSS99:
@@ -75,6 +78,8 @@ void PrecomputedAtmosphereScattering::Update()
 					((3.0 * N) * (6.0 - 7.0 * p_n));
 				gAtmosphereProfile.mRayleighScatteringCoefficient = kRayleigh / glm::pow(UnitHelper::sNanometerToMeter<glm::dvec3>(gAtmosphereProfile.kLambda), glm::dvec3(4.0));
 
+				// [Note] [BN08] 2.1 (1) miss the right half, (6.0 + 3.0 * p_n) / (6.0 - 7.0 * p_n)
+
 				// Total scattering coefficient = gAtmosphereProfile.mRayleighScatteringCoefficient = integral of angular scattering coefficient in all directions
 				// Angular scattering coefficient = Total scattering coefficient * (1 + cos(theta)^2) * 3.0 / 2.0
 			}
@@ -87,7 +92,7 @@ void PrecomputedAtmosphereScattering::Update()
 			atmosphere->mRayleighScattering = UnitHelper::sInverseMeterToInverseKilometer<glm::vec3>(gAtmosphereProfile.mRayleighScatteringCoefficient);
 
 			// Extinction Coefficient
-			// Air molecules do not absorb light
+			// Air molecules do not absorb light => Extinction = Scattering
 
 			// Density: decrease exponentially
 			atmosphere->mRayleighDensity.mLayer0 = { dummy, dummy, dummy, dummy, dummy };
@@ -116,6 +121,7 @@ void PrecomputedAtmosphereScattering::Update()
 			}
 			break;
 			default:
+				assert(false);
 				break;
 			}
 
@@ -172,18 +178,19 @@ void PrecomputedAtmosphereScattering::Render()
 void PrecomputedAtmosphereScattering::ComputeTransmittance()
 {
 	gPrecomputedAtmosphereScatteringResources.mComputeTransmittanceShader.Setup();
-	gCommandList->Dispatch(gPrecomputedAtmosphereScatteringResources.mTransmittanceTexture.mWidth / 8, gPrecomputedAtmosphereScatteringResources.mTransmittanceTexture.mHeight / 8, 1);
+	gCommandList->Dispatch(gPrecomputedAtmosphereScatteringResources.mTransmittanceTexture.mWidth / 8, gPrecomputedAtmosphereScatteringResources.mTransmittanceTexture.mHeight / 8, gPrecomputedAtmosphereScatteringResources.mTransmittanceTexture.mDepth);
 }
 
 void PrecomputedAtmosphereScattering::ComputeDirectIrradiance()
 {
 	gPrecomputedAtmosphereScatteringResources.mComputeDirectIrradianceShader.Setup();
-	gCommandList->Dispatch(gPrecomputedAtmosphereScatteringResources.mIrradianceTexture.mWidth / 8, gPrecomputedAtmosphereScatteringResources.mIrradianceTexture.mHeight / 8, 1);
+	gCommandList->Dispatch(gPrecomputedAtmosphereScatteringResources.mIrradianceTexture.mWidth / 8, gPrecomputedAtmosphereScatteringResources.mIrradianceTexture.mHeight / 8, gPrecomputedAtmosphereScatteringResources.mIrradianceTexture.mDepth);
 }
 
 void PrecomputedAtmosphereScattering::ComputeSingleScattering()
 {
-
+	gPrecomputedAtmosphereScatteringResources.mComputeSingleScatteringShader.Setup();
+	gCommandList->Dispatch(gPrecomputedAtmosphereScatteringResources.mScatteringTexture.mWidth / 8, gPrecomputedAtmosphereScatteringResources.mScatteringTexture.mHeight / 8, gPrecomputedAtmosphereScatteringResources.mScatteringTexture.mDepth);
 }
 
 void PrecomputedAtmosphereScattering::ComputeScatteringDensity()
@@ -199,6 +206,14 @@ void PrecomputedAtmosphereScattering::ComputeIndirectIrradiance()
 void PrecomputedAtmosphereScattering::AccumulateMultipleScattering()
 {
 
+}
+
+void PrecomputedAtmosphereScattering::Precompute()
+{
+	ComputeTransmittance();
+	ComputeDirectIrradiance();
+	ComputeSingleScattering();
+	ComputeMultipleScattering();
 }
 
 void PrecomputedAtmosphereScattering::Initialize()
@@ -221,19 +236,19 @@ void PrecomputedAtmosphereScattering::Initialize()
 
 	// Shader Binding
 	{
-		std::vector<Shader::DescriptorEntry> common_binding =
+		std::vector<Shader::DescriptorEntry> common_binding;
 		{
 			// CBV
-			gPrecomputedAtmosphereScatteringResources.mConstantUploadBuffer->GetGPUVirtualAddress(),
+			common_binding.push_back(gPrecomputedAtmosphereScatteringResources.mConstantUploadBuffer->GetGPUVirtualAddress());
 
 			// UAV
-			gPrecomputedAtmosphereScatteringResources.mTransmittanceTexture.mResource.Get(),
-			gPrecomputedAtmosphereScatteringResources.mDeltaIrradianceTexture.mResource.Get(),
-			gPrecomputedAtmosphereScatteringResources.mIrradianceTexture.mResource.Get(),
+			for (auto&& texture : gPrecomputedAtmosphereScatteringResources.mTextures)
+				common_binding.push_back(texture->mResource.Get());
 
 			// SRV
-			gPrecomputedAtmosphereScatteringResources.mTransmittanceTexture.mResource.Get(),
-		};
+			for (auto&& texture : gPrecomputedAtmosphereScatteringResources.mTextures)
+				common_binding.push_back(texture->mResource.Get());
+		}
 
 		for (auto&& shader : gPrecomputedAtmosphereScatteringResources.mShaders)
 			shader->Initialize(common_binding);
@@ -265,11 +280,12 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 		{
 			glm::vec3 scattering_coefficient = gAtmosphereProfile.mRayleighScatteringCoefficient * 1e6;
 			ImGui::InputFloat3("Scattering 1e-6", &scattering_coefficient.x);
-			ImGui::RadioButton("BN08Impl", (int*)&gAtmosphereProfile.mRayleighMode, (int)AtmosphereProfile::RayleighMode::BN08Impl);
+
+			ImGui::EnumRadioButton(AtmosphereProfile::RayleighMode::Precomputed, &gAtmosphereProfile.mRayleighMode);
 			ImGui::SameLine();
-			ImGui::RadioButton("BN08", (int*)&gAtmosphereProfile.mRayleighMode, (int)AtmosphereProfile::RayleighMode::BN08);
+			ImGui::EnumRadioButton(AtmosphereProfile::RayleighMode::BN08Impl, &gAtmosphereProfile.mRayleighMode);
 			ImGui::SameLine();
-			ImGui::RadioButton("PSS99", (int*)&gAtmosphereProfile.mRayleighMode, (int)AtmosphereProfile::RayleighMode::PSS99);
+			ImGui::EnumRadioButton(AtmosphereProfile::RayleighMode::PSS99, &gAtmosphereProfile.mRayleighMode);
 
 			ImGui::TreePop();
 		}
@@ -280,9 +296,10 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 			ImGui::InputFloat3("Extinction 1e-6 (/m)", &extinction_coefficient.x);
 			glm::vec3 scattering_coefficient = gAtmosphereProfile.mMieScatteringCoefficient * 1e6;
 			ImGui::InputFloat3("Scattering 1e-6 (/m)", &scattering_coefficient.x);
-			ImGui::RadioButton("BN08Impl", (int*)&gAtmosphereProfile.mMieMode, (int)AtmosphereProfile::MieMode::BN08Impl);
+
+			ImGui::EnumRadioButton(AtmosphereProfile::MieMode::BN08Impl, &gAtmosphereProfile.mMieMode);
 			ImGui::SameLine();
-			ImGui::RadioButton("BN08", (int*)&gAtmosphereProfile.mMieMode, (int)AtmosphereProfile::MieMode::BN08);
+			ImGui::EnumRadioButton(AtmosphereProfile::MieMode::BN08, &gAtmosphereProfile.mMieMode);
 
 			ImGui::TreePop();
 		}
@@ -305,6 +322,12 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 		ImGui::SameLine();
 		ImGui::Checkbox("UI Flip Y", &mUIFlipY);
 
+		ImGui::PushItemWidth(100);
+		ImGui::SliderFloat("Depth Slice", &g_TextureDepth, 0.0, 1.0f);
+		ImGui::PopItemWidth();
+		ImGui::SameLine();
+		ImGui::Checkbox("Show Alpha", &g_TextureAlpha);
+
 		ImGui::Checkbox("Unify XY Encode", &mUnifyXYEncode);
 
 		auto add_texture = [&](Texture& inTexture)
@@ -320,7 +343,8 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 			ImGui::SameLine();
 			std::string text = inTexture.mName;
 			text += "\n";
-			text += std::to_string(inTexture.mWidth) + "x" + std::to_string(inTexture.mHeight);
+			text += std::to_string(inTexture.mWidth) + " x " + std::to_string(inTexture.mHeight);
+			text += inTexture.mDepth == 1 ? "" : " x " + std::to_string(inTexture.mDepth);
 			ImGui::Text(text.c_str());
 		};
 

@@ -24,11 +24,11 @@ struct AtmosphereProfile
 	// Rayleigh [BN08][BN08 Code]
 	enum class RayleighMode
 	{
+		Precomputed,
 		BN08Impl,
-		BN08,
 		PSS99
 	};
-	RayleighMode mRayleighMode						= RayleighMode::BN08Impl;
+	RayleighMode mRayleighMode						= RayleighMode::Precomputed;
 	glm::dvec3 mRayleighScatteringCoefficient		= glm::dvec3(0);									// m^-1
 
 	double kLambdaR									= 680.0;											// nm
@@ -84,13 +84,7 @@ public:
 		AccumulateMultipleScattering();
 	}
 
-	void Precompute()
-	{
-		ComputeTransmittance();
-		ComputeDirectIrradiance();
-		ComputeSingleScattering();
-		ComputeMultipleScattering();
-	}
+	void Precompute();
 
 	float mUIScale = 1.0f;
 	bool mUIFlipY = false;
@@ -104,22 +98,36 @@ struct PrecomputedAtmosphereScatteringResources
 
 	Shader mComputeTransmittanceShader = Shader().CSName(L"ComputeTransmittanceCS");
 	Shader mComputeDirectIrradianceShader = Shader().CSName(L"ComputeDirectIrradianceCS");
+	Shader mComputeSingleScatteringShader = Shader().CSName(L"ComputeSingleScatteringCS");
 
+	// std::span is better but requires C++20
 	std::vector<Shader*> mShaders = 
 	{ 
 		&mComputeTransmittanceShader, 
-		&mComputeDirectIrradianceShader 
+		&mComputeDirectIrradianceShader,
+		&mComputeSingleScatteringShader
 	};
-	 
+
 	Texture mTransmittanceTexture = Texture().Width(256).Height(64).Name("Transmittance");
+
 	Texture mDeltaIrradianceTexture = Texture().Width(64).Height(16).Name("DeltaIrradiance").UIScale(4.0f);
 	Texture mIrradianceTexture = Texture().Width(64).Height(16).Name("Irradiance").UIScale(4.0f);
+
+	Texture mDeltaRayleighScatteringTexture = Texture().Width(256).Height(128).Depth(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Delta Rayleigh Scattering");
+	Texture mDeltaMieScatteringTexture = Texture().Width(256).Height(128).Depth(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Delta Mie Scattering");
+	Texture mScatteringTexture = Texture().Width(256).Height(128).Depth(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Scattering");
+
+	Texture mDeltaScatteringDensityTexture = Texture().Width(256).Height(128).Depth(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Delta Scattering Density");
 
 	std::vector<Texture*> mTextures =
 	{
 		&mTransmittanceTexture,
 		&mDeltaIrradianceTexture,
-		&mIrradianceTexture
+		&mIrradianceTexture,
+		&mDeltaRayleighScatteringTexture,
+		&mDeltaMieScatteringTexture,
+		&mScatteringTexture,
+		&mDeltaScatteringDensityTexture
 	};
 };
 
