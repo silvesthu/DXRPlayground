@@ -49,7 +49,8 @@ void PrecomputedAtmosphereScattering::Update()
 	atmosphere->mSolarIrradiance					= gAtmosphereProfile.mUseConstantSolarIrradiance ? gAtmosphereProfile.kConstantSolarIrradiance : gAtmosphereProfile.kSolarIrradiance;
 	atmosphere->mSunAngularRadius					= static_cast<float>(gAtmosphereProfile.kSunAngularRadius);
 
-	atmosphere->mUnifyXYEncode						= mUnifyXYEncode ? 1 : 0;
+	atmosphere->mTrivialAxisEncoding				= mTrivialAxisEncoding ? 1 : 0;
+	atmosphere->mXBinCount							= gPrecomputedAtmosphereScatteringResources.mXBinCount;
 
 	// Density Profile: { Width, ExpTerm, ExpScale, LinearTerm, ConstantTerm }
 	{
@@ -58,10 +59,10 @@ void PrecomputedAtmosphereScattering::Update()
 			switch (gAtmosphereProfile.mRayleighMode)
 			{
 			case AtmosphereProfile::RayleighMode::Precomputed:
-				// [BN08] 2.1 [REK*04] Table 3
+				// [Bruneton08] 2.1 [REK*04] Table 3
 				gAtmosphereProfile.mRayleighScatteringCoefficient = gAtmosphereProfile.mRayleighScatteringCoefficient_;
 				break;
-			case AtmosphereProfile::RayleighMode::BN08Impl:
+			case AtmosphereProfile::RayleighMode::Bruneton08Impl:
 				// demo.cc
 				gAtmosphereProfile.mRayleighScatteringCoefficient = gAtmosphereProfile.kRayleigh / glm::pow(UnitHelper::sNanometerToMeter<glm::dvec3>(gAtmosphereProfile.kLambda), glm::dvec3(4.0));
 				break;
@@ -78,7 +79,7 @@ void PrecomputedAtmosphereScattering::Update()
 					((3.0 * N) * (6.0 - 7.0 * p_n));
 				gAtmosphereProfile.mRayleighScatteringCoefficient = kRayleigh / glm::pow(UnitHelper::sNanometerToMeter<glm::dvec3>(gAtmosphereProfile.kLambda), glm::dvec3(4.0));
 
-				// [Note] [BN08] 2.1 (1) miss the right half, (6.0 + 3.0 * p_n) / (6.0 - 7.0 * p_n)
+				// [Note] [Bruneton08] 2.1 (1) miss the right half, (6.0 + 3.0 * p_n) / (6.0 - 7.0 * p_n)
 
 				// Total scattering coefficient = gAtmosphereProfile.mRayleighScatteringCoefficient = integral of angular scattering coefficient in all directions
 				// Angular scattering coefficient = Total scattering coefficient * (1 + cos(theta)^2) * 3.0 / 2.0
@@ -92,7 +93,9 @@ void PrecomputedAtmosphereScattering::Update()
 			atmosphere->mRayleighScattering = UnitHelper::sInverseMeterToInverseKilometer<glm::vec3>(gAtmosphereProfile.mRayleighScatteringCoefficient);
 
 			// Extinction Coefficient
-			// Air molecules do not absorb light => Extinction = Scattering
+			// Note that extinction = scattering + absorption
+			// Air molecules do not absorb light
+			atmosphere->mRayleighExtinction = atmosphere->mRayleighScattering;
 
 			// Density: decrease exponentially
 			atmosphere->mRayleighDensity.mLayer0 = { dummy, dummy, dummy, dummy, dummy };
@@ -103,9 +106,9 @@ void PrecomputedAtmosphereScattering::Update()
 		{
 			switch (gAtmosphereProfile.mMieMode)
 			{
-			case AtmosphereProfile::MieMode::BN08Impl:
+			case AtmosphereProfile::MieMode::Bruneton08Impl:
 			{
-				// [BN08 Impl]
+				// [Bruneton08 Impl]
 				// [TODO] Further reference?
 				gAtmosphereProfile.mMieExtinctionCoefficient = gAtmosphereProfile.kMieAngstromBeta / gAtmosphereProfile.kMieScaleHeight * glm::pow(gAtmosphereProfile.kLambda, glm::dvec3(-gAtmosphereProfile.kMieAngstromAlpha));
 
@@ -113,9 +116,9 @@ void PrecomputedAtmosphereScattering::Update()
 				gAtmosphereProfile.mMieScatteringCoefficient = gAtmosphereProfile.mMieExtinctionCoefficient * gAtmosphereProfile.kMieSingleScatteringAlbedo;
 			}
 			break;
-			case AtmosphereProfile::MieMode::BN08:
+			case AtmosphereProfile::MieMode::Bruneton08:
 			{
-				// [BN08] Figure 6
+				// [Bruneton08] Figure 6
 				gAtmosphereProfile.mMieExtinctionCoefficient = gAtmosphereProfile.mMieExtinctionCoefficientPaper;
 				gAtmosphereProfile.mMieScatteringCoefficient = gAtmosphereProfile.mMieScatteringCoefficientPaper;
 			}
@@ -125,13 +128,15 @@ void PrecomputedAtmosphereScattering::Update()
 				break;
 			}
 
-			// Coefficient
-			atmosphere->mMieExtinction = UnitHelper::sInverseMeterToInverseKilometer<glm::vec3>(gAtmosphereProfile.mMieExtinctionCoefficient);
+			// Scattering Coefficient
 			atmosphere->mMieScattering = UnitHelper::sInverseMeterToInverseKilometer<glm::vec3>(gAtmosphereProfile.mMieScatteringCoefficient);
+
+			// Extinction Coefficient
+			atmosphere->mMieExtinction = UnitHelper::sInverseMeterToInverseKilometer<glm::vec3>(gAtmosphereProfile.mMieExtinctionCoefficient);
 
 			// Density: decrease exponentially
 			atmosphere->mMieDensity.mLayer0 = { dummy, dummy, dummy, dummy, dummy };
-			atmosphere->mMieDensity.mLayer1 = { dummy, 1.0f, -1.0f / UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.kRayleighScaleHeight), 0.0f, 0.0f };
+			atmosphere->mMieDensity.mLayer1 = { dummy, 1.0f, -1.0f / UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.kMieScaleHeight), 0.0f, 0.0f };
 		}
 
 		// Ozone
@@ -156,17 +161,20 @@ void PrecomputedAtmosphereScattering::Update()
 
 			if (gAtmosphereProfile.mEnableOzone)
 			{
-				atmosphere->mAbsorptionDensity.mLayer0 = { ozone_bottom_altitude, 0.0f, 0.0f, layer_0_linear_term, layer_0_constant_term };
-				atmosphere->mAbsorptionDensity.mLayer1 = { dummy, 0.0f, 0.0f, layer_1_linear_term, layer_1_constant_term };
+				atmosphere->mOzoneDensity.mLayer0 = { ozone_mid_altitude, 0.0f, 0.0f, layer_0_linear_term, layer_0_constant_term };
+				atmosphere->mOzoneDensity.mLayer1 = { dummy, 0.0f, 0.0f, layer_1_linear_term, layer_1_constant_term };
 
-				atmosphere->mAbsorptionExtinction = UnitHelper::sInverseMeterToInverseKilometer<glm::vec3>(gAtmosphereProfile.mOZoneAbsorptionCoefficient);
+				// Extinction Coefficient
+				// Note that extinction = scattering + absorption
+				// Ozone do not scatter light (?)
+				atmosphere->mOzoneExtinction = UnitHelper::sInverseMeterToInverseKilometer<glm::vec3>(gAtmosphereProfile.mOZoneAbsorptionCoefficient);
 			}
 			else
 			{
-				atmosphere->mAbsorptionDensity.mLayer0 = { dummy, 0.0f, 0.0f, 0.0f, 0.0f };
-				atmosphere->mAbsorptionDensity.mLayer1 = { dummy, 0.0f, 0.0f, 0.0f, 0.0f };
+				atmosphere->mOzoneDensity.mLayer0 = { dummy, 0.0f, 0.0f, 0.0f, 0.0f };
+				atmosphere->mOzoneDensity.mLayer1 = { dummy, 0.0f, 0.0f, 0.0f, 0.0f };
 
-				atmosphere->mAbsorptionExtinction = glm::vec3(0);
+				atmosphere->mOzoneExtinction = glm::vec3(dummy);
 			}
 		}
 	} // Density Profile
@@ -265,7 +273,7 @@ void PrecomputedAtmosphereScattering::Finalize()
 
 void PrecomputedAtmosphereScattering::UpdateImGui()
 {
-	if (ImGui::TreeNodeEx("Profile"))
+	if (ImGui::TreeNodeEx("Geometry"))
 	{
 		glm::f64 earth_radius_min = 1000.0;
 		glm::f64 earth_radius_max = 10000000.0;
@@ -277,7 +285,7 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 		ImGui::TreePop();
 	}
 
-	if (ImGui::TreeNodeEx("Parameters", ImGuiTreeNodeFlags_DefaultOpen))
+	if (ImGui::TreeNodeEx("Coefficients & Density", ImGuiTreeNodeFlags_DefaultOpen))
 	{
 		if (ImGui::TreeNodeEx("Rayleigh", ImGuiTreeNodeFlags_DefaultOpen))
 		{
@@ -286,7 +294,7 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 
 			ImGui::EnumRadioButton(AtmosphereProfile::RayleighMode::Precomputed, &gAtmosphereProfile.mRayleighMode);
 			ImGui::SameLine();
-			ImGui::EnumRadioButton(AtmosphereProfile::RayleighMode::BN08Impl, &gAtmosphereProfile.mRayleighMode);
+			ImGui::EnumRadioButton(AtmosphereProfile::RayleighMode::Bruneton08Impl, &gAtmosphereProfile.mRayleighMode);
 			ImGui::SameLine();
 			ImGui::EnumRadioButton(AtmosphereProfile::RayleighMode::PSS99, &gAtmosphereProfile.mRayleighMode);
 
@@ -300,9 +308,9 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 			glm::vec3 scattering_coefficient = gAtmosphereProfile.mMieScatteringCoefficient * 1e6;
 			ImGui::InputFloat3("Scattering 1e-6 (/m)", &scattering_coefficient.x);
 
-			ImGui::EnumRadioButton(AtmosphereProfile::MieMode::BN08Impl, &gAtmosphereProfile.mMieMode);
+			ImGui::EnumRadioButton(AtmosphereProfile::MieMode::Bruneton08Impl, &gAtmosphereProfile.mMieMode);
 			ImGui::SameLine();
-			ImGui::EnumRadioButton(AtmosphereProfile::MieMode::BN08, &gAtmosphereProfile.mMieMode);
+			ImGui::EnumRadioButton(AtmosphereProfile::MieMode::Bruneton08, &gAtmosphereProfile.mMieMode);
 
 			ImGui::TreePop();
 		}
@@ -334,7 +342,7 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 		ImGui::SameLine();
 		ImGui::Checkbox("Show Alpha", &g_TextureAlpha);
 
-		ImGui::Checkbox("Unify XY Encode", &mUnifyXYEncode);
+		ImGui::Checkbox("Trivial Axis Encoding", &mTrivialAxisEncoding);
 
 		auto add_texture = [&](Texture& inTexture)
 		{
@@ -344,8 +352,9 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 			if (mUIFlipY)
 				std::swap(uv0.y, uv1.y);
 
-			ImGui::Image((ImTextureID)inTexture.mGPUHandle.ptr,
-				ImVec2(inTexture.mWidth * inTexture.mUIScale * mUIScale, inTexture.mHeight * inTexture.mUIScale * mUIScale), uv0, uv1);
+			float ui_scale = inTexture.mUIScale * mUIScale;
+			ImGui::Image((ImTextureID)inTexture.mGPUHandle.ptr, ImVec2(inTexture.mWidth * ui_scale, inTexture.mHeight * ui_scale), uv0, uv1);
+
 			ImGui::SameLine();
 			std::string text = inTexture.mName;
 			text += "\n";

@@ -87,9 +87,9 @@ struct DensityProfileLayer
 
 #ifndef HLSL_AS_CPP
 // Altitude -> Density
-float GetLayerDensity(DensityProfileLayer inLayer, float inAltitude)
+float GetLayerDensity(DensityProfileLayer layer, float altitude)
 {
-	float density = inLayer.mExpTerm * exp(inLayer.mExpScale * inAltitude) + inLayer.mLinearTerm * inAltitude + inLayer.mConstantTerm;
+	float density = layer.mExpTerm * exp(layer.mExpScale * altitude) + layer.mLinearTerm * altitude + layer.mConstantTerm;
 	return clamp(density, 0.0, 1.0);
 }
 #endif // HLSL_AS_CPP
@@ -101,12 +101,12 @@ struct DensityProfile
 };
 
 #ifndef HLSL_AS_CPP
-float GetProfileDensity(DensityProfile inProfile, float inAltitude)
+float GetProfileDensity(DensityProfile profile, float altitude)
 {
-	if (inAltitude < inProfile.mLayer0.mWidth)
-		return GetLayerDensity(inProfile.mLayer0, inAltitude);
+	if (altitude < profile.mLayer0.mWidth)
+		return GetLayerDensity(profile.mLayer0, altitude);
 	else
-		return GetLayerDensity(inProfile.mLayer1, inAltitude);
+		return GetLayerDensity(profile.mLayer1, altitude);
 }
 #endif // HLSL_AS_CPP
 
@@ -116,22 +116,25 @@ struct Atmosphere
 	float					mTopRadius				CONSTANT_DEFAULT(0);	// km
 	float2					mPad0;
 
-	uint					mUnifyXYEncode			CONSTANT_DEFAULT(0);
-	uint3					mPadFlags;
-
+	uint					mTrivialAxisEncoding	CONSTANT_DEFAULT(0);
+	uint					mXBinCount				CONSTANT_DEFAULT(0);
+	uint2					mPadFlags;
+	
 	float3					mRayleighScattering		CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	float					mPad1;
+	float3					mRayleighExtinction		CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	float					mPad2;
 	DensityProfile			mRayleighDensity;
 
 	float3					mMieScattering			CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
-	float					mPad2;
-	float3					mMieExtinction			CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	float					mPad3;
+	float3					mMieExtinction			CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	float					mPad4;
 	DensityProfile			mMieDensity;
 
-	float3					mAbsorptionExtinction	CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
-	float					mPad4;
-	DensityProfile			mAbsorptionDensity;
+	float3					mOzoneExtinction		CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	float					mPad5;
+	DensityProfile			mOzoneDensity;
 
 	float3					mSolarIrradiance		CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	float					mSunAngularRadius		CONSTANT_DEFAULT(0);
