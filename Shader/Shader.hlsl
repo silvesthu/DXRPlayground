@@ -547,11 +547,13 @@ float4 Decode4D_Scattering(uint3 inTexCoords, out bool intersects_ground)
 	
 	// r - Height
 	{
-		// Non-linear mapping, Figure 3
-		r = sqrt(rho * rho + R_g * R_g);
+		// [Mapping] Height -> Ground towards Horizon
 
 		// Same as
 		// r = Decode_R(u_r, false);
+
+		// Non-linear mapping, Figure 3
+		r = sqrt(rho * rho + R_g * R_g);
 	}
 
 	// mu - View Zenith
@@ -561,7 +563,7 @@ float4 Decode4D_Scattering(uint3 inTexCoords, out bool intersects_ground)
 		float rho = H * u_r;
 		if (inTexCoords.y <= size.y / 2)
 		{
-			// View Zenith -> P to Ground distance
+			// [Mapping] View Zenith -> P to Ground distance
 
 			intersects_ground = true;
 
@@ -576,9 +578,10 @@ float4 Decode4D_Scattering(uint3 inTexCoords, out bool intersects_ground)
 		}
 		else
 		{
+			// [Mapping] View Zenith -> P to Top distance
+
 			// Same as
 			// mu = Decode_Mu(y, u_r, false);
-			// View Zenith -> P to Top distance
 
 			intersects_ground = false;
 
@@ -595,6 +598,8 @@ float4 Decode4D_Scattering(uint3 inTexCoords, out bool intersects_ground)
 
 	// mu_s - Sun Zenith
 	{
+		// [Mapping] Sun Zenith -> 
+
 		// [NOTE] Fitted curve is most likely to be created with 102.0
 		bool use_half_precision = true;
 		float max_sun_zenith_angle = (use_half_precision ? 102.0 : 120.0) / 180.0 * MATH_PI;
@@ -624,10 +629,12 @@ float4 Decode4D_Scattering(uint3 inTexCoords, out bool intersects_ground)
 
 	// nu - View Sun Angle
 	{
+		// [Mapping] View Sun Angle -> View Sun Angle (trivial)
+
 		nu = ClampCosine(u_nu * 2.0 - 1.0);
 	}
 
-	// ?
+	// [Note] View Sun Angle is bounded by View Zenith and Sun Zenith
 	nu = clamp(nu, mu * mu_s - sqrt((1.0 - mu * mu) * (1.0 - mu_s * mu_s)), mu * mu_s + sqrt((1.0 - mu * mu) * (1.0 - mu_s * mu_s)));
 
 	return float4(r, mu, mu_s, nu);
@@ -639,7 +646,7 @@ float3 Encode4D_Scattering(float4 r_mu_mu_s_nu)
 	return 0;
 }
 
-float IntegrateExtinctionCoefficient(DensityProfile inProfile, float2 mu_r)
+float IntegrateDensity(DensityProfile inProfile, float2 mu_r)
 {
 	const int SAMPLE_COUNT = 500;
 
@@ -655,7 +662,7 @@ float IntegrateExtinctionCoefficient(DensityProfile inProfile, float2 mu_r)
 		// Distance between the current sample point and the planet center.
 		float r_i = sqrt(d_i * d_i + 2.0 * r * mu * d_i + r * r);
 
-		// Extinction Coefficient (Density) based on altitude.
+		// Extinction Coefficient Multiplier (Density) based on altitude.
 		float altitude = r_i - mAtmosphere.mBottomRadius;
 		float beta_i = GetProfileDensity(inProfile, altitude);
 
@@ -671,43 +678,58 @@ float IntegrateExtinctionCoefficient(DensityProfile inProfile, float2 mu_r)
 float3 ComputeTransmittance(float2 mu_r)
 {
 	// See [Bruneton08] 2.2 (5)
+	// Extinction Coefficients at sea level is extracted out of integration
 
-	float3 rayleigh = mAtmosphere.mRayleighExtinction.xyz * IntegrateExtinctionCoefficient(mAtmosphere.mRayleighDensity, mu_r);
-	float3 mie = mAtmosphere.mMieExtinction.xyz* IntegrateExtinctionCoefficient(mAtmosphere.mMieDensity, mu_r);
-	float3 ozone = mAtmosphere.mOzoneExtinction.xyz* IntegrateExtinctionCoefficient(mAtmosphere.mOzoneDensity, mu_r);
+	float3 rayleigh		= mAtmosphere.mRayleighExtinction.xyz	* IntegrateDensity(mAtmosphere.mRayleighDensity, mu_r);
+	float3 mie			= mAtmosphere.mMieExtinction.xyz		* IntegrateDensity(mAtmosphere.mMieDensity, mu_r);
+	float3 ozone		= mAtmosphere.mOzoneExtinction.xyz		* IntegrateDensity(mAtmosphere.mOzoneDensity, mu_r);
 
 	float3 transmittance = exp(-(rayleigh + mie + ozone));
 	return transmittance;
 }
 
-float3 GetTransmittanceToTopAtmosphereBoundary(float r, float mu)
+float3 SampleTransmittanceToTopAtmosphereBoundary(float r, float mu)
 {
+	// [Bruneton08 Impl] GetTransmittanceToTopAtmosphereBoundary
+
 	float2 mu_r = float2(mu, r);
 
 	float2 transmittance_uv = XY_to_UV(Encode2D(mu_r, mAtmosphere.mTrivialAxisEncoding), TransmittanceSRV);
 	float3 transmittance = TransmittanceSRV.SampleLevel(BilinearSampler, transmittance_uv, 0).xyz;
-	// transmittance = ComputeTransmittance(mu_r); // compute transmittance directly
+
+	bool compute_transmittance = false; // compute transmittance directly instead of sampling LUT
+	if (compute_transmittance)
+		transmittance = ComputeTransmittance(mu_r);
 
 	return transmittance;
 }
 
-float3 GetTransmittance(float r, float mu, float d, bool ray_r_mu_intersects_ground) 
+float3 SampleTransmittance(float r, float mu, float d, bool ray_r_mu_intersects_ground) 
 {
-	float r_d = ClampRadius(sqrt(d * d + 2.0 * r * mu * d + r * r));
-	float mu_d = ClampCosine((r * mu + d) / r_d);
+	// [Bruneton08 Impl] GetTransmittance
 
+	// P -> Top along Eye -> P
+	float r_d = ClampRadius(sqrt(d * d + 2.0 * r * mu * d + r * r));
+	float mu_d = ClampCosine((r * mu + d) / r_d); // [NOTE] direction is same, but up vector changed
+
+	// Eye -> P
 	if (ray_r_mu_intersects_ground)
-		return min(GetTransmittanceToTopAtmosphereBoundary(r_d, -mu_d) / GetTransmittanceToTopAtmosphereBoundary(r, -mu), 1.0);
+		return min(SampleTransmittanceToTopAtmosphereBoundary(r_d, -mu_d) / SampleTransmittanceToTopAtmosphereBoundary(r, -mu), 1.0);
 	else
-		return min(GetTransmittanceToTopAtmosphereBoundary(r, mu) / GetTransmittanceToTopAtmosphereBoundary(r_d, mu_d), 1.0);
+		return min(SampleTransmittanceToTopAtmosphereBoundary(r, mu) / SampleTransmittanceToTopAtmosphereBoundary(r_d, mu_d), 1.0);
 }
 
-float3 GetTransmittanceToSun(float r, float mu_s) 
+float3 SampleTransmittanceToSun(float r, float mu_s) 
 {
+	// [Bruneton08 Impl] GetTransmittanceToSun
+
 	float sin_theta_h = mAtmosphere.mBottomRadius / r;
 	float cos_theta_h = -sqrt(max(1.0 - sin_theta_h * sin_theta_h, 0.0));
 
-	return GetTransmittanceToTopAtmosphereBoundary(r, mu_s) * 
+	// Approximate visible sun disk fraction
+	// See https://ebruneton.github.io/precomputed_atmospheric_scattering/atmosphere/functions.glsl.html
+	// [TODO] Read again
+	return SampleTransmittanceToTopAtmosphereBoundary(r, mu_s) * 
 		smoothstep(-sin_theta_h * mAtmosphere.mSunAngularRadius, sin_theta_h * mAtmosphere.mSunAngularRadius, mu_s - cos_theta_h);
 }
 
@@ -718,11 +740,14 @@ void ComputeSingleScatteringIntegrand(float4 r_mu_mu_s_nu, float d, bool ray_r_m
 	float mu_s = r_mu_mu_s_nu.z;
 	float nu = r_mu_mu_s_nu.w;
 
-	float r_d = ClampRadius(sqrt(d * d + 2.0 * r * mu * d + r * r));
+	// d = distance(Eye, P)
 
+	// P -> Sun
+	float r_d = ClampRadius(sqrt(d * d + 2.0 * r * mu * d + r * r)); // = ((mu * d) + r)^2 + (1-mu^2)d^2
 	float mu_s_d = ClampCosine((r * mu_s + d * nu) / r_d);
 
-	float3 transmittance = GetTransmittance(r, mu, d, ray_r_mu_intersects_ground) * GetTransmittanceToSun(r_d, mu_s_d);
+	// Eye -> P then P -> Sun
+	float3 transmittance = SampleTransmittance(r, mu, d, ray_r_mu_intersects_ground) * SampleTransmittanceToSun(r_d, mu_s_d);
 
 	rayleigh = transmittance * GetProfileDensity(mAtmosphere.mRayleighDensity, r_d - mAtmosphere.mBottomRadius);
 	mie = transmittance * GetProfileDensity(mAtmosphere.mMieDensity, r_d - mAtmosphere.mBottomRadius);
@@ -752,7 +777,7 @@ void ComputeTransmittanceCS(
 	// float3 debug = float3(uv, 0);
 	// debug = (r - 6360) / 60.0;
 	// debug = mu.xxx;
-	// debug = IntegrateExtinctionCoefficient(mAtmosphere.mRayleighDensity, r, mu).xxx;
+	// debug = IntegrateDensity(mAtmosphere.mRayleighDensity, r, mu).xxx;
 	// TransmittanceUAV[inDispatchThreadID.xy] = float4(debug, 1.0);
 	// TransmittanceUAV[inDispatchThreadID.xy] = float4(xy, 0, 1);
 }
@@ -784,7 +809,7 @@ void ComputeDirectIrradianceCS(
 		average_cosine_factor = (mu_s + alpha_s) * (mu_s + alpha_s) / (4.0 * alpha_s);
 
 	// Direct Irradiance
-	float3 transmittance = GetTransmittanceToTopAtmosphereBoundary(r, mu_s);
+	float3 transmittance = SampleTransmittanceToTopAtmosphereBoundary(r, mu_s);
 	float3 direct_irradiance = transmittance * mAtmosphere.mSolarIrradiance * average_cosine_factor; // [Bruneton08] 2.2 (9) L_0
 
 	// Output
@@ -798,8 +823,10 @@ void ComputeDirectIrradianceCS(
 	// IrradianceUAV[inDispatchThreadID.xy] = float4(uv, 0, 1);
 }
 
-void ComputeSingleScattering(float4 r_mu_mu_s_nu, bool intersects_ground, out float3 rayleigh, out float3 mie)
+void IntegrateSingleScattering(float4 r_mu_mu_s_nu, bool intersects_ground, out float3 rayleigh, out float3 mie)
 {
+	// [Bruneton08 Impl] ComputeSingleScattering
+
 	float r = r_mu_mu_s_nu.x;
 	float mu = r_mu_mu_s_nu.y;
 	float mu_s = r_mu_mu_s_nu.z;
@@ -814,7 +841,6 @@ void ComputeSingleScattering(float4 r_mu_mu_s_nu, bool intersects_ground, out fl
 	// Integration loop.
 	float3 rayleigh_sum = 0.0;
 	float3 mie_sum = 0.0;
-
 	for (int i = 0; i <= SAMPLE_COUNT; ++i) 
 	{
 		float d_i = i * dx;
@@ -851,7 +877,7 @@ void ComputeSingleScatteringCS(
 	// Compute
 	float3 delta_rayleigh = 0;
 	float3 delta_mie = 0;
-	ComputeSingleScattering(r_mu_mu_s_nu, intersects_ground, delta_rayleigh, delta_mie);
+	IntegrateSingleScattering(r_mu_mu_s_nu, intersects_ground, delta_rayleigh, delta_mie);
 
 	// [TODO]
 	float3x3 luminance_from_radiance = { 1,0,0,0,1,0,0,0,1 };

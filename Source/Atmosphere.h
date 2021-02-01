@@ -4,6 +4,7 @@
 
 struct AtmosphereProfile
 {
+	// [Nishita93][NSTN93] Display of The Earth Taking into Account Atmospheric Scattering https://www.researchgate.net/publication/2933032_Display_of_The_Earth_Taking_into_Account_Atmospheric_Scattering
 	// [Preetham99][PSS99] A Practical Analytic Model for Daylight https://www2.cs.duke.edu/courses/cps124/spring08/assign/07_papers/p91-preetham.pdf
 	// [Riley04][REK*04] Efficient Rendering of Atmospheric Phenomena https://people.cs.clemson.edu/~jtessen/reports/papers_files/Atmos_EGSR_Elec.pdf
 	// [Zotti07][ZWP07] A Critical Review of the Preetham Skylight Model https://www.cg.tuwien.ac.at/research/publications/2007/zotti-2007-wscg/zotti-2007-wscg-paper.pdf
@@ -22,6 +23,9 @@ struct AtmosphereProfile
 	double kOzoneBottomAltitude						= 10000.0;											// m
 	double kOzoneMidAltitude						= 25000.0;											// m
 	double kOzoneTopAltitude						= 40000.0;											// m
+
+	// Geometry Alternative
+	double kRayleighScaleHeight_NSTN93				= 7994.0;											// m
 
 	// Rayleigh [Bruneton08][Bruneton08 Impl]
 	enum class RayleighMode

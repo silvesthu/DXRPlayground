@@ -79,7 +79,7 @@ void PrecomputedAtmosphereScattering::Update()
 					((3.0 * N) * (6.0 - 7.0 * p_n));
 				gAtmosphereProfile.mRayleighScatteringCoefficient = kRayleigh / glm::pow(UnitHelper::sNanometerToMeter<glm::dvec3>(gAtmosphereProfile.kLambda), glm::dvec3(4.0));
 
-				// [Note] [Bruneton08] 2.1 (1) miss the right half, (6.0 + 3.0 * p_n) / (6.0 - 7.0 * p_n)
+				// [Note] [Bruneton08] 2.1 (1) might miss the right half? (6.0 + 3.0 * p_n) / (6.0 - 7.0 * p_n)
 
 				// Total scattering coefficient = gAtmosphereProfile.mRayleighScatteringCoefficient = integral of angular scattering coefficient in all directions
 				// Angular scattering coefficient = Total scattering coefficient * (1 + cos(theta)^2) * 3.0 / 2.0
@@ -98,8 +98,12 @@ void PrecomputedAtmosphereScattering::Update()
 			atmosphere->mRayleighExtinction = atmosphere->mRayleighScattering;
 
 			// Density: decrease exponentially
+			// [Bruneton08] 2.1 (1), e^(-1/H_R)
 			atmosphere->mRayleighDensity.mLayer0 = { dummy, dummy, dummy, dummy, dummy };
 			atmosphere->mRayleighDensity.mLayer1 = { dummy, 1.0f, -1.0f / UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.kRayleighScaleHeight), 0.0f, 0.0f };
+
+			// How to get scale height?
+			// https://en.wikipedia.org/wiki/Scale_height
 		}
 
 		// Mie
@@ -129,12 +133,14 @@ void PrecomputedAtmosphereScattering::Update()
 			}
 
 			// Scattering Coefficient
+			// [Bruneton08] 2.1 (3), beta_M(0, lambda)
 			atmosphere->mMieScattering = UnitHelper::sInverseMeterToInverseKilometer<glm::vec3>(gAtmosphereProfile.mMieScatteringCoefficient);
 
 			// Extinction Coefficient
 			atmosphere->mMieExtinction = UnitHelper::sInverseMeterToInverseKilometer<glm::vec3>(gAtmosphereProfile.mMieExtinctionCoefficient);
 
 			// Density: decrease exponentially
+			// [Bruneton08] 2.1 (3), e^(-1/H_M)
 			atmosphere->mMieDensity.mLayer0 = { dummy, dummy, dummy, dummy, dummy };
 			atmosphere->mMieDensity.mLayer1 = { dummy, 1.0f, -1.0f / UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.kMieScaleHeight), 0.0f, 0.0f };
 		}
