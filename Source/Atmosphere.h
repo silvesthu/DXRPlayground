@@ -9,9 +9,14 @@ struct AtmosphereProfile
 	// [Riley04][REK*04] Efficient Rendering of Atmospheric Phenomena https://people.cs.clemson.edu/~jtessen/reports/papers_files/Atmos_EGSR_Elec.pdf
 	// [Zotti07][ZWP07] A Critical Review of the Preetham Skylight Model https://www.cg.tuwien.ac.at/research/publications/2007/zotti-2007-wscg/zotti-2007-wscg-paper.pdf
 	// [Bruneton08] Precomputed Atmospheric Scattering https://hal.inria.fr/inria-00288758/document
+	// [Bruneton08 Doc] https://ebruneton.github.io/precomputed_atmospheric_scattering/atmosphere/functions.glsl.html
 	// [Bruneton08 Impl] https://github.com/ebruneton/precomputed_atmospheric_scattering
 	// [Elek09] Rendering Parametrizable Planetary Atmospheres with Multiple Scattering in Real-Time http://www.klayge.org/material/4_0/Atmospheric/Rendering%20Parametrizable%20Planetary%20Atmospheres%20with%20Multiple%20Scattering%20in%20Real-Time.pdf
 	// [Yusov13] Outdoor Light Scattering Sample Update https://software.intel.com/content/www/us/en/develop/blogs/otdoor-light-scattering-sample-update.html
+	// [Hillaire16] Physically Based Sky, Atmosphere and Cloud Rendering in Frostbite https://media.contentapi.ea.com/content/dam/eacom/frostbite/files/s2016-pbs-frostbite-sky-clouds-new.pdf
+	// [Carpentier17] Decima Engine : Advances in Lighting and AA https://www.guerrilla-games.com/read/decima-engine-advances-in-lighting-and-aa
+	// [Hillaire20] A Scalable and Production Ready Sky and Atmosphere Rendering Technique https://sebh.github.io/publications/egsr2020.pdf
+	// [UE4 SkyAtmosphere] SkyAtmosphere.usf SkyAtmosphereComponent.cpp https://docs.unrealengine.com/en-US/BuildingWorlds/FogEffects/SkyAtmosphere/index.html
 
 	// Geometry [Bruneton08]
 	double kBottomRadius							= 6360000.0;										// m
@@ -23,9 +28,6 @@ struct AtmosphereProfile
 	double kOzoneBottomAltitude						= 10000.0;											// m
 	double kOzoneMidAltitude						= 25000.0;											// m
 	double kOzoneTopAltitude						= 40000.0;											// m
-
-	// Geometry Alternative
-	double kRayleighScaleHeight_NSTN93				= 7994.0;											// m
 
 	// Rayleigh [Bruneton08][Bruneton08 Impl]
 	enum class RayleighMode
@@ -61,6 +63,8 @@ struct AtmosphereProfile
 	glm::dvec3 mMieScatteringCoefficientPaper		= glm::dvec3(20.0, 20.0, 20.0) * 1e-6;				// m^-1
 	glm::dvec3 mMieExtinctionCoefficientPaper		= mMieScatteringCoefficientPaper / 0.9;				// m^-1
 
+	double kMiePhaseFunctionG						= 0.8;
+
 	// Ozone 
 	// [Bruneton08 Impl]
 	bool mEnableOzone								= true;
@@ -69,9 +73,6 @@ struct AtmosphereProfile
 	glm::dvec3 kOzoneCrossSection					= glm::dvec3(1.209e-25, 3.5e-25, 1.582e-26);		// m^2
 
 	glm::dvec3 mOZoneAbsorptionCoefficient			= glm::dvec3(0);									// m^-1
-
-	// Turbidity [PSS99][ZWP07]
-	double kTurbidity								= 1;												// 1 ~ Pure air, >= 10 ~ Haze
 
 	// Solar 
 	// [Bruneton08 Impl] demo.cc http://rredc.nrel.gov/solar/spectra/am1.5/ASTMG173/ASTMG173.html
@@ -85,6 +86,12 @@ struct AtmosphereProfile
 	// [Note] Calculated based on Sun seen from Earth
 	// https://sciencing.com/calculate-angular-diameter-sun-8592633.html
 	// Angular Radius = Angular Diameter / 2.0 = arctan(Sun radius / Sun-Earth distance)
+
+	// Multiple scattering
+	glm::uint mScatteringOrder						= 2; // 4;
+
+	// Ground
+	glm::dvec3 mGroundAlbedo						= glm::dvec3(0.1);
 };
 
 class PrecomputedAtmosphereScattering
@@ -99,18 +106,17 @@ public:
 	void ComputeTransmittance();
 	void ComputeDirectIrradiance();
 	void ComputeSingleScattering();
-	void ComputeScatteringDensity();
+
+	void ComputeScatteringDensity(glm::uint inScatteringOrder);
 	void ComputeIndirectIrradiance();
 	void AccumulateMultipleScattering();
 
-	void ComputeMultipleScattering()
-	{
-		ComputeScatteringDensity();
-		ComputeIndirectIrradiance();
-		AccumulateMultipleScattering();
-	}
+	void ComputeMultipleScattering(glm::uint inScatteringOrder);
 
 	void Precompute();
+
+	bool mRecomputeRequested = true;
+	bool mRecomputeEveryFrame = false;
 
 	float mUIScale = 1.0f;
 	bool mUIFlipY = false;
@@ -122,38 +128,50 @@ struct PrecomputedAtmosphereScatteringResources
 	ComPtr<ID3D12Resource> mConstantUploadBuffer;
 	void* mConstantUploadBufferPointer = nullptr;
 
-	Shader mComputeTransmittanceShader = Shader().CSName(L"ComputeTransmittanceCS");
-	Shader mComputeDirectIrradianceShader = Shader().CSName(L"ComputeDirectIrradianceCS");
-	Shader mComputeSingleScatteringShader = Shader().CSName(L"ComputeSingleScatteringCS");
+	Shader mComputeTransmittanceShader			= Shader().CSName(L"ComputeTransmittanceCS");
+	Shader mComputeDirectIrradianceShader		= Shader().CSName(L"ComputeDirectIrradianceCS");
+	Shader mComputeSingleScatteringShader		= Shader().CSName(L"ComputeSingleScatteringCS");
 
-	// std::span is better but requires C++20
+	Shader mComputeScatteringDensityShader		= Shader().CSName(L"ComputeScatteringDensityCS");
+	Shader mComputeIndirectIrradianceShader		= Shader().CSName(L"ComputeIndirectIrradianceCS");
+	Shader mComputeMultipleScatteringShader		= Shader().CSName(L"ComputeMultipleScatteringCS");
+
+	// Put shaders in array to use in loop (use std::span when C++20 is available)
 	std::vector<Shader*> mShaders = 
 	{ 
 		&mComputeTransmittanceShader, 
 		&mComputeDirectIrradianceShader,
-		&mComputeSingleScatteringShader
+		&mComputeSingleScatteringShader,
+
+		&mComputeScatteringDensityShader,
+		&mComputeIndirectIrradianceShader,
+		&mComputeMultipleScatteringShader
 	};
 
-	Texture mTransmittanceTexture = Texture().Width(256).Height(64).Name("Transmittance");
+	Texture mTransmittanceTexture				= Texture().Width(256).Height(64).Format(DXGI_FORMAT_R32G32B32A32_FLOAT).Name("Transmittance");
 
-	Texture mDeltaIrradianceTexture = Texture().Width(64).Height(16).Name("DeltaIrradiance").UIScale(4.0f);
-	Texture mIrradianceTexture = Texture().Width(64).Height(16).Name("Irradiance").UIScale(4.0f);
+	Texture mDeltaIrradianceTexture				= Texture().Width(64).Height(16).Format(DXGI_FORMAT_R32G32B32A32_FLOAT).Name("DeltaIrradiance").UIScale(4.0f);
+	Texture mIrradianceTexture					= Texture().Width(64).Height(16).Format(DXGI_FORMAT_R32G32B32A32_FLOAT).Name("Irradiance").UIScale(4.0f);
 
-	glm::uint mXBinCount = 8;
-	Texture mDeltaRayleighScatteringTexture = Texture().Width(256).Height(128).Depth(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Delta Rayleigh Scattering");
-	Texture mDeltaMieScatteringTexture = Texture().Width(256).Height(128).Depth(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Delta Mie Scattering");
-	Texture mScatteringTexture = Texture().Width(256).Height(128).Depth(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Scattering");
+	glm::uint mXSliceCount						= 8; // Slice X axis to use 3D texture as 4D storage
+	Texture mDeltaRayleighScatteringTexture		= Texture().Width(256).Height(128).Depth(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Delta Rayleigh Scattering");
+	Texture mDeltaMieScatteringTexture			= Texture().Width(256).Height(128).Depth(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Delta Mie Scattering");
+	Texture mScatteringTexture					= Texture().Width(256).Height(128).Depth(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Scattering");
 
-	Texture mDeltaScatteringDensityTexture = Texture().Width(256).Height(128).Depth(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Delta Scattering Density");
-
+	Texture mDeltaScatteringDensityTexture		= Texture().Width(256).Height(128).Depth(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Delta Scattering Density");
+	
+	// Put textures in array to use in loop
 	std::vector<Texture*> mTextures =
 	{
 		&mTransmittanceTexture,
+
 		&mDeltaIrradianceTexture,
 		&mIrradianceTexture,
+
 		&mDeltaRayleighScatteringTexture,
 		&mDeltaMieScatteringTexture,
 		&mScatteringTexture,
+
 		&mDeltaScatteringDensityTexture
 	};
 };

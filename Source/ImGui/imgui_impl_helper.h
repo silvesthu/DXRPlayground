@@ -10,6 +10,17 @@ namespace ImGui
 	{
 		return ImGui::RadioButton(nameof::nameof_enum(inEnum).data(), (int*)inPointer, (int)inEnum);
 	}
+
+	inline bool InputDouble3(const char* label, double v[3], const char* format = "%.3f", ImGuiInputTextFlags flags = 0)
+	{
+		flags |= ImGuiInputTextFlags_CharsScientific;
+		return InputScalarN(label, ImGuiDataType_Double, v, 3, NULL, NULL, format, flags);
+	}
+
+	inline bool SliderDouble(const char* label, double* v, double v_min, double v_max, const char* format = "%.3f", float power = 1.0f)
+	{
+		return SliderScalar(label, ImGuiDataType_Double, v, &v_min, &v_max, format, power);
+	}
 }
 
 struct ExampleAppLog

@@ -52,7 +52,7 @@ static IDxcBlob* sCompileShader(const char* inFilename, const char* inSource, gl
 		gValidate(operation_result->GetErrorBuffer(&blob));
 		// We can use the library to get our preferred encoding.
 		gValidate(utils->GetBlobAsUtf8(blob, &blob_8));
-		std::string str((LPCSTR)blob_8->GetBufferPointer(), (int)blob_8->GetBufferSize() / 2);
+		std::string str((LPCSTR)blob_8->GetBufferPointer(), (int)blob_8->GetBufferSize());
 		str += '\n';
 		gDebugPrint(str.c_str());
 		blob->Release();
@@ -212,6 +212,7 @@ struct LocalRootSignature : public StateSubobjectHolder<ID3D12RootSignature*, D3
 	LocalRootSignature(const D3D12_ROOT_SIGNATURE_DESC& inDesc)
 	{
 		mRootSignature = CreateRootSignature(inDesc);
+		mRootSignature->SetName(L"LocalRootSignature");
 		mDesc = mRootSignature.Get();
 	}
 private:
@@ -254,6 +255,7 @@ struct GlobalRootSignature : public StateSubobjectHolder<ID3D12RootSignature*, D
 	GlobalRootSignature(const D3D12_ROOT_SIGNATURE_DESC& inDesc)
 	{
 		mRootSignature = CreateRootSignature(inDesc);
+		mRootSignature->SetName(L"GlobalRootSignature");
 		mDesc = mRootSignature.Get();
 	}
 	ComPtr<ID3D12RootSignature> mRootSignature;
@@ -283,11 +285,11 @@ bool sCreateVSPSPipelineState(const char* inShaderFileName, std::stringstream& i
 	if (vs_blob == nullptr || ps_blob == nullptr)
 		return false;
 
-	if (FAILED(gDevice->CreateRootSignature(0, ps_blob->GetBufferPointer(), ps_blob->GetBufferSize(), IID_PPV_ARGS(&ioSystemShader.mRootSignature))))
+	if (FAILED(gDevice->CreateRootSignature(0, ps_blob->GetBufferPointer(), ps_blob->GetBufferSize(), IID_PPV_ARGS(&ioSystemShader.mData.mRootSignature))))
 		return false;
 
 	ComPtr<ID3D12RootSignatureDeserializer> deserializer;
-	if (FAILED(D3D12CreateRootSignatureDeserializer(ps_blob->GetBufferPointer(), ps_blob->GetBufferSize(), IID_PPV_ARGS(&ioSystemShader.mRootSignatureDeserializer))))
+	if (FAILED(D3D12CreateRootSignatureDeserializer(ps_blob->GetBufferPointer(), ps_blob->GetBufferSize(), IID_PPV_ARGS(&ioSystemShader.mData.mRootSignatureDeserializer))))
 		return false;
 
 	D3D12_RASTERIZER_DESC rasterizer_desc = {};
@@ -302,7 +304,7 @@ bool sCreateVSPSPipelineState(const char* inShaderFileName, std::stringstream& i
 	pipeline_state_desc.VS.BytecodeLength = vs_blob->GetBufferSize();
 	pipeline_state_desc.PS.pShaderBytecode = ps_blob->GetBufferPointer();
 	pipeline_state_desc.PS.BytecodeLength = ps_blob->GetBufferSize();
-	pipeline_state_desc.pRootSignature = ioSystemShader.mRootSignature.Get();
+	pipeline_state_desc.pRootSignature = ioSystemShader.mData.mRootSignature.Get();
 	pipeline_state_desc.RasterizerState = rasterizer_desc;
 	pipeline_state_desc.BlendState = blend_desc;
 	pipeline_state_desc.DepthStencilState.DepthEnable = FALSE;
@@ -313,7 +315,7 @@ bool sCreateVSPSPipelineState(const char* inShaderFileName, std::stringstream& i
 	pipeline_state_desc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
 	pipeline_state_desc.SampleDesc.Count = 1;
 	
-	if (FAILED(gDevice->CreateGraphicsPipelineState(&pipeline_state_desc, IID_PPV_ARGS(&ioSystemShader.mPipelineState))))
+	if (FAILED(gDevice->CreateGraphicsPipelineState(&pipeline_state_desc, IID_PPV_ARGS(&ioSystemShader.mData.mPipelineState))))
 		return false;
 
 	return true;
@@ -325,11 +327,11 @@ bool sCreateCSPipelineState(const char* inShaderFileName, std::stringstream& inS
 	if (cs_blob == nullptr)
 		return false;
 
-	if (FAILED(gDevice->CreateRootSignature(0, cs_blob->GetBufferPointer(), cs_blob->GetBufferSize(), IID_PPV_ARGS(&ioSystemShader.mRootSignature))))
+	if (FAILED(gDevice->CreateRootSignature(0, cs_blob->GetBufferPointer(), cs_blob->GetBufferSize(), IID_PPV_ARGS(&ioSystemShader.mData.mRootSignature))))
 		return false;
 
 	ComPtr<ID3D12RootSignatureDeserializer> deserializer;
-	if (FAILED(D3D12CreateRootSignatureDeserializer(cs_blob->GetBufferPointer(), cs_blob->GetBufferSize(), IID_PPV_ARGS(&ioSystemShader.mRootSignatureDeserializer))))
+	if (FAILED(D3D12CreateRootSignatureDeserializer(cs_blob->GetBufferPointer(), cs_blob->GetBufferSize(), IID_PPV_ARGS(&ioSystemShader.mData.mRootSignatureDeserializer))))
 		return false;
 
 	D3D12_RASTERIZER_DESC rasterizer_desc = {};
@@ -342,9 +344,9 @@ bool sCreateCSPipelineState(const char* inShaderFileName, std::stringstream& inS
 	D3D12_COMPUTE_PIPELINE_STATE_DESC pipeline_state_desc = {};
 	pipeline_state_desc.CS.pShaderBytecode = cs_blob->GetBufferPointer();
 	pipeline_state_desc.CS.BytecodeLength = cs_blob->GetBufferSize();
-	pipeline_state_desc.pRootSignature = ioSystemShader.mRootSignature.Get();
+	pipeline_state_desc.pRootSignature = ioSystemShader.mData.mRootSignature.Get();
 
-	if (FAILED(gDevice->CreateComputePipelineState(&pipeline_state_desc, IID_PPV_ARGS(&ioSystemShader.mPipelineState))))
+	if (FAILED(gDevice->CreateComputePipelineState(&pipeline_state_desc, IID_PPV_ARGS(&ioSystemShader.mData.mPipelineState))))
 		return false;
 
 	return true;
@@ -475,4 +477,6 @@ void gCleanupPipelineState()
 {
 	gDXRStateObject = nullptr;
 	gDXRGlobalRootSignature = nullptr;
+
+	gCompositeShader.Reset();
 }

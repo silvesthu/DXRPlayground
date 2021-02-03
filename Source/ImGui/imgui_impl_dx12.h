@@ -35,6 +35,7 @@ IMGUI_IMPL_API bool     ImGui_ImplDX12_CreateDeviceObjects();
 // Descriptor - Customization
 IMGUI_IMPL_API void		ImGui_ImplDX12_AllocateDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE& out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE& out_gpu_handle);
 
-// Customization
-extern float			g_TextureDepth;
-extern bool				g_TextureAlpha;
+namespace ImGui
+{
+	void TextureOption();
+}

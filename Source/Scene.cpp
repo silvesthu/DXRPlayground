@@ -344,7 +344,7 @@ void Scene::CreateShaderResource()
 
 	// Composite 
 	{
-		gCompositeShader.Initialize(
+		gCompositeShader.InitializeDescriptors(
 		{
 			mOutputResource.Get()
 		});

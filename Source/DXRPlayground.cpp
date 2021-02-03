@@ -288,6 +288,8 @@ static void sUpdate()
 			sWaitForLastSubmittedFrame();
 			gScene.RebuildShader();
 			gPerFrameConstantBuffer.mReset = 1;
+
+			gPrecomputedAtmosphereScattering.mRecomputeRequested = true;
 		}
 	}
 }
@@ -342,6 +344,7 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 			{
 				std::string msg = "Reload triggered by " + inPath + "\n";
 				gLog.AddLog(msg.c_str());
+
 				sReloadRequested = true;
 			}
 		});
@@ -498,12 +501,9 @@ void sRender()
 		rect.bottom = (LONG)desc.Height;
 		gCommandList->RSSetScissorRects(1, &rect);
 		gCommandList->OMSetRenderTargets(1, &frame_render_target_descriptor_handle, false, nullptr);
-		gCommandList->SetGraphicsRootSignature(gCompositeShader.mRootSignature.Get());
-		ID3D12DescriptorHeap* descriptor_heap = gCompositeShader.mDescriptorHeap.Get();
-		gCommandList->SetDescriptorHeaps(1, &descriptor_heap);
-		gCommandList->SetGraphicsRootDescriptorTable(0, gCompositeShader.mDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
-		gCommandList->SetPipelineState(gCompositeShader.mPipelineState.Get());
 		gCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+		gCompositeShader.SetupGraphics();
 		gCommandList->DrawInstanced(3, 1, 0, 0);
 
 		// Output - Copy -> UAV
@@ -603,6 +603,8 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		desc.NodeMask = 1;
 		if (gDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&gRTVDescriptorHeap)) != S_OK)
 			return false;
+
+		gRTVDescriptorHeap->SetName(L"RTVDescriptorHeap");
 
 		SIZE_T rtvDescriptorSize = gDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = gRTVDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
@@ -715,7 +717,7 @@ static void sCleanupDeviceD3D()
 	{
 		ComPtr<IDXGIDebug1> dxgi_debug;
 		if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgi_debug))))
-			dxgi_debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_FLAGS(DXGI_DEBUG_RLO_SUMMARY | DXGI_DEBUG_RLO_IGNORE_INTERNAL));
+			dxgi_debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_FLAGS(DXGI_DEBUG_RLO_DETAIL | DXGI_DEBUG_RLO_IGNORE_INTERNAL));
 	}
 }
 

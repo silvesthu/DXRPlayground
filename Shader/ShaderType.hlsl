@@ -10,7 +10,7 @@ struct PerFrame
 	float4					mCameraRightExtend		CONSTANT_DEFAULT(float4(1.0f, 0.0f, 0.0f, 0.0f));
 	float4					mCameraUpExtend			CONSTANT_DEFAULT(float4(0.0f, 1.0f, 0.0f, 0.0f));
 	
-	BackgroundMode			mBackgroundMode			CONSTANT_DEFAULT(BackgroundMode::Atmosphere);
+	BackgroundMode			mBackgroundMode			CONSTANT_DEFAULT(BackgroundMode::Color);
 	float					mSunAzimuth				CONSTANT_DEFAULT(0);
 	float					mSunZenith				CONSTANT_DEFAULT(MATH_PI / 2.0f);
 	float					mPadding;
@@ -117,7 +117,7 @@ struct Atmosphere
 	float2					mPad0;
 
 	uint					mTrivialAxisEncoding	CONSTANT_DEFAULT(0);
-	uint					mXBinCount				CONSTANT_DEFAULT(0);
+	uint					mXSliceCount			CONSTANT_DEFAULT(0);
 	uint2					mPadFlags;
 	
 	float3					mRayleighScattering		CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
@@ -127,15 +127,26 @@ struct Atmosphere
 	DensityProfile			mRayleighDensity;
 
 	float3					mMieScattering			CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
-	float					mPad3;
+	float					mMiePhaseFunctionG		CONSTANT_DEFAULT(0);
 	float3					mMieExtinction			CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
-	float					mPad4;
+	float					mPad3;
 	DensityProfile			mMieDensity;
 
 	float3					mOzoneExtinction		CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
-	float					mPad5;
+	float					mPad4;
 	DensityProfile			mOzoneDensity;
 
 	float3					mSolarIrradiance		CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	float					mSunAngularRadius		CONSTANT_DEFAULT(0);
+
+	float3					mGroundAlbedo			CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	float					mPad5;
+};
+
+struct AtmospherePerDraw
+{
+	uint					mScatteringOrder		CONSTANT_DEFAULT(0);
+	uint					mPad0;
+	uint					mPad1;
+	uint					mPad2;
 };

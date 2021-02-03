@@ -52,8 +52,25 @@ static int                          g_DescriptorHeapNextIndex = 0;
 static UINT                         g_DescriptorHeapIncrementSize = 0;
 
 // Customization
+float                               g_TextureMin = 0;
+float                               g_TextureMax = 1;
 float                               g_TextureDepth = 0;
 bool                                g_TextureAlpha = false;
+
+namespace ImGui
+{
+	void TextureOption()
+	{
+		ImGui::PushItemWidth(100);
+
+        ImGui::Text("Image Options");
+		ImGui::SliderFloat("Min", &g_TextureMin, 0.0, 1.0f); ImGui::SameLine(); ImGui::SliderFloat("Max", &g_TextureMax, 0.0, 1.0f);
+		ImGui::SliderFloat("Depth Slice", &g_TextureDepth, 0.0, 1.0f);
+		ImGui::Checkbox("Show Alpha", &g_TextureAlpha);
+
+		ImGui::PopItemWidth();
+	}
+}
 
 struct FrameResources
 {
@@ -69,11 +86,6 @@ static UINT             g_FrameIndex = UINT_MAX;
 struct CONSTANT_BUFFER
 {
     float   mvp[4][4];
-
-    float   mTextureDepth = 0;
-    float   mTextureAlpha = 0;
-    float   mPad1;
-    float   mPad2;
 };
 
 static void ImGui_ImplDX12_SetupRenderState(ImDrawData* draw_data, ID3D12GraphicsCommandList* ctx, FrameResources* fr)
@@ -94,9 +106,6 @@ static void ImGui_ImplDX12_SetupRenderState(ImDrawData* draw_data, ID3D12Graphic
             { (R+L)/(L-R),  (T+B)/(B-T),    0.5f,       1.0f },
         };
         memcpy(&constant_buffer.mvp, mvp, sizeof(mvp));
-
-        constant_buffer.mTextureDepth = g_TextureDepth;
-        constant_buffer.mTextureAlpha = g_TextureAlpha ? 1.0f : 0.0f;
     }
 
     // Setup viewport
@@ -246,6 +255,18 @@ void ImGui_ImplDX12_RenderDrawData(ImDrawData* draw_data, ID3D12GraphicsCommandL
                 const D3D12_RECT r = { (LONG)(pcmd->ClipRect.x - clip_off.x), (LONG)(pcmd->ClipRect.y - clip_off.y), (LONG)(pcmd->ClipRect.z - clip_off.x), (LONG)(pcmd->ClipRect.w - clip_off.y) };
                 ctx->SetGraphicsRootDescriptorTable(1, *(D3D12_GPU_DESCRIPTOR_HANDLE*)&pcmd->TextureId);
                 ctx->SetGraphicsRootDescriptorTable(2, *(D3D12_GPU_DESCRIPTOR_HANDLE*)&pcmd->TextureId);
+
+				float constant_buffer[] = { 0, 1, 0, 0 };
+				if (g_FontSrvGpuDescHandle.ptr != (*(D3D12_GPU_DESCRIPTOR_HANDLE*)&pcmd->TextureId).ptr)
+				{
+                    // Only apply on draw of texture
+					constant_buffer[0] = g_TextureMin;
+					constant_buffer[1] = g_TextureMax;
+					constant_buffer[2] = g_TextureDepth;
+					constant_buffer[3] = g_TextureAlpha ? 1.0f : 0.0f;
+				};
+				ctx->SetGraphicsRoot32BitConstants(3, 4, &constant_buffer, 0);
+
                 ctx->RSSetScissorRects(1, &r);
                 ctx->DrawIndexedInstanced(pcmd->ElemCount, 1, idx_offset, vtx_offset, 0);
             }
@@ -421,7 +442,7 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
         descRange.RegisterSpace = 0;
         descRange.OffsetInDescriptorsFromTableStart = 0;
 
-        D3D12_ROOT_PARAMETER param[3] = {};
+        D3D12_ROOT_PARAMETER param[4] = {};
 
         param[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
         param[0].Constants.ShaderRegister = 0;
@@ -445,6 +466,12 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
 		param[2].DescriptorTable.NumDescriptorRanges = 1;
 		param[2].DescriptorTable.pDescriptorRanges = &descRange_space1;
 		param[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+		param[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+		param[3].Constants.ShaderRegister = 1;
+		param[3].Constants.RegisterSpace = 0;
+		param[3].Constants.Num32BitValues = 4;
+		param[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
         D3D12_STATIC_SAMPLER_DESC staticSampler = {};
         staticSampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
@@ -503,10 +530,13 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
             "cbuffer vertexBuffer : register(b0) \
             {\
               float4x4 ProjectionMatrix; \
+            };\
+            cbuffer constantBuffer : register(b1) \
+            {\
+              float    TextureMin; \
+              float    TextureMax; \
               float    TextureDepthSlice; \
               float    TextureAlpha; \
-              float    Pad1; \
-              float    Pad2; \
             };\
             struct VS_INPUT\
             {\
@@ -551,17 +581,23 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
 			"cbuffer vertexBuffer : register(b0) \
             {\
               float4x4 ProjectionMatrix; \
+            };\
+            \
+            cbuffer constantBuffer : register(b1) \
+            {\
+              float    TextureMin; \
+              float    TextureMax; \
               float    TextureDepthSlice; \
               float    TextureAlpha; \
-              float    Pad1; \
-              float    Pad2; \
             };\
+            \
             struct PS_INPUT\
             {\
               float4 pos : SV_POSITION;\
               float4 col : COLOR0;\
               float2 uv  : TEXCOORD0;\
             };\
+            \
             SamplerState sampler0 : register(s0);\
             Texture2D texture0 : register(t0, space0);\
             Texture3D texture1 : register(t0, space1);\
@@ -573,6 +609,7 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
                 col = float4(col.aaa, 1); \
               else \
                 { uint x,y,z = 0; texture1.GetDimensions(x,y,z); if (z > 1) col.a = 1; } \
+              col = (col - TextureMin) / max(TextureMax - TextureMin, 0.0001);\
               return input.col * col; \
             }";
 

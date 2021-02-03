@@ -31,27 +31,29 @@ glm::uint32							gFrameIndex = 0;
 glm::float32						gTime = 0.0f;
 ShaderType::PerFrame				gPerFrameConstantBuffer = {};
 
-void Shader::Initialize(const std::vector<Shader::DescriptorEntry>& inEntries)
+void Shader::InitializeDescriptors(const std::vector<Shader::DescriptorEntry>& inEntries)
 {
 	// Check if root signature is supported
-	const D3D12_ROOT_SIGNATURE_DESC* root_signature_desc = mRootSignatureDeserializer->GetRootSignatureDesc();
+	const D3D12_ROOT_SIGNATURE_DESC* root_signature_desc = mData.mRootSignatureDeserializer->GetRootSignatureDesc();
 
-	assert(root_signature_desc->NumParameters == 1);
+	assert(root_signature_desc->NumParameters >= 1);
 	assert(root_signature_desc->pParameters[0].ParameterType == D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE);
 	const D3D12_ROOT_DESCRIPTOR_TABLE& table = root_signature_desc->pParameters[0].DescriptorTable;
 
 	// DescriptorHeap
 	{
 		D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-		desc.NumDescriptors = 1000000;
+		desc.NumDescriptors = 1000000; // Max
 		desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 		desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-		gValidate(gDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&mDescriptorHeap)));
+		gValidate(gDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&mData.mDescriptorHeap)));
+
+		mData.mDescriptorHeap->SetName(mCSName != nullptr ? mCSName : mPSName);
 	}
 
 	// DescriptorTable
 	{
-		D3D12_CPU_DESCRIPTOR_HANDLE handle = mDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+		D3D12_CPU_DESCRIPTOR_HANDLE handle = mData.mDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
 		UINT increment_size = gDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 		int entry_index = 0;
@@ -130,13 +132,22 @@ void Shader::Initialize(const std::vector<Shader::DescriptorEntry>& inEntries)
 	}
 }
 
-void Shader::Setup()
+void Shader::SetupGraphics()
 {
-	gCommandList->SetComputeRootSignature(mRootSignature.Get());
-	ID3D12DescriptorHeap* descriptor_heap = mDescriptorHeap.Get();
+	gCommandList->SetGraphicsRootSignature(mData.mRootSignature.Get());
+	ID3D12DescriptorHeap* descriptor_heap = mData.mDescriptorHeap.Get();
 	gCommandList->SetDescriptorHeaps(1, &descriptor_heap);
-	gCommandList->SetComputeRootDescriptorTable(0, mDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
-	gCommandList->SetPipelineState(mPipelineState.Get());
+	gCommandList->SetGraphicsRootDescriptorTable(0, mData.mDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+	gCommandList->SetPipelineState(mData.mPipelineState.Get());
+}
+
+void Shader::SetupCompute()
+{
+	gCommandList->SetComputeRootSignature(mData.mRootSignature.Get());
+	ID3D12DescriptorHeap* descriptor_heap = mData.mDescriptorHeap.Get();
+	gCommandList->SetDescriptorHeaps(1, &descriptor_heap);
+	gCommandList->SetComputeRootDescriptorTable(0, mData.mDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+	gCommandList->SetPipelineState(mData.mPipelineState.Get());
 }
 
 void Texture::Initialize()

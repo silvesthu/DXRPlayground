@@ -78,13 +78,19 @@ struct Shader
 		D3D12_GPU_VIRTUAL_ADDRESS mAddress = 0;
 	};
 
-	void Initialize(const std::vector<Shader::DescriptorEntry>& inEntries);
-	void Setup();
+	void InitializeDescriptors(const std::vector<Shader::DescriptorEntry>& inEntries);
+	void SetupGraphics();
+	void SetupCompute();
+	void Reset() { mData = {}; }
 
-	ComPtr<ID3D12RootSignatureDeserializer> mRootSignatureDeserializer;
-	ComPtr<ID3D12RootSignature> mRootSignature;
-	ComPtr<ID3D12PipelineState> mPipelineState;
-	ComPtr<ID3D12DescriptorHeap> mDescriptorHeap;
+	struct Data
+	{
+		ComPtr<ID3D12RootSignatureDeserializer> mRootSignatureDeserializer;
+		ComPtr<ID3D12RootSignature> mRootSignature;
+		ComPtr<ID3D12PipelineState> mPipelineState;
+		ComPtr<ID3D12DescriptorHeap> mDescriptorHeap;
+	};
+	Data mData;
 };
 
 struct Texture

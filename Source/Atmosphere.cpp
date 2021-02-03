@@ -50,7 +50,9 @@ void PrecomputedAtmosphereScattering::Update()
 	atmosphere->mSunAngularRadius					= static_cast<float>(gAtmosphereProfile.kSunAngularRadius);
 
 	atmosphere->mTrivialAxisEncoding				= mTrivialAxisEncoding ? 1 : 0;
-	atmosphere->mXBinCount							= gPrecomputedAtmosphereScatteringResources.mXBinCount;
+	atmosphere->mXSliceCount						= gPrecomputedAtmosphereScatteringResources.mXSliceCount;
+
+	atmosphere->mGroundAlbedo						= gAtmosphereProfile.mGroundAlbedo;
 
 	// Density Profile: { Width, ExpTerm, ExpScale, LinearTerm, ConstantTerm }
 	{
@@ -136,6 +138,9 @@ void PrecomputedAtmosphereScattering::Update()
 			// [Bruneton08] 2.1 (3), beta_M(0, lambda)
 			atmosphere->mMieScattering = UnitHelper::sInverseMeterToInverseKilometer<glm::vec3>(gAtmosphereProfile.mMieScatteringCoefficient);
 
+			// Phase function
+			atmosphere->mMiePhaseFunctionG = static_cast<float>(gAtmosphereProfile.kMiePhaseFunctionG);
+
 			// Extinction Coefficient
 			atmosphere->mMieExtinction = UnitHelper::sInverseMeterToInverseKilometer<glm::vec3>(gAtmosphereProfile.mMieExtinctionCoefficient);
 
@@ -194,43 +199,72 @@ void PrecomputedAtmosphereScattering::Render()
 
 void PrecomputedAtmosphereScattering::ComputeTransmittance()
 {
-	gPrecomputedAtmosphereScatteringResources.mComputeTransmittanceShader.Setup();
+	gPrecomputedAtmosphereScatteringResources.mComputeTransmittanceShader.SetupCompute();
 	gCommandList->Dispatch(gPrecomputedAtmosphereScatteringResources.mTransmittanceTexture.mWidth / 8, gPrecomputedAtmosphereScatteringResources.mTransmittanceTexture.mHeight / 8, gPrecomputedAtmosphereScatteringResources.mTransmittanceTexture.mDepth);
 }
 
 void PrecomputedAtmosphereScattering::ComputeDirectIrradiance()
 {
-	gPrecomputedAtmosphereScatteringResources.mComputeDirectIrradianceShader.Setup();
+	gPrecomputedAtmosphereScatteringResources.mComputeDirectIrradianceShader.SetupCompute();
 	gCommandList->Dispatch(gPrecomputedAtmosphereScatteringResources.mIrradianceTexture.mWidth / 8, gPrecomputedAtmosphereScatteringResources.mIrradianceTexture.mHeight / 8, gPrecomputedAtmosphereScatteringResources.mIrradianceTexture.mDepth);
 }
 
 void PrecomputedAtmosphereScattering::ComputeSingleScattering()
 {
-	gPrecomputedAtmosphereScatteringResources.mComputeSingleScatteringShader.Setup();
+	gPrecomputedAtmosphereScatteringResources.mComputeSingleScatteringShader.SetupCompute();
 	gCommandList->Dispatch(gPrecomputedAtmosphereScatteringResources.mScatteringTexture.mWidth / 8, gPrecomputedAtmosphereScatteringResources.mScatteringTexture.mHeight / 8, gPrecomputedAtmosphereScatteringResources.mScatteringTexture.mDepth);
 }
 
-void PrecomputedAtmosphereScattering::ComputeScatteringDensity()
+void PrecomputedAtmosphereScattering::ComputeScatteringDensity(glm::uint inScatteringOrder)
 {
+	gPrecomputedAtmosphereScatteringResources.mComputeScatteringDensityShader.SetupCompute();
 
+	ShaderType::AtmospherePerDraw atmosphere_per_draw = {};
+	atmosphere_per_draw.mScatteringOrder = inScatteringOrder;
+	gCommandList->SetComputeRoot32BitConstants(1, sizeof(ShaderType::AtmospherePerDraw) / 4, &atmosphere_per_draw, 0);
+
+	gCommandList->Dispatch(gPrecomputedAtmosphereScatteringResources.mDeltaScatteringDensityTexture.mWidth / 8, gPrecomputedAtmosphereScatteringResources.mDeltaScatteringDensityTexture.mHeight / 8, gPrecomputedAtmosphereScatteringResources.mDeltaScatteringDensityTexture.mDepth);
 }
 
 void PrecomputedAtmosphereScattering::ComputeIndirectIrradiance()
 {
-
+	gPrecomputedAtmosphereScatteringResources.mComputeIndirectIrradianceShader.SetupCompute();
+	gCommandList->Dispatch(gPrecomputedAtmosphereScatteringResources.mIrradianceTexture.mWidth / 8, gPrecomputedAtmosphereScatteringResources.mIrradianceTexture.mHeight / 8, gPrecomputedAtmosphereScatteringResources.mIrradianceTexture.mDepth);
 }
 
 void PrecomputedAtmosphereScattering::AccumulateMultipleScattering()
 {
+	gPrecomputedAtmosphereScatteringResources.mComputeMultipleScatteringShader.SetupCompute();
+	gCommandList->Dispatch(gPrecomputedAtmosphereScatteringResources.mScatteringTexture.mWidth / 8, gPrecomputedAtmosphereScatteringResources.mScatteringTexture.mHeight / 8, gPrecomputedAtmosphereScatteringResources.mScatteringTexture.mDepth);
+}
 
+void PrecomputedAtmosphereScattering::ComputeMultipleScattering(glm::uint inScatteringOrder)
+{
+	ComputeScatteringDensity(inScatteringOrder);
+	ComputeIndirectIrradiance();
+	AccumulateMultipleScattering();
 }
 
 void PrecomputedAtmosphereScattering::Precompute()
 {
+	static AtmosphereProfile sAtmosphereProfileCache = gAtmosphereProfile;
+	if (memcmp(&sAtmosphereProfileCache, &gAtmosphereProfile, sizeof(AtmosphereProfile)) != 0)
+	{
+		sAtmosphereProfileCache = gAtmosphereProfile;
+		mRecomputeRequested = true;
+	}
+
+	if (!mRecomputeRequested && !mRecomputeEveryFrame)
+		return;
+
 	ComputeTransmittance();
 	ComputeDirectIrradiance();
 	ComputeSingleScattering();
-	ComputeMultipleScattering();
+
+	for (glm::uint scattering_order = 2; scattering_order <= gAtmosphereProfile.mScatteringOrder; scattering_order++)
+		ComputeMultipleScattering(scattering_order);
+
+	mRecomputeRequested = false;
 }
 
 void PrecomputedAtmosphereScattering::Initialize()
@@ -268,7 +302,7 @@ void PrecomputedAtmosphereScattering::Initialize()
 		}
 
 		for (auto&& shader : gPrecomputedAtmosphereScatteringResources.mShaders)
-			shader->Initialize(common_binding);
+			shader->InitializeDescriptors(common_binding);
 	}
 }
 
@@ -281,12 +315,8 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 {
 	if (ImGui::TreeNodeEx("Geometry"))
 	{
-		glm::f64 earth_radius_min = 1000.0;
-		glm::f64 earth_radius_max = 10000000.0;
-		ImGui::SliderScalar("Earth Radius (m)", ImGuiDataType_Double, &gAtmosphereProfile.kBottomRadius, &earth_radius_min, &earth_radius_max);
-		glm::f64 atmosphere_thickness_min = 1000.0;
-		glm::f64 atmosphere_thickness_max = 100000.0;
-		ImGui::SliderScalar("Atmosphere Thickness (m)", ImGuiDataType_Double, &gAtmosphereProfile.kAtmosphereThickness, &atmosphere_thickness_min, &atmosphere_thickness_max);
+		ImGui::SliderDouble("Earth Radius (m)", &gAtmosphereProfile.kBottomRadius, 1000.0, 10000000.0);
+		ImGui::SliderDouble("Atmosphere Thickness (m)", &gAtmosphereProfile.kAtmosphereThickness, 1000.0, 100000.0);
 
 		ImGui::TreePop();
 	}
@@ -295,8 +325,7 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 	{
 		if (ImGui::TreeNodeEx("Rayleigh", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			glm::vec3 scattering_coefficient = gAtmosphereProfile.mRayleighScatteringCoefficient * 1e6;
-			ImGui::InputFloat3("Scattering 1e-6", &scattering_coefficient.x);
+			ImGui::InputDouble3("Scattering  (/m)", &gAtmosphereProfile.mRayleighScatteringCoefficient.x, "%.3e");
 
 			ImGui::EnumRadioButton(AtmosphereProfile::RayleighMode::Precomputed, &gAtmosphereProfile.mRayleighMode);
 			ImGui::SameLine();
@@ -309,10 +338,10 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 
 		if (ImGui::TreeNodeEx("Mie", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			glm::vec3 extinction_coefficient = gAtmosphereProfile.mMieExtinctionCoefficient * 1e6;
-			ImGui::InputFloat3("Extinction 1e-6 (/m)", &extinction_coefficient.x);
-			glm::vec3 scattering_coefficient = gAtmosphereProfile.mMieScatteringCoefficient * 1e6;
-			ImGui::InputFloat3("Scattering 1e-6 (/m)", &scattering_coefficient.x);
+			ImGui::InputDouble3("Extinction (/m)", &gAtmosphereProfile.mMieExtinctionCoefficient.x, "%.3e");
+			ImGui::InputDouble3("Scattering (/m)", &gAtmosphereProfile.mMieScatteringCoefficient.x, "%.3e");
+
+			ImGui::SliderDouble("Phase Function G", &gAtmosphereProfile.kMiePhaseFunctionG, -1.0f, 1.0f);
 
 			ImGui::EnumRadioButton(AtmosphereProfile::MieMode::Bruneton08Impl, &gAtmosphereProfile.mMieMode);
 			ImGui::SameLine();
@@ -325,11 +354,18 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 		{
 			ImGui::Checkbox("Enable", &gAtmosphereProfile.mEnableOzone);
 
-			glm::vec3 absorption_coefficient = gAtmosphereProfile.mOZoneAbsorptionCoefficient * 1e6;
-			ImGui::InputFloat3("Absorption 1e-6 (/m)", &absorption_coefficient.x);
+			ImGui::InputDouble3("Absorption (/m)", &gAtmosphereProfile.mOZoneAbsorptionCoefficient.x, "%.3e");
 
 			ImGui::TreePop();
 		}
+
+		ImGui::TreePop();
+	}
+
+	if (ImGui::TreeNodeEx("Computation", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		ImGui::Checkbox("Recompute Every Frame", &mRecomputeEveryFrame);
+		ImGui::SliderInt("Scattering Order", (int*)&gAtmosphereProfile.mScatteringOrder, 1, 4);
 
 		ImGui::TreePop();
 	}
@@ -342,11 +378,7 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 		ImGui::SameLine();
 		ImGui::Checkbox("UI Flip Y", &mUIFlipY);
 
-		ImGui::PushItemWidth(100);
-		ImGui::SliderFloat("Depth Slice", &g_TextureDepth, 0.0, 1.0f);
-		ImGui::PopItemWidth();
-		ImGui::SameLine();
-		ImGui::Checkbox("Show Alpha", &g_TextureAlpha);
+
 
 		ImGui::Checkbox("Trivial Axis Encoding", &mTrivialAxisEncoding);
 
@@ -360,6 +392,8 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 
 			float ui_scale = inTexture.mUIScale * mUIScale;
 			ImGui::Image((ImTextureID)inTexture.mGPUHandle.ptr, ImVec2(inTexture.mWidth * ui_scale, inTexture.mHeight * ui_scale), uv0, uv1);
+			if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+				ImGui::OpenPopup("Image Options");
 
 			ImGui::SameLine();
 			std::string text = inTexture.mName;
@@ -368,6 +402,12 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 			text += inTexture.mDepth == 1 ? "" : " x " + std::to_string(inTexture.mDepth);
 			ImGui::Text(text.c_str());
 		};
+
+		if (ImGui::BeginPopup("Image Options"))
+		{
+			ImGui::TextureOption();
+			ImGui::EndPopup();
+		}
 
 		for (auto&& texture : gPrecomputedAtmosphereScatteringResources.mTextures)
 			add_texture(*texture);

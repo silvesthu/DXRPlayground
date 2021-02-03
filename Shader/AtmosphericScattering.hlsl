@@ -1,9 +1,5 @@
 // From https://www.shadertoy.com/view/lslXDr
 
-// math const
-#define PI 3.14159265359
-#define MAX 10000.0
-
 // ray intersects sphere
 // e = -b +/- sqrt( b^2 - c )
 float2 ray_vs_sphere( float3 p, float3 dir, float r ) {
@@ -12,7 +8,7 @@ float2 ray_vs_sphere( float3 p, float3 dir, float r ) {
 	
 	float d = b * b - c;
 	if ( d < 0.0 ) {
-		return float2( MAX, -MAX );
+		return float2(10000.0, -10000.0);
 	}
 	d = sqrt( d );
 	
@@ -41,14 +37,14 @@ float phase_mie( float g, float c, float cc ) {
 	b *= sqrt( b );
 	b *= 2.0 + gg;	
 	
-	return ( 3.0 / 8.0 / PI ) * a / b;
+	return ( 3.0 / 8.0 / MATH_PI ) * a / b;
 }
 
 // Rayleigh
 // g : 0
 // F = 3/16PI * ( 1 + c^2 )
 float phase_ray( float cc ) {
-	return ( 3.0 / 16.0 / PI ) * ( 1.0 + cc );
+	return ( 3.0 / 16.0 / MATH_PI) * ( 1.0 + cc );
 }
 
 float density( float3 p, float ph ) {
