@@ -17,3 +17,6 @@
 [submodule "Source/Thirdparty/filewatch"]
 	path = Source/Thirdparty/filewatch
 	url = https://github.com/ThomasMonkman/filewatch.git
+[submodule "Source/Thirdparty/DirectXTex"]
+	path = Source/Thirdparty/DirectXTex
+	url = https://github.com/microsoft/DirectXTex.git

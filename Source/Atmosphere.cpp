@@ -49,7 +49,7 @@ void PrecomputedAtmosphereScattering::Update()
 	atmosphere->mSolarIrradiance					= gAtmosphereProfile.mUseConstantSolarIrradiance ? gAtmosphereProfile.kConstantSolarIrradiance : gAtmosphereProfile.kSolarIrradiance;
 	atmosphere->mSunAngularRadius					= static_cast<float>(gAtmosphereProfile.kSunAngularRadius);
 
-	atmosphere->mTrivialAxisEncoding				= mTrivialAxisEncoding ? 1 : 0;
+	atmosphere->mTrivialAxisEncoding				= gAtmosphereProfile.mTrivialAxisEncoding ? 1 : 0;
 	atmosphere->mXSliceCount						= gPrecomputedAtmosphereScatteringResources.mXSliceCount;
 
 	atmosphere->mGroundAlbedo						= gAtmosphereProfile.mGroundAlbedo;
@@ -226,9 +226,14 @@ void PrecomputedAtmosphereScattering::ComputeScatteringDensity(glm::uint inScatt
 	gCommandList->Dispatch(gPrecomputedAtmosphereScatteringResources.mDeltaScatteringDensityTexture.mWidth / 8, gPrecomputedAtmosphereScatteringResources.mDeltaScatteringDensityTexture.mHeight / 8, gPrecomputedAtmosphereScatteringResources.mDeltaScatteringDensityTexture.mDepth);
 }
 
-void PrecomputedAtmosphereScattering::ComputeIndirectIrradiance()
+void PrecomputedAtmosphereScattering::ComputeIndirectIrradiance(glm::uint inScatteringOrder)
 {
 	gPrecomputedAtmosphereScatteringResources.mComputeIndirectIrradianceShader.SetupCompute();
+
+	ShaderType::AtmospherePerDraw atmosphere_per_draw = {};
+	atmosphere_per_draw.mScatteringOrder = inScatteringOrder - 1;
+	gCommandList->SetComputeRoot32BitConstants(1, sizeof(ShaderType::AtmospherePerDraw) / 4, &atmosphere_per_draw, 0);
+
 	gCommandList->Dispatch(gPrecomputedAtmosphereScatteringResources.mIrradianceTexture.mWidth / 8, gPrecomputedAtmosphereScatteringResources.mIrradianceTexture.mHeight / 8, gPrecomputedAtmosphereScatteringResources.mIrradianceTexture.mDepth);
 }
 
@@ -241,7 +246,7 @@ void PrecomputedAtmosphereScattering::AccumulateMultipleScattering()
 void PrecomputedAtmosphereScattering::ComputeMultipleScattering(glm::uint inScatteringOrder)
 {
 	ComputeScatteringDensity(inScatteringOrder);
-	ComputeIndirectIrradiance();
+	ComputeIndirectIrradiance(inScatteringOrder);
 	AccumulateMultipleScattering();
 }
 
@@ -378,10 +383,9 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 		ImGui::SameLine();
 		ImGui::Checkbox("UI Flip Y", &mUIFlipY);
 
+		ImGui::Checkbox("Trivial Axis Encoding", &gAtmosphereProfile.mTrivialAxisEncoding);
 
-
-		ImGui::Checkbox("Trivial Axis Encoding", &mTrivialAxisEncoding);
-
+		static Texture* sTexture = nullptr;
 		auto add_texture = [&](Texture& inTexture)
 		{
 			ImVec2 uv0 = ImVec2(0, 0);
@@ -393,19 +397,35 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 			float ui_scale = inTexture.mUIScale * mUIScale;
 			ImGui::Image((ImTextureID)inTexture.mGPUHandle.ptr, ImVec2(inTexture.mWidth * ui_scale, inTexture.mHeight * ui_scale), uv0, uv1);
 			if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+			{
+				sTexture = &inTexture;
 				ImGui::OpenPopup("Image Options");
+			}
 
 			ImGui::SameLine();
-			std::string text = inTexture.mName;
+			std::string text = "-------\n"; 
+			text += inTexture.mName;
 			text += "\n";
-			text += std::to_string(inTexture.mWidth) + " x " + std::to_string(inTexture.mHeight);
-			text += inTexture.mDepth == 1 ? "" : " x " + std::to_string(inTexture.mDepth);
+			text += std::to_string(inTexture.mWidth) + " x " + std::to_string(inTexture.mHeight) + (inTexture.mDepth == 1 ? "" : " x " + std::to_string(inTexture.mDepth));
+			text += "\n";
+			text += nameof::nameof_enum(inTexture.mFormat);
 			ImGui::Text(text.c_str());
 		};
 
 		if (ImGui::BeginPopup("Image Options"))
 		{
+			if (sTexture != nullptr)
+			{
+				ImGui::Text(sTexture->mName);
+
+				if (ImGui::Button("Save"))
+					gSaveTexture = sTexture;
+
+				ImGui::Separator();
+			}
+
 			ImGui::TextureOption();
+
 			ImGui::EndPopup();
 		}
 

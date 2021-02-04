@@ -1,10 +1,8 @@
-﻿#include "Thirdparty/imgui/imgui.h"
+﻿#include "Common.h"
+
 #include "Thirdparty/filewatch/FileWatch.hpp"
 #include "ImGui/imgui_impl_win32.h"
 #include "ImGui/imgui_impl_dx12.h"
-#include "ImGui/imgui_impl_helper.h"
-
-#include "Common.h"
 
 #include "Scene.h"
 #include "RayTrace.h"
@@ -527,6 +525,25 @@ void sRender()
 
 		gTime += ImGui::GetIO().DeltaTime;
 		gPerFrameConstantBuffer.mFrameIndex++;
+	}
+
+	// Capture
+	{
+		if (gSaveTexture != nullptr && gSaveTexture->mResource != nullptr)
+		{
+			DirectX::ScratchImage image;
+			DirectX::CaptureTexture(gCommandQueue, gSaveTexture->mResource.Get(), false, image, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE);
+
+			std::string narrow_name(gSaveTexture->mName);
+			int wide_size = MultiByteToWideChar(CP_UTF8, 0, narrow_name.c_str(), (int)narrow_name.size(), NULL, 0);
+			std::wstring wide_name(wide_size, 0);
+			MultiByteToWideChar(CP_UTF8, 0, narrow_name.c_str(), (int)narrow_name.size(), &wide_name[0], wide_size);
+
+			wide_name += L".dds";
+			DirectX::SaveToDDSFile(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::DDS_FLAGS_NONE, wide_name.c_str());
+			
+			gSaveTexture = nullptr;
+		}
 	}
 
 	// Swap

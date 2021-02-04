@@ -92,6 +92,9 @@ struct AtmosphereProfile
 
 	// Ground
 	glm::dvec3 mGroundAlbedo						= glm::dvec3(0.1);
+
+	// Encoding
+	bool mTrivialAxisEncoding						= false;
 };
 
 class PrecomputedAtmosphereScattering
@@ -108,7 +111,7 @@ public:
 	void ComputeSingleScattering();
 
 	void ComputeScatteringDensity(glm::uint inScatteringOrder);
-	void ComputeIndirectIrradiance();
+	void ComputeIndirectIrradiance(glm::uint inScatteringOrder);
 	void AccumulateMultipleScattering();
 
 	void ComputeMultipleScattering(glm::uint inScatteringOrder);
@@ -120,7 +123,6 @@ public:
 
 	float mUIScale = 1.0f;
 	bool mUIFlipY = false;
-	bool mTrivialAxisEncoding = false;
 };
 
 struct PrecomputedAtmosphereScatteringResources
@@ -150,7 +152,7 @@ struct PrecomputedAtmosphereScatteringResources
 
 	Texture mTransmittanceTexture				= Texture().Width(256).Height(64).Format(DXGI_FORMAT_R32G32B32A32_FLOAT).Name("Transmittance");
 
-	Texture mDeltaIrradianceTexture				= Texture().Width(64).Height(16).Format(DXGI_FORMAT_R32G32B32A32_FLOAT).Name("DeltaIrradiance").UIScale(4.0f);
+	Texture mDeltaIrradianceTexture				= Texture().Width(64).Height(16).Format(DXGI_FORMAT_R32G32B32A32_FLOAT).Name("Delta Irradiance").UIScale(4.0f);
 	Texture mIrradianceTexture					= Texture().Width(64).Height(16).Format(DXGI_FORMAT_R32G32B32A32_FLOAT).Name("Irradiance").UIScale(4.0f);
 
 	glm::uint mXSliceCount						= 8; // Slice X axis to use 3D texture as 4D storage

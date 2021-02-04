@@ -4,21 +4,33 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 16.0.28803.352
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DXRPlayground", "DXRPlayground.vcxproj", "{1296E4A0-1F08-493D-8453-CD5EF53FF812}"
+	ProjectSection(ProjectDependencies) = postProject
+		{371B9FA9-4C90-4AC6-A123-ACED756D6C77} = {371B9FA9-4C90-4AC6-A123-ACED756D6C77}
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{E030573C-C17F-48C0-A5D2-1BAB1A11FA8F}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DirectXTex", "Source\Thirdparty\DirectXTex\DirectXTex\DirectXTex_Desktop_2019_Win10.vcxproj", "{371B9FA9-4C90-4AC6-A123-ACED756D6C77}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
-		Debug|x86 = Debug|x86
+		Profile|x64 = Profile|x64
 		Release|x64 = Release|x64
-		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{1296E4A0-1F08-493D-8453-CD5EF53FF812}.Debug|x64.ActiveCfg = Debug|x64
 		{1296E4A0-1F08-493D-8453-CD5EF53FF812}.Debug|x64.Build.0 = Debug|x64
-		{1296E4A0-1F08-493D-8453-CD5EF53FF812}.Debug|x86.ActiveCfg = Debug|x64
+		{1296E4A0-1F08-493D-8453-CD5EF53FF812}.Profile|x64.ActiveCfg = Release|x64
+		{1296E4A0-1F08-493D-8453-CD5EF53FF812}.Profile|x64.Build.0 = Release|x64
 		{1296E4A0-1F08-493D-8453-CD5EF53FF812}.Release|x64.ActiveCfg = Release|x64
 		{1296E4A0-1F08-493D-8453-CD5EF53FF812}.Release|x64.Build.0 = Release|x64
-		{1296E4A0-1F08-493D-8453-CD5EF53FF812}.Release|x86.ActiveCfg = Release|x64
+		{371B9FA9-4C90-4AC6-A123-ACED756D6C77}.Debug|x64.ActiveCfg = Debug|x64
+		{371B9FA9-4C90-4AC6-A123-ACED756D6C77}.Debug|x64.Build.0 = Debug|x64
+		{371B9FA9-4C90-4AC6-A123-ACED756D6C77}.Profile|x64.ActiveCfg = Profile|x64
+		{371B9FA9-4C90-4AC6-A123-ACED756D6C77}.Profile|x64.Build.0 = Profile|x64
+		{371B9FA9-4C90-4AC6-A123-ACED756D6C77}.Release|x64.ActiveCfg = Release|x64
+		{371B9FA9-4C90-4AC6-A123-ACED756D6C77}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -31,6 +31,9 @@ glm::uint32							gFrameIndex = 0;
 glm::float32						gTime = 0.0f;
 ShaderType::PerFrame				gPerFrameConstantBuffer = {};
 
+// Capture
+Texture*							gSaveTexture = nullptr;
+
 void Shader::InitializeDescriptors(const std::vector<Shader::DescriptorEntry>& inEntries)
 {
 	// Check if root signature is supported

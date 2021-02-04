@@ -420,14 +420,14 @@ float3 DispatchThreadID_to_XYZ(uint3 inDispatchThreadID, RWTexture3D<float4> inT
 	return inDispatchThreadID.xyz / (size - 1.0);
 }
 
-float X_to_U(float xyzw, uint size)
+float X_to_U(float x, uint size)
 {
-	return 0.5 / size + xyzw * (1.0 - 1.0 / size);
+	return 0.5 / size + x * (1.0 - 1.0 / size);
 }
 
-float U_to_X(float uvwx, uint size)
+float U_to_X(float u, uint size)
 {
-	return (uvwx - 0.5 / size) / (1.0 - 1.0 / size);
+	return (u - 0.5 / size) / (1.0 - 1.0 / size);
 }
 
 float2 XY_to_UV(float2 xy, Texture2D<float4> texture) // GetTextureCoordFromUnitRange
@@ -678,18 +678,6 @@ void Encode4D_Scattering(float4 r_mu_mu_s_nu, bool intersects_ground, Texture3D<
 	float mu_s = r_mu_mu_s_nu.z;
 	float nu = r_mu_mu_s_nu.w;
 
-	if (mAtmosphere.mTrivialAxisEncoding)
-	{
-		//r = lerp(mAtmosphere.mBottomRadius, mAtmosphere.mTopRadius, u_r);
-		//mu = u_mu * 2.0 - 1.0;
-		//mu_s = u_mu_s * 2.0 - 1.0;
-		//nu = u_nu * 2.0 - 1.0;
-
-		//intersects_ground = mu < 0 && (r * mu < mAtmosphere.mBottomRadius);
-
-		//return float4(r, mu, mu_s, nu);
-	}
-
 	float H = sqrt(mAtmosphere.mTopRadius * mAtmosphere.mTopRadius - mAtmosphere.mBottomRadius * mAtmosphere.mBottomRadius);
 	float rho = SafeSqrt(r * r - mAtmosphere.mBottomRadius * mAtmosphere.mBottomRadius);
 	float u_r = rho / H;
@@ -738,6 +726,7 @@ void Encode4D_Scattering(float4 r_mu_mu_s_nu, bool intersects_ground, Texture3D<
 
 	float x_offset = u_mu_s * (x_slice_size - 1.0);
 	float x_step = u_nu * (x_slice_count - 1.0);
+	
 	outS = frac(x_step);
 
 	tex_coords.x = floor(x_step) * x_slice_size + x_offset;
@@ -746,9 +735,9 @@ void Encode4D_Scattering(float4 r_mu_mu_s_nu, bool intersects_ground, Texture3D<
 
 	// Merge Y
 	if (intersects_ground)
-		tex_coords.y = size.y / 2 - u_mu * (size.y / 2 - 1);			// [1.0 ~ 0.0] -> [0.0 -> 0.5]
+		tex_coords.y = (size.y / 2 - 1) - u_mu * (size.y / 2 - 1);			// [1.0 ~ 0.0] -> [0.0 -> 0.5]
 	else
-		tex_coords.y = u_mu * (size.y / 2 - 1) + (size.y / 2);			// [0.0 ~ 1.0] -> [0.5 -> 1.0]
+		tex_coords.y = u_mu * (size.y / 2 - 1) + (size.y / 2);				// [0.0 ~ 1.0] -> [0.5 -> 1.0]
 
 	outUVW0.x = X_to_U((tex_coords.x + 0) / (size.x - 1), size.x);
 	outUVW1.x = X_to_U((tex_coords.x + x_slice_size) / (size.x - 1), size.x);
@@ -1030,6 +1019,7 @@ float3 GetScattering(Texture3D<float4> scattering_texture, float r, float mu, fl
 	float3 uvw0, uvw1;
 	float s;
 	Encode4D_Scattering(float4(r, mu, mu_s, nu), ray_r_mu_intersects_ground, scattering_texture, uvw0, uvw1, s);
+
 	return lerp(scattering_texture.SampleLevel(BilinearSampler, uvw0, 0), scattering_texture.SampleLevel(BilinearSampler, uvw1, 0), s).xyz;
 }
 
@@ -1162,6 +1152,51 @@ void ComputeScatteringDensityCS(
 	// DeltaScatteringDensityUAV[inDispatchThreadID.xyz] = float4(r_mu_mu_s_nu.xyz, 1.0);
 }
 
+float3 ComputeIndirectIrradiance(float2 mu_s_r)
+{
+	float mu_s = mu_s_r.x;
+	float r = mu_s_r.y;
+
+	const int SAMPLE_COUNT = 32;
+
+	const float dphi = MATH_PI / float(SAMPLE_COUNT);
+	const float dtheta = MATH_PI / float(SAMPLE_COUNT);
+
+	float3 result = 0;
+
+	float3 omega_s = float3(sqrt(1.0 - mu_s * mu_s), 0.0, mu_s);
+
+	for (int j = 0; j < SAMPLE_COUNT / 2; ++j)
+	{
+		float theta = (float(j) + 0.5) * dtheta;
+		for (int i = 0; i < 2 * SAMPLE_COUNT; ++i)
+		{
+			float phi = (float(i) + 0.5) * dphi;
+
+			float3 omega = float3(cos(phi) * sin(theta), sin(phi) * sin(theta), cos(theta));
+			
+			float domega = (dtheta) * (dphi) * sin(theta);
+
+			float nu = dot(omega, omega_s);
+
+			result += GetScattering(r, omega.z, mu_s, nu, false /* ray_r_theta_intersects_ground */, mAtmospherePerDraw.mScatteringOrder) * omega.z * domega;
+		}
+	}
+
+	// Debug
+	if (false)
+	{
+		float3 uvw0, uvw1;
+		float s;
+		Encode4D_Scattering(float4(r, 0, mu_s, 0), false, DeltaRayleighScatteringSRV, uvw0, uvw1, s);
+		return uvw0;
+		return lerp(DeltaRayleighScatteringSRV.SampleLevel(BilinearSampler, uvw0, 0), DeltaRayleighScatteringSRV.SampleLevel(BilinearSampler, uvw1, 0), s).xyz;
+		return GetScattering(DeltaRayleighScatteringSRV, r, 0, mu_s, 0, false);
+	}
+
+	return result;
+}
+
 [RootSignature(AtmosphereRootSignature)]
 [numthreads(8, 8, 1)]
 void ComputeIndirectIrradianceCS(
@@ -1170,10 +1205,28 @@ void ComputeIndirectIrradianceCS(
 	uint3 inDispatchThreadID : SV_DispatchThreadID,
 	uint inGroupIndex : SV_GroupIndex)
 {
+	// XY
 	float2 xy = DispatchThreadID_to_XY(inDispatchThreadID.xy, IrradianceUAV);
 
+	// Decode
+	float2 mu_s_r = Decode2D(xy, true);
+
+	// [TODO]
+	float3x3 luminance_from_radiance = { 1,0,0,0,1,0,0,0,1 };
+
+	float3 delta_irradiance = ComputeIndirectIrradiance(mu_s_r);
+	float3 irradiance = mul(luminance_from_radiance, delta_irradiance);
+
+	// Output
+	DeltaIrradianceUAV[inDispatchThreadID.xy] = float4(delta_irradiance, 1.0);
+	IrradianceUAV[inDispatchThreadID.xy] = float4(irradiance, 1.0);
+
+	// Debug
 	// DeltaIrradianceUAV[inDispatchThreadID.xy] = float4(xy, 0.0, 1.0);
 	// IrradianceUAV[inDispatchThreadID.xy] = float4(xy, 0.0, 1.0);
+	// DeltaIrradianceUAV[inDispatchThreadID.xy] = float4(mu_s_r.x, (mu_s_r.y - mAtmosphere.mBottomRadius) / (mAtmosphere.mTopRadius - mAtmosphere.mBottomRadius), 0.0, 1.0);
+	// DeltaIrradianceUAV[inDispatchThreadID.xy] = DeltaRayleighScatteringSRV.SampleLevel(BilinearSampler, float3(xy, 0), 0);
+	// DeltaIrradianceUAV[inDispatchThreadID.xy] = DeltaMieScatteringSRV.SampleLevel(BilinearSampler, float3(xy, 0), 0);
 }
 
 [RootSignature(AtmosphereRootSignature)]

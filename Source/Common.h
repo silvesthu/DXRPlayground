@@ -21,6 +21,7 @@ using Microsoft::WRL::ComPtr;
 
 #include "Thirdparty/glm/glm/gtx/transform.hpp"
 #include "Thirdparty/nameof/include/nameof.hpp"
+#include "Thirdparty/DirectXTex/DirectXTex/DirectXTex.h"
 #include "ImGui/imgui_impl_helper.h"
 
 // System
@@ -131,6 +132,8 @@ struct FrameContext
 extern FrameContext							gFrameContext[];
 extern glm::uint32							gFrameIndex;
 extern glm::float32							gTime;
+
+extern Texture*								gSaveTexture;
 
 enum class DebugMode : glm::uint32
 {
