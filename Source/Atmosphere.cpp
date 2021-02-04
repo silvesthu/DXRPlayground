@@ -403,7 +403,7 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 			}
 
 			ImGui::SameLine();
-			std::string text = "-------\n"; 
+			std::string text = "-----------------------------------\n"; 
 			text += inTexture.mName;
 			text += "\n";
 			text += std::to_string(inTexture.mWidth) + " x " + std::to_string(inTexture.mHeight) + (inTexture.mDepth == 1 ? "" : " x " + std::to_string(inTexture.mDepth));
@@ -418,8 +418,8 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 			{
 				ImGui::Text(sTexture->mName);
 
-				if (ImGui::Button("Save"))
-					gSaveTexture = sTexture;
+				if (ImGui::Button("Dump"))
+					gDumpTexture = sTexture;
 
 				ImGui::Separator();
 			}

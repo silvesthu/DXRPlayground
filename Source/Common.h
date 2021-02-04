@@ -18,6 +18,7 @@ using Microsoft::WRL::ComPtr;
 #include <type_traits>
 #include <locale>
 #include <codecvt>
+#include <filesystem>
 
 #include "Thirdparty/glm/glm/gtx/transform.hpp"
 #include "Thirdparty/nameof/include/nameof.hpp"
@@ -133,7 +134,7 @@ extern FrameContext							gFrameContext[];
 extern glm::uint32							gFrameIndex;
 extern glm::float32							gTime;
 
-extern Texture*								gSaveTexture;
+extern Texture*								gDumpTexture;
 
 enum class DebugMode : glm::uint32
 {
@@ -236,6 +237,14 @@ inline void gDebugPrint(const T& in)
 	std::string str = std::to_string(in) + "\n";
 	OutputDebugStringA(str.c_str());
 	gLog.AddLog(str.c_str());
+}
+
+inline std::wstring gToWString(const std::string inString)
+{
+	int wide_size = MultiByteToWideChar(CP_UTF8, 0, inString.c_str(), (int)inString.size(), NULL, 0);
+	std::wstring wide_string(wide_size, 0);
+	MultiByteToWideChar(CP_UTF8, 0, inString.c_str(), (int)inString.size(), &wide_string[0], wide_size);
+	return wide_string;
 }
 
 namespace nameof

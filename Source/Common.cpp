@@ -32,7 +32,7 @@ glm::float32						gTime = 0.0f;
 ShaderType::PerFrame				gPerFrameConstantBuffer = {};
 
 // Capture
-Texture*							gSaveTexture = nullptr;
+Texture*							gDumpTexture = nullptr;
 
 void Shader::InitializeDescriptors(const std::vector<Shader::DescriptorEntry>& inEntries)
 {
@@ -159,13 +159,8 @@ void Texture::Initialize()
 	D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
 
 	gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&mResource)));
-
-	std::string narrow_name(mName);
-	int wide_size = MultiByteToWideChar(CP_UTF8, 0, narrow_name.c_str(), (int)narrow_name.size(), NULL, 0);
-	std::wstring wide_name(wide_size, 0);
-	MultiByteToWideChar(CP_UTF8, 0, narrow_name.c_str(), (int)narrow_name.size(), &wide_name[0], wide_size);
-	mResource->SetName(wide_name.c_str());
-
+	mResource->SetName(gToWString(mName).c_str());
+	
 	// SRV for ImGui
 	ImGui_ImplDX12_AllocateDescriptor(mCPUHandle, mGPUHandle);
 

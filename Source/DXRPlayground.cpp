@@ -403,13 +403,13 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 
 void sRender()
 {
-	// Frame context
+	// Frame Context
 	FrameContext* frameCtxt = sWaitForNextFrameResources();
 	glm::uint32 frame_index = gSwapChain->GetCurrentBackBufferIndex();
 	ID3D12Resource* frame_render_target_resource = gBackBufferRenderTargetResource[frame_index];
 	D3D12_CPU_DESCRIPTOR_HANDLE& frame_render_target_descriptor_handle = gBackBufferRenderTargetRTV[frame_index];
 
-	// Frame begin
+	// Frame Begin
 	{
 		frameCtxt->mCommandAllocator->Reset();
 		gCommandList->Reset(frameCtxt->mCommandAllocator, nullptr);
@@ -517,7 +517,7 @@ void sRender()
 		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), gCommandList);
 	}
 
-	// Frame end
+	// Frame End
 	{
 		gBarrierTransition(gCommandList, frame_render_target_resource, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
 		gCommandList->Close();
@@ -527,22 +527,19 @@ void sRender()
 		gPerFrameConstantBuffer.mFrameIndex++;
 	}
 
-	// Capture
+	// Dump Texture
 	{
-		if (gSaveTexture != nullptr && gSaveTexture->mResource != nullptr)
+		if (gDumpTexture != nullptr && gDumpTexture->mResource != nullptr)
 		{
 			DirectX::ScratchImage image;
-			DirectX::CaptureTexture(gCommandQueue, gSaveTexture->mResource.Get(), false, image, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE);
+			DirectX::CaptureTexture(gCommandQueue, gDumpTexture->mResource.Get(), false, image, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE);
 
-			std::string narrow_name(gSaveTexture->mName);
-			int wide_size = MultiByteToWideChar(CP_UTF8, 0, narrow_name.c_str(), (int)narrow_name.size(), NULL, 0);
-			std::wstring wide_name(wide_size, 0);
-			MultiByteToWideChar(CP_UTF8, 0, narrow_name.c_str(), (int)narrow_name.size(), &wide_name[0], wide_size);
-
-			wide_name += L".dds";
-			DirectX::SaveToDDSFile(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::DDS_FLAGS_NONE, wide_name.c_str());
+			std::wstring directory = L"TextureDump/";
+			std::filesystem::create_directory(directory);
+			std::wstring path = directory + gToWString(gDumpTexture->mName) + L".dds";
+			DirectX::SaveToDDSFile(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::DDS_FLAGS_NONE, path.c_str());
 			
-			gSaveTexture = nullptr;
+			gDumpTexture = nullptr;
 		}
 	}
 
