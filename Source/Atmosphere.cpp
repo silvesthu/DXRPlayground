@@ -49,7 +49,6 @@ void PrecomputedAtmosphereScattering::Update()
 	atmosphere->mSolarIrradiance					= gAtmosphereProfile.mUseConstantSolarIrradiance ? gAtmosphereProfile.kConstantSolarIrradiance : gAtmosphereProfile.kSolarIrradiance;
 	atmosphere->mSunAngularRadius					= static_cast<float>(gAtmosphereProfile.kSunAngularRadius);
 
-	atmosphere->mTrivialAxisEncoding				= gAtmosphereProfile.mTrivialAxisEncoding ? 1 : 0;
 	atmosphere->mXSliceCount						= gPrecomputedAtmosphereScatteringResources.mXSliceCount;
 
 	atmosphere->mGroundAlbedo						= gAtmosphereProfile.mGroundAlbedo;
@@ -292,6 +291,8 @@ void PrecomputedAtmosphereScattering::Initialize()
 
 	// Shader Binding
 	{
+		// [NOTE] Strictly speaking, binding same texture as UAV and SRV at the same time is not ok, and there should be barriers for state transition
+
 		std::vector<Shader::DescriptorEntry> common_binding;
 		{
 			// CBV
@@ -370,7 +371,7 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 	if (ImGui::TreeNodeEx("Computation", ImGuiTreeNodeFlags_DefaultOpen))
 	{
 		ImGui::Checkbox("Recompute Every Frame", &mRecomputeEveryFrame);
-		ImGui::SliderInt("Scattering Order", (int*)&gAtmosphereProfile.mScatteringOrder, 1, 4);
+		ImGui::SliderInt("Scattering Order", (int*)&gAtmosphereProfile.mScatteringOrder, 1, 8);
 
 		ImGui::TreePop();
 	}
@@ -382,8 +383,6 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 		ImGui::PopItemWidth();
 		ImGui::SameLine();
 		ImGui::Checkbox("UI Flip Y", &mUIFlipY);
-
-		ImGui::Checkbox("Trivial Axis Encoding", &gAtmosphereProfile.mTrivialAxisEncoding);
 
 		static Texture* sTexture = nullptr;
 		auto add_texture = [&](Texture& inTexture)

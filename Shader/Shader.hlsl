@@ -445,41 +445,34 @@ float2 UV_to_XY(float2 uv, Texture2D<float4> texture) // GetUnitRangeFromTexture
 }
 
 // [Bruneton08] 4. Precomputations.Parameterization
-float Encode_R(float r, bool trivial_encoding)
+float Encode_R_Transmittance(float r)
 {
-	float R_g = mAtmosphere.mBottomRadius; // Ground
-	float R_t = mAtmosphere.mTopRadius; // Top
-
-	if (trivial_encoding)
-		return invlerp(R_g, R_t, r);
+	float R_g = mAtmosphere.mBottomRadius;					// Ground
+	float R_t = mAtmosphere.mTopRadius;						// Top
 	
-	float H = sqrt(R_t * R_t - R_g * R_g); // Ground to Horizon
-	float rho = sqrt(max(0, r * r - R_g * R_g)); // Ground towards Horizon [0, H]
+	float H = sqrt(R_t * R_t - R_g * R_g);					// Ground to Horizon
+	float rho = sqrt(max(0, r * r - R_g * R_g));			// Ground towards Horizon [0, H]
+
 	return rho / H;
 }
 
 // Inverse of Encode_R
-float Decode_R(float u_r, bool trivial_encoding)
+float Decode_R_Transmittance(float u_r)
 {
 	float R_g = mAtmosphere.mBottomRadius;
 	float R_t = mAtmosphere.mTopRadius;
 
-	if (trivial_encoding)
-		return lerp(R_g, R_t, u_r);
-
 	float H = sqrt(R_t * R_t - R_g * R_g);
 	float rho = H * u_r;
+
 	return sqrt(rho * rho + R_g * R_g);
 }
 
 // [Bruneton08] 4. Precomputations.Parameterization ?
-float Encode_Mu(float mu, float r, bool trivial_encoding)
+float Encode_Mu_Transmittance(float mu, float r)
 {
 	float R_g = mAtmosphere.mBottomRadius;
 	float R_t = mAtmosphere.mTopRadius;
-
-	if (trivial_encoding)
-		return invlerp(-1, 1, mu);
 
 	float H = sqrt(R_t * R_t - R_g * R_g);					// Ground to Horizon
 	float rho = sqrt(max(0, r * r - R_g * R_g));			// Ground towards Horizon [0, H]
@@ -496,15 +489,12 @@ float Encode_Mu(float mu, float r, bool trivial_encoding)
 }
 
 // Inverse of Encode_Mu
-float Decode_Mu(float u_mu, float u_r, bool trivial_encoding)
+float Decode_Mu_Transmittance(float u_mu, float u_r)
 {
 	float R_g = mAtmosphere.mBottomRadius;
 	float R_t = mAtmosphere.mTopRadius;
 
-	if (trivial_encoding)
-		return lerp(-1, 1, u_mu);
-
-	float r = Decode_R(u_r, trivial_encoding);
+	float r = Decode_R_Transmittance(u_r);
 
 	float H = sqrt(R_t * R_t - R_g * R_g);
 	float rho = H * u_r;
@@ -515,23 +505,39 @@ float Decode_Mu(float u_mu, float u_r, bool trivial_encoding)
 	float d = d_min + u_mu * (d_max - d_min);
 
 	float mu = InvDistanceToTopAtmosphereBoundary(r, d);
-
 	return ClampCosine(mu);
 }
 
-float2 Decode2D(float2 u_mu_u_r, bool trivial_encoding)
+float2 Decode2D_Transmittance(float2 u_mu_u_r)
 {
-	float mu = Decode_Mu(u_mu_u_r.x, u_mu_u_r.y, trivial_encoding);
-	float r = Decode_R(u_mu_u_r.y, trivial_encoding);	
+	float mu = Decode_Mu_Transmittance(u_mu_u_r.x, u_mu_u_r.y);
+	float r = Decode_R_Transmittance(u_mu_u_r.y);
 
 	return float2(mu, r);
 }
 
-// Inverse of Decode2D
-float2 Encode2D(float2 mu_r, bool trivial_encoding)
+// Inverse of Decode2D_Transmittance
+float2 Encode2D_Transmittance(float2 mu_r)
 {
-	float u_mu = Encode_Mu(mu_r.x, mu_r.y, trivial_encoding);
-	float u_r = Encode_R(mu_r.y, trivial_encoding);
+	float u_mu = Encode_Mu_Transmittance(mu_r.x, mu_r.y);
+	float u_r = Encode_R_Transmittance(mu_r.y);
+
+	return float2(u_mu, u_r);
+}
+
+float2 Decode2D_Irradiance(float2 u_mu_u_r)
+{
+	float mu = lerp(-1, 1, u_mu_u_r.x);
+	float r = lerp(mAtmosphere.mBottomRadius, mAtmosphere.mTopRadius, u_mu_u_r.y);
+
+	return float2(mu, r);
+}
+
+// Inverse of Decode2D_Irradiance
+float2 Encode2D_Irradiance(float2 mu_r)
+{
+	float u_mu = invlerp(-1, 1, mu_r.x);
+	float u_r = invlerp(mAtmosphere.mBottomRadius, mAtmosphere.mTopRadius, mu_r.y);
 
 	return float2(u_mu, u_r);
 }
@@ -560,10 +566,10 @@ float4 Decode4D(uint3 inTexCoords, RWTexture3D<float4> inTexture, out bool inter
 	float nu;	// Cosine of view sun angle
 
 	// [Bruneton08]
-	float R_t = mAtmosphere.mTopRadius; // Top
-	float R_g = mAtmosphere.mBottomRadius; // Ground
-	float H = sqrt(R_t * R_t - R_g * R_g); // Ground to Horizon
-	float rho = H * u_r; // Ground towards Horizon [0, H]
+	float R_t = mAtmosphere.mTopRadius;				// Top
+	float R_g = mAtmosphere.mBottomRadius;			// Ground
+	float H = sqrt(R_t * R_t - R_g * R_g);			// Ground to Horizon
+	float rho = H * u_r;							// Ground towards Horizon [0, H]
 	
 	// r - Height
 	{
@@ -608,7 +614,7 @@ float4 Decode4D(uint3 inTexCoords, RWTexture3D<float4> inTexture, out bool inter
 
 	// mu_s - Sun Zenith
 	{
-		// [Mapping] Sun Zenith -> 
+		// [Mapping] Sun Zenith -> ?
 
 		// [NOTE] Fitted curve is most likely to be created with 102.0
 		bool use_half_precision = true;
@@ -772,12 +778,12 @@ float3 ComputeTransmittance(float2 mu_r)
 	return transmittance;
 }
 
-float3 SampleTransmittanceToTopAtmosphereBoundary(float r, float mu)
+float3 GetTransmittanceToTopAtmosphereBoundary(float r, float mu)
 {
 	// [Bruneton08 Impl] GetTransmittanceToTopAtmosphereBoundary
 
 	float2 mu_r = float2(mu, r);
-	float2 transmittance_uv = XY_to_UV(Encode2D(mu_r, mAtmosphere.mTrivialAxisEncoding), TransmittanceSRV);
+	float2 transmittance_uv = XY_to_UV(Encode2D_Transmittance(mu_r), TransmittanceSRV);
 
 	// Sample 2D LUT
 	float3 transmittance = TransmittanceSRV.SampleLevel(BilinearSampler, transmittance_uv, 0).xyz;
@@ -789,7 +795,7 @@ float3 SampleTransmittanceToTopAtmosphereBoundary(float r, float mu)
 	return transmittance;
 }
 
-float3 SampleTransmittance(float r, float mu, float d, bool ray_r_mu_intersects_ground) 
+float3 GetTransmittance(float r, float mu, float d, bool intersects_ground) 
 {
 	// [Bruneton08 Impl] GetTransmittance
 
@@ -798,13 +804,13 @@ float3 SampleTransmittance(float r, float mu, float d, bool ray_r_mu_intersects_
 	float mu_d = ClampCosine((r * mu + d) / r_d); // [NOTE] direction is same, but up vector changed
 
 	// Eye -> P
-	if (ray_r_mu_intersects_ground)
-		return min(SampleTransmittanceToTopAtmosphereBoundary(r_d, -mu_d) / SampleTransmittanceToTopAtmosphereBoundary(r, -mu), 1.0);
+	if (intersects_ground)
+		return min(GetTransmittanceToTopAtmosphereBoundary(r_d, -mu_d) / GetTransmittanceToTopAtmosphereBoundary(r, -mu), 1.0);
 	else
-		return min(SampleTransmittanceToTopAtmosphereBoundary(r, mu) / SampleTransmittanceToTopAtmosphereBoundary(r_d, mu_d), 1.0);
+		return min(GetTransmittanceToTopAtmosphereBoundary(r, mu) / GetTransmittanceToTopAtmosphereBoundary(r_d, mu_d), 1.0);
 }
 
-float3 SampleTransmittanceToSun(float r, float mu_s) 
+float3 GetTransmittanceToSun(float r, float mu_s) 
 {
 	// [Bruneton08 Impl] GetTransmittanceToSun
 
@@ -813,11 +819,11 @@ float3 SampleTransmittanceToSun(float r, float mu_s)
 
 	// [Bruneton08 Doc] Approximate visible sun disk fraction
 	// [TODO] Add notes
-	return SampleTransmittanceToTopAtmosphereBoundary(r, mu_s) * 
+	return GetTransmittanceToTopAtmosphereBoundary(r, mu_s) * 
 		smoothstep(-sin_theta_h * mAtmosphere.mSunAngularRadius, sin_theta_h * mAtmosphere.mSunAngularRadius, mu_s - cos_theta_h);
 }
 
-void ComputeSingleScatteringIntegrand(float4 r_mu_mu_s_nu, float d, bool ray_r_mu_intersects_ground, out float3 rayleigh, out float3 mie) 
+void ComputeSingleScatteringIntegrand(float4 r_mu_mu_s_nu, float d, bool intersects_ground, out float3 rayleigh, out float3 mie) 
 {
 	float r = r_mu_mu_s_nu.x;
 	float mu = r_mu_mu_s_nu.y;
@@ -831,7 +837,7 @@ void ComputeSingleScatteringIntegrand(float4 r_mu_mu_s_nu, float d, bool ray_r_m
 	float mu_s_d = ClampCosine((r * mu_s + d * nu) / r_d);
 
 	// Eye -> P then P -> Sun
-	float3 transmittance = SampleTransmittance(r, mu, d, ray_r_mu_intersects_ground) * SampleTransmittanceToSun(r_d, mu_s_d);
+	float3 transmittance = GetTransmittance(r, mu, d, intersects_ground) * GetTransmittanceToSun(r_d, mu_s_d);
 
 	rayleigh = transmittance * GetProfileDensity(mAtmosphere.mRayleighDensity, r_d - mAtmosphere.mBottomRadius);
 	mie = transmittance * GetProfileDensity(mAtmosphere.mMieDensity, r_d - mAtmosphere.mBottomRadius);
@@ -849,7 +855,7 @@ void ComputeTransmittanceCS(
 	float2 xy = DispatchThreadID_to_XY(inDispatchThreadID.xy, TransmittanceUAV);
 
 	// Decode
-	float2 mu_r = Decode2D(xy, mAtmosphere.mTrivialAxisEncoding);
+	float2 mu_r = Decode2D_Transmittance(xy);
 
 	// Transmittance
 	float3 transmittance = ComputeTransmittance(mu_r);
@@ -878,7 +884,7 @@ void ComputeDirectIrradianceCS(
 	float2 xy = DispatchThreadID_to_XY(inDispatchThreadID.xy, IrradianceUAV);
 
 	// Decode
-	float2 mu_r = Decode2D(xy, true);
+	float2 mu_r = Decode2D_Irradiance(xy);
 	float mu_s = mu_r.x;
 	float r = mu_r.y;
 
@@ -893,7 +899,7 @@ void ComputeDirectIrradianceCS(
 		average_cosine_factor = (mu_s + alpha_s) * (mu_s + alpha_s) / (4.0 * alpha_s);
 
 	// Direct Irradiance
-	float3 transmittance = SampleTransmittanceToTopAtmosphereBoundary(r, mu_s);
+	float3 transmittance = GetTransmittanceToTopAtmosphereBoundary(r, mu_s);
 	float3 direct_irradiance = transmittance * mAtmosphere.mSolarIrradiance * average_cosine_factor; // [Bruneton08] 2.2 (9) L_0
 
 	// Output
@@ -974,7 +980,6 @@ void ComputeSingleScatteringCS(
 	ScatteringUAV[inDispatchThreadID.xyz] = float4(mul(luminance_from_radiance, delta_rayleigh).xyz, mul(luminance_from_radiance, delta_mie).x);
 
 	// Debug
-	// DeltaRayleighScatteringUAV[inDispatchThreadID.xyz] = float4(ComputeTransmittance(Decode2D(float2(1,1), mAtmosphere.mTrivialAxisEncoding)), 1) * 100; 
 	// DeltaRayleighScatteringUAV[inDispatchThreadID.xyz] = TransmittanceSRV.SampleLevel(BilinearSampler, float2(1,1), 0) * 100;
 	// DeltaRayleighScatteringUAV[inDispatchThreadID.xyz] = float4(r_mu_mu_s_nu.xyz, 1);
 	// DeltaRayleighScatteringUAV[inDispatchThreadID.xyz] = float4(xyz, xyz.x);
@@ -1000,34 +1005,34 @@ float MiePhaseFunction(float g, float nu)
 
 float3 GetIrradiance(float r, float mu_s) 
 {
-	float2 uv = XY_to_UV(Encode2D(float2(mu_s, r), true), DeltaIrradianceSRV);
+	float2 uv = XY_to_UV(Encode2D_Irradiance(float2(mu_s, r)), DeltaIrradianceSRV);
 
 	// Sample 2D LUT
 	return DeltaIrradianceSRV.SampleLevel(BilinearSampler, uv, 0).xyz;
 }
 
-float3 GetScattering(Texture3D<float4> scattering_texture, float r, float mu, float mu_s, float nu, bool ray_r_mu_intersects_ground)
+float3 GetScattering(Texture3D<float4> scattering_texture, float r, float mu, float mu_s, float nu, bool intersects_ground)
 {
 	float3 uvw0, uvw1;
 	float s;
-	Encode4D(float4(r, mu, mu_s, nu), ray_r_mu_intersects_ground, scattering_texture, uvw0, uvw1, s);
+	Encode4D(float4(r, mu, mu_s, nu), intersects_ground, scattering_texture, uvw0, uvw1, s);
 
 	// Sample 4D LUT
 	return lerp(scattering_texture.SampleLevel(BilinearSampler, uvw0, 0), scattering_texture.SampleLevel(BilinearSampler, uvw1, 0), s).xyz;
 }
 
-float3 GetScattering(float r, float mu, float mu_s, float nu, bool ray_r_mu_intersects_ground, int scattering_order) 
+float3 GetScattering(float r, float mu, float mu_s, float nu, bool intersects_ground, int scattering_order) 
 {
 	// [TODO] Add note
 
 	if (scattering_order == 1) 
 	{
-		float3 rayleigh = GetScattering(DeltaRayleighScatteringSRV, r, mu, mu_s, nu, ray_r_mu_intersects_ground);
-		float3 mie = GetScattering(DeltaMieScatteringSRV, r, mu, mu_s, nu, ray_r_mu_intersects_ground);
+		float3 rayleigh = GetScattering(DeltaRayleighScatteringSRV, r, mu, mu_s, nu, intersects_ground);
+		float3 mie = GetScattering(DeltaMieScatteringSRV, r, mu, mu_s, nu, intersects_ground);
 		return rayleigh * RayleighPhaseFunction(nu) + mie * MiePhaseFunction(mAtmosphere.mMiePhaseFunctionG, nu);
 	}
 	
-	return GetScattering(DeltaRayleighScatteringSRV, r, mu, mu_s, nu, ray_r_mu_intersects_ground);
+	return GetScattering(DeltaRayleighScatteringSRV, r, mu, mu_s, nu, intersects_ground);
 }
 
 float3 ComputeScatteringDensity(float4 r_mu_mu_s_nu, bool intersects_ground)
@@ -1069,7 +1074,7 @@ float3 ComputeScatteringDensity(float4 r_mu_mu_s_nu, bool intersects_ground)
 		if (ray_r_theta_intersects_ground) 
 		{
 			distance_to_ground = DistanceToBottomAtmosphereBoundary(r, cos_theta);
-			transmittance_to_ground = SampleTransmittance(r, cos_theta, distance_to_ground, true /* ray_intersects_ground */);
+			transmittance_to_ground = GetTransmittance(r, cos_theta, distance_to_ground, true /* ray_intersects_ground */);
 
 			ground_albedo = mAtmosphere.mGroundAlbedo;
 		}
@@ -1212,7 +1217,7 @@ void ComputeIndirectIrradianceCS(
 	float2 xy = DispatchThreadID_to_XY(inDispatchThreadID.xy, IrradianceUAV);
 
 	// Decode
-	float2 mu_s_r = Decode2D(xy, true);
+	float2 mu_s_r = Decode2D_Irradiance(xy);
 
 	// [TODO]
 	float3x3 luminance_from_radiance = { 1,0,0,0,1,0,0,0,1 };
@@ -1223,7 +1228,7 @@ void ComputeIndirectIrradianceCS(
 
 	// Output
 	DeltaIrradianceUAV[inDispatchThreadID.xy] = float4(delta_irradiance, 1.0);
-	IrradianceUAV[inDispatchThreadID.xy] = float4(irradiance, 1.0);
+	IrradianceUAV[inDispatchThreadID.xy] = IrradianceUAV[inDispatchThreadID.xy] + float4(irradiance, 0.0); // Accumulation
 
 	// Debug
 	// DeltaIrradianceUAV[inDispatchThreadID.xy] = float4(xy, 0.0, 1.0);
@@ -1231,6 +1236,47 @@ void ComputeIndirectIrradianceCS(
 	// DeltaIrradianceUAV[inDispatchThreadID.xy] = float4(mu_s_r.x, (mu_s_r.y - mAtmosphere.mBottomRadius) / (mAtmosphere.mTopRadius - mAtmosphere.mBottomRadius), 0.0, 1.0);
 	// DeltaIrradianceUAV[inDispatchThreadID.xy] = DeltaRayleighScatteringSRV.SampleLevel(BilinearSampler, float3(xy, 0), 0);
 	// DeltaIrradianceUAV[inDispatchThreadID.xy] = DeltaMieScatteringSRV.SampleLevel(BilinearSampler, float3(xy, 0), 0);
+}
+
+void ComputeMultipleScattering(float4 r_mu_mu_s_nu, bool intersects_ground, out float3 delta_multiple_scattering)
+{
+	float r = r_mu_mu_s_nu.x;
+	float mu = r_mu_mu_s_nu.y;
+	float mu_s = r_mu_mu_s_nu.z;
+	float nu = r_mu_mu_s_nu.w;
+
+	// Number of intervals for the numerical integration.
+	const int SAMPLE_COUNT = 50;
+
+	// The integration step, i.e. the length of each integration interval.
+	float dx = DistanceToNearestAtmosphereBoundary(r, mu, intersects_ground) / float(SAMPLE_COUNT);
+
+	// Integration loop.
+	float3 rayleigh_mie_sum = 0;
+	for (int i = 0; i <= SAMPLE_COUNT; ++i)
+	{
+		float d_i = float(i) * dx;
+
+		// The r, mu and mu_s parameters at the current integration point (see the
+		// single scattering section for a detailed explanation).
+		float r_i =	ClampRadius(sqrt(d_i * d_i + 2.0 * r * mu * d_i + r * r));
+		float mu_i = ClampCosine((r * mu + d_i) / r_i);
+		float mu_s_i = ClampCosine((r * mu_s + d_i * nu) / r_i);
+
+		// The Rayleigh and Mie multiple scattering at the current sample point.
+		float3 rayleigh_mie_i =
+			GetScattering(DeltaScatteringDensitySRV, r_i, mu_i, mu_s_i, nu, intersects_ground)
+			*
+			GetTransmittance(r, mu, d_i, intersects_ground)
+			*
+			dx;
+
+		// Sample weight (from the trapezoidal rule).
+		float weight_i = (i == 0 || i == SAMPLE_COUNT) ? 0.5 : 1.0;
+		rayleigh_mie_sum += rayleigh_mie_i * weight_i;
+	}
+	
+	delta_multiple_scattering = rayleigh_mie_sum;
 }
 
 [RootSignature(AtmosphereRootSignature)]
@@ -1243,6 +1289,32 @@ void ComputeMultipleScatteringCS(
 {
 	float3 xyz = DispatchThreadID_to_XYZ(inDispatchThreadID.xyz, ScatteringUAV);
 
+	// [TODO]
+	float3x3 luminance_from_radiance = { 1,0,0,0,1,0,0,0,1 };
+
+	// Decode
+	bool intersects_ground = false;
+	float4 r_mu_mu_s_nu = Decode4D(inDispatchThreadID, DeltaRayleighScatteringUAV, intersects_ground);
+
+	// Scatter
+	float3 delta_multiple_scattering = 0;
+	ComputeMultipleScattering(r_mu_mu_s_nu, intersects_ground, delta_multiple_scattering);
+	float3 delta_scattering = mul(luminance_from_radiance, delta_multiple_scattering.rgb / RayleighPhaseFunction(r_mu_mu_s_nu.w));
+
+	// Output
+	DeltaRayleighScatteringUAV[inDispatchThreadID.xyz] = float4(delta_multiple_scattering, 1.0);
+	ScatteringUAV[inDispatchThreadID.xyz] = ScatteringUAV[inDispatchThreadID.xyz] + float4(delta_scattering, 0.0); // Accumulation
+
+	// Debug
+	// DeltaRayleighScatteringUAV[inDispatchThreadID.xyz] = r_mu_mu_s_nu;
+	// DeltaRayleighScatteringUAV[inDispatchThreadID.xyz] = DeltaScatteringDensitySRV[inDispatchThreadID.xyz];
+	// DeltaRayleighScatteringUAV[inDispatchThreadID.xyz] = float4(r_mu_mu_s_nu.xyz, 1);
 	// DeltaRayleighScatteringUAV[inDispatchThreadID.xyz] = float4(xyz, 1.0);
 	// ScatteringUAV[inDispatchThreadID.xyz] = float4(xyz, 1.0);
+
+	// [NOTE] Accumulation here inside shader may produce different result compared with RenderDoc capture from [Bruneton08 Impl] using alpha blend
+
+	// [SANITY CHECK] Seek improvement?
+	// (1.32227, 2.1543, 2.65234, 0.35205) at [95, 127] 4-order scattering
+	// (1.32227, 2.16016, 2.65625, 0.35205) at [95, 127] 4-order scattering from [Bruneton08 Impl] RenderDoc capture
 }

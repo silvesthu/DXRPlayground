@@ -36,7 +36,7 @@ struct AtmosphereProfile
 		Bruneton08Impl,
 		PSS99
 	};
-	RayleighMode mRayleighMode						= RayleighMode::Precomputed;
+	RayleighMode mRayleighMode						= RayleighMode::Bruneton08Impl;
 	glm::dvec3 mRayleighScatteringCoefficient		= glm::dvec3(0);									// m^-1
 
 	double kLambdaR									= 680.0;											// nm
@@ -88,13 +88,10 @@ struct AtmosphereProfile
 	// Angular Radius = Angular Diameter / 2.0 = arctan(Sun radius / Sun-Earth distance)
 
 	// Multiple scattering
-	glm::uint mScatteringOrder						= 2; // 4;
+	glm::uint mScatteringOrder						= 4;
 
 	// Ground
 	glm::dvec3 mGroundAlbedo						= glm::dvec3(0.1);
-
-	// Encoding
-	bool mTrivialAxisEncoding						= false;
 };
 
 class PrecomputedAtmosphereScattering

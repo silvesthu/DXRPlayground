@@ -116,7 +116,7 @@ struct Atmosphere
 	float					mTopRadius				CONSTANT_DEFAULT(0);	// km
 	float2					mPad0;
 
-	uint					mTrivialAxisEncoding	CONSTANT_DEFAULT(0);
+	uint					mUnused					CONSTANT_DEFAULT(0);
 	uint					mXSliceCount			CONSTANT_DEFAULT(0);
 	uint2					mPadFlags;
 	
