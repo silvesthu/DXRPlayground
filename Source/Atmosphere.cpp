@@ -268,6 +268,9 @@ void PrecomputedAtmosphereScattering::Precompute()
 	for (glm::uint scattering_order = 2; scattering_order <= gAtmosphereProfile.mScatteringOrder; scattering_order++)
 		ComputeMultipleScattering(scattering_order);
 
+	// Reset accumulation
+	gPerFrameConstantBuffer.mReset = true;
+
 	mRecomputeRequested = false;
 }
 
@@ -319,6 +322,24 @@ void PrecomputedAtmosphereScattering::Finalize()
 
 void PrecomputedAtmosphereScattering::UpdateImGui()
 {
+	ImGui::Text("Mode"); ImGui::SameLine();
+	for (int i = 0; i < (int)BackgroundMode::Count; i++)
+	{
+		const auto& name = nameof::nameof_enum((BackgroundMode)i);
+
+		ImGui::SameLine();
+		if (ImGui::RadioButton(name.data(), (int)gPerFrameConstantBuffer.mBackgroundMode == i))
+			gPerFrameConstantBuffer.mBackgroundMode = (BackgroundMode)i;
+	}
+
+	if (gPerFrameConstantBuffer.mBackgroundMode == BackgroundMode::Color)
+		ImGui::ColorEdit3("Color", (float*)&gPerFrameConstantBuffer.mBackgroundColor);
+	else
+	{
+		ImGui::SliderAngle("Sun Azimuth Angle", &gPerFrameConstantBuffer.mSunAzimuth, 0, 360.0f);
+		ImGui::SliderAngle("Sun Zenith Angle", &gPerFrameConstantBuffer.mSunZenith, 0, 180.0f);
+	}
+
 	if (ImGui::TreeNodeEx("Geometry"))
 	{
 		ImGui::SliderDouble("Earth Radius (m)", &gAtmosphereProfile.kBottomRadius, 1000.0, 10000000.0);

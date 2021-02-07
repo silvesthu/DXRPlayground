@@ -174,64 +174,82 @@ void Scene::Load(const char* inFilename)
 	std::vector<NormalType> normals;
 
 	tinyobj::ObjReader reader;
-	reader.ParseFromFile(inFilename);
-
-	if (!reader.Warning().empty())
-		gDebugPrint(reader.Warning().c_str());
-
-	if (!reader.Error().empty())
-		gDebugPrint(reader.Error().c_str());
-
-	// Fetch indices, normals
-	glm::uint32 index = 0;
-	for (auto&& shape : reader.GetShapes())
+	if (inFilename == nullptr)
 	{
-		glm::uint32 index_offset = (glm::uint32)indices.size();
-		
-		const int kNumFaceVerticesTriangle = 3;
-		glm::uint32 index_count = (glm::uint32)shape.mesh.num_face_vertices.size() * kNumFaceVerticesTriangle;
-		for (size_t face_index = 0; face_index < shape.mesh.num_face_vertices.size(); face_index++)
-		{
-			assert(shape.mesh.num_face_vertices[face_index] == kNumFaceVerticesTriangle);
-			for (size_t vertex_index = 0; vertex_index < kNumFaceVerticesTriangle; vertex_index++)
-			{
-				tinyobj::index_t idx = shape.mesh.indices[face_index * kNumFaceVerticesTriangle + vertex_index];
-				indices.push_back(IndexType(index++));
+		// Dummy scene
+		indices.push_back(0);
+		indices.push_back(0);
+		indices.push_back(0);
 
-				vertices.push_back(glm::vec3(
-					reader.GetAttrib().vertices[3 * idx.vertex_index + 0],
-					reader.GetAttrib().vertices[3 * idx.vertex_index + 1],
-					reader.GetAttrib().vertices[3 * idx.vertex_index + 2]
-				));
+		vertices.push_back(glm::vec3(0, 0, 0));
+		normals.push_back(glm::vec3(0, 0, 0));
 
-				normals.push_back(glm::vec3(
-					reader.GetAttrib().normals[3 * idx.normal_index + 0],
-					reader.GetAttrib().normals[3 * idx.normal_index + 1],
-					reader.GetAttrib().normals[3 * idx.normal_index + 2]
-				));
-				static_assert(std::is_same<NormalType, glm::vec3>::value, "Need conversion if format does not matched");
-			}
-		}
-
-		// trivial - index count == vertex count
-		glm::uint32 vertex_offset = 0;
-		glm::uint32 vertex_count = index_count;
-
-		std::wstring name(shape.name.begin(), shape.name.end());
-		BLASRef blas = std::make_shared<BLAS>(std::make_shared<Primitive>(vertex_offset, vertex_count, index_offset, index_count), name);
+		BLASRef blas = std::make_shared<BLAS>(std::make_shared<Primitive>(0, 1, 0, 3), L"Dummy");
 		ObjectInstanceRef object_instance = std::make_shared<ObjectInstance>(blas, glm::mat4(1), kDefaultHitGroupIndex);
 		object_instances.push_back(object_instance);
+	}
+	else
+	{
+		// Load from file
+		reader.ParseFromFile(inFilename);
 
-		if (shape.mesh.material_ids.size() > 0)
+		if (!reader.Warning().empty())
+			gDebugPrint(reader.Warning().c_str());
+
+		if (!reader.Error().empty())
+			gDebugPrint(reader.Error().c_str());
+
+		// Fetch indices, normals
+		glm::uint32 index = 0;
+		for (auto&& shape : reader.GetShapes())
 		{
-			const tinyobj::material_t& material = reader.GetMaterials()[shape.mesh.material_ids[0]];
-			object_instance->Data().mAlbedo = glm::vec3(material.diffuse[0], material.diffuse[1], material.diffuse[2]);
-			object_instance->Data().mEmission = glm::vec3(material.emission[0], material.emission[1], material.emission[2]);
-			object_instance->Data().mReflectance = glm::vec3(material.specular[0], material.specular[1], material.specular[2]);
-			object_instance->Data().mRoughness = material.roughness;
+			glm::uint32 index_offset = (glm::uint32)indices.size();
 
-			object_instance->Data().mIndexOffset = index_offset;
-			object_instance->Data().mVertexOffset = vertex_offset;
+			const int kNumFaceVerticesTriangle = 3;
+			glm::uint32 index_count = (glm::uint32)shape.mesh.num_face_vertices.size() * kNumFaceVerticesTriangle;
+			for (size_t face_index = 0; face_index < shape.mesh.num_face_vertices.size(); face_index++)
+			{
+				assert(shape.mesh.num_face_vertices[face_index] == kNumFaceVerticesTriangle);
+				for (size_t vertex_index = 0; vertex_index < kNumFaceVerticesTriangle; vertex_index++)
+				{
+					tinyobj::index_t idx = shape.mesh.indices[face_index * kNumFaceVerticesTriangle + vertex_index];
+					indices.push_back(IndexType(index++));
+
+					vertices.push_back(glm::vec3(
+						reader.GetAttrib().vertices[3 * idx.vertex_index + 0],
+						reader.GetAttrib().vertices[3 * idx.vertex_index + 1],
+						reader.GetAttrib().vertices[3 * idx.vertex_index + 2]
+					));
+
+					normals.push_back(glm::vec3(
+						reader.GetAttrib().normals[3 * idx.normal_index + 0],
+						reader.GetAttrib().normals[3 * idx.normal_index + 1],
+						reader.GetAttrib().normals[3 * idx.normal_index + 2]
+					));
+					static_assert(std::is_same<NormalType, glm::vec3>::value, "Need conversion if format does not matched");
+				}
+			}
+
+			// trivial - index count == vertex count
+			glm::uint32 vertex_offset = 0;
+			glm::uint32 vertex_count = index_count;
+
+			std::wstring name(shape.name.begin(), shape.name.end());
+			BLASRef blas = std::make_shared<BLAS>(std::make_shared<Primitive>(vertex_offset, vertex_count, index_offset, index_count), name);
+			ObjectInstanceRef object_instance = std::make_shared<ObjectInstance>(blas, glm::mat4(1), kDefaultHitGroupIndex);
+			object_instances.push_back(object_instance);
+
+			if (shape.mesh.material_ids.size() > 0)
+			{
+				const tinyobj::material_t& material = reader.GetMaterials()[shape.mesh.material_ids[0]];
+				object_instance->Data().mAlbedo = glm::vec3(material.diffuse[0], material.diffuse[1], material.diffuse[2]);
+				object_instance->Data().mEmission = glm::vec3(material.emission[0], material.emission[1], material.emission[2]);
+				object_instance->Data().mReflectance = glm::vec3(material.specular[0], material.specular[1], material.specular[2]);
+				object_instance->Data().mRoughness = material.roughness;
+
+				object_instance->Data().mIndexOffset = index_offset;
+				object_instance->Data().mVertexOffset = vertex_offset;
+			}
 		}
 	}
 
@@ -369,9 +387,9 @@ void Scene::CreateShaderResource()
 			D3D12_UNORDERED_ACCESS_VIEW_DESC desc = {};
 			desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
 			gDevice->CreateUnorderedAccessView(mOutputResource.Get(), nullptr, &desc, handle);
-		}
 
-		handle.ptr += increment_size;
+			handle.ptr += increment_size;
+		}
 
 		// b0
 		{
@@ -379,9 +397,9 @@ void Scene::CreateShaderResource()
 			desc.BufferLocation = gConstantGPUBuffer->GetGPUVirtualAddress();
 			desc.SizeInBytes = gAlignUp((UINT)sizeof(ShaderType::PerFrame), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
 			gDevice->CreateConstantBufferView(&desc, handle);
-		}
 
-		handle.ptr += increment_size;
+			handle.ptr += increment_size;
+		}
 
 		// t0
 		{
@@ -390,9 +408,9 @@ void Scene::CreateShaderResource()
 			desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 			desc.RaytracingAccelerationStructure.Location = mTLAS->GetGPUVirtualAddress();
 			gDevice->CreateShaderResourceView(nullptr, &desc, handle);
-		}
 
-		handle.ptr += increment_size;
+			handle.ptr += increment_size;
+		}
 
 		// t1
 		{
@@ -404,9 +422,9 @@ void Scene::CreateShaderResource()
 			desc.Buffer.StructureByteStride = sizeof(ShaderType::InstanceData);
 			desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
 			gDevice->CreateShaderResourceView(mTLAS->GetInstanceBuffer(), &desc, handle);
-		}
 
-		handle.ptr += increment_size;
+			handle.ptr += increment_size;
+		}
 
 		// t2
 		{
@@ -418,9 +436,9 @@ void Scene::CreateShaderResource()
 			desc.Buffer.NumElements = (UINT)(resource_desc.Width / sizeof(glm::uint32)); // RAW is counted as 32-bit typeless
 			desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
 			gDevice->CreateShaderResourceView(mIndexBuffer.Get(), &desc, handle);
-		}
 
-		handle.ptr += increment_size;
+			handle.ptr += increment_size;
+		}
 
 		// t3
 		{
@@ -431,9 +449,9 @@ void Scene::CreateShaderResource()
 			desc.Buffer.NumElements = (UINT)(resource_desc.Width / sizeof(Scene::VertexType));
 			desc.Buffer.StructureByteStride = sizeof(Scene::VertexType);
 			gDevice->CreateShaderResourceView(mVertexBuffer.Get(), &desc, handle);
-		}
 
-		handle.ptr += increment_size;
+			handle.ptr += increment_size;
+		}
 
 		// t4
 		{
@@ -444,6 +462,36 @@ void Scene::CreateShaderResource()
 			desc.Buffer.NumElements = (UINT)(resource_desc.Width / sizeof(Scene::NormalType));
 			desc.Buffer.StructureByteStride = sizeof(Scene::NormalType);
 			gDevice->CreateShaderResourceView(mNormalBuffer.Get(), &desc, handle);
+
+			handle.ptr += increment_size;
+		}
+
+		// b, space2 - PrecomputedAtmosphere
+		if (gPrecomputedAtmosphereScatteringResources.mConstantUploadBuffer != nullptr)
+		{
+			D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
+			desc.BufferLocation = gPrecomputedAtmosphereScatteringResources.mConstantUploadBuffer->GetGPUVirtualAddress();
+			desc.SizeInBytes = gAlignUp((UINT)sizeof(ShaderType::PerFrame), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+			gDevice->CreateConstantBufferView(&desc, handle);
+
+			handle.ptr += increment_size;
+		}
+
+		// t, space2 - PrecomputedAtmosphere
+		for (auto&& texture : gPrecomputedAtmosphereScatteringResources.mTextures)
+		{
+			if (texture->mResource == nullptr)
+				continue;
+
+			D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
+			srv_desc.Format = texture->mFormat;
+			srv_desc.ViewDimension = texture->mDepth == 1 ? D3D12_SRV_DIMENSION_TEXTURE2D : D3D12_SRV_DIMENSION_TEXTURE3D;
+			srv_desc.Texture2D.MipLevels = (UINT)-1;
+			srv_desc.Texture2D.MostDetailedMip = 0;
+			srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+			gDevice->CreateShaderResourceView(texture->mResource.Get(), &srv_desc, handle);
+
+			handle.ptr += increment_size;
 		}
 	}
 }

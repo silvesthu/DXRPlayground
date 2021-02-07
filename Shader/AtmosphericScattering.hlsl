@@ -1,8 +1,9 @@
-// From https://www.shadertoy.com/view/lslXDr
+// Based on https://www.shadertoy.com/view/lslXDr
 
 // ray intersects sphere
 // e = -b +/- sqrt( b^2 - c )
-float2 ray_vs_sphere( float3 p, float3 dir, float r ) {
+float2 ray_vs_sphere( float3 p, float3 dir, float r )
+{
 	float b = dot( p, dir );
 	float c = dot( p, p ) - r * r;
 	
@@ -17,8 +18,8 @@ float2 ray_vs_sphere( float3 p, float3 dir, float r ) {
 
 // scatter const
 // Match earth/atmosphere radius with Bruneton 2017
-#define EARTH_RADIUS 		6.360		// [1e6m]
-#define ATMOSPHERE_RADIUS 	6.420		// [1e6m]
+#define EARTH_RADIUS 		(mAtmosphere.mBottomRadius)		// km
+#define ATMOSPHERE_RADIUS 	(mAtmosphere.mTopRadius)		// km
 
 #define NUM_OUT_SCATTER 8
 #define NUM_IN_SCATTER 80
@@ -28,7 +29,8 @@ float2 ray_vs_sphere( float3 p, float3 dir, float r ) {
 //      3 * ( 1 - g^2 )               1 + c^2
 // F = ----------------- * -------------------------------
 //      8pi * ( 2 + g^2 )     ( 1 + g^2 - 2 * g * c )^(3/2)
-float phase_mie( float g, float c, float cc ) {
+float phase_mie( float g, float c, float cc )
+{
 	float gg = g * g;
 	
 	float a = ( 1.0 - gg ) * ( 1.0 + cc );
@@ -43,15 +45,18 @@ float phase_mie( float g, float c, float cc ) {
 // Rayleigh
 // g : 0
 // F = 3/16PI * ( 1 + c^2 )
-float phase_ray( float cc ) {
+float phase_ray( float cc )
+{
 	return ( 3.0 / 16.0 / MATH_PI) * ( 1.0 + cc );
 }
 
-float density( float3 p, float ph ) {
+float density( float3 p, float ph )
+{
 	return exp( -max( length( p ) - EARTH_RADIUS, 0.0 ) / ph );
 }
 
-float optic( float3 p, float3 q, float ph ) {
+float optic( float3 p, float3 q, float ph )
+{
 	float3 s = ( q - p ) / float( NUM_OUT_SCATTER );
 	float3 v = p + s * 0.5;
 	
@@ -65,13 +70,14 @@ float optic( float3 p, float3 q, float ph ) {
 	return sum;
 }
 
-float3 in_scatter( float3 o, float3 dir, float2 e, float3 l ) {
+float3 in_scatter( float3 o, float3 dir, float2 e, float3 l )
+{
 	// Match rayleigh/mie scaled depth with Bruneton 2017
-	const float scaled_height_rayleigh 						= 0.008;							// [1e6m]
-    const float scaled_height_mie 							= 0.0012;							// [1e6m]    
-    const float3 scattering_coefficient_rayleigh 			= float3(5.8, 13.5, 33.1);			// [1e6m]
-    const float3 scattering_coefficient_mie 				= 21.0;								// [1e6m] 
-    const float extinction_coefficient_mie_multiplier 		= 1.11;								// [1e6m] from scattering_coefficient_mie / extinction_coefficient_mie = 0.9 in paper
+	const float scaled_height_rayleigh 						= -1.0 / mAtmosphere.mRayleighDensity.mLayer1.mExpScale;	// km
+    const float scaled_height_mie 							= -1.0 / mAtmosphere.mMieDensity.mLayer1.mExpScale;			// km
+    const float3 scattering_coefficient_rayleigh 			= mAtmosphere.mRayleighScattering;							// km^-1
+    const float3 scattering_coefficient_mie 				= mAtmosphere.mMieScattering;								// km^-1
+    const float3 extinction_coefficient_mie 				= mAtmosphere.mMieExtinction;								// km^-1
     
 	float3 sum_ray = 0.0;
     float3 sum_mie = 0.0;
@@ -83,7 +89,8 @@ float3 in_scatter( float3 o, float3 dir, float2 e, float3 l ) {
     float3 s = dir * len;
 	float3 v = o + dir * ( e.x + len * 0.5 );
     
-    for ( int i = 0; i < NUM_IN_SCATTER; i++, v += s ) {   
+    for ( int i = 0; i < NUM_IN_SCATTER; i++, v += s )
+	{
 		float d_ray = density( v, scaled_height_rayleigh ) * len;
         float d_mie = density( v, scaled_height_mie ) * len;
         
@@ -96,7 +103,7 @@ float3 in_scatter( float3 o, float3 dir, float2 e, float3 l ) {
         float n_ray1 = optic( v, u, scaled_height_rayleigh );
         float n_mie1 = optic( v, u, scaled_height_mie );
 		
-        float3 att = exp( - ( n_ray0 + n_ray1 ) * scattering_coefficient_rayleigh - ( n_mie0 + n_mie1 ) * scattering_coefficient_mie * extinction_coefficient_mie_multiplier );
+        float3 att = exp( - ( n_ray0 + n_ray1 ) * scattering_coefficient_rayleigh - ( n_mie0 + n_mie1 ) * extinction_coefficient_mie);
         
 		sum_ray += d_ray * att;
         sum_mie += d_mie * att;
@@ -106,17 +113,22 @@ float3 in_scatter( float3 o, float3 dir, float2 e, float3 l ) {
 	float cc = c * c;
     float3 scatter =
         sum_ray * scattering_coefficient_rayleigh * phase_ray( cc ) +
-     	sum_mie * scattering_coefficient_mie * phase_mie( -0.76, c, cc );
+     	sum_mie * scattering_coefficient_mie * phase_mie( -mAtmosphere.mMiePhaseFunctionG, c, cc );
 
-	return 10.0 * scatter;
+	// [TODO]
+	float3 white_point = float3(1, 1, 1);
+	float exposure = 10.0;
+	return 1 - exp(-scatter / white_point * exposure);
+
+	// return 10.0 * scatter;
 }
 
 float3 AtmosphereScattering(float3 inPosition, float3 inDirection)
 {
 	float3 output = 0;
 
-	float3 base_altitude = float3(0, 1000, 0);
-	float3 eye = (base_altitude + inPosition) * 1e-6 + float3(0, EARTH_RADIUS, 0);
+	// Position in km
+	float3 eye = inPosition + float3(0, EARTH_RADIUS, 0);
 	float3 dir = inDirection;
 
 	float2 atmosphere_hit = ray_vs_sphere( eye, dir, ATMOSPHERE_RADIUS );

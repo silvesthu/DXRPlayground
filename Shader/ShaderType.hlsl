@@ -10,7 +10,7 @@ struct PerFrame
 	float4					mCameraRightExtend		CONSTANT_DEFAULT(float4(1.0f, 0.0f, 0.0f, 0.0f));
 	float4					mCameraUpExtend			CONSTANT_DEFAULT(float4(0.0f, 1.0f, 0.0f, 0.0f));
 	
-	BackgroundMode			mBackgroundMode			CONSTANT_DEFAULT(BackgroundMode::Color);
+	BackgroundMode			mBackgroundMode			CONSTANT_DEFAULT(BackgroundMode::PrecomputedAtmosphere);
 	float					mSunAzimuth				CONSTANT_DEFAULT(0);
 	float					mSunZenith				CONSTANT_DEFAULT(MATH_PI / 2.0f);
 	float					mPadding;

@@ -15,6 +15,8 @@ static const wchar_t*					kApplicationTitleW = L"DXR Playground";
 
 enum class SCENE_PRESET_TYPE
 {
+	NONE,
+
 	CORNELL_BOX,
 	VEACH_MIS,
 	FURNANCE,
@@ -32,6 +34,7 @@ struct ScenePreset
 
 static ScenePreset kScenePresets[(int)SCENE_PRESET_TYPE::COUNT] =
 {
+	{ "None", nullptr, glm::vec4(0.0f, 1.0f, 3.0f, 0.0f), glm::vec4(0.0f, 0.0f, -1.0f, 0.0f) },
 	{ "CornellBox", "Asset/raytracing-references/cornellbox/cornellbox.obj", glm::vec4(0.0f, 1.0f, 3.0f, 0.0f), glm::vec4(0.0f, 0.0f, -1.0f, 0.0f) },
 	{ "VeachMIS", "Asset/raytracing-references/veach-mis/veach-mis.obj", glm::vec4(0.0f, 1.0f, 13.0f, 0.0f), glm::vec4(0.0f, 0.0f, -1.0f, 0.0f) },
 	{ "Furnance", "Asset/raytracing-references/furnace-light-sampling/furnace-light-sampling.obj", glm::vec4(0.0f, 1.0f, 13.0f, 0.0f), glm::vec4(0.0f, 0.0f, -1.0f, 0.0f) },
@@ -129,6 +132,13 @@ static void sUpdate()
 			gPerFrameConstantBuffer.mCameraPosition -= right * move_speed;
 		if (ImGui::IsKeyDown('D'))
 			gPerFrameConstantBuffer.mCameraPosition += right * move_speed;
+
+		glm::vec4 up = glm::vec4(glm::normalize(glm::cross(glm::vec3(right), glm::vec3(gPerFrameConstantBuffer.mCameraDirection))), 0);
+
+		if (ImGui::IsKeyDown('Q'))
+			gPerFrameConstantBuffer.mCameraPosition -= up * move_speed;
+		if (ImGui::IsKeyDown('E'))
+			gPerFrameConstantBuffer.mCameraPosition += up * move_speed;
 	}
 
 	// Frustum
@@ -223,30 +233,6 @@ static void sUpdate()
 			if (ImGui::TreeNodeEx("Atmosphere", ImGuiTreeNodeFlags_DefaultOpen))
 			{
 				gPrecomputedAtmosphereScattering.UpdateImGui();
-
-				ImGui::TreePop();
-			}
-
-			if (ImGui::TreeNodeEx("Background"))
-			{
-				ImGui::Text("Mode"); ImGui::SameLine();
-				for (int i = 0; i < (int)BackgroundMode::Count; i++)
-				{
-					const auto& name = nameof::nameof_enum((BackgroundMode)i);
-
-					ImGui::SameLine();
-					if (ImGui::RadioButton(name.data(), (int)gPerFrameConstantBuffer.mBackgroundMode == i))
-						gPerFrameConstantBuffer.mBackgroundMode = (BackgroundMode)i;
-				}
-
-				if (gPerFrameConstantBuffer.mBackgroundMode == BackgroundMode::Color)
-					ImGui::ColorEdit3("Color", (float*)&gPerFrameConstantBuffer.mBackgroundColor);
-
-				if (gPerFrameConstantBuffer.mBackgroundMode == BackgroundMode::Atmosphere)
-				{
-					ImGui::SliderAngle("Sun Azimuth Angle", &gPerFrameConstantBuffer.mSunAzimuth, 0, 360.0f);
-					ImGui::SliderAngle("Sun Zenith Angle", &gPerFrameConstantBuffer.mSunZenith, 0, 180.0f);
-				}
 
 				ImGui::TreePop();
 			}

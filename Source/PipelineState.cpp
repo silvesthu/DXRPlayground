@@ -70,6 +70,7 @@ struct RootSignatureDescriptor
 	D3D12_ROOT_SIGNATURE_DESC mDesc = {};
 	std::vector<D3D12_DESCRIPTOR_RANGE> mDescriptorRanges;
 	std::vector<D3D12_ROOT_PARAMETER> mRootParameters;
+	std::vector<D3D12_STATIC_SAMPLER_DESC> mStaticSamplerDescs;
 };
 
 void GenerateGlobalRootSignatureDescriptor(RootSignatureDescriptor& outDesc)
@@ -92,7 +93,7 @@ void GenerateGlobalRootSignatureDescriptor(RootSignatureDescriptor& outDesc)
 	descriptor_range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 	outDesc.mDescriptorRanges.push_back(descriptor_range);
 
-	// t : space0
+	// t, space0
 	descriptor_range = {};
 	descriptor_range.NumDescriptors = 1;
 	descriptor_range.RegisterSpace = 0;
@@ -104,10 +105,19 @@ void GenerateGlobalRootSignatureDescriptor(RootSignatureDescriptor& outDesc)
 		outDesc.mDescriptorRanges.push_back(descriptor_range);
 	}
 
-	// t : space1
+	// b, space2 - PrecomputedAtmosphere
+	descriptor_range = {};
+	descriptor_range.BaseShaderRegister = 0;
+	descriptor_range.NumDescriptors = 1;
+	descriptor_range.RegisterSpace = 2;
+	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+	descriptor_range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	outDesc.mDescriptorRanges.push_back(descriptor_range);
+
+	// t, space2 - PrecomputedAtmosphere
 	descriptor_range = {};
 	descriptor_range.NumDescriptors = 1;
-	descriptor_range.RegisterSpace = 1;
+	descriptor_range.RegisterSpace = 2;
 	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 	descriptor_range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 	for (int i = 0; i <= 6; i++)
@@ -123,9 +133,32 @@ void GenerateGlobalRootSignatureDescriptor(RootSignatureDescriptor& outDesc)
 	root_parameter.DescriptorTable.pDescriptorRanges = outDesc.mDescriptorRanges.data();
 	outDesc.mRootParameters.push_back(root_parameter);
 
+	D3D12_STATIC_SAMPLER_DESC sampler = {};
+	sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+	sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+	sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+	sampler.MipLODBias = 0.f;
+	sampler.MaxAnisotropy = 0;
+	sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+	sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+	sampler.MinLOD = 0.f;
+	sampler.MaxLOD = D3D12_FLOAT32_MAX;
+	sampler.RegisterSpace = 0;
+	sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+	sampler.ShaderRegister = 0;
+	sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+	outDesc.mStaticSamplerDescs.push_back(sampler);
+
+	sampler.ShaderRegister = 1;
+	sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+	outDesc.mStaticSamplerDescs.push_back(sampler);
+
 	// Descriptor to table
 	outDesc.mDesc.NumParameters = (UINT)outDesc.mRootParameters.size();
 	outDesc.mDesc.pParameters = outDesc.mRootParameters.data();
+	outDesc.mDesc.NumStaticSamplers = (UINT)outDesc.mStaticSamplerDescs.size();
+	outDesc.mDesc.pStaticSamplers = outDesc.mStaticSamplerDescs.data();
 	outDesc.mDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
 }
 

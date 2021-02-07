@@ -175,6 +175,7 @@ enum class BackgroundMode : glm::uint32
 	Color = 0,
 
 	Atmosphere,
+	PrecomputedAtmosphere,
 
 	Count
 };

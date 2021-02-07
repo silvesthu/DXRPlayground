@@ -142,15 +142,15 @@ private:
 	void CreateShaderResource();
 	void CleanupShaderResource();
 
-	TLASRef mTLAS;
+	TLASRef							mTLAS;
 
-	ComPtr<ID3D12Resource> mIndexBuffer = nullptr;
-	ComPtr<ID3D12Resource> mVertexBuffer = nullptr;	
-	ComPtr<ID3D12Resource> mNormalBuffer = nullptr;
+	ComPtr<ID3D12Resource>			mIndexBuffer = nullptr;
+	ComPtr<ID3D12Resource>			mVertexBuffer = nullptr;	
+	ComPtr<ID3D12Resource>			mNormalBuffer = nullptr;
 
-	ComPtr<ID3D12Resource> mOutputResource = nullptr;
+	ComPtr<ID3D12Resource>			mOutputResource = nullptr;
 
-	ComPtr<ID3D12DescriptorHeap> mDXRDescriptorHeap = nullptr;
+	ComPtr<ID3D12DescriptorHeap>	mDXRDescriptorHeap = nullptr;
 };
 
 extern Scene gScene;
