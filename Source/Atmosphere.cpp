@@ -11,27 +11,27 @@ PrecomputedAtmosphereScatteringResources gPrecomputedAtmosphereScatteringResourc
 namespace UnitHelper
 {
 	template <typename ToType, typename FromType>
-	static ToType stMeterToKilometer(const FromType& inMeter)
+	static ToType stMeterToKilometer(const FromType& meter)
 	{
-		return ToType(inMeter * 1e-3);
+		return ToType(meter * 1e-3);
 	}
 
 	template <typename ToType, typename FromType>
-	static ToType sNanometerToMeter(const FromType& inNanometer)
+	static ToType sNanometerToMeter(const FromType& nanometer)
 	{
-		return ToType(inNanometer * 1e-9);
+		return ToType(nanometer * 1e-9);
 	}
 
 	template <typename ToType, typename FromType>
-	static ToType sInverseMeterToInverseKilometer(const FromType& inInverseMeter)
+	static ToType sInverseMeterToInverseKilometer(const FromType& inverse_meter)
 	{
-		return ToType(inInverseMeter * 1e3);
+		return ToType(inverse_meter * 1e3);
 	}
 
 	template <typename ToType, typename FromType>
-	static ToType sInverseNanometerToInverseKilometer(const FromType& inInverseNanometer)
+	static ToType sInverseNanometerToInverseKilometer(const FromType& inverse_nanometer)
 	{
-		return ToType(inInverseNanometer * 1e12);
+		return ToType(inverse_nanometer * 1e12);
 	}
 }
 
@@ -214,23 +214,23 @@ void PrecomputedAtmosphereScattering::ComputeSingleScattering()
 	gCommandList->Dispatch(gPrecomputedAtmosphereScatteringResources.mScatteringTexture.mWidth / 8, gPrecomputedAtmosphereScatteringResources.mScatteringTexture.mHeight / 8, gPrecomputedAtmosphereScatteringResources.mScatteringTexture.mDepth);
 }
 
-void PrecomputedAtmosphereScattering::ComputeScatteringDensity(glm::uint inScatteringOrder)
+void PrecomputedAtmosphereScattering::ComputeScatteringDensity(glm::uint scattering_order)
 {
 	gPrecomputedAtmosphereScatteringResources.mComputeScatteringDensityShader.SetupCompute();
 
 	ShaderType::AtmospherePerDraw atmosphere_per_draw = {};
-	atmosphere_per_draw.mScatteringOrder = inScatteringOrder;
+	atmosphere_per_draw.mScatteringOrder = scattering_order;
 	gCommandList->SetComputeRoot32BitConstants(1, sizeof(ShaderType::AtmospherePerDraw) / 4, &atmosphere_per_draw, 0);
 
 	gCommandList->Dispatch(gPrecomputedAtmosphereScatteringResources.mDeltaScatteringDensityTexture.mWidth / 8, gPrecomputedAtmosphereScatteringResources.mDeltaScatteringDensityTexture.mHeight / 8, gPrecomputedAtmosphereScatteringResources.mDeltaScatteringDensityTexture.mDepth);
 }
 
-void PrecomputedAtmosphereScattering::ComputeIndirectIrradiance(glm::uint inScatteringOrder)
+void PrecomputedAtmosphereScattering::ComputeIndirectIrradiance(glm::uint scattering_order)
 {
 	gPrecomputedAtmosphereScatteringResources.mComputeIndirectIrradianceShader.SetupCompute();
 
 	ShaderType::AtmospherePerDraw atmosphere_per_draw = {};
-	atmosphere_per_draw.mScatteringOrder = inScatteringOrder - 1;
+	atmosphere_per_draw.mScatteringOrder = scattering_order - 1;
 	gCommandList->SetComputeRoot32BitConstants(1, sizeof(ShaderType::AtmospherePerDraw) / 4, &atmosphere_per_draw, 0);
 
 	gCommandList->Dispatch(gPrecomputedAtmosphereScatteringResources.mIrradianceTexture.mWidth / 8, gPrecomputedAtmosphereScatteringResources.mIrradianceTexture.mHeight / 8, gPrecomputedAtmosphereScatteringResources.mIrradianceTexture.mDepth);
@@ -242,10 +242,10 @@ void PrecomputedAtmosphereScattering::AccumulateMultipleScattering()
 	gCommandList->Dispatch(gPrecomputedAtmosphereScatteringResources.mScatteringTexture.mWidth / 8, gPrecomputedAtmosphereScatteringResources.mScatteringTexture.mHeight / 8, gPrecomputedAtmosphereScatteringResources.mScatteringTexture.mDepth);
 }
 
-void PrecomputedAtmosphereScattering::ComputeMultipleScattering(glm::uint inScatteringOrder)
+void PrecomputedAtmosphereScattering::ComputeMultipleScattering(glm::uint scattering_order)
 {
-	ComputeScatteringDensity(inScatteringOrder);
-	ComputeIndirectIrradiance(inScatteringOrder);
+	ComputeScatteringDensity(scattering_order);
+	ComputeIndirectIrradiance(scattering_order);
 	AccumulateMultipleScattering();
 }
 

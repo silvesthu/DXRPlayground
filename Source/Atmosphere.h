@@ -68,7 +68,7 @@ struct AtmosphereProfile
 	// Ozone 
 	// [Bruneton08 Impl]
 	bool mEnableOzone								= true;
-	double kDobsonUnit								= 2.687e20;											// m^-2
+	double kDobsonUnit								= 2.687e20;											// m^-2 [TODO]
 	double kMaxOzoneNumberDensity					= 300.0 * kDobsonUnit / 15000.0;					// m^-2
 	glm::dvec3 kOzoneCrossSection					= glm::dvec3(1.209e-25, 3.5e-25, 1.582e-26);		// m^2
 
@@ -107,11 +107,11 @@ public:
 	void ComputeDirectIrradiance();
 	void ComputeSingleScattering();
 
-	void ComputeScatteringDensity(glm::uint inScatteringOrder);
-	void ComputeIndirectIrradiance(glm::uint inScatteringOrder);
+	void ComputeScatteringDensity(glm::uint scattering_order);
+	void ComputeIndirectIrradiance(glm::uint scattering_order);
 	void AccumulateMultipleScattering();
 
-	void ComputeMultipleScattering(glm::uint inScatteringOrder);
+	void ComputeMultipleScattering(glm::uint scattering_order);
 
 	void Precompute();
 

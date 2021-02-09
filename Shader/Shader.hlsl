@@ -126,40 +126,55 @@ void DefaultRayGeneration()
 
 #include "AtmosphericScattering.hlsl"
 
-float3 GetSkyRadiance()
+float3 PlanetCenter()
 {
-	float3 planet_center = float3(0, -mAtmosphere.mBottomRadius, 0);
-	float3 camera = WorldRayOrigin() - planet_center;
+	return float3(0, -mAtmosphere.mBottomRadius, 0);
+}
+
+float PlanetRadius()
+{
+	return mAtmosphere.mBottomRadius;
+}
+
+float3 GetSunDirection()
+{
+	return mPerFrame.mSunDirection.xyz;
+}
+
+void GetSkyRadiance(out float3 sky_radiance, out float3 transmittance_to_top)
+{
+	sky_radiance = 0;
+	transmittance_to_top = 1;
+
+	float3 camera = WorldRayOrigin() - PlanetCenter();
 	float3 view_ray = WorldRayDirection();
 	float3 sun_direction = mPerFrame.mSunDirection;
 
 	float r = length(camera);
 	float rmu = dot(camera, view_ray);
-
 	float distance_to_top_atmosphere_boundary = -rmu - sqrt(rmu * rmu - r * r + mAtmosphere.mTopRadius * mAtmosphere.mTopRadius);
 
 	if (distance_to_top_atmosphere_boundary > 0.0) 
 	{
-		// If the viewer is in space and the view ray intersects the atmosphere, move
-		// the viewer to the top atmosphere boundary (along the view ray):
+		// Outer space
+
+		// Move camera to top of atmosphere along view direction
 		camera = camera + view_ray * distance_to_top_atmosphere_boundary;
 		r = mAtmosphere.mTopRadius;
 		rmu += distance_to_top_atmosphere_boundary;
 	}
 	else if (r > mAtmosphere.mTopRadius) 
 	{
-		// If the view ray does not intersect the atmosphere, simply return 0.
-		// transmittance = DimensionlessSpectrum(1.0);
-		return 0;
+		// No hit
+		return;
 	}
 
-	// Compute the r, mu, mu_s and nu parameters needed for the texture lookups.
 	float mu = rmu / r;
 	float mu_s = dot(camera, sun_direction) / r;
-	float  nu = dot(view_ray, sun_direction);
+	float nu = dot(view_ray, sun_direction);
 	bool ray_r_mu_intersects_ground = RayIntersectsGround(r, mu);
 
-	float3 transmittance = ray_r_mu_intersects_ground ? 0 : GetTransmittanceToTopAtmosphereBoundary(r, mu);
+	transmittance_to_top = ray_r_mu_intersects_ground ? 0 : GetTransmittanceToTopAtmosphereBoundary(r, mu);
 	float3 single_mie_scattering;
 	float3 scattering;
 
@@ -169,12 +184,78 @@ float3 GetSkyRadiance()
 
 	// [TODO] light shafts
 
-	return scattering * RayleighPhaseFunction(nu) + single_mie_scattering * MiePhaseFunction(mAtmosphere.mMiePhaseFunctionG, nu);
+	sky_radiance = scattering * RayleighPhaseFunction(nu) + single_mie_scattering * MiePhaseFunction(mAtmosphere.mMiePhaseFunctionG, nu);
+}
+
+void GetSunAndSkyIrradiance(float3 hit_position, float3 normal, out float3 sun_irradiance, out float3 sky_irradiance)
+{
+	float3 local_position = hit_position - PlanetCenter();
+	float3 sun_direction = GetSunDirection();
+
+	float r = length(local_position);
+	float mu_s = dot(local_position, sun_direction) / r;
+
+	// Indirect irradiance (approximated if the surface is not horizontal).
+	sky_irradiance = GetIrradiance(r, mu_s) * (1.0 + dot(normal, local_position) / r) * 0.5;
+
+	// Direct irradiance.
+	sun_irradiance = mAtmosphere.mSolarIrradiance * GetTransmittanceToSun(r, mu_s) * max(dot(normal, sun_direction), 0.0);
+}
+
+float GetSunVisibility(float3 position)
+{
+	float3 sun_direction = GetSunDirection();
+
+	// [TODO]
+
+	return 1.0;
+}
+
+float3 GetSkyVisibility(float3 position)
+{
+	// [TODO]
+
+	return 1.0;
 }
 
 float3 GetEnvironmentEmission()
 {
-	float3 radiance = GetSkyRadiance();
+	// Sky
+	float3 radiance = 0;
+	float3 transmittance_to_top = 0;
+	GetSkyRadiance(radiance, transmittance_to_top);
+
+	// Ground (the planet)
+	float2 distance = 0;
+	if (IntersectRaySphere(WorldRayOrigin(), WorldRayDirection(), PlanetCenter(), PlanetRadius(), distance) && distance.x > 0)
+	{
+		float3 hit_position = WorldRayOrigin() + WorldRayDirection() * distance.x;
+		float3 normal = normalize(hit_position - PlanetCenter());
+
+		float3 kGroundAlbedo = float3(0.0, 0.0, 0.00); // Sea?
+
+		// Sky/Sun Irradiance -> Reflection -> Radiance
+		float3 sky_irradiance = 0;
+		float3 sun_irradiance = 0;
+		GetSunAndSkyIrradiance(hit_position, normal, sun_irradiance, sky_irradiance);
+		float3 ground_radiance = kGroundAlbedo * (1.0 / MATH_PI) * (sun_irradiance * GetSunVisibility(hit_position) + sky_irradiance * GetSkyVisibility(hit_position));
+
+		// [TODO] lightshaft
+
+		// Transmittance (merge with GetSkyRadiance()?)
+		float r = length(WorldRayOrigin() - PlanetCenter());
+		float rmu = dot(WorldRayOrigin() - PlanetCenter(), WorldRayDirection());
+		float mu = rmu / r;
+		float3 transmittance_to_ground = GetTransmittance(r, mu, distance.x, true);
+
+		radiance = radiance + transmittance_to_ground * ground_radiance;
+	}
+
+	// Sun
+	if (dot(WorldRayDirection(), GetSunDirection()) > cos(mAtmosphere.mSunAngularRadius))
+	{
+		radiance = radiance + transmittance_to_top * mAtmosphere.mSolarIrradiance;
+	}
 
 	// [TODO]
 	float3 white_point = float3(1, 1, 1);
