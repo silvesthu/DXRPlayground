@@ -115,6 +115,8 @@ float3 in_scatter( float3 o, float3 dir, float2 e, float3 l )
         sum_ray * scattering_coefficient_rayleigh * phase_ray( cc ) +
      	sum_mie * scattering_coefficient_mie * phase_mie( -mAtmosphere.mMiePhaseFunctionG, c, cc );
 
+	scatter *= mAtmosphere.mSolarIrradiance;
+
 	// [TODO]
 	float3 white_point = float3(1, 1, 1);
 	float exposure = 10.0;

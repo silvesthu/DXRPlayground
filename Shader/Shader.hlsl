@@ -247,7 +247,7 @@ float3 GetEnvironmentEmission()
 		float3 hit_position = RayOrigin() + RayDirection() * distance.x;
 		float3 normal = normalize(hit_position - PlanetCenter());
 
-		float3 kGroundAlbedo = float3(0.0, 0.0, 0.00); // Sea?
+		float3 kGroundAlbedo = mAtmosphere.mRuntimeGroundAlbedo;
 
 		// Sky/Sun Irradiance -> Reflection -> Radiance
 		float3 sky_irradiance = 0;

@@ -21,6 +21,11 @@ namespace ImGui
 	{
 		return SliderScalar(label, ImGuiDataType_Double, v, &v_min, &v_max, format, power);
 	}
+
+	inline bool SliderDouble3(const char* label, double* v, double v_min, double v_max, const char* format = "%.3f", float power = 1.0f)
+	{
+		return SliderScalarN(label, ImGuiDataType_Double, v, 3, &v_min, &v_max, format, power);
+	}
 }
 
 struct ExampleAppLog

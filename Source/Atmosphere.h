@@ -2,6 +2,33 @@
 
 #include "Common.h"
 
+namespace UnitHelper
+{
+	template <typename ToType, typename FromType>
+	static ToType stMeterToKilometer(const FromType& meter)
+	{
+		return ToType(meter * 1e-3);
+	}
+
+	template <typename ToType, typename FromType>
+	static ToType sNanometerToMeter(const FromType& nanometer)
+	{
+		return ToType(nanometer * 1e-9);
+	}
+
+	template <typename ToType, typename FromType>
+	static ToType sInverseMeterToInverseKilometer(const FromType& inverse_meter)
+	{
+		return ToType(inverse_meter * 1e3);
+	}
+
+	template <typename ToType, typename FromType>
+	static ToType sInverseNanometerToInverseKilometer(const FromType& inverse_nanometer)
+	{
+		return ToType(inverse_nanometer * 1e12);
+	}
+}
+
 struct AtmosphereProfile
 {
 	// [Nishita93][NSTN93] Display of The Earth Taking into Account Atmospheric Scattering https://www.researchgate.net/publication/2933032_Display_of_The_Earth_Taking_into_Account_Atmospheric_Scattering
@@ -9,8 +36,8 @@ struct AtmosphereProfile
 	// [Riley04][REK*04] Efficient Rendering of Atmospheric Phenomena https://people.cs.clemson.edu/~jtessen/reports/papers_files/Atmos_EGSR_Elec.pdf
 	// [Zotti07][ZWP07] A Critical Review of the Preetham Skylight Model https://www.cg.tuwien.ac.at/research/publications/2007/zotti-2007-wscg/zotti-2007-wscg-paper.pdf
 	// [Bruneton08] Precomputed Atmospheric Scattering https://hal.inria.fr/inria-00288758/document
-	// [Bruneton08 Doc] https://ebruneton.github.io/precomputed_atmospheric_scattering/atmosphere/functions.glsl.html
-	// [Bruneton08 Impl] https://github.com/ebruneton/precomputed_atmospheric_scattering
+	// [Bruneton08Doc] https://ebruneton.github.io/precomputed_atmospheric_scattering/atmosphere/functions.glsl.html
+	// [Bruneton08Impl] https://github.com/ebruneton/precomputed_atmospheric_scattering
 	// [Elek09] Rendering Parametrizable Planetary Atmospheres with Multiple Scattering in Real-Time http://www.klayge.org/material/4_0/Atmospheric/Rendering%20Parametrizable%20Planetary%20Atmospheres%20with%20Multiple%20Scattering%20in%20Real-Time.pdf
 	// [Yusov13] Outdoor Light Scattering Sample Update https://software.intel.com/content/www/us/en/develop/blogs/otdoor-light-scattering-sample-update.html
 	// [Hillaire16] Physically Based Sky, Atmosphere and Cloud Rendering in Frostbite https://media.contentapi.ea.com/content/dam/eacom/frostbite/files/s2016-pbs-frostbite-sky-clouds-new.pdf
@@ -18,83 +45,153 @@ struct AtmosphereProfile
 	// [Hillaire20] A Scalable and Production Ready Sky and Atmosphere Rendering Technique https://sebh.github.io/publications/egsr2020.pdf
 	// [UE4 SkyAtmosphere] SkyAtmosphere.usf SkyAtmosphereComponent.cpp https://docs.unrealengine.com/en-US/BuildingWorlds/FogEffects/SkyAtmosphere/index.html
 
-	// Geometry [Bruneton08]
-	double kBottomRadius							= 6360000.0;										// m
-	double kAtmosphereThickness						= 60000.0;											// m
-	double BottomRadius() const						{ return kBottomRadius; }							// m
-	double TopRadius() const						{ return kBottomRadius + kAtmosphereThickness; }	// m
-	double kRayleighScaleHeight						= 8000.0;											// m
-	double kMieScaleHeight							= 1200.0;											// m
-	double kOzoneBottomAltitude						= 10000.0;											// m
-	double kOzoneMidAltitude						= 25000.0;											// m
-	double kOzoneTopAltitude						= 40000.0;											// m
+	// Wavelength
+	static constexpr double kLambdaR					= 680.0;											// nm
+	static constexpr double kLambdaG					= 550.0;											// nm
+	static constexpr double kLambdaB					= 440.0;											// nm
+	static constexpr glm::dvec3 kLambda					= glm::dvec3(kLambdaR, kLambdaG, kLambdaB);			// nm
 
-	// Rayleigh [Bruneton08][Bruneton08 Impl]
-	enum class RayleighMode
+	// Geometry
+	struct GeometryReference
 	{
-		Precomputed,
-		Bruneton08Impl,
-		PSS99
+		static void Bruneton08Impl(AtmosphereProfile& profile)
+		{
+			profile.mBottomRadius						= 6360000.0;										// m
+			profile.mAtmosphereThickness				= 60000.0;											// m
+			profile.mRayleighScaleHeight				= 8000.0;											// m
+			profile.mMieScaleHeight						= 1200.0;											// m
+			profile.mOzoneBottomAltitude				= 10000.0;											// m
+			profile.mOzoneMidAltitude					= 25000.0;											// m
+			profile.mOzoneTopAltitude					= 40000.0;											// m
+		}
 	};
-	RayleighMode mRayleighMode						= RayleighMode::Bruneton08Impl;
-	glm::dvec3 mRayleighScatteringCoefficient		= glm::dvec3(0);									// m^-1
 
-	double kLambdaR									= 680.0;											// nm
-	double kLambdaG									= 550.0;											// nm
-	double kLambdaB									= 440.0;											// nm
-	glm::dvec3 kLambda								= glm::dvec3(kLambdaR, kLambdaG, kLambdaB);			// nm
-	double kRayleigh								= 1.24062e-6 * 1e-24;								// m^4 <- um^4 (?)
-	glm::dvec3 mRayleighScatteringCoefficient_		= glm::dvec3(5.8, 13.5, 33.1) * 1e-6;				// m^-1
+	double mBottomRadius								= {};												// m
+	double mAtmosphereThickness							= {};												// m
+	double BottomRadius() const							{ return mBottomRadius; }							// m
+	double TopRadius() const							{ return mBottomRadius + mAtmosphereThickness; }	// m
+	double mRayleighScaleHeight							= {};												// m
+	double mMieScaleHeight								= {};												// m
+	double mOzoneBottomAltitude							= {};												// m
+	double mOzoneMidAltitude							= {};												// m
+	double mOzoneTopAltitude							= {};												// m
+
+	// Rayleigh
+	struct RayleighReference
+	{
+		static void Bruneton08Impl(AtmosphereProfile& profile)
+		{
+			constexpr double kRayleigh = 1.24062e-6 * 1e-24; // m^4 <- um^4 (?)
+			profile.mRayleighScatteringCoefficient = kRayleigh / glm::pow(UnitHelper::sNanometerToMeter<glm::dvec3>(AtmosphereProfile::kLambda), glm::dvec3(4.0));
+		}
+
+		static void Bruneton08(AtmosphereProfile& profile) // 2.1 [REK*04] Table 3
+		{
+			profile.mRayleighScatteringCoefficient = glm::dvec3(5.8, 13.5, 33.1) * 1e-6; // m^-1
+		}
+
+		static void PSS99(AtmosphereProfile& profile)
+		{
+			constexpr double pi = glm::pi<double>();
+			double n = 1.0003; // index of refraction of air
+			double N = 2.545e25; // number of molecules per unit volume
+			double p_n = 0.035; // depolarization factor
+			double kRayleigh =
+				((8.0 * glm::pow(pi, 3.0) * glm::pow((n * n - 1.0), 2.0)) * (6.0 + 3.0 * p_n)) // Why [Bruneton08] 2.1 (1) omit the right half?
+				/ // -----------------------------------------------------------------------------------------
+				((3.0 * N) * (6.0 - 7.0 * p_n));
+			profile.mRayleighScatteringCoefficient = kRayleigh / glm::pow(UnitHelper::sNanometerToMeter<glm::dvec3>(AtmosphereProfile::kLambda), glm::dvec3(4.0));
+
+			// [NOTE]
+			// Total Scattering Coefficient = Integral of Angular Scattering Coefficient in all directions
+			// Angular Scattering Coefficient = Total Scattering Coefficient * (1 + cos(theta)^2) * 3.0 / 2.0
+		}
+	};
+	glm::dvec3 mRayleighScatteringCoefficient			= {}; // m^-1
 
 	// Mie
-	enum class MieMode
+	struct MieReference
 	{
-		Bruneton08Impl,
-		Bruneton08,
+		static void Bruneton08Impl(AtmosphereProfile& profile)
+		{
+			static constexpr double kMieAngstromAlpha = 0.0;
+			static constexpr double kMieAngstromBeta = 5.328e-3;
+			static constexpr double kMieSingleScatteringAlbedo = 0.9;
+
+			// [TODO] Different from paper?
+			profile.mMieExtinctionCoefficient = kMieAngstromBeta / profile.mMieScaleHeight * glm::pow(profile.kLambda, glm::dvec3(-kMieAngstromAlpha));
+			profile.mMieScatteringCoefficient = profile.mMieExtinctionCoefficient * kMieSingleScatteringAlbedo;
+
+			profile.mMiePhaseFunctionG = 0.8;
+		}
+
+		static void Bruneton08(AtmosphereProfile& profile) // 2.1 (3), beta_M(0, lambda)
+		{
+			profile.mMieScatteringCoefficient = glm::dvec3(20.0, 20.0, 20.0) * 1e-6;
+			profile.mMieExtinctionCoefficient = profile.mMieScatteringCoefficient / 0.9;
+
+			profile.mMiePhaseFunctionG = 0.8;
+		}
 	};
-	MieMode mMieMode								= MieMode::Bruneton08Impl;
-	glm::dvec3 mMieExtinctionCoefficient			= glm::dvec3(0.0);									// m^-1
-	glm::dvec3 mMieScatteringCoefficient			= glm::dvec3(0.0);									// m^-1
-
-	double kMieAngstromAlpha						= 0.0;
-	double kMieAngstromBeta							= 5.328e-3;
-	double kMieSingleScatteringAlbedo				= 0.9;
-
-	glm::dvec3 mMieScatteringCoefficientPaper		= glm::dvec3(20.0, 20.0, 20.0) * 1e-6;				// m^-1
-	glm::dvec3 mMieExtinctionCoefficientPaper		= mMieScatteringCoefficientPaper / 0.9;				// m^-1
-
-	double kMiePhaseFunctionG						= 0.8;
+	glm::dvec3 mMieScatteringCoefficient				= {}; // m^-1
+	glm::dvec3 mMieExtinctionCoefficient				= {}; // m^-1
+	double mMiePhaseFunctionG							= {};
 
 	// Ozone 
-	// [Bruneton08 Impl]
-	bool mEnableOzone								= true;
-	double kDobsonUnit								= 2.687e20;											// m^-2 [TODO]
-	double kMaxOzoneNumberDensity					= 300.0 * kDobsonUnit / 15000.0;					// m^-2
-	glm::dvec3 kOzoneCrossSection					= glm::dvec3(1.209e-25, 3.5e-25, 1.582e-26);		// m^2
+	struct OzoneReference
+	{
+		static void Bruneton08Impl(AtmosphereProfile& profile)				
+		{ 
+			profile.mEnableOzone = true;
 
-	glm::dvec3 mOZoneAbsorptionCoefficient			= glm::dvec3(0);									// m^-1
+			constexpr double kDobsonUnit = 2.687e20; // m^-2
+			constexpr double kMaxOzoneNumberDensity	= 300.0 * kDobsonUnit / 15000.0; // m^-2
+			constexpr glm::dvec3 kOzoneCrossSection	= glm::dvec3(1.209e-25, 3.5e-25, 1.582e-26); // m^2
+			profile.mOZoneAbsorptionCoefficient = kMaxOzoneNumberDensity * kOzoneCrossSection; 
+		}
+	};
+	bool mEnableOzone									= {};
+	glm::dvec3 mOZoneAbsorptionCoefficient				= {}; // m^-1
 
-	// Solar 
-	// [Bruneton08 Impl] demo.cc http://rredc.nrel.gov/solar/spectra/am1.5/ASTMG173/ASTMG173.html
-	bool mUseConstantSolarIrradiance				= false;
-	glm::dvec3 kConstantSolarIrradiance				= glm::dvec3(1.5);									// W.m^-2
-	glm::dvec3 kSolarIrradiance						= glm::dvec3(1.474000, 1.850400, 1.911980);			// W.m^-2
+	// Solar
+	struct SolarIrradianceReference
+	{
+		// http://rredc.nrel.gov/solar/spectra/am1.5/ASTMG173/ASTMG173.html
+		static void Bruneton08ImplConstant(AtmosphereProfile& profile)		
+		{ 
+			profile.mSolarIrradiance = glm::vec3(1.5f); 
+		}
 
-	// Sun
-	// [Bruneton08 Impl] demo.cc
-	double kSunAngularRadius						= 0.00935f / 2.0f;									// Radian
+		static void Bruneton08Impl(AtmosphereProfile& profile)
+		{ 
+			profile.mSolarIrradiance = glm::vec3(1.474000f, 1.850400f, 1.911980f); 
+		}
+	};
+	glm::vec3 mSolarIrradiance							= {}; // W.m^-2
 	// [Note] Calculated based on Sun seen from Earth
 	// https://sciencing.com/calculate-angular-diameter-sun-8592633.html
 	// Angular Radius = Angular Diameter / 2.0 = arctan(Sun radius / Sun-Earth distance)
+	double kSunAngularRadius							= 0.00935f / 2.0f; // Radian, from [Bruneton08Impl] demo.cc
 
 	// Multiple scattering
-	glm::uint mScatteringOrder						= 4;
+	glm::uint mScatteringOrder							= 4;
 
 	// Ground
-	glm::dvec3 mGroundAlbedo						= glm::dvec3(0.1);
+	glm::vec3 mGroundAlbedo								= glm::vec3(0.1f);
+	glm::vec3 mRuntimeGroundAlbedo						= glm::vec3(0.0f, 0.0f, 0.04f);
 
-	// Config
-	float mSceneScale								= 1.0;
+	// Unit
+	float mSceneScale									= 1.0;
+
+	// Default
+	AtmosphereProfile()
+	{
+		GeometryReference::Bruneton08Impl(*this);
+		RayleighReference::Bruneton08Impl(*this);
+		MieReference::Bruneton08Impl(*this);
+		OzoneReference::Bruneton08Impl(*this);
+		SolarIrradianceReference::Bruneton08Impl(*this);
+	}
 };
 
 class PrecomputedAtmosphereScattering

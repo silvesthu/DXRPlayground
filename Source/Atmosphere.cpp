@@ -8,33 +8,6 @@ AtmosphereProfile gAtmosphereProfile;
 PrecomputedAtmosphereScattering gPrecomputedAtmosphereScattering;
 PrecomputedAtmosphereScatteringResources gPrecomputedAtmosphereScatteringResources;
 
-namespace UnitHelper
-{
-	template <typename ToType, typename FromType>
-	static ToType stMeterToKilometer(const FromType& meter)
-	{
-		return ToType(meter * 1e-3);
-	}
-
-	template <typename ToType, typename FromType>
-	static ToType sNanometerToMeter(const FromType& nanometer)
-	{
-		return ToType(nanometer * 1e-9);
-	}
-
-	template <typename ToType, typename FromType>
-	static ToType sInverseMeterToInverseKilometer(const FromType& inverse_meter)
-	{
-		return ToType(inverse_meter * 1e3);
-	}
-
-	template <typename ToType, typename FromType>
-	static ToType sInverseNanometerToInverseKilometer(const FromType& inverse_nanometer)
-	{
-		return ToType(inverse_nanometer * 1e12);
-	}
-}
-
 void PrecomputedAtmosphereScattering::Update()
 {
 	ShaderType::Atmosphere* atmosphere = static_cast<ShaderType::Atmosphere*>(gPrecomputedAtmosphereScatteringResources.mConstantUploadBufferPointer);
@@ -48,50 +21,18 @@ void PrecomputedAtmosphereScattering::Update()
 
 	atmosphere->mSceneScale							= gAtmosphereProfile.mSceneScale;
 
-	atmosphere->mSolarIrradiance					= gAtmosphereProfile.mUseConstantSolarIrradiance ? gAtmosphereProfile.kConstantSolarIrradiance : gAtmosphereProfile.kSolarIrradiance;
+	atmosphere->mSolarIrradiance					= gAtmosphereProfile.mSolarIrradiance;
 	atmosphere->mSunAngularRadius					= static_cast<float>(gAtmosphereProfile.kSunAngularRadius);
 
 	atmosphere->mXSliceCount						= gPrecomputedAtmosphereScatteringResources.mXSliceCount;
 
 	atmosphere->mGroundAlbedo						= gAtmosphereProfile.mGroundAlbedo;
+	atmosphere->mRuntimeGroundAlbedo				= gAtmosphereProfile.mRuntimeGroundAlbedo;
 
 	// Density Profile: { Width, ExpTerm, ExpScale, LinearTerm, ConstantTerm }
 	{
 		// Rayleigh
 		{
-			switch (gAtmosphereProfile.mRayleighMode)
-			{
-			case AtmosphereProfile::RayleighMode::Precomputed:
-				// [Bruneton08] 2.1 [REK*04] Table 3
-				gAtmosphereProfile.mRayleighScatteringCoefficient = gAtmosphereProfile.mRayleighScatteringCoefficient_;
-				break;
-			case AtmosphereProfile::RayleighMode::Bruneton08Impl:
-				// demo.cc
-				gAtmosphereProfile.mRayleighScatteringCoefficient = gAtmosphereProfile.kRayleigh / glm::pow(UnitHelper::sNanometerToMeter<glm::dvec3>(gAtmosphereProfile.kLambda), glm::dvec3(4.0));
-				break;
-			case AtmosphereProfile::RayleighMode::PSS99:
-			{
-				// [PSS99] A.3
-				constexpr double pi = glm::pi<double>();
-				double n = 1.0003; // index of refraction of air
-				double N = 2.545e25; // number of molecules per unit volume
-				double p_n = 0.035; // depolarization factor
-				double kRayleigh =
-					((8.0 * glm::pow(pi, 3.0) * glm::pow((n * n - 1.0), 2.0)) * (6.0 + 3.0 * p_n))
-					/ // -----------------------------------------------------------------------------------------
-					((3.0 * N) * (6.0 - 7.0 * p_n));
-				gAtmosphereProfile.mRayleighScatteringCoefficient = kRayleigh / glm::pow(UnitHelper::sNanometerToMeter<glm::dvec3>(gAtmosphereProfile.kLambda), glm::dvec3(4.0));
-
-				// [Note] [Bruneton08] 2.1 (1) might miss the right half? (6.0 + 3.0 * p_n) / (6.0 - 7.0 * p_n)
-
-				// Total scattering coefficient = gAtmosphereProfile.mRayleighScatteringCoefficient = integral of angular scattering coefficient in all directions
-				// Angular scattering coefficient = Total scattering coefficient * (1 + cos(theta)^2) * 3.0 / 2.0
-			}
-			break;
-			default:
-				break;
-			}
-
 			// Scattering Coefficient
 			atmosphere->mRayleighScattering = UnitHelper::sInverseMeterToInverseKilometer<glm::vec3>(gAtmosphereProfile.mRayleighScatteringCoefficient);
 
@@ -103,7 +44,7 @@ void PrecomputedAtmosphereScattering::Update()
 			// Density: decrease exponentially
 			// [Bruneton08] 2.1 (1), e^(-1/H_R)
 			atmosphere->mRayleighDensity.mLayer0 = { dummy, dummy, dummy, dummy, dummy };
-			atmosphere->mRayleighDensity.mLayer1 = { dummy, 1.0f, -1.0f / UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.kRayleighScaleHeight), 0.0f, 0.0f };
+			atmosphere->mRayleighDensity.mLayer1 = { dummy, 1.0f, -1.0f / UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.mRayleighScaleHeight), 0.0f, 0.0f };
 
 			// How to get scale height?
 			// https://en.wikipedia.org/wiki/Scale_height
@@ -111,36 +52,11 @@ void PrecomputedAtmosphereScattering::Update()
 
 		// Mie
 		{
-			switch (gAtmosphereProfile.mMieMode)
-			{
-			case AtmosphereProfile::MieMode::Bruneton08Impl:
-			{
-				// [Bruneton08 Impl]
-				// [TODO] Further reference?
-				gAtmosphereProfile.mMieExtinctionCoefficient = gAtmosphereProfile.kMieAngstromBeta / gAtmosphereProfile.kMieScaleHeight * glm::pow(gAtmosphereProfile.kLambda, glm::dvec3(-gAtmosphereProfile.kMieAngstromAlpha));
-
-				// [TODO] Why this is different from the paper
-				gAtmosphereProfile.mMieScatteringCoefficient = gAtmosphereProfile.mMieExtinctionCoefficient * gAtmosphereProfile.kMieSingleScatteringAlbedo;
-			}
-			break;
-			case AtmosphereProfile::MieMode::Bruneton08:
-			{
-				// [Bruneton08] Figure 6
-				gAtmosphereProfile.mMieExtinctionCoefficient = gAtmosphereProfile.mMieExtinctionCoefficientPaper;
-				gAtmosphereProfile.mMieScatteringCoefficient = gAtmosphereProfile.mMieScatteringCoefficientPaper;
-			}
-			break;
-			default:
-				assert(false);
-				break;
-			}
-
 			// Scattering Coefficient
-			// [Bruneton08] 2.1 (3), beta_M(0, lambda)
 			atmosphere->mMieScattering = UnitHelper::sInverseMeterToInverseKilometer<glm::vec3>(gAtmosphereProfile.mMieScatteringCoefficient);
 
 			// Phase function
-			atmosphere->mMiePhaseFunctionG = static_cast<float>(gAtmosphereProfile.kMiePhaseFunctionG);
+			atmosphere->mMiePhaseFunctionG = static_cast<float>(gAtmosphereProfile.mMiePhaseFunctionG);
 
 			// Extinction Coefficient
 			atmosphere->mMieExtinction = UnitHelper::sInverseMeterToInverseKilometer<glm::vec3>(gAtmosphereProfile.mMieExtinctionCoefficient);
@@ -148,15 +64,15 @@ void PrecomputedAtmosphereScattering::Update()
 			// Density: decrease exponentially
 			// [Bruneton08] 2.1 (3), e^(-1/H_M)
 			atmosphere->mMieDensity.mLayer0 = { dummy, dummy, dummy, dummy, dummy };
-			atmosphere->mMieDensity.mLayer1 = { dummy, 1.0f, -1.0f / UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.kMieScaleHeight), 0.0f, 0.0f };
+			atmosphere->mMieDensity.mLayer1 = { dummy, 1.0f, -1.0f / UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.mMieScaleHeight), 0.0f, 0.0f };
 		}
 
 		// Ozone
 		{
 			// Density: increase linearly, then decrease linearly
-			float ozone_bottom_altitude = UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.kOzoneBottomAltitude);
-			float ozone_mid_altitude = UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.kOzoneMidAltitude);
-			float ozone_top_altitude = UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.kOzoneTopAltitude);
+			float ozone_bottom_altitude = UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.mOzoneBottomAltitude);
+			float ozone_mid_altitude = UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.mOzoneMidAltitude);
+			float ozone_top_altitude = UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.mOzoneTopAltitude);
 			float layer_0_linear_term, layer_0_constant_term, layer_1_linear_term, layer_1_constant_term;
 			{
 				// Altitude -> Density
@@ -168,8 +84,6 @@ void PrecomputedAtmosphereScattering::Update()
 				calculate_linear_term(ozone_bottom_altitude, ozone_mid_altitude, layer_0_linear_term, layer_0_constant_term);
 				calculate_linear_term(ozone_top_altitude, ozone_mid_altitude, layer_1_linear_term, layer_1_constant_term);
 			}
-
-			gAtmosphereProfile.mOZoneAbsorptionCoefficient = gAtmosphereProfile.kMaxOzoneNumberDensity * gAtmosphereProfile.kOzoneCrossSection;
 
 			if (gAtmosphereProfile.mEnableOzone)
 			{
@@ -324,34 +238,75 @@ void PrecomputedAtmosphereScattering::Finalize()
 
 void PrecomputedAtmosphereScattering::UpdateImGui()
 {
-	ImGui::Text("Mode"); ImGui::SameLine();
-	for (int i = 0; i < (int)BackgroundMode::Count; i++)
+	if (ImGui::TreeNodeEx("Mode", ImGuiTreeNodeFlags_DefaultOpen))
 	{
-		const auto& name = nameof::nameof_enum((BackgroundMode)i);
+		for (int i = 0; i < (int)BackgroundMode::Count; i++)
+		{
+			const auto& name = nameof::nameof_enum((BackgroundMode)i);
 
-		ImGui::SameLine();
-		if (ImGui::RadioButton(name.data(), (int)gPerFrameConstantBuffer.mBackgroundMode == i))
-			gPerFrameConstantBuffer.mBackgroundMode = (BackgroundMode)i;
+			if (i != 0)
+				ImGui::SameLine();
+			
+			if (ImGui::RadioButton(name.data(), (int)gPerFrameConstantBuffer.mBackgroundMode == i))
+				gPerFrameConstantBuffer.mBackgroundMode = (BackgroundMode)i;
+		}
+
+		if (gPerFrameConstantBuffer.mBackgroundMode == BackgroundMode::Color)
+			ImGui::ColorEdit3("Color", (float*)&gPerFrameConstantBuffer.mBackgroundColor, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
+
+		ImGui::TreePop();
+	}
+
+	if (ImGui::TreeNodeEx("Sun", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		ImGui::Text("Direction");
+		ImGui::SliderAngle("Azimuth Angle", &gPerFrameConstantBuffer.mSunAzimuth, 0, 360.0f);
+		ImGui::SliderAngle("Zenith Angle", &gPerFrameConstantBuffer.mSunZenith, 0, 180.0f);
+
+		ImGui::Text("Solar Irradiance");
+		ImGui::ColorEdit3("", &gAtmosphereProfile.mSolarIrradiance[0], ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
+		if (ImGui::SmallButton("Bruneton08Impl")) AtmosphereProfile::SolarIrradianceReference::Bruneton08Impl(gAtmosphereProfile);
+		ImGui::SameLine(); 
+		if (ImGui::SmallButton("Bruneton08ImplConstant")) AtmosphereProfile::SolarIrradianceReference::Bruneton08ImplConstant(gAtmosphereProfile);
+
+		ImGui::TreePop();
 	}
 	
-	ImGui::PushItemWidth(100);
-	ImGui::SliderFloat("Scene Scale", &gAtmosphereProfile.mSceneScale, 0.0f, 1.0f);
-	ImGui::PopItemWidth();
-	ImGui::SameLine(); if (ImGui::Button("m")) gAtmosphereProfile.mSceneScale = 1.0f;
-	ImGui::SameLine(); if (ImGui::Button("km")) gAtmosphereProfile.mSceneScale = 0.001f;
-
-	if (gPerFrameConstantBuffer.mBackgroundMode == BackgroundMode::Color)
-		ImGui::ColorEdit3("Color", (float*)&gPerFrameConstantBuffer.mBackgroundColor);
-	else
+	if (ImGui::TreeNodeEx("Unit", ImGuiTreeNodeFlags_DefaultOpen))
 	{
-		ImGui::SliderAngle("Sun Azimuth Angle", &gPerFrameConstantBuffer.mSunAzimuth, 0, 360.0f);
-		ImGui::SliderAngle("Sun Zenith Angle", &gPerFrameConstantBuffer.mSunZenith, 0, 180.0f);
+		ImGui::PushItemWidth(100); ImGui::SliderFloat("Scene Scale", &gAtmosphereProfile.mSceneScale, 0.0f, 1.0f); ImGui::PopItemWidth();
+		if (ImGui::SmallButton("m")) gAtmosphereProfile.mSceneScale = 1.0f;
+		ImGui::SameLine(); 
+		if (ImGui::SmallButton("km")) gAtmosphereProfile.mSceneScale = 0.001f;
+
+		ImGui::TreePop();
 	}
 
 	if (ImGui::TreeNodeEx("Geometry"))
 	{
-		ImGui::SliderDouble("Earth Radius (m)", &gAtmosphereProfile.kBottomRadius, 1000.0, 10000000.0);
-		ImGui::SliderDouble("Atmosphere Thickness (m)", &gAtmosphereProfile.kAtmosphereThickness, 1000.0, 100000.0);
+		ImGui::PushItemWidth(200);
+
+		ImGui::SliderDouble("Earth Radius (m)", &gAtmosphereProfile.mBottomRadius, 1000.0, 10000000.0);
+		ImGui::SliderDouble("Atmosphere Thickness (m)", &gAtmosphereProfile.mAtmosphereThickness, 1000.0, 100000.0);
+
+		ImGui::SliderDouble("Rayleigh Scale Height (m)", &gAtmosphereProfile.mRayleighScaleHeight, 100.0, 10000.0);
+		ImGui::SliderDouble("Mie Scale Height (m)", &gAtmosphereProfile.mMieScaleHeight, 100.0, 10000.0);
+
+		ImGui::SliderDouble("Ozone Bottom Altitude (m)", &gAtmosphereProfile.mOzoneBottomAltitude, 1000.0, 100000.0);
+		ImGui::SliderDouble("Ozone Mid Altitude (m)", &gAtmosphereProfile.mOzoneMidAltitude, 1000.0, 100000.0);
+		ImGui::SliderDouble("Ozone Top Altitude (m)", &gAtmosphereProfile.mOzoneTopAltitude, 1000.0, 100000.0);
+
+		ImGui::PopItemWidth();
+
+		if (ImGui::SmallButton("Bruneton08Impl")) AtmosphereProfile::GeometryReference::Bruneton08Impl(gAtmosphereProfile);
+
+		ImGui::TreePop();
+	}
+
+	if (ImGui::TreeNodeEx("Ground"))
+	{
+		ImGui::ColorEdit3("Albedo (Precomputed)", &gAtmosphereProfile.mGroundAlbedo[0], ImGuiColorEditFlags_Float);
+		ImGui::ColorEdit3("Albedo (Runtime)", &gAtmosphereProfile.mRuntimeGroundAlbedo[0], ImGuiColorEditFlags_Float);
 
 		ImGui::TreePop();
 	}
@@ -360,27 +315,25 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 	{
 		if (ImGui::TreeNodeEx("Rayleigh", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			ImGui::InputDouble3("Scattering  (/m)", &gAtmosphereProfile.mRayleighScatteringCoefficient.x, "%.3e");
-
-			ImGui::EnumRadioButton(AtmosphereProfile::RayleighMode::Precomputed, &gAtmosphereProfile.mRayleighMode);
+			ImGui::SliderDouble3("Scattering  (/m)", &gAtmosphereProfile.mRayleighScatteringCoefficient.x, 1.0e-8, 1.0e-4, "%.3e");
+			if (ImGui::SmallButton("Bruneton08Impl")) AtmosphereProfile::RayleighReference::Bruneton08Impl(gAtmosphereProfile);
 			ImGui::SameLine();
-			ImGui::EnumRadioButton(AtmosphereProfile::RayleighMode::Bruneton08Impl, &gAtmosphereProfile.mRayleighMode);
+			if (ImGui::SmallButton("Bruneton08")) AtmosphereProfile::RayleighReference::Bruneton08(gAtmosphereProfile);
 			ImGui::SameLine();
-			ImGui::EnumRadioButton(AtmosphereProfile::RayleighMode::PSS99, &gAtmosphereProfile.mRayleighMode);
+			if (ImGui::SmallButton("PSS99")) AtmosphereProfile::RayleighReference::PSS99(gAtmosphereProfile);
 
 			ImGui::TreePop();
 		}
 
 		if (ImGui::TreeNodeEx("Mie", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			ImGui::InputDouble3("Extinction (/m)", &gAtmosphereProfile.mMieExtinctionCoefficient.x, "%.3e");
-			ImGui::InputDouble3("Scattering (/m)", &gAtmosphereProfile.mMieScatteringCoefficient.x, "%.3e");
+			ImGui::SliderDouble3("Extinction (/m)", &gAtmosphereProfile.mMieExtinctionCoefficient[0], 1.0e-8, 1.0e-4, "%.3e");
+			ImGui::SliderDouble3("Scattering (/m)", &gAtmosphereProfile.mMieScatteringCoefficient[0], 1.0e-8, 1.0e-4, "%.3e");
+			ImGui::SliderDouble("Phase Function G", &gAtmosphereProfile.mMiePhaseFunctionG, -1.0f, 1.0f);
 
-			ImGui::SliderDouble("Phase Function G", &gAtmosphereProfile.kMiePhaseFunctionG, -1.0f, 1.0f);
-
-			ImGui::EnumRadioButton(AtmosphereProfile::MieMode::Bruneton08Impl, &gAtmosphereProfile.mMieMode);
+			if (ImGui::SmallButton("Bruneton08Impl")) AtmosphereProfile::MieReference::Bruneton08Impl(gAtmosphereProfile);
 			ImGui::SameLine();
-			ImGui::EnumRadioButton(AtmosphereProfile::MieMode::Bruneton08, &gAtmosphereProfile.mMieMode);
+			if (ImGui::SmallButton("Bruneton08")) AtmosphereProfile::MieReference::Bruneton08(gAtmosphereProfile);
 
 			ImGui::TreePop();
 		}
@@ -389,7 +342,8 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 		{
 			ImGui::Checkbox("Enable", &gAtmosphereProfile.mEnableOzone);
 
-			ImGui::InputDouble3("Absorption (/m)", &gAtmosphereProfile.mOZoneAbsorptionCoefficient.x, "%.3e");
+			ImGui::SliderDouble3("Absorption (/m)", &gAtmosphereProfile.mOZoneAbsorptionCoefficient[0], 0.0, 1.0e-5, "%.3e");
+			if (ImGui::SmallButton("Bruneton08Impl")) AtmosphereProfile::OzoneReference::Bruneton08Impl(gAtmosphereProfile);
 
 			ImGui::TreePop();
 		}
@@ -407,9 +361,7 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 
 	if (ImGui::TreeNodeEx("Textures", ImGuiTreeNodeFlags_DefaultOpen))
 	{
-		ImGui::PushItemWidth(100);
-		ImGui::SliderFloat("UI Scale", &mUIScale, 1.0, 4.0f);
-		ImGui::PopItemWidth();
+		ImGui::PushItemWidth(100); ImGui::SliderFloat("UI Scale", &mUIScale, 1.0, 4.0f); ImGui::PopItemWidth();
 		ImGui::SameLine();
 		ImGui::Checkbox("UI Flip Y", &mUIFlipY);
 

@@ -142,6 +142,9 @@ struct Atmosphere
 
 	float3					mGroundAlbedo			CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	float					mPad5;
+
+	float3					mRuntimeGroundAlbedo	CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	float					mPad6;
 };
 
 struct AtmospherePerDraw
