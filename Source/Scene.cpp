@@ -241,11 +241,22 @@ void Scene::Load(const char* inFilename)
 
 			if (shape.mesh.material_ids.size() > 0)
 			{
-				const tinyobj::material_t& material = reader.GetMaterials()[shape.mesh.material_ids[0]];
-				object_instance->Data().mAlbedo = glm::vec3(material.diffuse[0], material.diffuse[1], material.diffuse[2]);
-				object_instance->Data().mEmission = glm::vec3(material.emission[0], material.emission[1], material.emission[2]);
-				object_instance->Data().mReflectance = glm::vec3(material.specular[0], material.specular[1], material.specular[2]);
-				object_instance->Data().mRoughness = material.roughness;
+				if (shape.mesh.material_ids[0] == -1)
+				{
+					// Dummy material
+					object_instance->Data().mAlbedo = glm::vec3(0.1f, 0.1f, 0.1f);
+					object_instance->Data().mEmission = glm::vec3(0.0f, 0.0f, 0.0f);
+					object_instance->Data().mReflectance = glm::vec3(0.0f, 0.0f, 0.0f);
+					object_instance->Data().mRoughness = 1.0f;
+				}
+				else
+				{
+					const tinyobj::material_t& material = reader.GetMaterials()[shape.mesh.material_ids[0]];
+					object_instance->Data().mAlbedo = glm::vec3(material.diffuse[0], material.diffuse[1], material.diffuse[2]);
+					object_instance->Data().mEmission = glm::vec3(material.emission[0], material.emission[1], material.emission[2]);
+					object_instance->Data().mReflectance = glm::vec3(material.specular[0], material.specular[1], material.specular[2]);
+					object_instance->Data().mRoughness = material.roughness;
+				}
 
 				object_instance->Data().mIndexOffset = index_offset;
 				object_instance->Data().mVertexOffset = vertex_offset;
