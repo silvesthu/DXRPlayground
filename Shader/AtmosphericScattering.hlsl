@@ -1,3 +1,4 @@
+// Atmosphere scattering without precomputation
 // Based on https://www.shadertoy.com/view/lslXDr
 
 // ray intersects sphere

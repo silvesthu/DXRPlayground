@@ -155,6 +155,11 @@ enum class DebugMode : glm::uint32
 
 	_Newline2,
 
+	Transmittance,
+	InScattering,
+
+	_Newline3,
+
 	RecursionCount,
 
 	Count

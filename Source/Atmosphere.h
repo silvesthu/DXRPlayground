@@ -58,11 +58,6 @@ struct AtmosphereProfile
 		{
 			profile.mBottomRadius						= 6360000.0;										// m
 			profile.mAtmosphereThickness				= 60000.0;											// m
-			profile.mRayleighScaleHeight				= 8000.0;											// m
-			profile.mMieScaleHeight						= 1200.0;											// m
-			profile.mOzoneBottomAltitude				= 10000.0;											// m
-			profile.mOzoneMidAltitude					= 25000.0;											// m
-			profile.mOzoneTopAltitude					= 40000.0;											// m
 		}
 	};
 
@@ -70,28 +65,37 @@ struct AtmosphereProfile
 	double mAtmosphereThickness							= {};												// m
 	double BottomRadius() const							{ return mBottomRadius; }							// m
 	double TopRadius() const							{ return mBottomRadius + mAtmosphereThickness; }	// m
-	double mRayleighScaleHeight							= {};												// m
-	double mMieScaleHeight								= {};												// m
-	double mOzoneBottomAltitude							= {};												// m
-	double mOzoneMidAltitude							= {};												// m
-	double mOzoneTopAltitude							= {};												// m
 
 	// Rayleigh
 	struct RayleighReference
 	{
 		static void Bruneton08Impl(AtmosphereProfile& profile)
 		{
+			static constexpr double kRayleighScaleHeight = 8000.0;
+
 			constexpr double kRayleigh = 1.24062e-6 * 1e-24; // m^4 <- um^4 (?)
 			profile.mRayleighScatteringCoefficient = kRayleigh / glm::pow(UnitHelper::sNanometerToMeter<glm::dvec3>(AtmosphereProfile::kLambda), glm::dvec3(4.0));
+
+			// [Bruneton08] 2.1 (1), e^(-1/H_R) Density decrease exponentially
+			static constexpr float kDummy = 0.0f;
+			profile.mRayleighDensityProfile.mLayer0 = { kDummy, kDummy, kDummy, kDummy, kDummy };
+			profile.mRayleighDensityProfile.mLayer1 = { kDummy, 1.0f, -1.0f / UnitHelper::stMeterToKilometer<float>(kRayleighScaleHeight), 0.0f, 0.0f };
+
+			// How to get scale height?
+			// https://en.wikipedia.org/wiki/Scale_height
 		}
 
 		static void Bruneton08(AtmosphereProfile& profile) // 2.1 [REK*04] Table 3
 		{
+			Bruneton08Impl(profile);
+
 			profile.mRayleighScatteringCoefficient = glm::dvec3(5.8, 13.5, 33.1) * 1e-6; // m^-1
 		}
 
 		static void PSS99(AtmosphereProfile& profile)
 		{
+			Bruneton08Impl(profile);
+
 			constexpr double pi = glm::pi<double>();
 			double n = 1.0003; // index of refraction of air
 			double N = 2.545e25; // number of molecules per unit volume
@@ -107,6 +111,7 @@ struct AtmosphereProfile
 			// Angular Scattering Coefficient = Total Scattering Coefficient * (1 + cos(theta)^2) * 3.0 / 2.0
 		}
 	};
+	ShaderType::DensityProfile mRayleighDensityProfile	= {}; // km
 	glm::dvec3 mRayleighScatteringCoefficient			= {}; // m^-1
 
 	// Mie
@@ -114,25 +119,33 @@ struct AtmosphereProfile
 	{
 		static void Bruneton08Impl(AtmosphereProfile& profile)
 		{
+			static constexpr double kMieScaleHeight = 1200.0;
+
 			static constexpr double kMieAngstromAlpha = 0.0;
 			static constexpr double kMieAngstromBeta = 5.328e-3;
 			static constexpr double kMieSingleScatteringAlbedo = 0.9;
 
 			// [TODO] Different from paper?
-			profile.mMieExtinctionCoefficient = kMieAngstromBeta / profile.mMieScaleHeight * glm::pow(profile.kLambda, glm::dvec3(-kMieAngstromAlpha));
+			profile.mMieExtinctionCoefficient = kMieAngstromBeta / kMieScaleHeight * glm::pow(profile.kLambda, glm::dvec3(-kMieAngstromAlpha));
 			profile.mMieScatteringCoefficient = profile.mMieExtinctionCoefficient * kMieSingleScatteringAlbedo;
 
 			profile.mMiePhaseFunctionG = 0.8;
+
+			// [Bruneton08] 2.1 (3), e^(-1/H_M) Density decrease exponentially
+			static constexpr float kDummy = 0.0f;
+			profile.mMieDensityProfile.mLayer0 = { kDummy, kDummy, kDummy, kDummy, kDummy };
+			profile.mMieDensityProfile.mLayer1 = { kDummy, 1.0f, -1.0f / UnitHelper::stMeterToKilometer<float>(kMieScaleHeight), 0.0f, 0.0f };
 		}
 
 		static void Bruneton08(AtmosphereProfile& profile) // 2.1 (3), beta_M(0, lambda)
 		{
+			Bruneton08Impl(profile);
+
 			profile.mMieScatteringCoefficient = glm::dvec3(20.0, 20.0, 20.0) * 1e-6;
 			profile.mMieExtinctionCoefficient = profile.mMieScatteringCoefficient / 0.9;
-
-			profile.mMiePhaseFunctionG = 0.8;
 		}
 	};
+	ShaderType::DensityProfile mMieDensityProfile		= {}; // km
 	glm::dvec3 mMieScatteringCoefficient				= {}; // m^-1
 	glm::dvec3 mMieExtinctionCoefficient				= {}; // m^-1
 	double mMiePhaseFunctionG							= {};
@@ -140,17 +153,49 @@ struct AtmosphereProfile
 	// Ozone 
 	struct OzoneReference
 	{
+		static void UpdateDensityProfile(AtmosphereProfile& profile)
+		{
+			// Density increase linearly, then decrease linearly
+			float ozone_bottom_altitude = UnitHelper::stMeterToKilometer<float>(profile.mOzoneBottomAltitude);
+			float ozone_mid_altitude = UnitHelper::stMeterToKilometer<float>(profile.mOzoneMidAltitude);
+			float ozone_top_altitude = UnitHelper::stMeterToKilometer<float>(profile.mOzoneTopAltitude);
+			float layer_0_linear_term, layer_0_constant_term, layer_1_linear_term, layer_1_constant_term;
+			{
+				// Altitude -> Density
+				auto calculate_linear_term = [](float inX0, float inX1, float& outLinearTerm, float& outConstantTerm)
+				{
+					outLinearTerm = 1.0f / (inX1 - inX0);
+					outConstantTerm = 1.0f * (0.0f - inX0) / (inX1 - inX0);
+				};
+				calculate_linear_term(ozone_bottom_altitude, ozone_mid_altitude, layer_0_linear_term, layer_0_constant_term);
+				calculate_linear_term(ozone_top_altitude, ozone_mid_altitude, layer_1_linear_term, layer_1_constant_term);
+			}
+			static constexpr float kDummy = 0.0f;
+			profile.mOzoneDensityProfile.mLayer0 = { ozone_mid_altitude, 0.0f, 0.0f, layer_0_linear_term, layer_0_constant_term };
+			profile.mOzoneDensityProfile.mLayer1 = { kDummy, 0.0f, 0.0f, layer_1_linear_term, layer_1_constant_term };
+		}
+
 		static void Bruneton08Impl(AtmosphereProfile& profile)				
 		{ 
 			profile.mEnableOzone = true;
 
+			profile.mOzoneBottomAltitude				= 10000.0;
+			profile.mOzoneMidAltitude					= 25000.0;
+			profile.mOzoneTopAltitude					= 40000.0;
+
 			constexpr double kDobsonUnit = 2.687e20; // m^-2
 			constexpr double kMaxOzoneNumberDensity	= 300.0 * kDobsonUnit / 15000.0; // m^-2
 			constexpr glm::dvec3 kOzoneCrossSection	= glm::dvec3(1.209e-25, 3.5e-25, 1.582e-26); // m^2
-			profile.mOZoneAbsorptionCoefficient = kMaxOzoneNumberDensity * kOzoneCrossSection; 
+			profile.mOZoneAbsorptionCoefficient = kMaxOzoneNumberDensity * kOzoneCrossSection;
+
+			UpdateDensityProfile(profile);
 		}
 	};
 	bool mEnableOzone									= {};
+	double mOzoneBottomAltitude							= {}; // m
+	double mOzoneMidAltitude							= {}; // m
+	double mOzoneTopAltitude							= {}; // m
+	ShaderType::DensityProfile mOzoneDensityProfile		= {}; // km
 	glm::dvec3 mOZoneAbsorptionCoefficient				= {}; // m^-1
 
 	// Solar
@@ -177,6 +222,7 @@ struct AtmosphereProfile
 	glm::uint mScatteringOrder							= 4;
 
 	// Ground
+	bool mAerialPerspective								= true;
 	glm::vec3 mGroundAlbedo								= glm::vec3(0.1f);
 	glm::vec3 mRuntimeGroundAlbedo						= glm::vec3(0.0f, 0.0f, 0.04f);
 

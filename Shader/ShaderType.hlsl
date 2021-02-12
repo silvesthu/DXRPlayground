@@ -14,6 +14,7 @@ struct PerFrame
 	float					mSunAzimuth				CONSTANT_DEFAULT(0);
 	float					mSunZenith				CONSTANT_DEFAULT(MATH_PI / 2.0f);
 	float					mPadding;
+
 	float4					mSunDirection			CONSTANT_DEFAULT(float4(1.0f, 0.0f, 0.0f, 0.0f));
 
 	DebugMode				mDebugMode				CONSTANT_DEFAULT(DebugMode::None);
@@ -50,6 +51,10 @@ struct HitInfo
 
 	float mScatteringPDF;
 	float mPDF;
+
+	// Participating Media along the ray
+	float3 mTransmittance;
+	float3 mInScattering;
 
 	bool mDone;
 };
@@ -112,8 +117,8 @@ float GetProfileDensity(DensityProfile profile, float altitude)
 
 struct Atmosphere
 {
-	float					mBottomRadius			CONSTANT_DEFAULT(0);	// km
-	float					mTopRadius				CONSTANT_DEFAULT(0);	// km
+	float					mBottomRadius			CONSTANT_DEFAULT(0);
+	float					mTopRadius				CONSTANT_DEFAULT(0);
 	float					mSceneScale				CONSTANT_DEFAULT(0);
 	float					mPad0;
 
@@ -141,7 +146,7 @@ struct Atmosphere
 	float					mSunAngularRadius		CONSTANT_DEFAULT(0);
 
 	float3					mGroundAlbedo			CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
-	float					mPad5;
+	float					mAerialPerspective		CONSTANT_DEFAULT(0);
 
 	float3					mRuntimeGroundAlbedo	CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	float					mPad6;

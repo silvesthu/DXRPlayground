@@ -131,30 +131,13 @@ void DefaultRayGeneration()
 
 #include "AtmosphericScattering.hlsl"
 
-float3 RayOrigin()
-{
-	return WorldRayOrigin() * mAtmosphere.mSceneScale;
-}
-
-float3 RayDirection()
-{
-	return WorldRayDirection();
-}
-
-float3 PlanetCenter()
-{
-	return float3(0, -mAtmosphere.mBottomRadius, 0);
-}
-
-float PlanetRadius()
-{
-	return mAtmosphere.mBottomRadius;
-}
-
-float3 GetSunDirection()
-{
-	return mPerFrame.mSunDirection.xyz;
-}
+// Adapters
+float3 RayOrigin() { return WorldRayOrigin() * mAtmosphere.mSceneScale; }
+float3 RayDirection() { return WorldRayDirection(); }
+float3 RayHitPosition() { return (WorldRayOrigin() + WorldRayDirection() * RayTCurrent()) * mAtmosphere.mSceneScale; }
+float3 PlanetCenter() { return float3(0, -mAtmosphere.mBottomRadius, 0); }
+float PlanetRadius() { return mAtmosphere.mBottomRadius; }
+float3 GetSunDirection() { return mPerFrame.mSunDirection.xyz; }
 
 void GetSkyRadiance(out float3 sky_radiance, out float3 transmittance_to_top)
 {
@@ -163,7 +146,7 @@ void GetSkyRadiance(out float3 sky_radiance, out float3 transmittance_to_top)
 
 	float3 camera = RayOrigin() - PlanetCenter();
 	float3 view_ray = RayDirection();
-	float3 sun_direction = mPerFrame.mSunDirection;
+	float3 sun_direction = GetSunDirection();
 
 	float r = length(camera);
 	float rmu = dot(camera, view_ray);
@@ -198,6 +181,87 @@ void GetSkyRadiance(out float3 sky_radiance, out float3 transmittance_to_top)
 	scattering = GetCombinedScattering(r, mu, mu_s, nu, ray_r_mu_intersects_ground, single_mie_scattering);
 
 	// [TODO] light shafts
+
+	sky_radiance = scattering * RayleighPhaseFunction(nu) + single_mie_scattering * MiePhaseFunction(mAtmosphere.mMiePhaseFunctionG, nu);
+}
+
+// Aerial Perspective
+void GetSkyRadianceToPoint(out float3 sky_radiance, out float3 transmittance)
+{
+	// [TODO] Occlusion?
+
+	sky_radiance = 0;
+	transmittance = 1;
+
+	if (mAtmosphere.mAerialPerspective == 0)
+		return;
+
+	float3 hit_position = RayHitPosition() - PlanetCenter();
+	float3 camera = RayOrigin() - PlanetCenter();
+	float3 sun_direction = GetSunDirection();
+
+	float3 view_ray = RayDirection();
+	float r = length(camera);
+	float rmu = dot(camera, view_ray);
+	float distance_to_top_atmosphere_boundary = -rmu - sqrt(rmu * rmu - r * r + mAtmosphere.mTopRadius * mAtmosphere.mTopRadius);
+
+	// If the viewer is in space and the view ray intersects the atmosphere, move
+	// the viewer to the top atmosphere boundary (along the view ray):
+	if (distance_to_top_atmosphere_boundary > 0.0)
+	{
+		// Outer space
+
+		// Move camera to top of atmosphere along view direction
+		camera = camera + view_ray * distance_to_top_atmosphere_boundary;
+		r = mAtmosphere.mTopRadius;
+		rmu += distance_to_top_atmosphere_boundary;
+	}
+
+	// Compute the r, mu, mu_s and nu parameters for the first texture lookup.
+	float mu = rmu / r;
+	float mu_s = dot(camera, sun_direction) / r;
+	float nu = dot(view_ray, sun_direction);
+	float d = length(hit_position - camera);
+	bool ray_r_mu_intersects_ground = RayIntersectsGround(r, mu);
+
+	transmittance = GetTransmittance(r, mu, d, ray_r_mu_intersects_ground);
+
+	float3 single_mie_scattering;
+	float3 scattering = GetCombinedScattering(r, mu, mu_s, nu, ray_r_mu_intersects_ground, single_mie_scattering);
+
+	// [TODO] shadow
+	float shadow_length = 0;
+	float3 single_mie_scattering_p = single_mie_scattering;
+	float3 scattering_p = scattering;
+	if (shadow_length > 0)
+	{
+		// Compute the r, mu, mu_s and nu parameters for the second texture lookup.
+		// If shadow_length is not 0 (case of light shafts), we want to ignore the
+		// scattering along the last shadow_length meters of the view ray, which we
+		// do by subtracting shadow_length from d (this way scattering_p is equal to
+		// the S|x_s=x_0-lv term in Eq. (17) of our paper).
+		d = max(d - shadow_length, 0.0);
+		float r_p = ClampRadius(sqrt(d * d + 2.0 * r * mu * d + r * r));
+		float mu_p = (r * mu + d) / r_p;
+		float mu_s_p = (r * mu_s + d * nu) / r_p;
+
+		scattering_p = GetCombinedScattering(r_p, mu_p, mu_s_p, nu, ray_r_mu_intersects_ground, single_mie_scattering_p);
+	}
+
+	// Combine the lookup results to get the scattering between camera and point.
+	float3 shadow_transmittance = transmittance;
+	if (shadow_length > 0.0)
+	{
+		// This is the T(x,x_s) term in Eq. (17) of our paper, for light shafts.
+		shadow_transmittance = GetTransmittance(r, mu, d, ray_r_mu_intersects_ground);
+	}
+	scattering = scattering - shadow_transmittance * scattering_p;
+	single_mie_scattering = single_mie_scattering - shadow_transmittance * single_mie_scattering_p;
+
+	single_mie_scattering = GetExtrapolatedSingleMieScattering(float4(scattering.rgb, single_mie_scattering.r));
+
+	// Hack to avoid rendering artifacts when the sun is below the horizon.
+	single_mie_scattering = single_mie_scattering * smoothstep(float(0.0), float(0.01), mu_s);
 
 	sky_radiance = scattering * RayleighPhaseFunction(nu) + single_mie_scattering * MiePhaseFunction(mAtmosphere.mMiePhaseFunctionG, nu);
 }
@@ -263,7 +327,29 @@ float3 GetEnvironmentEmission()
 		float mu = rmu / r;
 		float3 transmittance_to_ground = GetTransmittance(r, mu, distance.x, true);
 
-		radiance = radiance + transmittance_to_ground * ground_radiance;
+		if (mAtmosphere.mAerialPerspective == 0)
+			radiance = ground_radiance;
+		else
+			radiance = radiance + transmittance_to_ground * ground_radiance;
+
+		// Debug - Global
+		if (mPerFrame.mDebugMode != DebugMode_None && mPerFrame.mDebugMode != DebugMode_RecursionCount)
+		{
+			switch (mPerFrame.mDebugMode)
+			{
+			case DebugMode_Barycentrics: 			return 0;
+			case DebugMode_Vertex: 					return hit_position;
+			case DebugMode_Normal: 					return normal;
+			case DebugMode_Albedo: 					return kGroundAlbedo;
+			case DebugMode_Reflectance: 			return 0;
+			case DebugMode_Emission: 				return 0;
+			case DebugMode_Roughness: 				return 1;
+			case DebugMode_Transmittance:			return transmittance_to_ground;
+			case DebugMode_InScattering:			return radiance;
+			default:
+				break;
+			}
+		}
 	}
 
 	// Sun
@@ -297,6 +383,8 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	HitInfo hit_info = (HitInfo)0;
 	hit_info.mPDF = 1.0;
 	hit_info.mScatteringPDF = 1.0;
+	hit_info.mTransmittance = 1.0;
+	hit_info.mInScattering = 0.0;
 
 	// See https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html for more system value intrinsics
 	float3 barycentrics = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y, attribs.barycentrics.x, attribs.barycentrics.y);
@@ -336,6 +424,8 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	float3 raw_hit_position = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
 	hit_info.mPosition = raw_hit_position + normal * 0.001;
 
+	GetSkyRadianceToPoint(hit_info.mInScattering, hit_info.mTransmittance);
+
     // Debug - Global
 	if (mPerFrame.mDebugMode != DebugMode_None && mPerFrame.mDebugMode != DebugMode_RecursionCount)
 	{
@@ -348,6 +438,8 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	    	case DebugMode_Reflectance: 			hit_info.mEmission = InstanceDataBuffer[InstanceID()].mReflectance; break;
 	    	case DebugMode_Emission: 				hit_info.mEmission = InstanceDataBuffer[InstanceID()].mEmission; break;
 	    	case DebugMode_Roughness: 				hit_info.mEmission = InstanceDataBuffer[InstanceID()].mRoughness; break;
+			case DebugMode_Transmittance:			hit_info.mEmission = hit_info.mTransmittance; break;
+			case DebugMode_InScattering:			hit_info.mEmission = hit_info.mInScattering; break;
 	    	default:
 	    		break;
 	    }
@@ -426,12 +518,12 @@ void DefaultClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionA
 	payload.mReflectionDirection = hit_info.mReflectionDirection;
 
 	// Material
-	payload.mEmission = payload.mEmission + payload.mAlbedo * hit_info.mEmission;
+	payload.mEmission = payload.mEmission + payload.mAlbedo * hit_info.mTransmittance * hit_info.mEmission + hit_info.mInScattering;
 	bool use_pdf = true;
 	if (use_pdf)
-		payload.mAlbedo = hit_info.mPDF <= 0 ? 0 : payload.mAlbedo * hit_info.mAlbedo * hit_info.mScatteringPDF / hit_info.mPDF;
+		payload.mAlbedo = hit_info.mPDF <= 0 ? 0 : payload.mAlbedo * hit_info.mAlbedo * hit_info.mTransmittance * hit_info.mScatteringPDF / hit_info.mPDF;
 	else
-		payload.mAlbedo = payload.mAlbedo * hit_info.mAlbedo;	
+		payload.mAlbedo = payload.mAlbedo * hit_info.mAlbedo * hit_info.mTransmittance;
 }
 
 [shader("closesthit")]

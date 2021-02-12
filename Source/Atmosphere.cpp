@@ -10,9 +10,7 @@ PrecomputedAtmosphereScatteringResources gPrecomputedAtmosphereScatteringResourc
 
 void PrecomputedAtmosphereScattering::Update()
 {
-	ShaderType::Atmosphere* atmosphere = static_cast<ShaderType::Atmosphere*>(gPrecomputedAtmosphereScatteringResources.mConstantUploadBufferPointer);
-
-	float dummy = 0.0f;
+	ShaderType::Atmosphere* atmosphere				= static_cast<ShaderType::Atmosphere*>(gPrecomputedAtmosphereScatteringResources.mConstantUploadBufferPointer);
 
 	auto inv_m_to_inv_km							= [](glm::f64 inInvM) { return static_cast<float>(inInvM * 1000.0); };
 
@@ -26,82 +24,45 @@ void PrecomputedAtmosphereScattering::Update()
 
 	atmosphere->mXSliceCount						= gPrecomputedAtmosphereScatteringResources.mXSliceCount;
 
+	atmosphere->mAerialPerspective					= gAtmosphereProfile.mAerialPerspective ? 1.0f : 0.0f;
 	atmosphere->mGroundAlbedo						= gAtmosphereProfile.mGroundAlbedo;
 	atmosphere->mRuntimeGroundAlbedo				= gAtmosphereProfile.mRuntimeGroundAlbedo;
 
-	// Density Profile: { Width, ExpTerm, ExpScale, LinearTerm, ConstantTerm }
 	{
 		// Rayleigh
 		{
 			// Scattering Coefficient
-			atmosphere->mRayleighScattering = UnitHelper::sInverseMeterToInverseKilometer<glm::vec3>(gAtmosphereProfile.mRayleighScatteringCoefficient);
+			atmosphere->mRayleighScattering			= UnitHelper::sInverseMeterToInverseKilometer<glm::vec3>(gAtmosphereProfile.mRayleighScatteringCoefficient);
 
 			// Extinction Coefficient
-			// Note that extinction = scattering + absorption
-			// Air molecules do not absorb light
-			atmosphere->mRayleighExtinction = atmosphere->mRayleighScattering;
+			atmosphere->mRayleighExtinction			= atmosphere->mRayleighScattering;
 
-			// Density: decrease exponentially
-			// [Bruneton08] 2.1 (1), e^(-1/H_R)
-			atmosphere->mRayleighDensity.mLayer0 = { dummy, dummy, dummy, dummy, dummy };
-			atmosphere->mRayleighDensity.mLayer1 = { dummy, 1.0f, -1.0f / UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.mRayleighScaleHeight), 0.0f, 0.0f };
-
-			// How to get scale height?
-			// https://en.wikipedia.org/wiki/Scale_height
+			// Density
+			atmosphere->mRayleighDensity			= gAtmosphereProfile.mRayleighDensityProfile;
 		}
 
 		// Mie
 		{
 			// Scattering Coefficient
-			atmosphere->mMieScattering = UnitHelper::sInverseMeterToInverseKilometer<glm::vec3>(gAtmosphereProfile.mMieScatteringCoefficient);
-
-			// Phase function
-			atmosphere->mMiePhaseFunctionG = static_cast<float>(gAtmosphereProfile.mMiePhaseFunctionG);
+			atmosphere->mMieScattering				= UnitHelper::sInverseMeterToInverseKilometer<glm::vec3>(gAtmosphereProfile.mMieScatteringCoefficient);
 
 			// Extinction Coefficient
-			atmosphere->mMieExtinction = UnitHelper::sInverseMeterToInverseKilometer<glm::vec3>(gAtmosphereProfile.mMieExtinctionCoefficient);
+			atmosphere->mMieExtinction				= UnitHelper::sInverseMeterToInverseKilometer<glm::vec3>(gAtmosphereProfile.mMieExtinctionCoefficient);
 
-			// Density: decrease exponentially
-			// [Bruneton08] 2.1 (3), e^(-1/H_M)
-			atmosphere->mMieDensity.mLayer0 = { dummy, dummy, dummy, dummy, dummy };
-			atmosphere->mMieDensity.mLayer1 = { dummy, 1.0f, -1.0f / UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.mMieScaleHeight), 0.0f, 0.0f };
+			// Phase function
+			atmosphere->mMiePhaseFunctionG			= static_cast<float>(gAtmosphereProfile.mMiePhaseFunctionG);
+
+			// Density
+			atmosphere->mMieDensity					= gAtmosphereProfile.mMieDensityProfile;
 		}
 
 		// Ozone
 		{
-			// Density: increase linearly, then decrease linearly
-			float ozone_bottom_altitude = UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.mOzoneBottomAltitude);
-			float ozone_mid_altitude = UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.mOzoneMidAltitude);
-			float ozone_top_altitude = UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.mOzoneTopAltitude);
-			float layer_0_linear_term, layer_0_constant_term, layer_1_linear_term, layer_1_constant_term;
-			{
-				// Altitude -> Density
-				auto calculate_linear_term = [](float inX0, float inX1, float& outLinearTerm, float& outConstantTerm)
-				{
-					outLinearTerm = 1.0f / (inX1 - inX0);
-					outConstantTerm = 1.0f * (0.0f - inX0) / (inX1 - inX0);
-				};
-				calculate_linear_term(ozone_bottom_altitude, ozone_mid_altitude, layer_0_linear_term, layer_0_constant_term);
-				calculate_linear_term(ozone_top_altitude, ozone_mid_altitude, layer_1_linear_term, layer_1_constant_term);
-			}
+			// Extinction Coefficient
+			atmosphere->mOzoneExtinction			= gAtmosphereProfile.mEnableOzone ? UnitHelper::sInverseMeterToInverseKilometer<glm::vec3>(gAtmosphereProfile.mOZoneAbsorptionCoefficient) : glm::vec3();
 
-			if (gAtmosphereProfile.mEnableOzone)
-			{
-				atmosphere->mOzoneDensity.mLayer0 = { ozone_mid_altitude, 0.0f, 0.0f, layer_0_linear_term, layer_0_constant_term };
-				atmosphere->mOzoneDensity.mLayer1 = { dummy, 0.0f, 0.0f, layer_1_linear_term, layer_1_constant_term };
-
-				// Extinction Coefficient
-				// Note that extinction = scattering + absorption
-				// Ozone do not scatter light (?)
-				atmosphere->mOzoneExtinction = UnitHelper::sInverseMeterToInverseKilometer<glm::vec3>(gAtmosphereProfile.mOZoneAbsorptionCoefficient);
-			}
-			else
-			{
-				atmosphere->mOzoneDensity.mLayer0 = { dummy, 0.0f, 0.0f, 0.0f, 0.0f };
-				atmosphere->mOzoneDensity.mLayer1 = { dummy, 0.0f, 0.0f, 0.0f, 0.0f };
-
-				atmosphere->mOzoneExtinction = glm::vec3(dummy);
-			}
+			// Density
+			atmosphere->mOzoneDensity				= gAtmosphereProfile.mEnableOzone ? gAtmosphereProfile.mOzoneDensityProfile : ShaderType::DensityProfile();
 		}
 	} // Density Profile
 }
@@ -274,10 +235,10 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 	
 	if (ImGui::TreeNodeEx("Unit", ImGuiTreeNodeFlags_DefaultOpen))
 	{
-		ImGui::PushItemWidth(100); ImGui::SliderFloat("Scene Scale", &gAtmosphereProfile.mSceneScale, 0.0f, 1.0f); ImGui::PopItemWidth();
-		if (ImGui::SmallButton("m")) gAtmosphereProfile.mSceneScale = 1.0f;
+		ImGui::PushItemWidth(100); ImGui::SliderFloat("Scene Unit", &gAtmosphereProfile.mSceneScale, 0.0f, 1.0f); ImGui::PopItemWidth();
+		if (ImGui::SmallButton("km")) gAtmosphereProfile.mSceneScale = 1.0f;
 		ImGui::SameLine(); 
-		if (ImGui::SmallButton("km")) gAtmosphereProfile.mSceneScale = 0.001f;
+		if (ImGui::SmallButton("m")) gAtmosphereProfile.mSceneScale = 0.001f;
 
 		ImGui::TreePop();
 	}
@@ -288,13 +249,6 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 
 		ImGui::SliderDouble("Earth Radius (m)", &gAtmosphereProfile.mBottomRadius, 1000.0, 10000000.0);
 		ImGui::SliderDouble("Atmosphere Thickness (m)", &gAtmosphereProfile.mAtmosphereThickness, 1000.0, 100000.0);
-
-		ImGui::SliderDouble("Rayleigh Scale Height (m)", &gAtmosphereProfile.mRayleighScaleHeight, 100.0, 10000.0);
-		ImGui::SliderDouble("Mie Scale Height (m)", &gAtmosphereProfile.mMieScaleHeight, 100.0, 10000.0);
-
-		ImGui::SliderDouble("Ozone Bottom Altitude (m)", &gAtmosphereProfile.mOzoneBottomAltitude, 1000.0, 100000.0);
-		ImGui::SliderDouble("Ozone Mid Altitude (m)", &gAtmosphereProfile.mOzoneMidAltitude, 1000.0, 100000.0);
-		ImGui::SliderDouble("Ozone Top Altitude (m)", &gAtmosphereProfile.mOzoneTopAltitude, 1000.0, 100000.0);
 
 		ImGui::PopItemWidth();
 
@@ -308,14 +262,61 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 		ImGui::ColorEdit3("Albedo (Precomputed)", &gAtmosphereProfile.mGroundAlbedo[0], ImGuiColorEditFlags_Float);
 		ImGui::ColorEdit3("Albedo (Runtime)", &gAtmosphereProfile.mRuntimeGroundAlbedo[0], ImGuiColorEditFlags_Float);
 
+		ImGui::Checkbox("Aerial Perspective", &gAtmosphereProfile.mAerialPerspective);
+
 		ImGui::TreePop();
 	}
 
 	if (ImGui::TreeNodeEx("Coefficients & Density", ImGuiTreeNodeFlags_DefaultOpen))
 	{
+		struct DensityPlot
+		{
+			float mMin = 0.0;
+			float mMax = 1.0;
+			int mCount = 100;
+			ShaderType::DensityProfile* mProfile = nullptr;
+
+			static float Func(void* data, int index)
+			{
+				DensityPlot& plot = *(DensityPlot*)data;
+				float altitude = (index * 1.0f / (plot.mCount - 1)) * (plot.mMax - plot.mMin) + plot.mMin;
+				ShaderType::DensityProfileLayer& layer = altitude < plot.mProfile->mLayer0.mWidth ? plot.mProfile->mLayer0 : plot.mProfile->mLayer1;
+
+				// Also in ShaderType.hlsl
+				float density = layer.mExpTerm * exp(layer.mExpScale * altitude) + layer.mLinearTerm * altitude + layer.mConstantTerm;
+				return glm::clamp(density, 0.0f, 1.0f);
+			}
+		};
+
+		static ShaderType::DensityProfile* sDensityProfile = nullptr;
+		auto popup_density_profile = []()
+		{
+			if (ImGui::BeginPopup("DensityProfile") && sDensityProfile != nullptr)
+			{
+				ImGui::SliderFloat("ExpTerm", &sDensityProfile->mLayer1.mExpTerm, -2.0f, 2.0f);
+				ImGui::SliderFloat("ExpScale", &sDensityProfile->mLayer1.mExpScale, -2.0f, 2.0f);
+				ImGui::SliderFloat("LinearTerm", &sDensityProfile->mLayer1.mLinearTerm, -2.0f, 2.0f);
+				ImGui::SliderFloat("ConstantTerm", &sDensityProfile->mLayer1.mConstantTerm, -2.0f, 2.0f);
+
+				ImGui::EndPopup();
+			}
+		};
+
 		if (ImGui::TreeNodeEx("Rayleigh", ImGuiTreeNodeFlags_DefaultOpen))
 		{
 			ImGui::SliderDouble3("Scattering  (/m)", &gAtmosphereProfile.mRayleighScatteringCoefficient.x, 1.0e-8, 1.0e-4, "%.3e");
+
+			DensityPlot plot;
+			plot.mMax = UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.mAtmosphereThickness);
+			plot.mProfile = &gAtmosphereProfile.mRayleighDensityProfile;
+			ImGui::PlotLines("Density", DensityPlot::Func, &plot, plot.mCount, 0, nullptr, 0.0f, 1.0f, ImVec2(0, 40));
+			if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+			{
+				sDensityProfile = plot.mProfile;
+				ImGui::OpenPopup("DensityProfile");
+			}
+			popup_density_profile();
+
 			if (ImGui::SmallButton("Bruneton08Impl")) AtmosphereProfile::RayleighReference::Bruneton08Impl(gAtmosphereProfile);
 			ImGui::SameLine();
 			if (ImGui::SmallButton("Bruneton08")) AtmosphereProfile::RayleighReference::Bruneton08(gAtmosphereProfile);
@@ -331,6 +332,19 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 			ImGui::SliderDouble3("Scattering (/m)", &gAtmosphereProfile.mMieScatteringCoefficient[0], 1.0e-8, 1.0e-4, "%.3e");
 			ImGui::SliderDouble("Phase Function G", &gAtmosphereProfile.mMiePhaseFunctionG, -1.0f, 1.0f);
 
+			DensityPlot plot;
+			plot.mMin = 0.0f;
+			plot.mMax = UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.mAtmosphereThickness);
+			plot.mCount = 500;
+			plot.mProfile = &gAtmosphereProfile.mMieDensityProfile;
+			ImGui::PlotLines("Density", DensityPlot::Func, &plot, plot.mCount, 0, nullptr, 0.0f, 1.0f, ImVec2(0, 40));
+			if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+			{
+				sDensityProfile = plot.mProfile;
+				ImGui::OpenPopup("DensityProfile");
+			}
+			popup_density_profile();
+
 			if (ImGui::SmallButton("Bruneton08Impl")) AtmosphereProfile::MieReference::Bruneton08Impl(gAtmosphereProfile);
 			ImGui::SameLine();
 			if (ImGui::SmallButton("Bruneton08")) AtmosphereProfile::MieReference::Bruneton08(gAtmosphereProfile);
@@ -343,6 +357,33 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 			ImGui::Checkbox("Enable", &gAtmosphereProfile.mEnableOzone);
 
 			ImGui::SliderDouble3("Absorption (/m)", &gAtmosphereProfile.mOZoneAbsorptionCoefficient[0], 0.0, 1.0e-5, "%.3e");
+			
+			DensityPlot plot;
+			plot.mMin = 0.0f;
+			plot.mMax = UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.mAtmosphereThickness);
+			plot.mCount = 500;
+			plot.mProfile = &gAtmosphereProfile.mOzoneDensityProfile;
+			ImGui::PlotLines("Density", DensityPlot::Func, &plot, plot.mCount, 0, nullptr, 0.0f, 1.0f, ImVec2(0, 40));
+			if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+			{
+				sDensityProfile = plot.mProfile;
+				ImGui::OpenPopup("DensityProfile");
+			}
+
+			if (ImGui::BeginPopup("DensityProfile") && sDensityProfile != nullptr)
+			{
+				bool value_changed = false;
+
+				value_changed |= ImGui::SliderDouble("Ozone Bottom Altitude (m)", &gAtmosphereProfile.mOzoneBottomAltitude, 1000.0, 100000.0);
+				value_changed |= ImGui::SliderDouble("Ozone Mid Altitude (m)", &gAtmosphereProfile.mOzoneMidAltitude, 1000.0, 100000.0);
+				value_changed |= ImGui::SliderDouble("Ozone Top Altitude (m)", &gAtmosphereProfile.mOzoneTopAltitude, 1000.0, 100000.0);
+
+				if (value_changed)
+					AtmosphereProfile::OzoneReference::UpdateDensityProfile(gAtmosphereProfile);
+
+				ImGui::EndPopup();
+			}
+
 			if (ImGui::SmallButton("Bruneton08Impl")) AtmosphereProfile::OzoneReference::Bruneton08Impl(gAtmosphereProfile);
 
 			ImGui::TreePop();
