@@ -381,7 +381,7 @@ void DefaultMiss(inout RayPayload payload)
 	}
 }
 
-HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attribs)
+HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attributes)
 {
 	HitInfo hit_info = (HitInfo)0;
 	hit_info.mPDF = 1.0;
@@ -390,7 +390,7 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	hit_info.mInScattering = 0.0;
 
 	// See https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html for more system value intrinsics
-	float3 barycentrics = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y, attribs.barycentrics.x, attribs.barycentrics.y);
+	float3 barycentrics = float3(1.0 - attributes.barycentrics.x - attributes.barycentrics.y, attributes.barycentrics.x, attributes.barycentrics.y);
 
 	bool use_16bit_index = false;
 
@@ -520,9 +520,9 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 }
 
 [shader("closesthit")]
-void DefaultClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attribs)
+void DefaultClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attributes)
 {
-	HitInfo hit_info = HitInternal(payload, attribs);
+	HitInfo hit_info = HitInternal(payload, attributes);
 
 	// State
 	payload.mDone = hit_info.mDone;
@@ -541,7 +541,7 @@ void DefaultClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionA
 }
 
 [shader("closesthit")]
-void ShadowClosestHit(inout ShadowPayload payload, in BuiltInTriangleIntersectionAttributes attribs)
+void ShadowClosestHit(inout ShadowPayload payload, in BuiltInTriangleIntersectionAttributes attributes)
 {
 	payload.mHit = true;
 }

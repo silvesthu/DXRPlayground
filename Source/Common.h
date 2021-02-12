@@ -215,42 +215,42 @@ static const wchar_t*						kShadowHitGroup				= L"ShadowHitGroup";
 
 // Helper
 template <typename T>
-inline T gAlignUp(T inValue, T inAlignment)
+inline T gAlignUp(T value, T alignment)
 {
-	return (((inValue + inAlignment - 1) / inAlignment) * inAlignment);
+	return (((value + alignment - 1) / alignment) * alignment);
 }
 
 template <typename T>
-inline T gMin(T inLhs, T inRhs)
+inline T gMin(T lhs, T rhs)
 {
-	return inLhs < inRhs ? inLhs : inRhs;
+	return lhs < rhs ? lhs : rhs;
 }
 
 template <typename T>
-inline T gMax(T inLhs, T inRhs)
+inline T gMax(T lhs, T rhs)
 {
-	return inLhs > inRhs ? inLhs : inRhs;
+	return lhs > rhs ? lhs : rhs;
 }
 
-inline void gDebugPrint(const char* inString)
+inline void gDebugPrint(const char* string)
 {
-	OutputDebugStringA(inString);
-	gLog.AddLog(inString);
+	OutputDebugStringA(string);
+	gLog.AddLog(string);
 }
 
 template <typename T>
-inline void gDebugPrint(const T& in)
+inline void gDebugPrint(const T& data)
 {
-	std::string str = std::to_string(in) + "\n";
+	std::string str = std::to_string(data) + "\n";
 	OutputDebugStringA(str.c_str());
 	gLog.AddLog(str.c_str());
 }
 
-inline std::wstring gToWString(const std::string inString)
+inline std::wstring gToWString(const std::string string)
 {
-	int wide_size = MultiByteToWideChar(CP_UTF8, 0, inString.c_str(), (int)inString.size(), NULL, 0);
+	int wide_size = MultiByteToWideChar(CP_UTF8, 0, string.c_str(), (int)string.size(), NULL, 0);
 	std::wstring wide_string(wide_size, 0);
-	MultiByteToWideChar(CP_UTF8, 0, inString.c_str(), (int)inString.size(), &wide_string[0], wide_size);
+	MultiByteToWideChar(CP_UTF8, 0, string.c_str(), (int)string.size(), &wide_string[0], wide_size);
 	return wide_string;
 }
 
@@ -265,60 +265,60 @@ namespace nameof
 
 // DirectX helper
 template <typename T>
-inline void gSafeRelease(T*& inPointer)
+inline void gSafeRelease(T*& pointer)
 {
-	if (inPointer != nullptr)
+	if (pointer != nullptr)
 	{
-		inPointer->Release();
-		inPointer = nullptr;
+		pointer->Release();
+		pointer = nullptr;
 	}
 }
 
-inline void gSafeCloseHandle(HANDLE& inHandle)
+inline void gSafeCloseHandle(HANDLE& handle)
 {
-	if (inHandle != nullptr)
+	if (handle != nullptr)
 	{
-		CloseHandle(inHandle);
-		inHandle = nullptr;
+		CloseHandle(handle);
+		handle = nullptr;
 	}
 }
 
-inline void gValidate(HRESULT in)
+inline void gValidate(HRESULT hr)
 {
-	if (FAILED(in))
+	if (FAILED(hr))
 	{
 		char message[512];
-		FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, nullptr, in, 0, message, ARRAYSIZE(message), nullptr);
+		FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, nullptr, hr, 0, message, ARRAYSIZE(message), nullptr);
 		OutputDebugStringA(message);
 		assert(false);
 	}
 }
 
 template <typename T>
-inline void gSetName(ComPtr<T>& inObject, std::wstring inBaseName, std::wstring inName)
+inline void gSetName(ComPtr<T>& object, std::wstring base_name, std::wstring name)
 {
-	std::wstring new_name = inBaseName + inName;
-	inObject->SetName(new_name.c_str());
+	std::wstring new_name = base_name + name;
+	object->SetName(new_name.c_str());
 }
 
-inline void gBarrierTransition(ID3D12GraphicsCommandList4* inCommandList, ID3D12Resource* inResource, D3D12_RESOURCE_STATES inBefore, D3D12_RESOURCE_STATES inAfter)
+inline void gBarrierTransition(ID3D12GraphicsCommandList4* command_list, ID3D12Resource* resource, D3D12_RESOURCE_STATES state_before, D3D12_RESOURCE_STATES state_after)
 {
 	D3D12_RESOURCE_BARRIER barrier = {};
 	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-	barrier.Transition.pResource = inResource;
+	barrier.Transition.pResource = resource;
 	barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-	barrier.Transition.StateBefore = inBefore;
-	barrier.Transition.StateAfter = inAfter;
-	inCommandList->ResourceBarrier(1, &barrier);
+	barrier.Transition.StateBefore = state_before;
+	barrier.Transition.StateAfter = state_after;
+	command_list->ResourceBarrier(1, &barrier);
 }
 
-inline void gBarrierUAV(ID3D12GraphicsCommandList4* inCommandList, ID3D12Resource* inResource)
+inline void gBarrierUAV(ID3D12GraphicsCommandList4* command_list, ID3D12Resource* resource)
 {
 	D3D12_RESOURCE_BARRIER barrier = {};
 	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-	barrier.UAV.pResource = inResource;
-	inCommandList->ResourceBarrier(1, &barrier);
+	barrier.UAV.pResource = resource;
+	command_list->ResourceBarrier(1, &barrier);
 }
 
 inline D3D12_HEAP_PROPERTIES gGetDefaultHeapProperties()
@@ -339,7 +339,7 @@ inline D3D12_HEAP_PROPERTIES gGetUploadHeapProperties()
 	return props;
 }
 
-inline D3D12_RESOURCE_DESC gGetBufferResourceDesc(UINT64 inWidth)
+inline D3D12_RESOURCE_DESC gGetBufferResourceDesc(UINT64 width)
 {
 	D3D12_RESOURCE_DESC desc = {};
 	desc.Alignment = 0;
@@ -347,7 +347,7 @@ inline D3D12_RESOURCE_DESC gGetBufferResourceDesc(UINT64 inWidth)
 	desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
 	desc.Flags = D3D12_RESOURCE_FLAG_NONE;
 	desc.Format = DXGI_FORMAT_UNKNOWN;
-	desc.Width = inWidth;
+	desc.Width = width;
 	desc.Height = 1;
 	desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 	desc.MipLevels = 1;
@@ -356,24 +356,24 @@ inline D3D12_RESOURCE_DESC gGetBufferResourceDesc(UINT64 inWidth)
 	return desc;
 }
 
-inline D3D12_RESOURCE_DESC gGetTextureResourceDesc(UINT inWidth, UINT inHeight, UINT inDepth, DXGI_FORMAT inFormat)
+inline D3D12_RESOURCE_DESC gGetTextureResourceDesc(UINT width, UINT height, UINT depth, DXGI_FORMAT format)
 {
 	D3D12_RESOURCE_DESC desc = {};
-	desc.DepthOrArraySize = (UINT16)inDepth;
-	desc.Dimension = inDepth == 1 ? D3D12_RESOURCE_DIMENSION_TEXTURE2D : D3D12_RESOURCE_DIMENSION_TEXTURE3D;
-	desc.Format = inFormat;
+	desc.DepthOrArraySize = (UINT16)depth;
+	desc.Dimension = depth == 1 ? D3D12_RESOURCE_DIMENSION_TEXTURE2D : D3D12_RESOURCE_DIMENSION_TEXTURE3D;
+	desc.Format = format;
 	desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-	desc.Width = inWidth;
-	desc.Height = inHeight;
+	desc.Width = width;
+	desc.Height = height;
 	desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 	desc.MipLevels = 1;
 	desc.SampleDesc.Count = 1;
 	return desc;
 }
 
-inline D3D12_RESOURCE_DESC gGetUAVResourceDesc(UINT64 inWidth)
+inline D3D12_RESOURCE_DESC gGetUAVResourceDesc(UINT64 width)
 {
-	D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(inWidth);
+	D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(width);
 	desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 	return desc;
 }
