@@ -235,22 +235,18 @@ void GetSkyRadianceToPoint(out float3 sky_radiance, out float3 transmittance)
 
 	// [TODO] shadow
 	float shadow_length = 0;
-	float3 single_mie_scattering_p = single_mie_scattering;
-	float3 scattering_p = scattering;
-	if (shadow_length > 0)
-	{
-		// Compute the r, mu, mu_s and nu parameters for the second texture lookup.
-		// If shadow_length is not 0 (case of light shafts), we want to ignore the
-		// scattering along the last shadow_length meters of the view ray, which we
-		// do by subtracting shadow_length from d (this way scattering_p is equal to
-		// the S|x_s=x_0-lv term in Eq. (17) of our paper).
-		d = max(d - shadow_length, 0.0);
-		float r_p = ClampRadius(sqrt(d * d + 2.0 * r * mu * d + r * r));
-		float mu_p = (r * mu + d) / r_p;
-		float mu_s_p = (r * mu_s + d * nu) / r_p;
 
-		scattering_p = GetCombinedScattering(r_p, mu_p, mu_s_p, nu, ray_r_mu_intersects_ground, single_mie_scattering_p);
-	}
+	// Compute the r, mu, mu_s and nu parameters for the second texture lookup.
+	// If shadow_length is not 0 (case of light shafts), we want to ignore the
+	// scattering along the last shadow_length meters of the view ray, which we
+	// do by subtracting shadow_length from d (this way scattering_p is equal to
+	// the S|x_s=x_0-lv term in Eq. (17) of our paper).
+	d = max(d - shadow_length, 0.0);
+	float r_p = ClampRadius(sqrt(d * d + 2.0 * r * mu * d + r * r));
+	float mu_p = (r * mu + d) / r_p;
+	float mu_s_p = (r * mu_s + d * nu) / r_p;
+	float3 single_mie_scattering_p = 0;
+	float3 scattering_p = GetCombinedScattering(r_p, mu_p, mu_s_p, nu, ray_r_mu_intersects_ground, single_mie_scattering_p);
 
 	// Combine the lookup results to get the scattering between camera and point.
 	float3 shadow_transmittance = transmittance;
@@ -259,6 +255,7 @@ void GetSkyRadianceToPoint(out float3 sky_radiance, out float3 transmittance)
 		// This is the T(x,x_s) term in Eq. (17) of our paper, for light shafts.
 		shadow_transmittance = GetTransmittance(r, mu, d, ray_r_mu_intersects_ground);
 	}
+
 	scattering = scattering - shadow_transmittance * scattering_p;
 	single_mie_scattering = single_mie_scattering - shadow_transmittance * single_mie_scattering_p;
 
