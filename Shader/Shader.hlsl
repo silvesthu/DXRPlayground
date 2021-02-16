@@ -220,6 +220,11 @@ void GetSkyRadianceToPoint(out float3 sky_radiance, out float3 transmittance)
 		r = mAtmosphere.mTopRadius;
 		rmu += distance_to_top_atmosphere_boundary;
 	}
+	else if (r > mAtmosphere.mTopRadius)
+	{
+		// No hit
+		return;
+	}
 
 	// Compute the r, mu, mu_s and nu parameters for the first texture lookup.
 	float mu = rmu / r;
