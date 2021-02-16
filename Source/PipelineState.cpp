@@ -407,6 +407,7 @@ void gCreatePipelineState()
 		sWriteEnum<DebugMode>(enum_file);
 		sWriteEnum<DebugInstanceMode>(enum_file);
 		sWriteEnum<BackgroundMode>(enum_file);
+		sWriteEnum<AtmosphereMuSEncodingMode>(enum_file);
 	}
 	enum_file.close();
 

@@ -372,9 +372,9 @@ void DefaultMiss(inout RayPayload payload)
 	switch (mPerFrame.mBackgroundMode)
 	{
 		default:
-		case BackgroundMode_Color: 					payload.mEmission = payload.mEmission + payload.mAlbedo * mPerFrame.mBackgroundColor.xyz; return;
-		case BackgroundMode_Atmosphere: 			payload.mEmission = payload.mEmission + payload.mAlbedo * AtmosphereScattering(RayOrigin(), RayDirection()); return;
-		case BackgroundMode_PrecomputedAtmosphere: 	payload.mEmission = payload.mEmission + payload.mAlbedo * GetEnvironmentEmission(); return;
+		case BackgroundMode_Color: 						payload.mEmission = payload.mEmission + payload.mAlbedo * mPerFrame.mBackgroundColor.xyz; return;
+		case BackgroundMode_RaymarchAtmosphereOnly: 	payload.mEmission = payload.mEmission + payload.mAlbedo * AtmosphereScattering(RayOrigin(), RayDirection()); return;
+		case BackgroundMode_PrecomputedAtmosphere: 		payload.mEmission = payload.mEmission + payload.mAlbedo * GetEnvironmentEmission(); return;
 	}
 }
 
@@ -482,7 +482,7 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 			// random cosine direction
 
 			// onb - build_from_w
-			float3 axis[3];			
+			float3 axis[3];
 			axis[2] = normal;
 			float3 a = (abs(axis[2].x) > 0.9) ? float3(0, 1, 0) : float3(1, 0, 0);
 			axis[1] = normalize(cross(axis[2], a));

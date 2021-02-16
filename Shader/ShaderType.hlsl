@@ -124,7 +124,8 @@ struct Atmosphere
 
 	uint					mUnused					CONSTANT_DEFAULT(0);
 	uint					mXSliceCount			CONSTANT_DEFAULT(0);
-	uint2					mPadFlags;
+	uint					mMuSEncodingMode		CONSTANT_DEFAULT(0);
+	uint					mPadFlags;
 	
 	float3					mRayleighScattering		CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	float					mPad1;

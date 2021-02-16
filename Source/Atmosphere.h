@@ -29,6 +29,16 @@ namespace UnitHelper
 	}
 }
 
+enum class AtmosphereMuSEncodingMode
+{
+	Bruneton08Impl = 0,
+	Bruneton08,
+	Elek09,
+	Yusov13,
+
+	Count
+};
+
 struct AtmosphereProfile
 {
 	// [Nishita93][NSTN93] Display of The Earth Taking into Account Atmospheric Scattering https://www.researchgate.net/publication/2933032_Display_of_The_Earth_Taking_into_Account_Atmospheric_Scattering
@@ -218,7 +228,10 @@ struct AtmosphereProfile
 	// Angular Radius = Angular Diameter / 2.0 = arctan(Sun radius / Sun-Earth distance)
 	double kSunAngularRadius							= 0.00935f / 2.0f; // Radian, from [Bruneton08Impl] demo.cc
 
-	// Multiple scattering
+	// Encoding Config
+	AtmosphereMuSEncodingMode mMuSEncodingMode					= AtmosphereMuSEncodingMode::Bruneton08Impl;
+
+	// Multiple Scattering
 	glm::uint mScatteringOrder							= 4;
 
 	// Ground

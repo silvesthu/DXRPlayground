@@ -23,8 +23,9 @@ void PrecomputedAtmosphereScattering::Update()
 	atmosphere->mSunAngularRadius					= static_cast<float>(gAtmosphereProfile.kSunAngularRadius);
 
 	atmosphere->mXSliceCount						= gPrecomputedAtmosphereScatteringResources.mXSliceCount;
+	atmosphere->mMuSEncodingMode					= static_cast<glm::uint32>(gAtmosphereProfile.mMuSEncodingMode);
 
-	atmosphere->mAerialPerspective					= gAtmosphereProfile.mAerialPerspective ? 1.0f : 0.0f;
+	atmosphere->mAerialPerspective					= (gPerFrameConstantBuffer.mBackgroundMode == BackgroundMode::PrecomputedAtmosphere && gAtmosphereProfile.mAerialPerspective) ? 1.0f : 0.0f;
 	atmosphere->mGroundAlbedo						= gAtmosphereProfile.mGroundAlbedo;
 	atmosphere->mRuntimeGroundAlbedo				= gAtmosphereProfile.mRuntimeGroundAlbedo;
 
@@ -214,7 +215,12 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 			ImGui::ColorEdit3("Color", (float*)&gPerFrameConstantBuffer.mBackgroundColor, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
 
 		ImGui::Checkbox("Scene Unit: Kilometer : Meter", &gAtmosphereProfile.mSceneInKilometer);
+
 		ImGui::Checkbox("Aerial Perspective", &gAtmosphereProfile.mAerialPerspective);
+
+		ImGui::SliderInt("Scattering Order", (int*)&gAtmosphereProfile.mScatteringOrder, 1, 8);
+
+		ImGui::Checkbox("Recompute Every Frame", &mRecomputeEveryFrame);
 
 		ImGui::TreePop();
 	}
@@ -381,10 +387,17 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 		ImGui::TreePop();
 	}
 
-	if (ImGui::TreeNodeEx("Computation", ImGuiTreeNodeFlags_DefaultOpen))
+	if (ImGui::TreeNodeEx("Encoding", ImGuiTreeNodeFlags_DefaultOpen))
 	{
-		ImGui::Checkbox("Recompute Every Frame", &mRecomputeEveryFrame);
-		ImGui::SliderInt("Scattering Order", (int*)&gAtmosphereProfile.mScatteringOrder, 1, 8);
+		ImGui::Text(nameof::nameof_enum_type<AtmosphereMuSEncodingMode>().data());
+		for (int i = 0; i < (int)AtmosphereMuSEncodingMode::Count; i++)
+		{
+			const auto& name = nameof::nameof_enum((AtmosphereMuSEncodingMode)i);
+			if (i != 0)
+				ImGui::SameLine();
+			if (ImGui::RadioButton(name.data(), (int)gAtmosphereProfile.mMuSEncodingMode == i))
+				gAtmosphereProfile.mMuSEncodingMode = (AtmosphereMuSEncodingMode)i;
+		}
 
 		ImGui::TreePop();
 	}

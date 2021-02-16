@@ -1,4 +1,3 @@
-
 cbuffer AtmosphereBuffer : register(b0, space2)
 {
 	Atmosphere mAtmosphere;
@@ -244,6 +243,8 @@ float2 Encode2D_Irradiance(float2 mu_r)
 
 float4 Decode4D(uint3 inTexCoords, RWTexture3D<float4> inTexture, out bool intersects_ground)
 {
+	// https://www.desmos.com/calculator/y2vvrrb6yr
+
 	uint3 size;
 	inTexture.GetDimensions(size.x, size.y, size.z);
 
@@ -268,7 +269,8 @@ float4 Decode4D(uint3 inTexCoords, RWTexture3D<float4> inTexture, out bool inter
 	// [Bruneton08]
 	float R_t = mAtmosphere.mTopRadius;				// Top
 	float R_g = mAtmosphere.mBottomRadius;			// Ground
-	float H = sqrt(R_t * R_t - R_g * R_g);			// Ground to Horizon
+	float H_squared = R_t * R_t - R_g * R_g;		// [NOTE] Avoid precision loss on sqrt(squared)
+	float H = sqrt(H_squared);						// Ground to Horizon
 	float rho = H * u_r;							// Ground towards Horizon [0, H]
 	
 	// r - Height
@@ -308,7 +310,7 @@ float4 Decode4D(uint3 inTexCoords, RWTexture3D<float4> inTexture, out bool inter
 			float d_max = rho + H;
 			float d = d_min + (d_max - d_min) * u_mu; // Distance to AtmosphereBoundary
 
-			mu = d == 0.0 ? float(1.0) : ClampCosine((H * H - rho * rho - d * d) / (2.0 * r * d));
+			mu = d == 0.0 ? float(1.0) : ClampCosine((H_squared - rho * rho - d * d) / (2.0 * r * d));
 		}
 	}
 
@@ -316,31 +318,45 @@ float4 Decode4D(uint3 inTexCoords, RWTexture3D<float4> inTexture, out bool inter
 	{
 		// [Mapping] Sun Zenith -> ?
 
-		// [NOTE] Fitted curve is most likely to be created with 102.0
-		bool use_half_precision = true;
-		float max_sun_zenith_angle = (use_half_precision ? 102.0 : 120.0) / 180.0 * MATH_PI;
-		float mu_s_min = cos(max_sun_zenith_angle);
+		// [NOTE] Formulas other than Bruneton08Impl are likely fitted curve with max_sun_zenith_angle = 102.0 degrees
+		switch (mAtmosphere.mMuSEncodingMode)
+		{
+			case AtmosphereMuSEncodingMode_Bruneton08Impl:
+			{
+				bool use_half_precision = true;
+				float max_sun_zenith_angle = (use_half_precision ? 102.0 : 120.0) / 180.0 * MATH_PI;
+				float mu_s_min = cos(max_sun_zenith_angle);
 
-		float d_min = R_t - R_g;
-		float d_max = H;
+				float d_min = R_t - R_g;
+				float d_max = H;
 
-		float D = DistanceToTopAtmosphereBoundary(R_g, mu_s_min);
+				float D = DistanceToTopAtmosphereBoundary(R_g, mu_s_min);
 
-		float A = (D - d_min) / (d_max - d_min);
-		float a = (A - u_mu_s * A) / (1.0 + u_mu_s * A);
+				float A = (D - d_min) / (d_max - d_min);
+				float a = (A - u_mu_s * A) / (1.0 + u_mu_s * A);
 
-		float d = d_min + min(a, A) * (d_max - d_min);
+				float d = d_min + min(a, A) * (d_max - d_min);
 
-		mu_s = d == 0.0 ? float(1.0) : ClampCosine((H * H - d * d) / (2.0 * R_g * d));
-
-		// [Bruneton08] Fitted curve ?
-		// mu_s = (log(1.0 - (1 - exp(-3.6)) * u_mu_s) + 0.6) / -3.0;
-
-		// [Elek09] Fitted curve ?
-		// mu_s = (log(1.0 - (1 - exp(-3.6)) * u_mu_s) + 0.8) / -2.8;
-
-		// [Yusov13] Better fitted curve ?
-		// mu_s = tan((2.0 * u_mu_s - 1.0 + 0.26) * 1.1) / tan(1.26 * 1.1);
+				mu_s = d == 0.0 ? float(1.0) : ClampCosine((H * H - d * d) / (2.0 * R_g * d));
+			}
+			break;
+			case AtmosphereMuSEncodingMode_Bruneton08:
+			{
+				mu_s = (log(1.0 - (1 - exp(-3.6)) * u_mu_s) + 0.6) / -3.0;
+			}
+			break;
+			case AtmosphereMuSEncodingMode_Elek09:
+			{
+				mu_s = (log(1.0 - (1 - exp(-3.6)) * u_mu_s) + 0.8) / -2.8;
+			}
+			break;
+			case AtmosphereMuSEncodingMode_Yusov13:
+			{
+				mu_s = tan((2.0 * u_mu_s - 1.0 + 0.26) * 1.1) / tan(1.26 * 1.1);
+				mu_s = ClampCosine(mu_s); // [NOTE] without clamp, mu_s might be slightly larger than 1, which cause clamp on nu fail to work
+			}
+			break;
+		}
 	}
 
 	// nu - View Sun Angle
@@ -365,7 +381,10 @@ void Encode4D(float4 r_mu_mu_s_nu, bool intersects_ground, Texture3D<float4> inT
 	float nu = r_mu_mu_s_nu.w;
 
 	// [Bruneton08]
-	float H = sqrt(mAtmosphere.mTopRadius * mAtmosphere.mTopRadius - mAtmosphere.mBottomRadius * mAtmosphere.mBottomRadius);
+	float R_t = mAtmosphere.mTopRadius;				// Top
+	float R_g = mAtmosphere.mBottomRadius;			// Ground
+	float H_squared = R_t * R_t - R_g * R_g;		// [NOTE] Avoid precision loss on sqrt(squared)
+	float H = sqrt(H_squared);
 	float rho = SafeSqrt(r * r - mAtmosphere.mBottomRadius * mAtmosphere.mBottomRadius);
 
 	// r - Height
@@ -384,25 +403,49 @@ void Encode4D(float4 r_mu_mu_s_nu, bool intersects_ground, Texture3D<float4> inT
 	}
 	else 
 	{
-		float d = -r_mu + SafeSqrt(discriminant + H * H);
+		float d = -r_mu + SafeSqrt(discriminant + H_squared);
 		float d_min = mAtmosphere.mTopRadius - r;
 		float d_max = rho + H;
 		u_mu = (d - d_min) / (d_max - d_min);
 	}
 
 	// mu_s - Sun Zenith
-	// [NOTE] Fitted curve is most likely to be created with 102.0
-	bool use_half_precision = true;
-	float max_sun_zenith_angle = (use_half_precision ? 102.0 : 120.0) / 180.0 * MATH_PI;
-	float mu_s_min = cos(max_sun_zenith_angle);
+	float u_mu_s = 0.0;
 
-	float d = DistanceToTopAtmosphereBoundary(mAtmosphere.mBottomRadius, mu_s);
-	float d_min = mAtmosphere.mTopRadius - mAtmosphere.mBottomRadius;
-	float d_max = H;
-	float a = (d - d_min) / (d_max - d_min);
-	float D = DistanceToTopAtmosphereBoundary(mAtmosphere.mBottomRadius, mu_s_min);
-	float A = (D - d_min) / (d_max - d_min);
-	float u_mu_s = max(1.0 - a / A, 0.0) / (1.0 + a);
+	// [NOTE] Formulas other than Bruneton08Impl are likely fitted curve with max_sun_zenith_angle = 102.0 degrees
+	switch (mAtmosphere.mMuSEncodingMode)
+	{
+	case AtmosphereMuSEncodingMode_Bruneton08Impl:
+	{
+		bool use_half_precision = true;
+		float max_sun_zenith_angle = (use_half_precision ? 102.0 : 120.0) / 180.0 * MATH_PI;
+		float mu_s_min = cos(max_sun_zenith_angle);
+
+		float d = DistanceToTopAtmosphereBoundary(mAtmosphere.mBottomRadius, mu_s);
+		float d_min = mAtmosphere.mTopRadius - mAtmosphere.mBottomRadius;
+		float d_max = H;
+		float a = (d - d_min) / (d_max - d_min);
+		float D = DistanceToTopAtmosphereBoundary(mAtmosphere.mBottomRadius, mu_s_min);
+		float A = (D - d_min) / (d_max - d_min);
+		u_mu_s = max(1.0 - a / A, 0.0) / (1.0 + a);
+	}
+	break;
+	case AtmosphereMuSEncodingMode_Bruneton08:
+	{
+		u_mu_s = max((1.0 - exp(-3.0 * mu_s - 0.6)) / (1.0 - exp(-3.6)), 0.0);
+	}
+	break;
+	case AtmosphereMuSEncodingMode_Elek09:
+	{
+		u_mu_s = max((1.0 - exp(-2.8 * mu_s - 0.8)) / (1.0 - exp(-3.6)), 0.0);
+	}
+	break;
+	case AtmosphereMuSEncodingMode_Yusov13:
+	{
+		u_mu_s = 0.5 * (atan(max(mu_s, -0.1975) * tan(1.26 * 1.1)) / 1.1 + (1.0 - 0.26));
+	}
+	break;
+	}
 
 	// nu - View Sun Angle
 	float u_nu = (nu + 1.0) / 2.0;
@@ -837,9 +880,11 @@ void ComputeScatteringDensityCS(
 {
 	float3 xyz = DispatchThreadID_to_XYZ(inDispatchThreadID.xyz, DeltaScatteringDensityUAV);
 
+	uint3 dispatch_thread_id = inDispatchThreadID.xyz;
+
 	// Decode
 	bool intersects_ground = false;
-	float4 r_mu_mu_s_nu = Decode4D(inDispatchThreadID.xyz, DeltaScatteringDensityUAV, intersects_ground);
+	float4 r_mu_mu_s_nu = Decode4D(dispatch_thread_id, DeltaScatteringDensityUAV, intersects_ground);
 
 	// Compute
 	float3 scattering_density = ComputeScatteringDensity(r_mu_mu_s_nu, intersects_ground);
@@ -848,8 +893,11 @@ void ComputeScatteringDensityCS(
 	DeltaScatteringDensityUAV[inDispatchThreadID.xyz] = float4(scattering_density, 1.0);
 
 	// Debug
+	bool ray_r_theta_intersects_ground = false;
 	// DeltaScatteringDensityUAV[inDispatchThreadID.xyz] = float4(xyz, 1.0);
-	// DeltaScatteringDensityUAV[inDispatchThreadID.xyz] = float4(r_mu_mu_s_nu.xyz, 1.0);
+	// DeltaScatteringDensityUAV[inDispatchThreadID.xyz] = float4(GetScattering(r_mu_mu_s_nu.x, r_mu_mu_s_nu.y, r_mu_mu_s_nu.z, r_mu_mu_s_nu.w, ray_r_theta_intersects_ground, mAtmospherePerDraw.mScatteringOrder - 1), 1.0);
+	// DeltaScatteringDensityUAV[inDispatchThreadID.xyz] = r_mu_mu_s_nu;
+	// DeltaScatteringDensityUAV[inDispatchThreadID.xyz] = float4(tan((2.0 * xyz - 1.0 + 0.26) * 1.1) / tan(1.26 * 1.1), 1.0);
 }
 
 float3 ComputeIndirectIrradiance(float2 mu_s_r)

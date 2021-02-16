@@ -23,6 +23,8 @@ enum class ScenePresetType
 
 	PrecomputedAtmosphere,
 
+	Debug,
+
 	COUNT,
 };
 
@@ -42,9 +44,10 @@ static ScenePreset kScenePresets[(int)ScenePresetType::COUNT] =
 	{ "VeachMIS",				"Asset/raytracing-references/veach-mis/veach-mis.obj",								glm::vec4(0.0f, 1.0f, 13.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		glm::mat4x4(1.0f) },
 	{ "Furnance",				"Asset/raytracing-references/furnace-light-sampling/furnace-light-sampling.obj",	glm::vec4(0.0f, 1.0f, 13.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		glm::mat4x4(1.0f) },
 	{ "PrecomputedAtmosphere",	"Asset/primitives/sphere.obj",														glm::vec4(0.0f, 0.0f, 9.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		glm::translate(glm::vec3(0.0f, 1.0f, 0.0f)) },
+	{ "Debug",					"Asset/primitives/sphere.obj",														glm::vec4(0.0f, 80.0f, 150.0f, 0.0f),		glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		glm::scale(glm::vec3(100.0f, 100.0f, 100.0f)) },
 };
-static ScenePresetType sCurrentScene = ScenePresetType::PrecomputedAtmosphere;
-static ScenePresetType sPreviousScene = ScenePresetType::PrecomputedAtmosphere;
+static ScenePresetType sCurrentScene = ScenePresetType::Debug;
+static ScenePresetType sPreviousScene = ScenePresetType::Debug;
 
 static bool sReloadRequested = false;
 
