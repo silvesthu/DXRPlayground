@@ -123,7 +123,7 @@ struct Atmosphere
 	float					mPad0;
 
 	uint					mUnused					CONSTANT_DEFAULT(0);
-	uint					mXSliceCount			CONSTANT_DEFAULT(0);
+	uint					mSliceCount			CONSTANT_DEFAULT(0);
 	uint					mMuSEncodingMode		CONSTANT_DEFAULT(0);
 	uint					mPadFlags;
 	

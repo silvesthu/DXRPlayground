@@ -106,6 +106,14 @@ struct Texture
 	TEXTURE_MEMBER(const char*, Name, nullptr);
 	TEXTURE_MEMBER(float, UIScale, 1.0f);
 
+	Texture& Dimension(glm::uvec3 dimension) 
+	{
+		mWidth = dimension.x;
+		mHeight = dimension.y;
+		mDepth = dimension.z;
+		return *this;
+	}
+
 	void Initialize();
 
 	ComPtr<ID3D12Resource> mResource;

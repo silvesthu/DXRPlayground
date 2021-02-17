@@ -167,6 +167,10 @@ float Decode_R_Transmittance(float u_r)
 	return sqrt(rho * rho + R_g * R_g);
 }
 
+// Try to reduce artifact near mBottomRadius where transmittance for Aerial Perspective is calculated by (tiny float / tiny float)
+const static bool kUseMuTransmittancePower = false;
+const static float kMuTransmittancePower = kUseMuTransmittancePower ? 0.4 : 1.0;
+
 // [Bruneton08] 4. Precomputations.Parameterization ?
 float Encode_Mu_Transmittance(float mu, float r)
 {
@@ -184,12 +188,17 @@ float Encode_Mu_Transmittance(float mu, float r)
 	// i.e. Encode View Zenith as P to Top distance
 
 	float u_mu = (d - d_min) / (d_max - d_min);				// d to [0, 1]
+	
+	u_mu = pow(u_mu, 1.0 / kMuTransmittancePower);
+
 	return u_mu;
 }
 
 // Inverse of Encode_Mu
 float Decode_Mu_Transmittance(float u_mu, float u_r)
 {
+	u_mu = pow(u_mu, kMuTransmittancePower);
+
 	float R_g = mAtmosphere.mBottomRadius;
 	float R_t = mAtmosphere.mTopRadius;
 
@@ -245,21 +254,47 @@ float4 Decode4D(uint3 inTexCoords, RWTexture3D<float4> inTexture, out bool inter
 {
 	// https://www.desmos.com/calculator/y2vvrrb6yr
 
-	uint3 size;
-	inTexture.GetDimensions(size.x, size.y, size.z);
+	float u_mu_s;
+	float u_mu;
+	float u_r;
+	float u_nu;
 
-	uint x_slice_count = mAtmosphere.mXSliceCount;
-	uint x_slice_size = size.x / x_slice_count;
+	if (true)
+	{
+		// [Bruneton08Impl]
 
-	float u_mu_s	= (inTexCoords.x % x_slice_size) / (x_slice_size - 1.0);	// X
-	float u_mu		= 0;
-	intersects_ground = inTexCoords.y < size.y / 2;
-	if (intersects_ground)
-		u_mu = (size.y / 2.0 - 1 - inTexCoords.y) / (size.y / 2.0 - 1.0);		// Y - [0.0 ~ 0.5] in coordinates -> [1.0 -> 0.0]
+		uint3 size;
+		inTexture.GetDimensions(size.x, size.y, size.z);
+		uint slice_count = mAtmosphere.mSliceCount;
+		uint slice_size = size.x / slice_count;
+
+		u_mu_s = (inTexCoords.x % slice_size) / (slice_size - 1.0);		// X
+		intersects_ground = inTexCoords.y < size.y / 2;
+		if (intersects_ground)
+			u_mu = (size.y / 2.0 - 1 - inTexCoords.y) / (size.y / 2.0 - 1.0);	// Y - [0.0 ~ 0.5] in coordinates -> [1.0 -> 0.0]
+		else
+			u_mu = (inTexCoords.y - size.y / 2.0) / (size.y / 2.0 - 1.0);		// Y - [0.5 ~ 1.0] in coordinates -> [0.0 -> 1.0]
+		u_r = (inTexCoords.z) / (size.z - 1.0);							// Z
+		u_nu = (inTexCoords.x / slice_size) / (slice_count - 1.0);		// X
+	}
 	else
-		u_mu = (inTexCoords.y - size.y / 2.0) / (size.y / 2.0 - 1.0);			// Y - [0.5 ~ 1.0] in coordinates -> [0.0 -> 1.0]
-	float u_r		= (inTexCoords.z) / (size.z - 1.0);							// Z
-	float u_nu		= (inTexCoords.x / x_slice_size) / (x_slice_count - 1.0);	// X
+	{
+		// [Yusov13]
+
+		uint3 size;
+		inTexture.GetDimensions(size.x, size.y, size.z);
+		uint slice_count = mAtmosphere.mSliceCount;
+		uint slice_size = size.z / slice_count;
+
+		u_mu_s = (inTexCoords.z % slice_size) / (slice_size - 1.0);		// Z
+		intersects_ground = inTexCoords.y < size.y / 2;
+		if (intersects_ground)
+			u_mu = (size.y / 2.0 - 1 - inTexCoords.y) / (size.y / 2.0 - 1.0);	// Y - [0.0 ~ 0.5] in coordinates -> [1.0 -> 0.0]
+		else
+			u_mu = (inTexCoords.y - size.y / 2.0) / (size.y / 2.0 - 1.0);		// Y - [0.5 ~ 1.0] in coordinates -> [0.0 -> 1.0]
+		u_r = (inTexCoords.x) / (size.x - 1.0);							// X
+		u_nu = (inTexCoords.z / slice_size) / (slice_count - 1.0);		// Z
+	}
 
 	float r;	// Height
 	float mu;	// Cosine of view zenith
@@ -452,31 +487,62 @@ void Encode4D(float4 r_mu_mu_s_nu, bool intersects_ground, Texture3D<float4> inT
 
 	//////////////////////////////////////////////////////////////////////////////////
 
-	// Coordinates
-	float3 tex_coords = 0;
+	if (true)
+	{
+		// [Bruneton08Impl]
 
-	uint3 size;
-	inTexture.GetDimensions(size.x, size.y, size.z);
-	uint x_slice_count = mAtmosphere.mXSliceCount;
-	uint x_slice_size = size.x / x_slice_count;
+		uint3 size;
+		inTexture.GetDimensions(size.x, size.y, size.z);
+		uint slice_count = mAtmosphere.mSliceCount;
+		uint slice_size = size.x / slice_count;
 
-	float x_offset = u_mu_s * (x_slice_size - 1.0);
-	float x_step = u_nu * (x_slice_count - 1.0);
-	
-	outS = frac(x_step);													// For interpolation between slices
+		float offset = u_mu_s * (slice_size - 1.0);
+		float step = u_nu * (slice_count - 1.0);
 
-	tex_coords.x = floor(x_step) * x_slice_size + x_offset;					// X
-	if (intersects_ground)
-		tex_coords.y = (size.y / 2.0 - 1.0) - u_mu * (size.y / 2.0 - 1.0);	// Y - [1.0 ~ 0.0] -> [0.0 ~ 0.5] in coodinates
+		outS = frac(step);														// For interpolation between slices
+
+		float3 tex_coords = 0;
+		tex_coords.x = floor(step) * slice_size + offset;						// X
+		if (intersects_ground)
+			tex_coords.y = (size.y / 2.0 - 1.0) - u_mu * (size.y / 2.0 - 1.0);	// Y - [1.0 ~ 0.0] -> [0.0 ~ 0.5] in coodinates
+		else
+			tex_coords.y = u_mu * (size.y / 2.0 - 1.0) + (size.y / 2.0);		// Y - [0.0 ~ 1.0] -> [0.5 ~ 1.0] in coodinates
+		tex_coords.z = u_r * (size.z - 1.0);									// Z
+
+		// Coordinates to UV
+		outUVW0.x = X_to_U((tex_coords.x + 0) / (size.x - 1), size.x);
+		outUVW1.x = X_to_U((tex_coords.x + slice_size) / (size.x - 1), size.x);
+		outUVW0.y = outUVW1.y = X_to_U(tex_coords.y / (size.y - 1), size.y);
+		outUVW0.z = outUVW1.z = X_to_U(tex_coords.z / (size.z - 1), size.z);
+	}
 	else
-		tex_coords.y = u_mu * (size.y / 2.0 - 1.0) + (size.y / 2.0);		// Y - [0.0 ~ 1.0] -> [0.5 ~ 1.0] in coodinates
-	tex_coords.z = u_r * (size.z - 1.0);									// Z
+	{
+		// [Yusov13]
 
-	// Coordinates to UV
-	outUVW0.x = X_to_U((tex_coords.x + 0) / (size.x - 1), size.x);
-	outUVW1.x = X_to_U((tex_coords.x + x_slice_size) / (size.x - 1), size.x);
-	outUVW0.y = outUVW1.y = X_to_U(tex_coords.y / (size.y - 1), size.y);
-	outUVW0.z = outUVW1.z = X_to_U(tex_coords.z / (size.z - 1), size.z);
+		uint3 size;
+		inTexture.GetDimensions(size.x, size.y, size.z);
+		uint slice_count = mAtmosphere.mSliceCount;
+		uint slice_size = size.z / slice_count;
+
+		float offset = u_mu_s * (slice_size - 1.0);
+		float step = u_nu * (slice_count - 1.0);
+
+		outS = frac(step);														// For interpolation between slices
+
+		float3 tex_coords = 0;
+		tex_coords.z = floor(step) * slice_size + offset;						// Z
+		if (intersects_ground)
+			tex_coords.y = (size.y / 2.0 - 1.0) - u_mu * (size.y / 2.0 - 1.0);	// Y - [1.0 ~ 0.0] -> [0.0 ~ 0.5] in coodinates
+		else
+			tex_coords.y = u_mu * (size.y / 2.0 - 1.0) + (size.y / 2.0);		// Y - [0.0 ~ 1.0] -> [0.5 ~ 1.0] in coodinates
+		tex_coords.x = u_r * (size.x - 1.0);									// X
+
+		// Coordinates to UV
+		outUVW0.z = X_to_U((tex_coords.z + 0) / (size.z - 1), size.z);
+		outUVW1.z = X_to_U((tex_coords.z + slice_size) / (size.z - 1), size.z);
+		outUVW0.y = outUVW1.y = X_to_U(tex_coords.y / (size.y - 1), size.y);
+		outUVW0.x = outUVW1.x = X_to_U(tex_coords.x / (size.x - 1), size.x);
+	}
 }
 
 float IntegrateDensity(DensityProfile inProfile, float2 mu_r)

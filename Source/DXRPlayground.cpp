@@ -22,6 +22,7 @@ enum class ScenePresetType
 	Furnance,
 
 	PrecomputedAtmosphere,
+	PrecomputedAtmosphere_Artifact_Mu,
 
 	Debug,
 
@@ -39,12 +40,13 @@ struct ScenePreset
 
 static ScenePreset kScenePresets[(int)ScenePresetType::COUNT] =
 {
-	{ "None",					nullptr,																			glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		glm::mat4x4(1.0f) },
-	{ "CornellBox",				"Asset/raytracing-references/cornellbox/cornellbox.obj",							glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		glm::mat4x4(1.0f) },
-	{ "VeachMIS",				"Asset/raytracing-references/veach-mis/veach-mis.obj",								glm::vec4(0.0f, 1.0f, 13.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		glm::mat4x4(1.0f) },
-	{ "Furnance",				"Asset/raytracing-references/furnace-light-sampling/furnace-light-sampling.obj",	glm::vec4(0.0f, 1.0f, 13.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		glm::mat4x4(1.0f) },
-	{ "PrecomputedAtmosphere",	"Asset/primitives/sphere.obj",														glm::vec4(0.0f, 0.0f, 9.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		glm::translate(glm::vec3(0.0f, 1.0f, 0.0f)) },
-	{ "Debug",					"Asset/primitives/sphere.obj",														glm::vec4(0.0f, 80.0f, 150.0f, 0.0f),		glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		glm::scale(glm::vec3(100.0f, 100.0f, 100.0f)) },
+	{ "None",									nullptr,																			glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		glm::mat4x4(1.0f) },
+	{ "CornellBox",								"Asset/raytracing-references/cornellbox/cornellbox.obj",							glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		glm::mat4x4(1.0f) },
+	{ "VeachMIS",								"Asset/raytracing-references/veach-mis/veach-mis.obj",								glm::vec4(0.0f, 1.0f, 13.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		glm::mat4x4(1.0f) },
+	{ "Furnance",								"Asset/raytracing-references/furnace-light-sampling/furnace-light-sampling.obj",	glm::vec4(0.0f, 1.0f, 13.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		glm::mat4x4(1.0f) },
+	{ "PrecomputedAtmosphere",					"Asset/primitives/sphere.obj",														glm::vec4(0.0f, 0.0f, 9.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		glm::translate(glm::vec3(0.0f, 1.0f, 0.0f)) },
+	{ "PrecomputedAtmosphere_Artifact_Mu",		"Asset/primitives/sphere.obj",														glm::vec4(0.0f, 80.0f, 150.0f, 0.0f),		glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		glm::scale(glm::vec3(100.0f, 100.0f, 100.0f)) },
+	{ "Debug",									"Asset/primitives/sphere.obj",														glm::vec4(0.0f, 0.0f, 9.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		glm::translate(glm::vec3(0.0f, 1.0f, 0.0f)) },
 };
 static ScenePresetType sCurrentScene = ScenePresetType::Debug;
 static ScenePresetType sPreviousScene = ScenePresetType::Debug;
@@ -124,7 +126,7 @@ static void sUpdate()
 		float frame_speed_scale = ImGui::GetIO().DeltaTime / (1.0f / 60.0f);
 		float move_speed = gCameraSettings.mMoveRotateSpeed.x * frame_speed_scale;
 		if (ImGui::GetIO().KeyShift)
-			move_speed *= 5.0f;
+			move_speed *= 20.0f;
 		if (ImGui::GetIO().KeyCtrl)
 			move_speed *= 0.1f;
 

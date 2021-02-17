@@ -69,6 +69,12 @@ struct AtmosphereProfile
 			profile.mBottomRadius						= 6360000.0;										// m
 			profile.mAtmosphereThickness				= 60000.0;											// m
 		}
+
+		static void Yusov13(AtmosphereProfile& profile)
+		{
+			profile.mBottomRadius						= 6360000.0;										// m
+			profile.mAtmosphereThickness				= 80000.0;											// m
+		}
 	};
 
 	double mBottomRadius								= {};												// m
@@ -102,7 +108,7 @@ struct AtmosphereProfile
 			profile.mRayleighScatteringCoefficient = glm::dvec3(5.8, 13.5, 33.1) * 1e-6; // m^-1
 		}
 
-		static void PSS99(AtmosphereProfile& profile)
+		static void Preetham99(AtmosphereProfile& profile)
 		{
 			Bruneton08Impl(profile);
 
@@ -119,6 +125,17 @@ struct AtmosphereProfile
 			// [NOTE]
 			// Total Scattering Coefficient = Integral of Angular Scattering Coefficient in all directions
 			// Angular Scattering Coefficient = Total Scattering Coefficient * (1 + cos(theta)^2) * 3.0 / 2.0
+		}
+
+		static void Yusov13(AtmosphereProfile& profile)
+		{
+			Preetham99(profile);
+
+			static constexpr double kRayleighScaleHeight = 7994.0;
+
+			static constexpr float kDummy = 0.0f;
+			profile.mRayleighDensityProfile.mLayer0 = { kDummy, kDummy, kDummy, kDummy, kDummy };
+			profile.mRayleighDensityProfile.mLayer1 = { kDummy, 1.0f, -1.0f / UnitHelper::stMeterToKilometer<float>(kRayleighScaleHeight), 0.0f, 0.0f };
 		}
 	};
 	ShaderType::DensityProfile mRayleighDensityProfile	= {}; // km
@@ -153,6 +170,11 @@ struct AtmosphereProfile
 
 			profile.mMieScatteringCoefficient = glm::dvec3(20.0, 20.0, 20.0) * 1e-6;
 			profile.mMieExtinctionCoefficient = profile.mMieScatteringCoefficient / 0.9;
+		}
+
+		static void Yusov13(AtmosphereProfile& profile)
+		{
+			Bruneton08(profile);
 		}
 	};
 	ShaderType::DensityProfile mMieDensityProfile		= {}; // km
@@ -311,12 +333,36 @@ struct PrecomputedAtmosphereScatteringResources
 	Texture mDeltaIrradianceTexture				= Texture().Width(64).Height(16).Format(DXGI_FORMAT_R32G32B32A32_FLOAT).Name("Delta Irradiance").UIScale(4.0f);
 	Texture mIrradianceTexture					= Texture().Width(64).Height(16).Format(DXGI_FORMAT_R32G32B32A32_FLOAT).Name("Irradiance").UIScale(4.0f);
 
-	glm::uint mXSliceCount						= 8; // Slice X axis to use 3D texture as 4D storage
-	Texture mDeltaRayleighScatteringTexture		= Texture().Width(256).Height(128).Depth(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Delta Rayleigh Scattering");
-	Texture mDeltaMieScatteringTexture			= Texture().Width(256).Height(128).Depth(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Delta Mie Scattering");
-	Texture mScatteringTexture					= Texture().Width(256).Height(128).Depth(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Scattering");
+	glm::uint mSliceCount						= 0; // Slice axis to use 3D texture as 4D storage
+	Texture mDeltaRayleighScatteringTexture		= Texture().Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Delta Rayleigh Scattering");
+	Texture mDeltaMieScatteringTexture			= Texture().Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Delta Mie Scattering");
+	Texture mScatteringTexture					= Texture().Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Scattering");
 
-	Texture mDeltaScatteringDensityTexture		= Texture().Width(256).Height(128).Depth(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Delta Scattering Density");
+	Texture mDeltaScatteringDensityTexture		= Texture().Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Delta Scattering Density");
+
+	static void Bruneton08Impl(PrecomputedAtmosphereScatteringResources& resource)
+	{
+		constexpr glm::uvec3 kDimension = glm::uvec3(256, 128, 32);
+
+		resource.mDeltaRayleighScatteringTexture.Dimension(kDimension);
+		resource.mDeltaMieScatteringTexture.Dimension(kDimension);
+		resource.mScatteringTexture.Dimension(kDimension);
+		resource.mDeltaScatteringDensityTexture.Dimension(kDimension);
+
+		resource.mSliceCount = 8;
+	}
+
+	static void Yusov13(PrecomputedAtmosphereScatteringResources& resource)
+	{
+		constexpr glm::uvec3 kDimension = glm::uvec3(32, 128, 1024);
+
+		resource.mDeltaRayleighScatteringTexture.Dimension(kDimension);
+		resource.mDeltaMieScatteringTexture.Dimension(kDimension);
+		resource.mScatteringTexture.Dimension(kDimension);
+		resource.mDeltaScatteringDensityTexture.Dimension(kDimension);
+
+		resource.mSliceCount = 16;
+	}
 	
 	// Put textures in array to use in loop
 	std::vector<Texture*> mTextures =
@@ -332,6 +378,13 @@ struct PrecomputedAtmosphereScatteringResources
 
 		&mDeltaScatteringDensityTexture
 	};
+
+	// Default
+	PrecomputedAtmosphereScatteringResources()
+	{
+		Bruneton08Impl(*this);
+		// Yusov13(*this);
+	}
 };
 
 extern AtmosphereProfile gAtmosphereProfile;

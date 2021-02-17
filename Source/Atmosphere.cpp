@@ -22,7 +22,7 @@ void PrecomputedAtmosphereScattering::Update()
 	atmosphere->mSolarIrradiance					= gAtmosphereProfile.mSolarIrradiance;
 	atmosphere->mSunAngularRadius					= static_cast<float>(gAtmosphereProfile.kSunAngularRadius);
 
-	atmosphere->mXSliceCount						= gPrecomputedAtmosphereScatteringResources.mXSliceCount;
+	atmosphere->mSliceCount							= gPrecomputedAtmosphereScatteringResources.mSliceCount;
 	atmosphere->mMuSEncodingMode					= static_cast<glm::uint32>(gAtmosphereProfile.mMuSEncodingMode);
 
 	atmosphere->mAerialPerspective					= (gPerFrameConstantBuffer.mBackgroundMode == BackgroundMode::PrecomputedAtmosphere && gAtmosphereProfile.mAerialPerspective) ? 1.0f : 0.0f;
@@ -200,6 +200,8 @@ void PrecomputedAtmosphereScattering::Finalize()
 
 void PrecomputedAtmosphereScattering::UpdateImGui()
 {
+#define SMALL_BUTTON(func) if (ImGui::SmallButton(NAMEOF(func).c_str())) func(gAtmosphereProfile);
+
 	if (ImGui::TreeNodeEx("Mode", ImGuiTreeNodeFlags_DefaultOpen))
 	{
 		for (int i = 0; i < (int)BackgroundMode::Count; i++)
@@ -249,7 +251,9 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 
 		ImGui::PopItemWidth();
 
-		if (ImGui::SmallButton("Bruneton08Impl")) AtmosphereProfile::GeometryReference::Bruneton08Impl(gAtmosphereProfile);
+		SMALL_BUTTON(AtmosphereProfile::GeometryReference::Bruneton08Impl);
+		ImGui::SameLine();
+		SMALL_BUTTON(AtmosphereProfile::GeometryReference::Yusov13);
 
 		ImGui::TreePop();
 	}
@@ -312,11 +316,13 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 			}
 			popup_density_profile();
 
-			if (ImGui::SmallButton("Bruneton08Impl")) AtmosphereProfile::RayleighReference::Bruneton08Impl(gAtmosphereProfile);
+			SMALL_BUTTON(AtmosphereProfile::RayleighReference::Bruneton08Impl);
 			ImGui::SameLine();
-			if (ImGui::SmallButton("Bruneton08")) AtmosphereProfile::RayleighReference::Bruneton08(gAtmosphereProfile);
+			SMALL_BUTTON(AtmosphereProfile::RayleighReference::Bruneton08);
 			ImGui::SameLine();
-			if (ImGui::SmallButton("PSS99")) AtmosphereProfile::RayleighReference::PSS99(gAtmosphereProfile);
+			SMALL_BUTTON(AtmosphereProfile::RayleighReference::Preetham99);
+			ImGui::SameLine();
+			SMALL_BUTTON(AtmosphereProfile::RayleighReference::Yusov13);
 
 			ImGui::TreePop();
 		}
@@ -340,9 +346,11 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 			}
 			popup_density_profile();
 
-			if (ImGui::SmallButton("Bruneton08Impl")) AtmosphereProfile::MieReference::Bruneton08Impl(gAtmosphereProfile);
+			SMALL_BUTTON(AtmosphereProfile::MieReference::Bruneton08Impl);
 			ImGui::SameLine();
-			if (ImGui::SmallButton("Bruneton08")) AtmosphereProfile::MieReference::Bruneton08(gAtmosphereProfile);
+			SMALL_BUTTON(AtmosphereProfile::MieReference::Bruneton08);
+			ImGui::SameLine();
+			SMALL_BUTTON(AtmosphereProfile::MieReference::Yusov13);
 
 			ImGui::TreePop();
 		}
