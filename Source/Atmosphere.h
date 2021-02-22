@@ -2,32 +2,29 @@
 
 #include "Common.h"
 
-namespace UnitHelper
+// [Nishita93][NSTN93] Display of The Earth Taking into Account Atmospheric Scattering https://www.researchgate.net/publication/2933032_Display_of_The_Earth_Taking_into_Account_Atmospheric_Scattering
+// [Preetham99][PSS99] A Practical Analytic Model for Daylight https://www2.cs.duke.edu/courses/cps124/spring08/assign/07_papers/p91-preetham.pdf
+// [Riley04][REK*04] Efficient Rendering of Atmospheric Phenomena https://people.cs.clemson.edu/~jtessen/reports/papers_files/Atmos_EGSR_Elec.pdf
+// [Zotti07][ZWP07] A Critical Review of the Preetham Skylight Model https://www.cg.tuwien.ac.at/research/publications/2007/zotti-2007-wscg/zotti-2007-wscg-paper.pdf
+// [Bruneton08] Precomputed Atmospheric Scattering https://hal.inria.fr/inria-00288758/document
+// [Bruneton08Doc] https://ebruneton.github.io/precomputed_atmospheric_scattering/atmosphere/functions.glsl.html
+// [Bruneton08Impl] https://github.com/ebruneton/precomputed_atmospheric_scattering
+// [Elek09] Rendering Parametrizable Planetary Atmospheres with Multiple Scattering in Real-Time http://www.klayge.org/material/4_0/Atmospheric/Rendering%20Parametrizable%20Planetary%20Atmospheres%20with%20Multiple%20Scattering%20in%20Real-Time.pdf
+// [Yusov13] Outdoor Light Scattering Sample Update https://software.intel.com/content/www/us/en/develop/blogs/otdoor-light-scattering-sample-update.html
+// [Hillaire16] Physically Based Sky, Atmosphere and Cloud Rendering in Frostbite https://media.contentapi.ea.com/content/dam/eacom/frostbite/files/s2016-pbs-frostbite-sky-clouds-new.pdf
+// [Carpentier17] Decima Engine : Advances in Lighting and AA https://www.guerrilla-games.com/read/decima-engine-advances-in-lighting-and-aa
+// [Hillaire20] A Scalable and Production Ready Sky and Atmosphere Rendering Technique https://sebh.github.io/publications/egsr2020.pdf
+// [UE4 SkyAtmosphere] SkyAtmosphere.usf SkyAtmosphereComponent.cpp https://docs.unrealengine.com/en-US/BuildingWorlds/FogEffects/SkyAtmosphere/index.html
+
+enum class AtmosphereMode
 {
-	template <typename ToType, typename FromType>
-	static ToType stMeterToKilometer(const FromType& meter)
-	{
-		return ToType(meter * 1e-3);
-	}
+	ConstantColor = 0,
 
-	template <typename ToType, typename FromType>
-	static ToType sNanometerToMeter(const FromType& nanometer)
-	{
-		return ToType(nanometer * 1e-9);
-	}
+	RaymarchAtmosphereOnly,
+	PrecomputedAtmosphere,
 
-	template <typename ToType, typename FromType>
-	static ToType sInverseMeterToInverseKilometer(const FromType& inverse_meter)
-	{
-		return ToType(inverse_meter * 1e3);
-	}
-
-	template <typename ToType, typename FromType>
-	static ToType sInverseNanometerToInverseKilometer(const FromType& inverse_nanometer)
-	{
-		return ToType(inverse_nanometer * 1e12);
-	}
-}
+	Count
+};
 
 enum class AtmosphereMuSEncodingMode
 {
@@ -41,19 +38,11 @@ enum class AtmosphereMuSEncodingMode
 
 struct AtmosphereProfile
 {
-	// [Nishita93][NSTN93] Display of The Earth Taking into Account Atmospheric Scattering https://www.researchgate.net/publication/2933032_Display_of_The_Earth_Taking_into_Account_Atmospheric_Scattering
-	// [Preetham99][PSS99] A Practical Analytic Model for Daylight https://www2.cs.duke.edu/courses/cps124/spring08/assign/07_papers/p91-preetham.pdf
-	// [Riley04][REK*04] Efficient Rendering of Atmospheric Phenomena https://people.cs.clemson.edu/~jtessen/reports/papers_files/Atmos_EGSR_Elec.pdf
-	// [Zotti07][ZWP07] A Critical Review of the Preetham Skylight Model https://www.cg.tuwien.ac.at/research/publications/2007/zotti-2007-wscg/zotti-2007-wscg-paper.pdf
-	// [Bruneton08] Precomputed Atmospheric Scattering https://hal.inria.fr/inria-00288758/document
-	// [Bruneton08Doc] https://ebruneton.github.io/precomputed_atmospheric_scattering/atmosphere/functions.glsl.html
-	// [Bruneton08Impl] https://github.com/ebruneton/precomputed_atmospheric_scattering
-	// [Elek09] Rendering Parametrizable Planetary Atmospheres with Multiple Scattering in Real-Time http://www.klayge.org/material/4_0/Atmospheric/Rendering%20Parametrizable%20Planetary%20Atmospheres%20with%20Multiple%20Scattering%20in%20Real-Time.pdf
-	// [Yusov13] Outdoor Light Scattering Sample Update https://software.intel.com/content/www/us/en/develop/blogs/otdoor-light-scattering-sample-update.html
-	// [Hillaire16] Physically Based Sky, Atmosphere and Cloud Rendering in Frostbite https://media.contentapi.ea.com/content/dam/eacom/frostbite/files/s2016-pbs-frostbite-sky-clouds-new.pdf
-	// [Carpentier17] Decima Engine : Advances in Lighting and AA https://www.guerrilla-games.com/read/decima-engine-advances-in-lighting-and-aa
-	// [Hillaire20] A Scalable and Production Ready Sky and Atmosphere Rendering Technique https://sebh.github.io/publications/egsr2020.pdf
-	// [UE4 SkyAtmosphere] SkyAtmosphere.usf SkyAtmosphereComponent.cpp https://docs.unrealengine.com/en-US/BuildingWorlds/FogEffects/SkyAtmosphere/index.html
+	// Config
+	AtmosphereMode mMode								= AtmosphereMode::PrecomputedAtmosphere;
+
+	// Constant Color
+	glm::vec4 mConstantColor							= glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
 
 	// Wavelength
 	static constexpr double kLambdaR					= 680.0;											// nm
@@ -148,6 +137,7 @@ struct AtmosphereProfile
 		{
 			static constexpr double kMieScaleHeight = 1200.0;
 
+			// [Wikipedia] The Angstrom exponent is a parameter that describes how the optical thickness of an aerosol typically depends on the wavelength of the light.
 			static constexpr double kMieAngstromAlpha = 0.0;
 			static constexpr double kMieAngstromBeta = 5.328e-3;
 			static constexpr double kMieSingleScatteringAlbedo = 0.9;
@@ -233,7 +223,6 @@ struct AtmosphereProfile
 	// Solar
 	struct SolarIrradianceReference
 	{
-		// http://rredc.nrel.gov/solar/spectra/am1.5/ASTMG173/ASTMG173.html
 		static void Bruneton08ImplConstant(AtmosphereProfile& profile)		
 		{ 
 			profile.mSolarIrradiance = glm::vec3(1.5f); 
@@ -241,6 +230,7 @@ struct AtmosphereProfile
 
 		static void Bruneton08Impl(AtmosphereProfile& profile)
 		{ 
+			// http://rredc.nrel.gov/solar/spectra/am1.5/ASTMG173/ASTMG173.html
 			profile.mSolarIrradiance = glm::vec3(1.474000f, 1.850400f, 1.911980f); 
 		}
 	};
@@ -251,7 +241,7 @@ struct AtmosphereProfile
 	double kSunAngularRadius							= 0.00935f / 2.0f; // Radian, from [Bruneton08Impl] demo.cc
 
 	// Encoding Config
-	AtmosphereMuSEncodingMode mMuSEncodingMode					= AtmosphereMuSEncodingMode::Bruneton08Impl;
+	AtmosphereMuSEncodingMode mMuSEncodingMode			= AtmosphereMuSEncodingMode::Bruneton08Impl;
 
 	// Multiple Scattering
 	glm::uint mScatteringOrder							= 4;
@@ -282,7 +272,7 @@ public:
 	void Finalize();
 	void UpdateImGui();
 	void Update();
-	void Render();
+	void Precompute();
 
 	void ComputeTransmittance();
 	void ComputeDirectIrradiance();
@@ -293,8 +283,6 @@ public:
 	void AccumulateMultipleScattering();
 
 	void ComputeMultipleScattering(glm::uint scattering_order);
-
-	void Precompute();
 
 	bool mRecomputeRequested = true;
 	bool mRecomputeEveryFrame = false;

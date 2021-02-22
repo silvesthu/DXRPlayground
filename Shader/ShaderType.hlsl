@@ -4,16 +4,15 @@ static const uint sRecursionCountMax = 4;
 
 struct PerFrame
 {
-	float4					mBackgroundColor		CONSTANT_DEFAULT(float4(0.0f, 0.0f, 0.0f, 1.0f));
 	float4					mCameraPosition			CONSTANT_DEFAULT(float4(0.0f, 0.0f, 0.0f, 0.0f));
 	float4					mCameraDirection		CONSTANT_DEFAULT(float4(0.0f, 0.0f, 1.0f, 0.0f));
 	float4					mCameraRightExtend		CONSTANT_DEFAULT(float4(1.0f, 0.0f, 0.0f, 0.0f));
 	float4					mCameraUpExtend			CONSTANT_DEFAULT(float4(0.0f, 1.0f, 0.0f, 0.0f));
 	
-	BackgroundMode			mBackgroundMode			CONSTANT_DEFAULT(BackgroundMode::PrecomputedAtmosphere);
+	float					mPadding				CONSTANT_DEFAULT(0);
 	float					mSunAzimuth				CONSTANT_DEFAULT(0);
 	float					mSunZenith				CONSTANT_DEFAULT(MATH_PI / 4.0f);
-	float					mPadding;
+	float					mTime					CONSTANT_DEFAULT(0);
 
 	float4					mSunDirection			CONSTANT_DEFAULT(float4(1.0f, 0.0f, 0.0f, 0.0f));
 
@@ -122,10 +121,12 @@ struct Atmosphere
 	float					mSceneScale				CONSTANT_DEFAULT(0);
 	float					mPad0;
 
-	uint					mUnused					CONSTANT_DEFAULT(0);
-	uint					mSliceCount			CONSTANT_DEFAULT(0);
+	uint					mMode					CONSTANT_DEFAULT(0);
+	uint					mSliceCount				CONSTANT_DEFAULT(0);
 	uint					mMuSEncodingMode		CONSTANT_DEFAULT(0);
 	uint					mPadFlags;
+
+	float4					mConstantColor			CONSTANT_DEFAULT(float4(0.0f, 0.0f, 0.0f, 1.0));
 	
 	float3					mRayleighScattering		CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	float					mPad1;
@@ -156,6 +157,14 @@ struct Atmosphere
 struct AtmospherePerDraw
 {
 	uint					mScatteringOrder		CONSTANT_DEFAULT(0);
+	uint					mPad0;
+	uint					mPad1;
+	uint					mPad2;
+};
+
+struct Cloud
+{
+	uint					mMode					CONSTANT_DEFAULT(0);
 	uint					mPad0;
 	uint					mPad1;
 	uint					mPad2;

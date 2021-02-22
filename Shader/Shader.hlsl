@@ -21,6 +21,7 @@ SamplerState BilinearSampler : register(s1);
 //////////////////////////////////////////////////////////////////////////////////
 
 #include "PrecomputedAtmosphere.hlsl"
+#include "Cloud.hlsl"
 
 //////////////////////////////////////////////////////////////////////////////////
 
@@ -123,6 +124,9 @@ void DefaultRayGeneration()
 	previous_frame_color = max(0, previous_frame_color); // Eliminate nan
 	float3 mixed_color = lerp(previous_frame_color, current_frame_color, 1.0f / (float)(mPerFrame.mAccumulationFrameCount));
 
+	if (recursion == 0)
+		mixed_color = current_frame_color;
+
 	if (mPerFrame.mDebugMode == DebugMode_RecursionCount)
 		mixed_color = hsv2rgb(float3(recursion * 1.0 / (mPerFrame.mRecursionCountMax + 1), 1, 1));
 
@@ -133,7 +137,7 @@ void DefaultRayGeneration()
 	RaytracingOutput[DispatchRaysIndex().xy] = float4(mixed_color, 1);
 }
 
-#include "AtmosphericScattering.hlsl"
+#include "RaymarchAtmosphere.hlsl"
 
 // Adapters
 float3 RayOrigin() { return WorldRayOrigin() * mAtmosphere.mSceneScale; }
@@ -369,18 +373,194 @@ float3 GetEnvironmentEmission()
 	return 1 - exp(-radiance / white_point * exposure);
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// https://www.shadertoy.com/view/ll3SWl
+
+// hash function
+float hash(float n)
+{
+	return frac(cos(n) * 114514.1919);
+}
+
+// 3d noise function
+float noise(float3 x)
+{
+	float3 p = floor(x);
+	float3 f = smoothstep(0.0, 1.0, frac(x));
+
+	float n = p.x + p.y * 10.0 + p.z * 100.0;
+
+	return lerp(
+		lerp(lerp(hash(n + 0.0), hash(n + 1.0), f.x),
+			lerp(hash(n + 10.0), hash(n + 11.0), f.x), f.y),
+		lerp(lerp(hash(n + 100.0), hash(n + 101.0), f.x),
+			lerp(hash(n + 110.0), hash(n + 111.0), f.x), f.y), f.z);
+}
+
+// Fractional Brownian motion
+float fbm(float3 p)
+{
+	float3x3 m = float3x3(0.00, 1.60, 1.20, -1.60, 0.72, -0.96, -1.20, -0.96, 1.28);
+
+	float f = 0.5000 * noise(p);
+	p = mul(m, p);
+	f += 0.2500 * noise(p);
+	p = mul(m, p);
+	f += 0.1666 * noise(p);
+	p = mul(m, p);
+	f += 0.0834 * noise(p);
+	return f;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// [Schneider16]
+float SampleCloudDensity(float3 p, bool sample_coarse)
+{
+	float3 wind_direction = float3(1, 0, 0);
+	float wind_speed = 1.0;
+	float3 scroll = mPerFrame.mTime * wind_direction * wind_speed;
+
+	// [TODO] use noise texture
+	float noise = fbm(p * 0.02 + scroll);
+	return pow(noise, 10.0) * 1.0;
+}
+
+float SampleCloudDensityAlongCone(float3 p, float3 ray_direction)
+{
+	int sample_count = 6;
+	float light_step_length = 100.0; // m
+	float3 light_step = ray_direction * light_step_length;
+
+	float accumulated_density = 0.0;
+	for (int i = 0; i < sample_count; i++)
+	{
+		// [TODO] line -> cone
+		p += light_step;
+
+		// [TODO] utilize coarse
+		accumulated_density += SampleCloudDensity(p, false);
+	}
+
+	return accumulated_density;
+}
+
+float3 RaymarchCloud(out float3 transmittance)
+{
+	float3 accumulated_light = 0;
+	float accumulated_density = 0.0;
+
+	// Cloud
+	{
+		// [Schneider16]
+
+		// Stubs
+		int sample_count = 20;
+		int zero_density_max = 6;
+		float step_length = 10.0;
+
+		float3 position = RayOrigin();
+		float3 step = RayDirection() * step_length;
+
+		// move positon to bottom of cloudscape
+		position += RayDirection() * 100;
+
+		int zero_density_count = 0;
+		bool sample_coarse = true;
+
+		for (int i = 0; i < sample_count; i++)
+		{
+			float density = SampleCloudDensity(position, sample_coarse);
+			if (sample_coarse)
+			{
+				if (density != 0.0)
+				{
+					i--; // step back
+					sample_coarse = false;
+					continue;
+				}
+
+				position += step;
+			}
+			else
+			{
+				if (density == 0.0)
+					zero_density_count++;
+
+				if (zero_density_count == zero_density_max)
+				{
+					zero_density_count = 0;
+					sample_coarse = true;
+					continue;
+				}
+
+				// Lighting
+				{
+					float density_towards_light = SampleCloudDensityAlongCone(position, GetSunDirection());
+
+					float light_samples = density_towards_light * 10;
+
+					float powder_sugar_effect = 1.0 - exp(-light_samples * 2.0);
+					float beers_law = exp(-light_samples);
+					float light_energy = 2.0 * beers_law * powder_sugar_effect;
+
+					float phase = PhaseFunction_HenyeyGreenstein(0.2, dot(RayDirection(), GetSunDirection()));
+					light_energy *= phase;
+
+					accumulated_light += (1 - accumulated_density) * light_energy;
+				}
+
+				accumulated_density += density;
+				position += step;
+			}
+
+			if (accumulated_density >= 1.0)
+			{
+				accumulated_density = 1.0;
+				break;
+			}
+		}
+
+		// [Debug]
+		// accumulated_light = SampleCloudDensity(RayOrigin() + RayDirection() * 10, true);
+		// accumulated_light = accumulated_density;
+	}
+
+	transmittance = 1.0 - accumulated_density;
+	return accumulated_light;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 [shader("miss")]
 void DefaultMiss(inout RayPayload payload)
 {
 	payload.mDone = true;
 
-	switch (mPerFrame.mBackgroundMode)
+	float3 atmosphere = 0;
+	switch (mAtmosphere.mMode)
 	{
-		default:
-		case BackgroundMode_Color: 						payload.mEmission = payload.mEmission + payload.mAlbedo * mPerFrame.mBackgroundColor.xyz; return;
-		case BackgroundMode_RaymarchAtmosphereOnly: 	payload.mEmission = payload.mEmission + payload.mAlbedo * AtmosphereScattering(RayOrigin(), RayDirection()); return;
-		case BackgroundMode_PrecomputedAtmosphere: 		payload.mEmission = payload.mEmission + payload.mAlbedo * GetEnvironmentEmission(); return;
+	default:
+	case AtmosphereMode_ConstantColor: 				atmosphere = mAtmosphere.mConstantColor.xyz; break;
+	case AtmosphereMode_RaymarchAtmosphereOnly: 	atmosphere = RaymarchAtmosphereScattering(RayOrigin(), RayDirection()); break;
+	case AtmosphereMode_PrecomputedAtmosphere: 		atmosphere = GetEnvironmentEmission(); break;
 	}
+
+	float3 cloud = 0;
+	float3 cloud_transmittance = 1;
+	switch (mCloud.mMode)
+	{
+	default:
+	case CloudMode_None:							break;
+	case CloudMode_RuntimeNoise:					cloud = RaymarchCloud(cloud_transmittance); break;
+	}
+
+	// [TODO] How to mix contributions to get best result?
+	float3 emission = 0;
+	emission = atmosphere;
+	emission = lerp(emission, cloud, 1.0 - cloud_transmittance);
+
+	payload.mEmission = payload.mEmission + payload.mAlbedo * emission;
 }
 
 HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attributes)

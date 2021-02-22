@@ -798,18 +798,13 @@ void ComputeSingleScatteringCS(
 
 float RayleighPhaseFunction(float nu)
 {
-	// [TODO] Add note
-
 	float k = 3.0 / (16.0 * MATH_PI);
 	return k * (1.0 + nu * nu);
 }
 
 float MiePhaseFunction(float g, float nu) 
 {
-	// [TODO] Add note
-
-	float k = 3.0 / (8.0 * MATH_PI) * (1.0 - g * g) / (2.0 + g * g);
-	return k * (1.0 + nu * nu) / pow(1.0 + g * g - 2.0 * g * nu, 1.5);
+	return PhaseFunction_CornetteShanks(g, nu);
 }
 
 float3 GetIrradiance(float r, float mu_s) 
@@ -836,8 +831,8 @@ float3 GetScattering(float r, float mu, float mu_s, float nu, bool intersects_gr
 
 	if (scattering_order == 1) 
 	{
-		float3 rayleigh = GetScattering(DeltaRayleighScatteringSRV, r, mu, mu_s, nu, intersects_ground);
-		float3 mie = GetScattering(DeltaMieScatteringSRV, r, mu, mu_s, nu, intersects_ground);
+		float3 rayleigh = GetScattering(DeltaRayleighScatteringSRV, r, mu, mu_s, nu, intersects_ground).xyz;
+		float3 mie = GetScattering(DeltaMieScatteringSRV, r, mu, mu_s, nu, intersects_ground).xyz;
 		return rayleigh * RayleighPhaseFunction(nu) + mie * MiePhaseFunction(mAtmosphere.mMiePhaseFunctionG, nu);
 	}
 	

@@ -153,6 +153,9 @@
     <ClInclude Include="Source\Atmosphere.h">
       <Filter>Source</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Cloud.h">
+      <Filter>Source</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Thirdparty\imgui\imgui_widgets.cpp">
@@ -200,6 +203,9 @@
     <ClCompile Include="Source\Atmosphere.cpp">
       <Filter>Source</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Cloud.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <CopyFileToFolders Include="Shader\Shader.hlsl">
@@ -211,7 +217,7 @@
     <CopyFileToFolders Include="Shader\ShaderType.hlsl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\AtmosphericScattering.hlsl">
+    <CopyFileToFolders Include="Shader\RaymarchAtmosphere.hlsl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
   </ItemGroup>
@@ -219,10 +225,9 @@
     <None Include="Shader\Generated\Enum.hlsl">
       <Filter>Shader</Filter>
     </None>
-  </ItemGroup>
-  <ItemGroup>
-    <FxCompile Include="Shader\PrecomputedAtmosphere.hlsl">
+    <None Include="Shader\Cloud.hlsl" />
+    <None Include="Shader\PrecomputedAtmosphere.hlsl">
       <Filter>Shader</Filter>
-    </FxCompile>
+    </None>
   </ItemGroup>
 </Project>

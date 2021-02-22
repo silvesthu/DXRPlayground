@@ -8,6 +8,7 @@
 #include "RayTrace.h"
 
 #include "Atmosphere.h"
+#include "Cloud.h"
 
 #define DX12_ENABLE_DEBUG_LAYER			(1)
 
@@ -165,7 +166,8 @@ static void sUpdate()
 	{
 		ImGui::Begin("DXR Playground");
 		{
-			ImGui::Text("Average %.3f ms/frame (%.1f FPS) @ %dx%d",
+			ImGui::Text("Time %.3f @ Average %.3f ms/frame (%.1f FPS) @ %dx%d",
+				gPerFrameConstantBuffer.mTime,
 				1000.0f / ImGui::GetIO().Framerate,
 				ImGui::GetIO().Framerate,
 				gDisplaySettings.mRenderResolution.x,
@@ -251,7 +253,12 @@ static void sUpdate()
 			if (ImGui::TreeNodeEx("Atmosphere", ImGuiTreeNodeFlags_DefaultOpen))
 			{
 				gPrecomputedAtmosphereScattering.UpdateImGui();
+				ImGui::TreePop();
+			}
 
+			if (ImGui::TreeNodeEx("Cloud", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				gCloud.UpdateImGui();
 				ImGui::TreePop();
 			}
 
@@ -336,6 +343,7 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 
 	// Features (rely on ImGui, Scene)
 	gPrecomputedAtmosphereScattering.Initialize();
+	gCloud.Initialize();
 
 	// File watch
 	filewatch::FileWatch<std::string> file_watch("Shader/", 
@@ -388,6 +396,7 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 		sWaitForLastSubmittedFrame();
 
 		gPrecomputedAtmosphereScattering.Finalize();
+		gCloud.Finalize();
 
 		ImGui_ImplDX12_Shutdown();
 		ImGui_ImplWin32_Shutdown();
@@ -454,6 +463,7 @@ void sRender()
 			sPerFrameCopy.mDebugCoord = gPerFrameConstantBuffer.mDebugCoord = glm::uvec2((glm::uint32)ImGui::GetMousePos().x, (glm::uint32)ImGui::GetMousePos().y);
 			sPerFrameCopy.mAccumulationFrameCount = gPerFrameConstantBuffer.mAccumulationFrameCount;
 			sPerFrameCopy.mFrameIndex = gPerFrameConstantBuffer.mFrameIndex;
+			sPerFrameCopy.mTime = gPerFrameConstantBuffer.mTime;
 
 			if (gPerFrameConstantBuffer.mReset == 0 && memcmp(&sPerFrameCopy, &gPerFrameConstantBuffer, sizeof(ShaderType::PerFrame)) == 0)
 				gPerFrameConstantBuffer.mAccumulationFrameCount++;
@@ -473,7 +483,13 @@ void sRender()
 
 	// Atmosphere
 	{
-		gPrecomputedAtmosphereScattering.Render();
+		gPrecomputedAtmosphereScattering.Update();
+		gPrecomputedAtmosphereScattering.Precompute();
+	}
+
+	// Cloud
+	{
+		gCloud.Update();
 	}
 
 	// Raytrace
@@ -527,7 +543,7 @@ void sRender()
 		gCommandList->Close();
 		gCommandQueue->ExecuteCommandLists(1, (ID3D12CommandList* const*)&gCommandList);
 
-		gTime += ImGui::GetIO().DeltaTime;
+		gPerFrameConstantBuffer.mTime += ImGui::GetIO().DeltaTime;
 		gPerFrameConstantBuffer.mFrameIndex++;
 	}
 

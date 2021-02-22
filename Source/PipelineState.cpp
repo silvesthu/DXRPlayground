@@ -1,5 +1,6 @@
 #include "Common.h"
 #include "Atmosphere.h"
+#include "Cloud.h"
 
 #include <fstream>
 #include <sstream>
@@ -126,6 +127,15 @@ void GenerateGlobalRootSignatureDescriptor(RootSignatureDescriptor& outDesc)
 		descriptor_range.BaseShaderRegister = i;
 		outDesc.mDescriptorRanges.push_back(descriptor_range);
 	}
+
+	// b, space3 - Cloud
+	descriptor_range = {};
+	descriptor_range.BaseShaderRegister = 0;
+	descriptor_range.NumDescriptors = 1;
+	descriptor_range.RegisterSpace = 3;
+	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+	descriptor_range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	outDesc.mDescriptorRanges.push_back(descriptor_range);
 
 	// Table
 	D3D12_ROOT_PARAMETER root_parameter = {};
@@ -406,8 +416,9 @@ void gCreatePipelineState()
 
 		sWriteEnum<DebugMode>(enum_file);
 		sWriteEnum<DebugInstanceMode>(enum_file);
-		sWriteEnum<BackgroundMode>(enum_file);
+		sWriteEnum<AtmosphereMode>(enum_file);
 		sWriteEnum<AtmosphereMuSEncodingMode>(enum_file);
+		sWriteEnum<CloudMode>(enum_file);
 	}
 	enum_file.close();
 

@@ -5,6 +5,7 @@
 #include "ShaderTable.h"
 
 #include "Atmosphere.h"
+#include "Cloud.h"
 
 #include "Thirdparty/tinyobjloader/tiny_obj_loader.h"
 
@@ -483,7 +484,7 @@ void Scene::CreateShaderResource()
 		{
 			D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
 			desc.BufferLocation = gPrecomputedAtmosphereScatteringResources.mConstantUploadBuffer->GetGPUVirtualAddress();
-			desc.SizeInBytes = gAlignUp((UINT)sizeof(ShaderType::PerFrame), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+			desc.SizeInBytes = gAlignUp((UINT)sizeof(ShaderType::Atmosphere), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
 			gDevice->CreateConstantBufferView(&desc, handle);
 
 			handle.ptr += increment_size;
@@ -502,6 +503,17 @@ void Scene::CreateShaderResource()
 			srv_desc.Texture2D.MostDetailedMip = 0;
 			srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 			gDevice->CreateShaderResourceView(texture->mResource.Get(), &srv_desc, handle);
+
+			handle.ptr += increment_size;
+		}
+
+		// b, space3 - Cloud
+		if (gCloudResources.mConstantUploadBuffer != nullptr)
+		{
+			D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
+			desc.BufferLocation = gCloudResources.mConstantUploadBuffer->GetGPUVirtualAddress();
+			desc.SizeInBytes = gAlignUp((UINT)sizeof(ShaderType::Cloud), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+			gDevice->CreateConstantBufferView(&desc, handle);
 
 			handle.ptr += increment_size;
 		}

@@ -79,3 +79,21 @@ bool IntersectRaySphere(float3 origin, float3 direction, float3 center, float ra
     distance.y = (-b + sqrt(discriminant)) / (2 * a);
     return true;
 }
+
+float PhaseFunction_HenyeyGreenstein(float g, float cosine)
+{
+    return
+        (1.0 * (1.0 - g * g))
+        /
+        (4.0 * MATH_PI * pow(1.0 + g * g - 2.0 * g * cosine, 3.0 / 2.0));
+}
+
+// Physically reasonable analytic expression for the single-scattering phase function
+float PhaseFunction_CornetteShanks(float g, float cosine)
+{
+    // [NOTE] even when g = 0, it is not a isotropic distribution
+    return 
+        (3.0 * (1.0 - g * g) * (1.0 + cosine * cosine))
+        /
+        (4.0 * MATH_PI * 2.0 * (2.0 + g * g) * pow(1.0 + g * g - 2.0 * g * cosine, 3.0 / 2.0));
+}

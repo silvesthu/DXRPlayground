@@ -16,16 +16,18 @@ void PrecomputedAtmosphereScattering::Update()
 
 	atmosphere->mBottomRadius						= UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.BottomRadius());
 	atmosphere->mTopRadius							= UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.TopRadius());
-
 	atmosphere->mSceneScale							= gAtmosphereProfile.mSceneInKilometer ? 1.0f : 0.001f;
+
+	atmosphere->mMode								= static_cast<glm::uint32>(gAtmosphereProfile.mMode);
+	atmosphere->mMuSEncodingMode					= static_cast<glm::uint32>(gAtmosphereProfile.mMuSEncodingMode);
+	atmosphere->mSliceCount							= gPrecomputedAtmosphereScatteringResources.mSliceCount;
+
+	atmosphere->mConstantColor						= gAtmosphereProfile.mConstantColor;
 
 	atmosphere->mSolarIrradiance					= gAtmosphereProfile.mSolarIrradiance;
 	atmosphere->mSunAngularRadius					= static_cast<float>(gAtmosphereProfile.kSunAngularRadius);
 
-	atmosphere->mSliceCount							= gPrecomputedAtmosphereScatteringResources.mSliceCount;
-	atmosphere->mMuSEncodingMode					= static_cast<glm::uint32>(gAtmosphereProfile.mMuSEncodingMode);
-
-	atmosphere->mAerialPerspective					= (gPerFrameConstantBuffer.mBackgroundMode == BackgroundMode::PrecomputedAtmosphere && gAtmosphereProfile.mAerialPerspective) ? 1.0f : 0.0f;
+	atmosphere->mAerialPerspective					= (gAtmosphereProfile.mMode == AtmosphereMode::PrecomputedAtmosphere && gAtmosphereProfile.mAerialPerspective) ? 1.0f : 0.0f;
 	atmosphere->mGroundAlbedo						= gAtmosphereProfile.mGroundAlbedo;
 	atmosphere->mRuntimeGroundAlbedo				= gAtmosphereProfile.mRuntimeGroundAlbedo;
 
@@ -66,12 +68,6 @@ void PrecomputedAtmosphereScattering::Update()
 			atmosphere->mOzoneDensity				= gAtmosphereProfile.mEnableOzone ? gAtmosphereProfile.mOzoneDensityProfile : ShaderType::DensityProfile();
 		}
 	} // Density Profile
-}
-
-void PrecomputedAtmosphereScattering::Render()
-{
-	Update();
-	Precompute();
 }
 
 void PrecomputedAtmosphereScattering::ComputeTransmittance()
@@ -204,17 +200,17 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 
 	if (ImGui::TreeNodeEx("Mode", ImGuiTreeNodeFlags_DefaultOpen))
 	{
-		for (int i = 0; i < (int)BackgroundMode::Count; i++)
+		for (int i = 0; i < (int)AtmosphereMode::Count; i++)
 		{
-			const auto& name = nameof::nameof_enum((BackgroundMode)i);
+			const auto& name = nameof::nameof_enum((AtmosphereMode)i);
 			if (i != 0)
 				ImGui::SameLine();			
-			if (ImGui::RadioButton(name.data(), (int)gPerFrameConstantBuffer.mBackgroundMode == i))
-				gPerFrameConstantBuffer.mBackgroundMode = (BackgroundMode)i;
+			if (ImGui::RadioButton(name.data(), (int)gAtmosphereProfile.mMode == i))
+				gAtmosphereProfile.mMode = (AtmosphereMode)i;
 		}
 
-		if (gPerFrameConstantBuffer.mBackgroundMode == BackgroundMode::Color)
-			ImGui::ColorEdit3("Color", (float*)&gPerFrameConstantBuffer.mBackgroundColor, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
+		if (gAtmosphereProfile.mMode == AtmosphereMode::ConstantColor)
+			ImGui::ColorEdit3("Color", (float*)&gAtmosphereProfile.mConstantColor, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
 
 		ImGui::Checkbox("Scene Unit: Kilometer : Meter", &gAtmosphereProfile.mSceneInKilometer);
 
