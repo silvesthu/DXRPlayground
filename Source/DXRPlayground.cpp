@@ -24,7 +24,7 @@ enum class ScenePresetType
 	PrecomputedAtmosphere,
 	PrecomputedAtmosphere_Artifact_Mu,
 
-	// Extra (not in git repository)
+	// Extra (use download_extra_asset.ps1 to download)
 	Rungholt,
 
 	Debug,
