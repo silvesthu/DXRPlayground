@@ -1,6 +1,6 @@
 // Code shared between HLSL and C++
 
-static const uint sRecursionCountMax = 8;
+static const uint sRecursionCountMax = 4;
 
 struct PerFrame
 {
@@ -114,7 +114,8 @@ struct Atmosphere
 {
 	float					mBottomRadius			CONSTANT_DEFAULT(0);	// km
 	float					mTopRadius				CONSTANT_DEFAULT(0);	// km
-	float2					mPad0;
+	float					mSceneScale				CONSTANT_DEFAULT(0);
+	float					mPad0;
 
 	uint					mUnused					CONSTANT_DEFAULT(0);
 	uint					mXSliceCount			CONSTANT_DEFAULT(0);

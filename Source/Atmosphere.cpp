@@ -46,6 +46,8 @@ void PrecomputedAtmosphereScattering::Update()
 	atmosphere->mBottomRadius						= UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.BottomRadius());
 	atmosphere->mTopRadius							= UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.TopRadius());
 
+	atmosphere->mSceneScale							= gAtmosphereProfile.mSceneScale;
+
 	atmosphere->mSolarIrradiance					= gAtmosphereProfile.mUseConstantSolarIrradiance ? gAtmosphereProfile.kConstantSolarIrradiance : gAtmosphereProfile.kSolarIrradiance;
 	atmosphere->mSunAngularRadius					= static_cast<float>(gAtmosphereProfile.kSunAngularRadius);
 
@@ -331,6 +333,12 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 		if (ImGui::RadioButton(name.data(), (int)gPerFrameConstantBuffer.mBackgroundMode == i))
 			gPerFrameConstantBuffer.mBackgroundMode = (BackgroundMode)i;
 	}
+	
+	ImGui::PushItemWidth(100);
+	ImGui::SliderFloat("Scene Scale", &gAtmosphereProfile.mSceneScale, 0.0f, 1.0f);
+	ImGui::PopItemWidth();
+	ImGui::SameLine(); if (ImGui::Button("m")) gAtmosphereProfile.mSceneScale = 1.0f;
+	ImGui::SameLine(); if (ImGui::Button("km")) gAtmosphereProfile.mSceneScale = 0.001f;
 
 	if (gPerFrameConstantBuffer.mBackgroundMode == BackgroundMode::Color)
 		ImGui::ColorEdit3("Color", (float*)&gPerFrameConstantBuffer.mBackgroundColor);

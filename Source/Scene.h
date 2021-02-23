@@ -120,7 +120,7 @@ using TLASRef = std::shared_ptr<TLAS>;
 class Scene
 {
 public:
-	using IndexType = glm::uint16;
+	using IndexType = glm::uint32; // glm::uint16;
 	using VertexType = glm::vec3;
 	using NormalType = glm::vec3;
 

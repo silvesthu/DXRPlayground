@@ -92,6 +92,9 @@ struct AtmosphereProfile
 
 	// Ground
 	glm::dvec3 mGroundAlbedo						= glm::dvec3(0.1);
+
+	// Config
+	float mSceneScale								= 1.0;
 };
 
 class PrecomputedAtmosphereScattering

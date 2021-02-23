@@ -34,7 +34,6 @@ StructuredBuffer<float3> Normals : register(t4, space0);
 
 // From D3D12Raytracing
 // Load three 16 bit indices from a byte addressed buffer.
-static
 uint3 Load3x16BitIndices(uint offsetBytes)
 {
     uint3 indices;
@@ -64,6 +63,12 @@ uint3 Load3x16BitIndices(uint offsetBytes)
     }
 
     return indices;
+}
+
+uint3 Load3x32BitIndices(uint offsetBytes)
+{
+	const uint4 four32BitIndices = Indices.Load4(offsetBytes);
+	return four32BitIndices.xyz;
 }
 
 [shader("raygeneration")]
@@ -126,6 +131,16 @@ void DefaultRayGeneration()
 
 #include "AtmosphericScattering.hlsl"
 
+float3 RayOrigin()
+{
+	return WorldRayOrigin() * mAtmosphere.mSceneScale;
+}
+
+float3 RayDirection()
+{
+	return WorldRayDirection();
+}
+
 float3 PlanetCenter()
 {
 	return float3(0, -mAtmosphere.mBottomRadius, 0);
@@ -146,8 +161,8 @@ void GetSkyRadiance(out float3 sky_radiance, out float3 transmittance_to_top)
 	sky_radiance = 0;
 	transmittance_to_top = 1;
 
-	float3 camera = WorldRayOrigin() - PlanetCenter();
-	float3 view_ray = WorldRayDirection();
+	float3 camera = RayOrigin() - PlanetCenter();
+	float3 view_ray = RayDirection();
 	float3 sun_direction = mPerFrame.mSunDirection;
 
 	float r = length(camera);
@@ -227,9 +242,9 @@ float3 GetEnvironmentEmission()
 
 	// Ground (the planet)
 	float2 distance = 0;
-	if (IntersectRaySphere(WorldRayOrigin(), WorldRayDirection(), PlanetCenter(), PlanetRadius(), distance) && distance.x > 0)
+	if (IntersectRaySphere(RayOrigin(), RayDirection(), PlanetCenter(), PlanetRadius(), distance) && distance.x > 0)
 	{
-		float3 hit_position = WorldRayOrigin() + WorldRayDirection() * distance.x;
+		float3 hit_position = RayOrigin() + RayDirection() * distance.x;
 		float3 normal = normalize(hit_position - PlanetCenter());
 
 		float3 kGroundAlbedo = float3(0.0, 0.0, 0.00); // Sea?
@@ -243,8 +258,8 @@ float3 GetEnvironmentEmission()
 		// [TODO] lightshaft
 
 		// Transmittance (merge with GetSkyRadiance()?)
-		float r = length(WorldRayOrigin() - PlanetCenter());
-		float rmu = dot(WorldRayOrigin() - PlanetCenter(), WorldRayDirection());
+		float r = length(RayOrigin() - PlanetCenter());
+		float rmu = dot(RayOrigin() - PlanetCenter(), RayDirection());
 		float mu = rmu / r;
 		float3 transmittance_to_ground = GetTransmittance(r, mu, distance.x, true);
 
@@ -252,7 +267,7 @@ float3 GetEnvironmentEmission()
 	}
 
 	// Sun
-	if (dot(WorldRayDirection(), GetSunDirection()) > cos(mAtmosphere.mSunAngularRadius))
+	if (dot(RayDirection(), GetSunDirection()) > cos(mAtmosphere.mSunAngularRadius))
 	{
 		radiance = radiance + transmittance_to_top * mAtmosphere.mSolarIrradiance;
 	}
@@ -272,7 +287,7 @@ void DefaultMiss(inout RayPayload payload)
 	{
 		default:
 		case BackgroundMode_Color: 					payload.mEmission = payload.mEmission + payload.mAlbedo * mPerFrame.mBackgroundColor.xyz; return;
-		case BackgroundMode_Atmosphere: 			payload.mEmission = payload.mEmission + payload.mAlbedo * AtmosphereScattering(WorldRayOrigin(), WorldRayDirection()); return;
+		case BackgroundMode_Atmosphere: 			payload.mEmission = payload.mEmission + payload.mAlbedo * AtmosphereScattering(RayOrigin(), RayDirection()); return;
 		case BackgroundMode_PrecomputedAtmosphere: 	payload.mEmission = payload.mEmission + payload.mAlbedo * GetEnvironmentEmission(); return;
 	}
 }
@@ -286,14 +301,16 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	// See https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html for more system value intrinsics
 	float3 barycentrics = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y, attribs.barycentrics.x, attribs.barycentrics.y);
 
-	// Get the base index of the triangle's first 16 bit index.
-    uint index_size_in_bytes = 2;
-    uint index_count_per_triangle = 3;
-    uint triangleIndexStride = index_count_per_triangle * index_size_in_bytes;
-    uint base_index = PrimitiveIndex() * triangleIndexStride + InstanceDataBuffer[InstanceID()].mIndexOffset * index_size_in_bytes;
+	bool use_16bit_index = false;
 
-    // Load up 3 16 bit indices for the triangle.
-    const uint3 indices = Load3x16BitIndices(base_index);
+	// Get the base index of the triangle's first 16 or 32 bit index.
+	uint index_size_in_bytes = use_16bit_index ? 2 : 4;
+	uint index_count_per_triangle = 3;
+	uint triangle_index_stride = index_count_per_triangle * index_size_in_bytes;
+	uint base_index = PrimitiveIndex() * triangle_index_stride + InstanceDataBuffer[InstanceID()].mIndexOffset * index_size_in_bytes;
+
+	// Load up 3 16 bit indices for the triangle.
+	uint3 indices = use_16bit_index ? Load3x16BitIndices(base_index) : Load3x32BitIndices(base_index);
 
     // Attributes
     float3 normals[3] = { Normals[indices[0]], Normals[indices[1]], Normals[indices[2]] };

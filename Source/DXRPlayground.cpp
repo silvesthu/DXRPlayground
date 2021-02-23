@@ -13,13 +13,13 @@
 
 static const wchar_t*					kApplicationTitleW = L"DXR Playground";
 
-enum class SCENE_PRESET_TYPE
+enum class ScenePresetType
 {
-	NONE,
+	None,
 
-	CORNELL_BOX,
-	VEACH_MIS,
-	FURNANCE,
+	CornellBox,
+	VeachMIS,
+	Furnance,
 
 	COUNT,
 };
@@ -32,15 +32,15 @@ struct ScenePreset
 	glm::vec4 mCameraDirection;
 };
 
-static ScenePreset kScenePresets[(int)SCENE_PRESET_TYPE::COUNT] =
+static ScenePreset kScenePresets[(int)ScenePresetType::COUNT] =
 {
-	{ "None", nullptr, glm::vec4(0.0f, 1.0f, 3.0f, 0.0f), glm::vec4(0.0f, 0.0f, -1.0f, 0.0f) },
-	{ "CornellBox", "Asset/raytracing-references/cornellbox/cornellbox.obj", glm::vec4(0.0f, 1.0f, 3.0f, 0.0f), glm::vec4(0.0f, 0.0f, -1.0f, 0.0f) },
-	{ "VeachMIS", "Asset/raytracing-references/veach-mis/veach-mis.obj", glm::vec4(0.0f, 1.0f, 13.0f, 0.0f), glm::vec4(0.0f, 0.0f, -1.0f, 0.0f) },
-	{ "Furnance", "Asset/raytracing-references/furnace-light-sampling/furnace-light-sampling.obj", glm::vec4(0.0f, 1.0f, 13.0f, 0.0f), glm::vec4(0.0f, 0.0f, -1.0f, 0.0f) },
+	{ "None",			nullptr,																			glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f) },
+	{ "CornellBox",		"Asset/raytracing-references/cornellbox/cornellbox.obj",							glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f) },
+	{ "VeachMIS",		"Asset/raytracing-references/veach-mis/veach-mis.obj",								glm::vec4(0.0f, 1.0f, 13.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f) },
+	{ "Furnance",		"Asset/raytracing-references/furnace-light-sampling/furnace-light-sampling.obj",	glm::vec4(0.0f, 1.0f, 13.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f) },	
 };
-static SCENE_PRESET_TYPE sCurrentScene = SCENE_PRESET_TYPE::CORNELL_BOX;
-static SCENE_PRESET_TYPE sPreviousScene = SCENE_PRESET_TYPE::CORNELL_BOX;
+static ScenePresetType sCurrentScene = ScenePresetType::CornellBox;
+static ScenePresetType sPreviousScene = ScenePresetType::CornellBox;
 
 static bool sReloadRequested = false;
 
@@ -117,7 +117,7 @@ static void sUpdate()
 		float frame_speed_scale = ImGui::GetIO().DeltaTime / (1.0f / 60.0f);
 		float move_speed = gCameraSettings.mMoveRotateSpeed.x * frame_speed_scale;
 		if (ImGui::GetIO().KeyShift)
-			move_speed *= 2.0f;
+			move_speed *= 5.0f;
 		if (ImGui::GetIO().KeyCtrl)
 			move_speed *= 0.1f;
 
@@ -166,7 +166,7 @@ static void sUpdate()
 				if (ImGui::Button("Reset Camera"))
 				{
 					gPerFrameConstantBuffer.mCameraPosition = kScenePresets[(int)sCurrentScene].mCameraPosition;
-					gPerFrameConstantBuffer.mCameraDirection = kScenePresets[(int)sCurrentScene].mCameraDirection;
+					gPerFrameConstantBuffer.mCameraDirection = glm::normalize(kScenePresets[(int)sCurrentScene].mCameraDirection);
 
 					gCameraSettings.Reset();
 				}
@@ -224,7 +224,7 @@ static void sUpdate()
 
 			if (ImGui::TreeNodeEx("Scene"))
 			{
-				for (int i = 0; i < (int)SCENE_PRESET_TYPE::COUNT; i++)
+				for (int i = 0; i < (int)ScenePresetType::COUNT; i++)
 					ImGui::RadioButton(kScenePresets[i].mName, (int*)&sCurrentScene, i);
 
 				ImGui::TreePop();

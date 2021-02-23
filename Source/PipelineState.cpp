@@ -32,7 +32,7 @@ static IDxcBlob* sCompileShader(const char* inFilename, const char* inSource, gl
 	std::wstring wfilename(filename.begin(), filename.end());
 
 	IDxcOperationResult* operation_result;
-	assert(SUCCEEDED(compiler->Compile(
+	if (FAILED(compiler->Compile(
 		blob_encoding,								// program text
 		wfilename.c_str(),							// file name, mostly for error messages
 		inEntryPoint,								// entry point function
@@ -40,7 +40,8 @@ static IDxcBlob* sCompileShader(const char* inFilename, const char* inSource, gl
 		nullptr, 0,									// compilation arguments and their count
 		nullptr, 0,									// name/value defines and their count
 		include_handler.Get(),						// handler for #include directives
-		&operation_result)));
+		&operation_result)))
+		assert(false);
 
 	HRESULT compile_result;
 	gValidate(operation_result->GetStatus(&compile_result));
@@ -175,7 +176,8 @@ ComPtr<ID3D12RootSignature> CreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC 
 		return nullptr;
 	}
 	ComPtr<ID3D12RootSignature> root_signature;
-	assert(SUCCEEDED(gDevice->CreateRootSignature(0, signature_blob->GetBufferPointer(), signature_blob->GetBufferSize(), IID_PPV_ARGS(&root_signature))));
+	if (FAILED(gDevice->CreateRootSignature(0, signature_blob->GetBufferPointer(), signature_blob->GetBufferSize(), IID_PPV_ARGS(&root_signature))))
+		assert(false);
 	return root_signature;
 }
 
