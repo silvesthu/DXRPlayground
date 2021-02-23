@@ -33,6 +33,7 @@ ShaderType::PerFrame				gPerFrameConstantBuffer = {};
 
 // Capture
 Texture*							gDumpTexture = nullptr;
+Texture								gDumpTextureProxy = {};
 
 void Shader::InitializeDescriptors(const std::vector<Shader::DescriptorEntry>& inEntries)
 {

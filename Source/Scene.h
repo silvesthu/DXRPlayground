@@ -124,7 +124,7 @@ public:
 	using VertexType = glm::vec3;
 	using NormalType = glm::vec3;
 
-	void Load(const char* inFilename);
+	void Load(const char* inFilename, const glm::mat4x4& inTransform);
 	void Unload();
 
 	void Build(ID3D12GraphicsCommandList4* inCommandList);

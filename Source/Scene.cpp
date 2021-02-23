@@ -156,7 +156,8 @@ void TLAS::UpdateObjectInstances()
 		mInstanceDescsPointer[instance_index].InstanceID = instance_index; // This value will be exposed to the shader via InstanceID()
 		mInstanceDescsPointer[instance_index].InstanceContributionToHitGroupIndex = object_instance->GetHitGroupIndex(); // Match shader table
 		mInstanceDescsPointer[instance_index].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
-		memcpy(mInstanceDescsPointer[instance_index].Transform, &object_instance->Transform(), sizeof(mInstanceDescsPointer[instance_index].Transform));
+		glm::mat4x4 transform = glm::transpose(object_instance->Transform());
+		memcpy(mInstanceDescsPointer[instance_index].Transform, &transform, sizeof(mInstanceDescsPointer[instance_index].Transform));
 		mInstanceDescsPointer[instance_index].AccelerationStructure = object_instance->GetBLAS()->GetGPUVirtualAddress();
 		mInstanceDescsPointer[instance_index].InstanceMask = 0xFF;
 
@@ -166,7 +167,7 @@ void TLAS::UpdateObjectInstances()
 	}
 }
 
-void Scene::Load(const char* inFilename)
+void Scene::Load(const char* inFilename, const glm::mat4x4& inTransform)
 {
 	std::vector<ObjectInstanceRef> object_instances;
 	std::vector<IndexType> indices;
@@ -236,7 +237,7 @@ void Scene::Load(const char* inFilename)
 
 			std::wstring name(shape.name.begin(), shape.name.end());
 			BLASRef blas = std::make_shared<BLAS>(std::make_shared<Primitive>(vertex_offset, vertex_count, index_offset, index_count), name);
-			ObjectInstanceRef object_instance = std::make_shared<ObjectInstance>(blas, glm::mat4(1), kDefaultHitGroupIndex);
+			ObjectInstanceRef object_instance = std::make_shared<ObjectInstance>(blas, inTransform, kDefaultHitGroupIndex);
 			object_instances.push_back(object_instance);
 
 			if (shape.mesh.material_ids.size() > 0)

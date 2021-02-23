@@ -227,7 +227,7 @@ struct AtmosphereProfile
 	glm::vec3 mRuntimeGroundAlbedo						= glm::vec3(0.0f, 0.0f, 0.04f);
 
 	// Unit
-	float mSceneScale									= 1.0;
+	bool mSceneInKilometer								= true; // Meter otherwise
 
 	// Default
 	AtmosphereProfile()

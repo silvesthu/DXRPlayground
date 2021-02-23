@@ -135,6 +135,7 @@ extern glm::uint32							gFrameIndex;
 extern glm::float32							gTime;
 
 extern Texture*								gDumpTexture;
+extern Texture								gDumpTextureProxy;
 
 enum class DebugMode : glm::uint32
 {

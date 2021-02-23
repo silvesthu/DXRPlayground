@@ -114,6 +114,10 @@ void DefaultRayGeneration()
 		ray.Direction = payload.mReflectionDirection;
 	}
 
+	// [Debug]
+	// payload.mEmission = RemoveSRGBCurve(payload.mEmission);
+	// payload.mEmission = (uint3)(RemoveSRGBCurve(payload.mEmission) * 255.0) / 255.0;
+
 	float3 current_frame_color = payload.mEmission;
 	float3 previous_frame_color = RaytracingOutput[DispatchRaysIndex().xy].xyz;
 	previous_frame_color = max(0, previous_frame_color); // Eliminate nan
@@ -286,14 +290,12 @@ float GetSunVisibility(float3 position)
 	float3 sun_direction = GetSunDirection();
 
 	// [TODO]
-
 	return 1.0;
 }
 
 float3 GetSkyVisibility(float3 position)
 {
 	// [TODO]
-
 	return 1.0;
 }
 
@@ -327,11 +329,6 @@ float3 GetEnvironmentEmission()
 		float mu = rmu / r;
 		float3 transmittance_to_ground = GetTransmittance(r, mu, distance.x, true);
 
-		if (mAtmosphere.mAerialPerspective == 0)
-			radiance = ground_radiance;
-		else
-			radiance = radiance + transmittance_to_ground * ground_radiance;
-
 		// Debug - Global
 		if (mPerFrame.mDebugMode != DebugMode_None && mPerFrame.mDebugMode != DebugMode_RecursionCount)
 		{
@@ -350,6 +347,12 @@ float3 GetEnvironmentEmission()
 				break;
 			}
 		}
+
+		// Blend
+		if (mAtmosphere.mAerialPerspective == 0)
+			radiance = ground_radiance;
+		else
+			radiance = radiance + transmittance_to_ground * ground_radiance;
 	}
 
 	// Sun
@@ -424,7 +427,9 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	float3 raw_hit_position = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
 	hit_info.mPosition = raw_hit_position + normal * 0.001;
 
-	GetSkyRadianceToPoint(hit_info.mInScattering, hit_info.mTransmittance);
+	float3 sky_radiance = 0;
+	float3 transmittance = 0;
+	GetSkyRadianceToPoint(sky_radiance, transmittance);
 
     // Debug - Global
 	if (mPerFrame.mDebugMode != DebugMode_None && mPerFrame.mDebugMode != DebugMode_RecursionCount)
@@ -438,8 +443,8 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	    	case DebugMode_Reflectance: 			hit_info.mEmission = InstanceDataBuffer[InstanceID()].mReflectance; break;
 	    	case DebugMode_Emission: 				hit_info.mEmission = InstanceDataBuffer[InstanceID()].mEmission; break;
 	    	case DebugMode_Roughness: 				hit_info.mEmission = InstanceDataBuffer[InstanceID()].mRoughness; break;
-			case DebugMode_Transmittance:			hit_info.mEmission = hit_info.mTransmittance; break;
-			case DebugMode_InScattering:			hit_info.mEmission = hit_info.mInScattering; break;
+			case DebugMode_Transmittance:			hit_info.mEmission = transmittance; break;
+			case DebugMode_InScattering:			hit_info.mEmission = sky_radiance; break;
 	    	default:
 	    		break;
 	    }
@@ -500,6 +505,15 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 		
 		hit_info.mAlbedo = InstanceDataBuffer[InstanceID()].mAlbedo;
 		hit_info.mEmission = InstanceDataBuffer[InstanceID()].mEmission;
+	}
+
+	// Participating Media
+	{
+		// [TODO]
+		float3 white_point = float3(1, 1, 1);
+		float exposure = 10.0;
+		hit_info.mInScattering = 1 - exp(-sky_radiance / white_point * exposure);
+		hit_info.mTransmittance = transmittance;
 	}
 
 	return hit_info;

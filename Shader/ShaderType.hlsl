@@ -12,7 +12,7 @@ struct PerFrame
 	
 	BackgroundMode			mBackgroundMode			CONSTANT_DEFAULT(BackgroundMode::PrecomputedAtmosphere);
 	float					mSunAzimuth				CONSTANT_DEFAULT(0);
-	float					mSunZenith				CONSTANT_DEFAULT(MATH_PI / 2.0f);
+	float					mSunZenith				CONSTANT_DEFAULT(MATH_PI / 4.0f);
 	float					mPadding;
 
 	float4					mSunDirection			CONSTANT_DEFAULT(float4(1.0f, 0.0f, 0.0f, 0.0f));

@@ -17,7 +17,7 @@ void PrecomputedAtmosphereScattering::Update()
 	atmosphere->mBottomRadius						= UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.BottomRadius());
 	atmosphere->mTopRadius							= UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.TopRadius());
 
-	atmosphere->mSceneScale							= gAtmosphereProfile.mSceneScale;
+	atmosphere->mSceneScale							= gAtmosphereProfile.mSceneInKilometer ? 1.0f : 0.001f;
 
 	atmosphere->mSolarIrradiance					= gAtmosphereProfile.mSolarIrradiance;
 	atmosphere->mSunAngularRadius					= static_cast<float>(gAtmosphereProfile.kSunAngularRadius);
@@ -204,16 +204,17 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 		for (int i = 0; i < (int)BackgroundMode::Count; i++)
 		{
 			const auto& name = nameof::nameof_enum((BackgroundMode)i);
-
 			if (i != 0)
-				ImGui::SameLine();
-			
+				ImGui::SameLine();			
 			if (ImGui::RadioButton(name.data(), (int)gPerFrameConstantBuffer.mBackgroundMode == i))
 				gPerFrameConstantBuffer.mBackgroundMode = (BackgroundMode)i;
 		}
 
 		if (gPerFrameConstantBuffer.mBackgroundMode == BackgroundMode::Color)
 			ImGui::ColorEdit3("Color", (float*)&gPerFrameConstantBuffer.mBackgroundColor, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
+
+		ImGui::Checkbox("Scene Unit: Kilometer : Meter", &gAtmosphereProfile.mSceneInKilometer);
+		ImGui::Checkbox("Aerial Perspective", &gAtmosphereProfile.mAerialPerspective);
 
 		ImGui::TreePop();
 	}
@@ -229,16 +230,6 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 		if (ImGui::SmallButton("Bruneton08Impl")) AtmosphereProfile::SolarIrradianceReference::Bruneton08Impl(gAtmosphereProfile);
 		ImGui::SameLine(); 
 		if (ImGui::SmallButton("Bruneton08ImplConstant")) AtmosphereProfile::SolarIrradianceReference::Bruneton08ImplConstant(gAtmosphereProfile);
-
-		ImGui::TreePop();
-	}
-	
-	if (ImGui::TreeNodeEx("Unit", ImGuiTreeNodeFlags_DefaultOpen))
-	{
-		ImGui::PushItemWidth(100); ImGui::SliderFloat("Scene Unit", &gAtmosphereProfile.mSceneScale, 0.0f, 1.0f); ImGui::PopItemWidth();
-		if (ImGui::SmallButton("km")) gAtmosphereProfile.mSceneScale = 1.0f;
-		ImGui::SameLine(); 
-		if (ImGui::SmallButton("m")) gAtmosphereProfile.mSceneScale = 0.001f;
 
 		ImGui::TreePop();
 	}
@@ -261,8 +252,6 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 	{
 		ImGui::ColorEdit3("Albedo (Precomputed)", &gAtmosphereProfile.mGroundAlbedo[0], ImGuiColorEditFlags_Float);
 		ImGui::ColorEdit3("Albedo (Runtime)", &gAtmosphereProfile.mRuntimeGroundAlbedo[0], ImGuiColorEditFlags_Float);
-
-		ImGui::Checkbox("Aerial Perspective", &gAtmosphereProfile.mAerialPerspective);
 
 		ImGui::TreePop();
 	}

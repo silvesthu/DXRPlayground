@@ -21,6 +21,8 @@ enum class ScenePresetType
 	VeachMIS,
 	Furnance,
 
+	PrecomputedAtmosphere,
+
 	COUNT,
 };
 
@@ -30,17 +32,19 @@ struct ScenePreset
 	const char* mPath;
 	glm::vec4 mCameraPosition;
 	glm::vec4 mCameraDirection;
+	glm::mat4x4 mTransform;
 };
 
 static ScenePreset kScenePresets[(int)ScenePresetType::COUNT] =
 {
-	{ "None",			nullptr,																			glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f) },
-	{ "CornellBox",		"Asset/raytracing-references/cornellbox/cornellbox.obj",							glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f) },
-	{ "VeachMIS",		"Asset/raytracing-references/veach-mis/veach-mis.obj",								glm::vec4(0.0f, 1.0f, 13.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f) },
-	{ "Furnance",		"Asset/raytracing-references/furnace-light-sampling/furnace-light-sampling.obj",	glm::vec4(0.0f, 1.0f, 13.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f) },	
+	{ "None",					nullptr,																			glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		glm::mat4x4(1.0f) },
+	{ "CornellBox",				"Asset/raytracing-references/cornellbox/cornellbox.obj",							glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		glm::mat4x4(1.0f) },
+	{ "VeachMIS",				"Asset/raytracing-references/veach-mis/veach-mis.obj",								glm::vec4(0.0f, 1.0f, 13.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		glm::mat4x4(1.0f) },
+	{ "Furnance",				"Asset/raytracing-references/furnace-light-sampling/furnace-light-sampling.obj",	glm::vec4(0.0f, 1.0f, 13.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		glm::mat4x4(1.0f) },
+	{ "PrecomputedAtmosphere",	"Asset/primitives/sphere.obj",														glm::vec4(0.0f, 0.0f, 9.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		glm::translate(glm::vec3(0.0f, 1.0f, 0.0f)) },
 };
-static ScenePresetType sCurrentScene = ScenePresetType::CornellBox;
-static ScenePresetType sPreviousScene = ScenePresetType::CornellBox;
+static ScenePresetType sCurrentScene = ScenePresetType::PrecomputedAtmosphere;
+static ScenePresetType sPreviousScene = ScenePresetType::PrecomputedAtmosphere;
 
 static bool sReloadRequested = false;
 
@@ -173,8 +177,17 @@ static void sUpdate()
 
 				ImGui::SameLine();
 
-				if (ImGui::Button("Reload shader") || ImGui::IsKeyPressed(VK_F5))
+				if (ImGui::Button("Reload Shader") || ImGui::IsKeyPressed(VK_F5))
 					sReloadRequested = true;
+
+				ImGui::SameLine();
+
+				if (ImGui::Button("Dump Texture") || ImGui::IsKeyPressed(VK_F6))
+				{
+					gDumpTextureProxy.mResource = gScene.GetOutputResource();
+					gDumpTextureProxy.mName = "Output";
+					gDumpTexture = &gDumpTextureProxy;
+				}
 			}
 
 			if (ImGui::TreeNodeEx("Render"))
@@ -311,7 +324,7 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 	ImGui_ImplDX12_CreateDeviceObjects();
 
 	// Create Scene
-	gScene.Load(kScenePresets[(int)sCurrentScene].mPath);
+	gScene.Load(kScenePresets[(int)sCurrentScene].mPath, kScenePresets[(int)sCurrentScene].mTransform);
 	gScene.Build(gCommandList);
 	gPerFrameConstantBuffer.mCameraPosition = kScenePresets[(int)sCurrentScene].mCameraPosition;
 	gPerFrameConstantBuffer.mCameraDirection = kScenePresets[(int)sCurrentScene].mCameraDirection;
@@ -412,7 +425,7 @@ void sRender()
 			sWaitForIdle();
 
 			gScene.Unload();
-			gScene.Load(kScenePresets[(int)sCurrentScene].mPath);
+			gScene.Load(kScenePresets[(int)sCurrentScene].mPath, kScenePresets[(int)sCurrentScene].mTransform);
 			gScene.Build(gCommandList);
 
 			gPerFrameConstantBuffer.mCameraPosition = kScenePresets[(int)sCurrentScene].mCameraPosition;
@@ -426,7 +439,7 @@ void sRender()
 	{
 		{
 			gPerFrameConstantBuffer.mSunDirection = 
-				glm::vec4(0,1,0,0) * glm::rotate(gPerFrameConstantBuffer.mSunZenith, glm::vec3(0, 0, 1)) * glm::rotate(gPerFrameConstantBuffer.mSunAzimuth, glm::vec3(0, 1, 0));
+				glm::vec4(0,1,0,0) * glm::rotate(gPerFrameConstantBuffer.mSunZenith, glm::vec3(0, 0, 1)) * glm::rotate(gPerFrameConstantBuffer.mSunAzimuth + glm::pi<float>() / 2.0f, glm::vec3(0, 1, 0));
 		}
 
 		// Accumulation reset check
@@ -517,8 +530,12 @@ void sRender()
 	{
 		if (gDumpTexture != nullptr && gDumpTexture->mResource != nullptr)
 		{
+			D3D12_RESOURCE_STATES resource_state = D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
+			if (gScene.GetOutputResource() == gDumpTexture->mResource.Get())
+				resource_state = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+
 			DirectX::ScratchImage image;
-			DirectX::CaptureTexture(gCommandQueue, gDumpTexture->mResource.Get(), false, image, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE);
+			DirectX::CaptureTexture(gCommandQueue, gDumpTexture->mResource.Get(), false, image, resource_state, resource_state);
 
 			std::wstring directory = L"TextureDump/";
 			std::filesystem::create_directory(directory);
