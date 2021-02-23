@@ -21,9 +21,11 @@ enum class ScenePresetType
 	CornellBox,
 	VeachMIS,
 	Furnance,
-
 	PrecomputedAtmosphere,
 	PrecomputedAtmosphere_Artifact_Mu,
+
+	// Extra (not in git repository)
+	Rungholt,
 
 	Debug,
 
@@ -47,6 +49,9 @@ static ScenePreset kScenePresets[(int)ScenePresetType::COUNT] =
 	{ "Furnance",								"Asset/raytracing-references/furnace-light-sampling/furnace-light-sampling.obj",	glm::vec4(0.0f, 1.0f, 13.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		glm::mat4x4(1.0f) },
 	{ "PrecomputedAtmosphere",					"Asset/primitives/sphere.obj",														glm::vec4(0.0f, 0.0f, 9.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		glm::translate(glm::vec3(0.0f, 1.0f, 0.0f)) },
 	{ "PrecomputedAtmosphere_Artifact_Mu",		"Asset/primitives/sphere.obj",														glm::vec4(0.0f, 80.0f, 150.0f, 0.0f),		glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		glm::scale(glm::vec3(100.0f, 100.0f, 100.0f)) },
+
+	{ "Rungholt",								"Asset/extra/rungholt/rungholt.obj",												glm::vec4(-234.0f, 88.0f, 98.0f, 0.0f),		glm::vec4(0.88f, -0.15f, -0.45f, 0.0f), glm::mat4x4(1.0f) },
+
 	{ "Debug",									"Asset/primitives/sphere.obj",														glm::vec4(0.0f, 0.0f, 9.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		glm::translate(glm::vec3(0.0f, 1.0f, 0.0f)) },
 };
 static ScenePresetType sCurrentScene = ScenePresetType::Debug;
@@ -245,7 +250,10 @@ static void sUpdate()
 			if (ImGui::TreeNodeEx("Scene"))
 			{
 				for (int i = 0; i < (int)ScenePresetType::COUNT; i++)
-					ImGui::RadioButton(kScenePresets[i].mName, (int*)&sCurrentScene, i);
+				{
+					if (kScenePresets[i].mPath == nullptr || std::filesystem::exists(kScenePresets[i].mPath))
+						ImGui::RadioButton(kScenePresets[i].mName, (int*)&sCurrentScene, i);
+				}
 
 				ImGui::TreePop();
 			}

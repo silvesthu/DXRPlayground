@@ -176,7 +176,7 @@ void Scene::Load(const char* inFilename, const glm::mat4x4& inTransform)
 	std::vector<NormalType> normals;
 
 	tinyobj::ObjReader reader;
-	if (inFilename == nullptr)
+	if (inFilename == nullptr || !std::filesystem::exists(inFilename))
 	{
 		// Dummy scene
 		indices.push_back(0);
