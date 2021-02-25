@@ -96,14 +96,14 @@
     </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Shader\Generated\Enum.hlsl">
+    <CopyFileToFolders Include="Shader\Generated\Enum.hlsl">
       <FileType>Document</FileType>
-    </None>
+    </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Shader\PrecomputedAtmosphere.hlsl">
+    <CopyFileToFolders Include="Shader\PrecomputedAtmosphere.hlsl">
       <FileType>Document</FileType>
-    </None>
+    </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
     <None Include="Shader\Cloud.hlsl">

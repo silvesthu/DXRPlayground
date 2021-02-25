@@ -12,7 +12,7 @@ void Cloud::Update()
 {
 	ShaderType::Cloud* cloud = static_cast<ShaderType::Cloud*>(gCloudResources.mConstantUploadBufferPointer);
 
-	cloud->mMode = static_cast<glm::uint32>(gCloudProfile.mMode);
+	cloud->mMode = gCloudProfile.mMode;
 }
 
 

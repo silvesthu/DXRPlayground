@@ -61,16 +61,20 @@ static bool sReloadRequested = false;
 
 struct CameraSettings
 {
-	glm::vec2		mMoveRotateSpeed;
-	float			mHorizontalFovDegree;
+	glm::vec2		mMoveRotateSpeed = glm::vec2(0.1f, 0.01f);
+	float			mHorizontalFovDegree = 90.0f;
 
-	CameraSettings() { Reset(); }
-
-	void Reset()
+	struct ExposureControl
 	{
-		mMoveRotateSpeed = glm::vec2(0.1f, 0.01f);
-		mHorizontalFovDegree = 90.0f;
-	}
+		// Sunny 16 rule
+		float			mAperture = 16.0;						// N, f-stops
+		float			mInvShutterSpeed = 100.0;				// t, seconds
+		float			mSensitivity = 100.0f;					// S, ISO
+	};
+	ExposureControl mExposureControl;
+
+	void			ResetTransform()	{ mHorizontalFovDegree = CameraSettings().mHorizontalFovDegree; }
+	void			ResetExposure()		{ mExposureControl = ExposureControl(); }
 };
 CameraSettings		gCameraSettings = {};
 
@@ -179,12 +183,12 @@ static void sUpdate()
 				gDisplaySettings.mRenderResolution.y);
 
 			{
-				if (ImGui::Button("Reset Camera"))
+				if (ImGui::Button("Reset Camera Transform"))
 				{
 					gPerFrameConstantBuffer.mCameraPosition = kScenePresets[(int)sCurrentScene].mCameraPosition;
 					gPerFrameConstantBuffer.mCameraDirection = glm::normalize(kScenePresets[(int)sCurrentScene].mCameraDirection);
 
-					gCameraSettings.Reset();
+					gCameraSettings.ResetTransform();
 				}
 
 				ImGui::SameLine();
@@ -192,14 +196,66 @@ static void sUpdate()
 				if (ImGui::Button("Reload Shader") || ImGui::IsKeyPressed(VK_F5))
 					sReloadRequested = true;
 
-				ImGui::SameLine();
-
-				if (ImGui::Button("Dump Texture") || ImGui::IsKeyPressed(VK_F6))
+				if (ImGui::Button("Dump Output") || ImGui::IsKeyPressed(VK_F6))
 				{
 					gDumpTextureProxy.mResource = gScene.GetOutputResource();
 					gDumpTextureProxy.mName = "Output";
 					gDumpTexture = &gDumpTextureProxy;
 				}
+
+				ImGui::SameLine();
+
+				ImGui::CheckboxFlags("Output Luminance", &gPerFrameConstantBuffer.mOutputLuminance, 0x1);
+			}
+
+			// Always update
+			gPerFrameConstantBuffer.mEV100 = glm::log2((gCameraSettings.mExposureControl.mAperture * gCameraSettings.mExposureControl.mAperture) / (1.0f / gCameraSettings.mExposureControl.mInvShutterSpeed) * 100.0f / gCameraSettings.mExposureControl.mSensitivity);
+			if (ImGui::TreeNodeEx("Camera"))
+			{
+				auto s = [](float pivot = ImGui::GetCursorPosX()) { ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.65f - (ImGui::GetCursorPosX() - pivot)); };
+	
+				ImGui::InputFloat3("Position", (float*)&gPerFrameConstantBuffer.mCameraPosition);
+				ImGui::InputFloat3("Direction", (float*)&gPerFrameConstantBuffer.mCameraDirection);
+				ImGui::SliderFloat("Horz Fov", (float*)&gCameraSettings.mHorizontalFovDegree, 30.0f, 160.0f);
+
+				ImGui::PushID("Aperture");
+				{
+					float x = ImGui::GetCursorPosX();
+
+					if (ImGui::Button("<")) { gCameraSettings.mExposureControl.mAperture /= glm::sqrt(2.0f); }
+					ImGui::SameLine();
+					if (ImGui::Button(">")) { gCameraSettings.mExposureControl.mAperture *= glm::sqrt(2.0f); }
+					ImGui::SameLine();
+					s(x); ImGui::SliderFloat("Aperture (f/_)", &gCameraSettings.mExposureControl.mAperture, 1.0f, 22.0f);
+				}
+				ImGui::PopID();
+				ImGui::PushID("Shutter Speed");
+				{
+					float x = ImGui::GetCursorPosX();
+
+					if (ImGui::Button("<")) { gCameraSettings.mExposureControl.mInvShutterSpeed /= 2.0f; }
+					ImGui::SameLine();
+					if (ImGui::Button(">")) { gCameraSettings.mExposureControl.mInvShutterSpeed *= 2.0f; }
+					ImGui::SameLine();
+					s(x); ImGui::SliderFloat("Shutter Speed (1/_ sec)", &gCameraSettings.mExposureControl.mInvShutterSpeed, 1.0f, 500.0f);
+				}
+				ImGui::PopID();
+				s(); ImGui::SliderFloat("ISO", &gCameraSettings.mExposureControl.mSensitivity, 100.0f, 1000.0f);
+
+				if (ImGui::SmallButton("Reset Exposure"))
+					gCameraSettings.ResetExposure();
+				ImGui::SameLine();
+				ImGui::Text("EV100 = %.2f", gPerFrameConstantBuffer.mEV100);
+
+				ImGui::Text("Tonemap");
+				for (int i = 0; i < (int)TonemapMode::Count; i++)
+				{
+					const auto& name = nameof::nameof_enum((TonemapMode)i);
+					ImGui::SameLine();
+					ImGui::RadioButton(name.data(), (int*)&gPerFrameConstantBuffer.mTonemapMode, i);
+				}
+
+				ImGui::TreePop();
 			}
 
 			if (ImGui::TreeNodeEx("Render"))
@@ -267,15 +323,6 @@ static void sUpdate()
 			if (ImGui::TreeNodeEx("Cloud", ImGuiTreeNodeFlags_DefaultOpen))
 			{
 				gCloud.UpdateImGui();
-				ImGui::TreePop();
-			}
-
-			if (ImGui::TreeNodeEx("Camera"))
-			{
-				ImGui::InputFloat3("Position", (float*)&gPerFrameConstantBuffer.mCameraPosition);
-				ImGui::InputFloat3("Direction", (float*)&gPerFrameConstantBuffer.mCameraDirection);
-				ImGui::SliderFloat("Horz Fov", (float*)&gCameraSettings.mHorizontalFovDegree, 30.0f, 160.0f);
-
 				ImGui::TreePop();
 			}
 
@@ -484,9 +531,9 @@ void sRender()
 		
 		memcpy(frameCtxt->mConstantUploadBufferPointer, &gPerFrameConstantBuffer, sizeof(gPerFrameConstantBuffer));
 
-		gBarrierTransition(gCommandList, gConstantGPUBuffer.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
+		gBarrierTransition(gCommandList, gConstantGPUBuffer.Get(), D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, D3D12_RESOURCE_STATE_COPY_DEST);
 		gCommandList->CopyResource(gConstantGPUBuffer.Get(), frameCtxt->mConstantUploadBuffer);
-		gBarrierTransition(gCommandList, gConstantGPUBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE);
+		gBarrierTransition(gCommandList, gConstantGPUBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 	}
 
 	// Atmosphere
@@ -701,7 +748,7 @@ static bool sCreateDeviceD3D(HWND hWnd)
 			D3D12_RESOURCE_DESC resource_desc = gGetBufferResourceDesc(gAlignUp((UINT)sizeof(ShaderType::PerFrame), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
 			D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
 
-			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&gConstantGPUBuffer)));
+			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, nullptr, IID_PPV_ARGS(&gConstantGPUBuffer)));
 			std::wstring name = L"Constant_GPU";
 			gConstantGPUBuffer->SetName(name.c_str());
 		}

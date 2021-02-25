@@ -87,12 +87,7 @@ float3 in_scatter( float3 o, float3 dir, float2 e, float3 l )
 		sum_ray * mAtmosphere.mSolarIrradiance * mAtmosphere.mRayleighScattering * RayleighPhaseFunction( c ) +
 	 	sum_mie * mAtmosphere.mSolarIrradiance * mAtmosphere.mMieScattering * MiePhaseFunction( mAtmosphere.mMiePhaseFunctionG, c );
 
-	// [TODO]
-	float3 white_point = float3(1, 1, 1);
-	float exposure = 10.0;
-	return 1 - exp(-scatter / white_point * exposure);
-
-	// return 10.0 * scatter;
+	return RadianceToLuminance(scatter);
 }
 
 float3 RaymarchAtmosphereScattering(float3 inPosition, float3 inDirection)

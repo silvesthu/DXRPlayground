@@ -34,7 +34,7 @@ ShaderType::PerFrame				gPerFrameConstantBuffer = {};
 Texture*							gDumpTexture = nullptr;
 Texture								gDumpTextureProxy = {};
 
-void Shader::InitializeDescriptors(const std::vector<Shader::DescriptorEntry>& inEntries)
+void Shader::InitializeDescriptors(const std::vector<ID3D12Resource*>& inEntries)
 {
 	// Check if root signature is supported
 	const D3D12_ROOT_SIGNATURE_DESC* root_signature_desc = mData.mRootSignatureDeserializer->GetRootSignatureDesc();
@@ -71,7 +71,7 @@ void Shader::InitializeDescriptors(const std::vector<Shader::DescriptorEntry>& i
 				{
 					D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
 					desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-					if (inEntries[entry_index].mResource->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D)
+					if (inEntries[entry_index]->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D)
 					{
 						desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 						desc.Texture2D.MipLevels = (UINT)-1;
@@ -83,7 +83,7 @@ void Shader::InitializeDescriptors(const std::vector<Shader::DescriptorEntry>& i
 						desc.Texture3D.MipLevels = (UINT)-1;
 						desc.Texture3D.MostDetailedMip = 0;
 					}
-					gDevice->CreateShaderResourceView(inEntries[entry_index].mResource, &desc, handle);
+					gDevice->CreateShaderResourceView(inEntries[entry_index], &desc, handle);
 
 					entry_index++;
 					handle.ptr += increment_size;
@@ -95,7 +95,7 @@ void Shader::InitializeDescriptors(const std::vector<Shader::DescriptorEntry>& i
 				for (UINT j = 0; j < range.NumDescriptors; j++)
 				{
 					D3D12_UNORDERED_ACCESS_VIEW_DESC desc = {};
-					if (inEntries[entry_index].mResource->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D)
+					if (inEntries[entry_index]->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D)
 					{
 						desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
 						desc.Texture2D.MipSlice = 0;
@@ -106,9 +106,9 @@ void Shader::InitializeDescriptors(const std::vector<Shader::DescriptorEntry>& i
 						desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE3D;
 						desc.Texture3D.MipSlice = 0;
 						desc.Texture3D.FirstWSlice = 0;
-						desc.Texture3D.WSize = inEntries[entry_index].mResource->GetDesc().DepthOrArraySize;
+						desc.Texture3D.WSize = inEntries[entry_index]->GetDesc().DepthOrArraySize;
 					}
-					gDevice->CreateUnorderedAccessView(inEntries[entry_index].mResource, nullptr, &desc, handle);
+					gDevice->CreateUnorderedAccessView(inEntries[entry_index], nullptr, &desc, handle);
 
 					entry_index++;
 					handle.ptr += increment_size;
@@ -120,8 +120,8 @@ void Shader::InitializeDescriptors(const std::vector<Shader::DescriptorEntry>& i
 				for (UINT j = 0; j < range.NumDescriptors; j++)
 				{
 					D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
-					desc.SizeInBytes = gAlignUp((UINT)sizeof(ShaderType::Atmosphere), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
-					desc.BufferLocation = inEntries[entry_index].mAddress;
+					desc.SizeInBytes = (UINT)inEntries[entry_index]->GetDesc().Width;
+					desc.BufferLocation = inEntries[entry_index]->GetGPUVirtualAddress();
 					gDevice->CreateConstantBufferView(&desc, handle);
 
 					entry_index++;

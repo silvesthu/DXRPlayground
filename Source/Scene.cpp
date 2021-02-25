@@ -377,6 +377,7 @@ void Scene::CreateShaderResource()
 	{
 		gCompositeShader.InitializeDescriptors(
 		{
+			gConstantGPUBuffer.Get(),
 			mOutputResource.Get()
 		});
 	}

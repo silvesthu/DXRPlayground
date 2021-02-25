@@ -16,26 +16,6 @@
 // [Hillaire20] A Scalable and Production Ready Sky and Atmosphere Rendering Technique https://sebh.github.io/publications/egsr2020.pdf
 // [Epic20] SkyAtmosphere.usf SkyAtmosphereComponent.cpp https://docs.unrealengine.com/en-US/BuildingWorlds/FogEffects/SkyAtmosphere/index.html
 
-enum class AtmosphereMode
-{
-	ConstantColor = 0,
-
-	RaymarchAtmosphereOnly,
-	PrecomputedAtmosphere,
-
-	Count
-};
-
-enum class AtmosphereMuSEncodingMode
-{
-	Bruneton17 = 0,
-	Bruneton08,
-	Elek09,
-	Yusov13,
-
-	Count
-};
-
 struct AtmosphereProfile
 {
 	// Config
@@ -160,11 +140,15 @@ struct AtmosphereProfile
 
 			profile.mMieScatteringCoefficient = glm::dvec3(20.0, 20.0, 20.0) * 1e-6;
 			profile.mMieExtinctionCoefficient = profile.mMieScatteringCoefficient / 0.9;
+
+			profile.mMiePhaseFunctionG = 0.76;
 		}
 
 		static void Yusov13(AtmosphereProfile& profile)
 		{
 			Bruneton08(profile);
+
+			profile.mMiePhaseFunctionG = 0.76;
 		}
 	};
 	ShaderType::DensityProfile mMieDensityProfile		= {}; // km
@@ -241,9 +225,6 @@ struct AtmosphereProfile
 	// https://sciencing.com/calculate-angular-diameter-sun-8592633.html
 	// Angular Radius = Angular Diameter / 2.0 = arctan(Sun radius / Sun-Earth distance)
 	double kSunAngularRadius							= 0.00935f / 2.0f; // Radian, from [Bruneton17] demo.cc
-
-	// https://en.wikipedia.org/wiki/Luminous_efficacy
-	double kMaxLuminousEfficacy							= 683.0; // lm/W
 
 	// Encoding Config
 	AtmosphereMuSEncodingMode mMuSEncodingMode			= AtmosphereMuSEncodingMode::Bruneton17;

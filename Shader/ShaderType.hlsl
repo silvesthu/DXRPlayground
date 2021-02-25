@@ -8,6 +8,11 @@ struct PerFrame
 	float4					mCameraDirection		CONSTANT_DEFAULT(float4(0.0f, 0.0f, 1.0f, 0.0f));
 	float4					mCameraRightExtend		CONSTANT_DEFAULT(float4(1.0f, 0.0f, 0.0f, 0.0f));
 	float4					mCameraUpExtend			CONSTANT_DEFAULT(float4(0.0f, 1.0f, 0.0f, 0.0f));
+
+	uint					mOutputLuminance		CONSTANT_DEFAULT(0);
+	float					mEV100					CONSTANT_DEFAULT(16.0f);
+	TonemapMode				mTonemapMode			CONSTANT_DEFAULT(TonemapMode::knarkowicz);
+	float					_0						CONSTANT_DEFAULT(0.0f);
 	
 	float					mPadding				CONSTANT_DEFAULT(0);
 	float					mSunAzimuth				CONSTANT_DEFAULT(0);
@@ -19,7 +24,7 @@ struct PerFrame
 	DebugMode				mDebugMode				CONSTANT_DEFAULT(DebugMode::None);
 	DebugInstanceMode		mDebugInstanceMode		CONSTANT_DEFAULT(DebugInstanceMode::None);
 	uint					mDebugInstanceIndex		CONSTANT_DEFAULT(0);
-	uint					_mDummy					CONSTANT_DEFAULT(0);
+	uint					_1						CONSTANT_DEFAULT(0);
 
 	uint					mRecursionCountMax		CONSTANT_DEFAULT(sRecursionCountMax);
 	uint					mFrameIndex				CONSTANT_DEFAULT(0);
@@ -27,6 +32,7 @@ struct PerFrame
 	uint					mReset					CONSTANT_DEFAULT(0);
 
 	uint2					mDebugCoord				CONSTANT_DEFAULT(uint2(0, 0));
+	uint2					_2						CONSTANT_DEFAULT(uint2(0, 0));
 };
 
 struct InstanceData
@@ -116,45 +122,45 @@ float GetProfileDensity(DensityProfile profile, float altitude)
 
 struct Atmosphere
 {
-	float					mBottomRadius			CONSTANT_DEFAULT(0);
-	float					mTopRadius				CONSTANT_DEFAULT(0);
-	float					mSceneScale				CONSTANT_DEFAULT(0);
-	float					mPad0;
+	float						mBottomRadius			CONSTANT_DEFAULT(0);
+	float						mTopRadius				CONSTANT_DEFAULT(0);
+	float						mSceneScale				CONSTANT_DEFAULT(0);
+	float						mPad0;
 
-	uint					mMode					CONSTANT_DEFAULT(0);
-	uint					mSliceCount				CONSTANT_DEFAULT(0);
-	uint					mMuSEncodingMode		CONSTANT_DEFAULT(0);
-	uint					mPadFlags;
+	AtmosphereMode				mMode					CONSTANT_DEFAULT(AtmosphereMode::PrecomputedAtmosphere);
+	uint						mSliceCount				CONSTANT_DEFAULT(0);
+	AtmosphereMuSEncodingMode	mMuSEncodingMode		CONSTANT_DEFAULT(AtmosphereMuSEncodingMode::Bruneton17);
+	uint						mPadFlags;
 
-	float4					mConstantColor			CONSTANT_DEFAULT(float4(0.0f, 0.0f, 0.0f, 1.0));
+	float4						mConstantColor			CONSTANT_DEFAULT(float4(0.0f, 0.0f, 0.0f, 1.0));
 	
-	float3					mRayleighScattering		CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
-	float					mPad1;
-	float3					mRayleighExtinction		CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
-	float					mPad2;
-	DensityProfile			mRayleighDensity;
+	float3						mRayleighScattering		CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	float						mPad1;
+	float3						mRayleighExtinction		CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	float						mPad2;
+	DensityProfile				mRayleighDensity;
 
-	float3					mMieScattering			CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
-	float					mMiePhaseFunctionG		CONSTANT_DEFAULT(0);
-	float3					mMieExtinction			CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
-	float					mPad3;
-	DensityProfile			mMieDensity;
+	float3						mMieScattering			CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	float						mMiePhaseFunctionG		CONSTANT_DEFAULT(0);
+	float3						mMieExtinction			CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	float						mPad3;
+	DensityProfile				mMieDensity;
 
-	float3					mOzoneExtinction		CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
-	float					mPad4;
-	DensityProfile			mOzoneDensity;
+	float3						mOzoneExtinction		CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	float						mPad4;
+	DensityProfile				mOzoneDensity;
 
-	float3					mSolarIrradiance		CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
-	float					mSunAngularRadius		CONSTANT_DEFAULT(0);
+	float3						mSolarIrradiance		CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	float						mSunAngularRadius		CONSTANT_DEFAULT(0);
 
-	float3					mPad5;
-	uint					mPrecomputeWithSolarIrradiance	CONSTANT_DEFAULT(0);
+	float3						mPad5;
+	uint						mPrecomputeWithSolarIrradiance	CONSTANT_DEFAULT(0);
 
-	float3					mGroundAlbedo			CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
-	float					mAerialPerspective		CONSTANT_DEFAULT(0);
+	float3						mGroundAlbedo			CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	float						mAerialPerspective		CONSTANT_DEFAULT(0);
 
-	float3					mRuntimeGroundAlbedo	CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
-	float					mPad6;
+	float3						mRuntimeGroundAlbedo	CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	float						mPad6;
 };
 
 struct AtmospherePerDraw
@@ -167,7 +173,7 @@ struct AtmospherePerDraw
 
 struct Cloud
 {
-	uint					mMode					CONSTANT_DEFAULT(0);
+	CloudMode				mMode					CONSTANT_DEFAULT(CloudMode::RuntimeNoise);
 	uint					mPad0;
 	uint					mPad1;
 	uint					mPad2;

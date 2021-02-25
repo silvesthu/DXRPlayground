@@ -1,11 +1,11 @@
 #include "Common.hlsl"
 
-typedef uint DebugMode;
-typedef uint DebugInstanceMode;
-typedef uint BackgroundMode;
 #define CONSTANT_DEFAULT(x)
-#include "ShaderType.hlsl"
 #include "Generated/Enum.hlsl"
+#include "ShaderType.hlsl"
+
+const static float kPreExposure = 1.0e-4;
+const static float kEmissionScale = 1.0e4;
 
 //////////////////////////////////////////////////////////////////////////////////
 
@@ -19,6 +19,25 @@ SamplerState PointSampler : register(s0);
 SamplerState BilinearSampler : register(s1);
 
 //////////////////////////////////////////////////////////////////////////////////
+
+float3 RadianceToLuminance(float3 radiance)
+{
+	// https://en.wikipedia.org/wiki/Luminous_efficacy
+	// https://en.wikipedia.org/wiki/Sunlight#Measurement
+
+	float kW_to_W = 1000.0; // W/kW
+	float kSunLuminousEfficacy = 93.0; // lm/W
+	float3 luminance = radiance * kW_to_W * kSunLuminousEfficacy * kPreExposure;
+	return luminance;
+
+	// [Bruneton17]
+	if (0)
+	{
+		float3 white_point = float3(1, 1, 1);
+		float exposure = 10.0;
+		return 1 - exp(-radiance / white_point * exposure);
+	}
+}
 
 #include "PrecomputedAtmosphere.hlsl"
 #include "Cloud.hlsl"
@@ -72,6 +91,47 @@ uint3 Load3x32BitIndices(uint offsetBytes)
 	return four32BitIndices.xyz;
 }
 
+// https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
+float3 Tonemap_knarkowicz(float3 x)
+{
+	float a = 2.51f;
+	float b = 0.03f;
+	float c = 2.43f;
+	float d = 0.59f;
+	float e = 0.14f;
+	return saturate((x * (a * x + b)) / (x * (c * x + d) + e));
+}
+
+float3 LuminanceToColor(float3 luminance)
+{
+	// Exposure
+	float3 normalized_luminance = 0;
+	{
+		// https://google.github.io/filament/Filament.htmdl#physicallybasedcamera
+
+		float kSaturationBasedSpeedConstant = 78.0f;
+		float kISO = 100;
+		float kVignettingAttenuation = 0.78f; // To cancel out saturation. Typically 0.65 for real lens, see https://www.unrealengine.com/en-US/tech-blog/how-epic-games-is-handling-auto-exposure-in-4-25
+		float kLensSaturation = kSaturationBasedSpeedConstant / kISO / kVignettingAttenuation;
+
+		float exposure_normalization_factor = 1.0 / (pow(2.0, mPerFrame.mEV100) * kLensSaturation); // = 1.0 / luminance_max
+		normalized_luminance = luminance * (exposure_normalization_factor / kPreExposure);
+	}
+
+	float3 tonemapped_color = 0;
+	// Tonemap
+	{
+		switch (mPerFrame.mTonemapMode)
+		{
+		default:
+		case TonemapMode_Passthrough: tonemapped_color = normalized_luminance; break;
+		case TonemapMode_knarkowicz: tonemapped_color = Tonemap_knarkowicz(normalized_luminance); break;
+		}
+	}
+
+	return tonemapped_color;
+}
+
 [shader("raygeneration")]
 void DefaultRayGeneration()
 {
@@ -119,22 +179,37 @@ void DefaultRayGeneration()
 	// payload.mEmission = RemoveSRGBCurve(payload.mEmission);
 	// payload.mEmission = (uint3)(RemoveSRGBCurve(payload.mEmission) * 255.0) / 255.0;
 
-	float3 current_frame_color = payload.mEmission;
-	float3 previous_frame_color = RaytracingOutput[DispatchRaysIndex().xy].xyz;
-	previous_frame_color = max(0, previous_frame_color); // Eliminate nan
-	float3 mixed_color = lerp(previous_frame_color, current_frame_color, 1.0f / (float)(mPerFrame.mAccumulationFrameCount));
+	float3 scene_luminance = payload.mEmission;
+	float3 output = LuminanceToColor(scene_luminance);
 
-	if (recursion == 0)
-		mixed_color = current_frame_color;
+	if (mPerFrame.mOutputLuminance)
+		output = scene_luminance;
 
-	if (mPerFrame.mDebugMode == DebugMode_RecursionCount)
-		mixed_color = hsv2rgb(float3(recursion * 1.0 / (mPerFrame.mRecursionCountMax + 1), 1, 1));
+	if (mPerFrame.mDebugMode != DebugMode_None)
+		output = scene_luminance;
 
-	// [TODO] Ray visualization ?
-	// if (all(abs((int2)DispatchRaysIndex().xy - (int2)mDebugCoord) < DEBUG_PIXEL_RADIUS))
-	// 	mixed_color = 0;
+	// Accumulation
+	{
+		float3 current_output = output;
 
-	RaytracingOutput[DispatchRaysIndex().xy] = float4(mixed_color, 1);
+		float3 previous_output = RaytracingOutput[DispatchRaysIndex().xy].xyz;
+		previous_output = max(0, previous_output); // Eliminate nan
+		float3 mixed_output = lerp(previous_output, current_output, 1.0f / (float)(mPerFrame.mAccumulationFrameCount));
+
+		if (recursion == 0)
+			mixed_output = current_output;
+
+		if (mPerFrame.mDebugMode == DebugMode_RecursionCount)
+			mixed_output = hsv2rgb(float3(recursion * 1.0 / (mPerFrame.mRecursionCountMax + 1), 1, 1));
+
+		// [TODO] Ray visualization ?
+		// if (all(abs((int2)DispatchRaysIndex().xy - (int2)mDebugCoord) < DEBUG_PIXEL_RADIUS))
+		// 	mixed_output = 0;
+
+		output = mixed_output;
+	}
+
+	RaytracingOutput[DispatchRaysIndex().xy] = float4(output, 1);
 }
 
 #include "RaymarchAtmosphere.hlsl"
@@ -157,13 +232,13 @@ float3 GetExtrapolatedSingleMieScattering(float4 scattering)
 	return scattering.rgb * scattering.a / scattering.r * (mAtmosphere.mRayleighScattering.r / mAtmosphere.mMieScattering.r) * (mAtmosphere.mMieScattering / mAtmosphere.mRayleighScattering);
 }
 
-float3 GetCombinedScattering(float r, float mu, float mu_s, float nu, bool ray_r_mu_intersects_ground, out float3 single_mie_scattering)
+void GetCombinedScattering(float r, float mu, float mu_s, float nu, bool ray_r_mu_intersects_ground, out float3 rayleigh_scattering, out float3 single_mie_scattering)
 {
 	float4 scattering = GetScattering(ScatteringSRV, r, mu, mu_s, nu, ray_r_mu_intersects_ground);
-	single_mie_scattering = GetExtrapolatedSingleMieScattering(scattering);
-
 	float3 solar_irradiance = mAtmosphere.mPrecomputeWithSolarIrradiance ? 1.0 : mAtmosphere.mSolarIrradiance;
-	return solar_irradiance * scattering;
+
+	single_mie_scattering = GetExtrapolatedSingleMieScattering(scattering) * solar_irradiance;
+	rayleigh_scattering = scattering.xyz * solar_irradiance;
 }
 
 void GetSkyRadiance(out float3 sky_radiance, out float3 transmittance_to_top)
@@ -200,16 +275,15 @@ void GetSkyRadiance(out float3 sky_radiance, out float3 transmittance_to_top)
 	bool ray_r_mu_intersects_ground = RayIntersectsGround(r, mu);
 
 	transmittance_to_top = ray_r_mu_intersects_ground ? 0 : GetTransmittanceToTopAtmosphereBoundary(r, mu);
-	float3 single_mie_scattering;
-	float3 scattering;
 
 	// [TODO] shadow
-
-	scattering = GetCombinedScattering(r, mu, mu_s, nu, ray_r_mu_intersects_ground, single_mie_scattering);
+	float3 rayleigh_scattering;
+	float3 single_mie_scattering;
+	GetCombinedScattering(r, mu, mu_s, nu, ray_r_mu_intersects_ground, rayleigh_scattering, single_mie_scattering);
 
 	// [TODO] light shafts
 
-	sky_radiance = scattering * RayleighPhaseFunction(nu) + single_mie_scattering * MiePhaseFunction(mAtmosphere.mMiePhaseFunctionG, nu);
+	sky_radiance = rayleigh_scattering * RayleighPhaseFunction(nu) + single_mie_scattering * MiePhaseFunction(mAtmosphere.mMiePhaseFunctionG, nu);
 }
 
 // Aerial Perspective
@@ -258,23 +332,27 @@ void GetSkyRadianceToPoint(out float3 sky_radiance, out float3 transmittance)
 
 	transmittance = GetTransmittance(r, mu, d, ray_r_mu_intersects_ground);
 
+	float3 rayleigh_scattering;
 	float3 single_mie_scattering;
-	float3 scattering = GetCombinedScattering(r, mu, mu_s, nu, ray_r_mu_intersects_ground, single_mie_scattering);
+	GetCombinedScattering(r, mu, mu_s, nu, ray_r_mu_intersects_ground, rayleigh_scattering, single_mie_scattering);
 
 	// [TODO] shadow
 	float shadow_length = 0;
 
 	// Compute the r, mu, mu_s and nu parameters for the second texture lookup.
 	// If shadow_length is not 0 (case of light shafts), we want to ignore the
-	// scattering along the last shadow_length meters of the view ray, which we
-	// do by subtracting shadow_length from d (this way scattering_p is equal to
+	// rayleigh_scattering along the last shadow_length meters of the view ray, which we
+	// do by subtracting shadow_length from d (this way rayleigh_scattering_p is equal to
 	// the S|x_s=x_0-lv term in Eq. (17) of our paper).
 	d = max(d - shadow_length, 0.0);
 	float r_p = ClampRadius(sqrt(d * d + 2.0 * r * mu * d + r * r));
 	float mu_p = (r * mu + d) / r_p;
 	float mu_s_p = (r * mu_s + d * nu) / r_p;
+	float3 rayleigh_scattering_p = 0;
 	float3 single_mie_scattering_p = 0;
-	float3 scattering_p = GetCombinedScattering(r_p, mu_p, mu_s_p, nu, ray_r_mu_intersects_ground, single_mie_scattering_p);
+
+	// [TODO] artifact near horizon
+	GetCombinedScattering(r_p, mu_p, mu_s_p, nu, ray_r_mu_intersects_ground, rayleigh_scattering_p, single_mie_scattering_p);
 
 	// Combine the lookup results to get the scattering between camera and point.
 	float3 shadow_transmittance = transmittance;
@@ -284,15 +362,15 @@ void GetSkyRadianceToPoint(out float3 sky_radiance, out float3 transmittance)
 		shadow_transmittance = GetTransmittance(r, mu, d, ray_r_mu_intersects_ground);
 	}
 
-	scattering = scattering - shadow_transmittance * scattering_p;
+	rayleigh_scattering = rayleigh_scattering - shadow_transmittance * rayleigh_scattering_p;
 	single_mie_scattering = single_mie_scattering - shadow_transmittance * single_mie_scattering_p;
 
-	single_mie_scattering = GetExtrapolatedSingleMieScattering(float4(scattering.rgb, single_mie_scattering.r));
+	single_mie_scattering = GetExtrapolatedSingleMieScattering(float4(rayleigh_scattering.rgb, single_mie_scattering.r));
 
 	// Hack to avoid rendering artifacts when the sun is below the horizon.
 	single_mie_scattering = single_mie_scattering * smoothstep(float(0.0), float(0.01), mu_s);
 
-	sky_radiance = scattering * RayleighPhaseFunction(nu) + single_mie_scattering * MiePhaseFunction(mAtmosphere.mMiePhaseFunctionG, nu);
+	sky_radiance = rayleigh_scattering* RayleighPhaseFunction(nu) + single_mie_scattering * MiePhaseFunction(mAtmosphere.mMiePhaseFunctionG, nu);
 }
 
 void GetSunAndSkyIrradiance(float3 hit_position, float3 normal, out float3 sun_irradiance, out float3 sky_irradiance)
@@ -410,10 +488,7 @@ float3 GetEnvironmentEmission()
 		radiance = radiance + transmittance_to_top * mAtmosphere.mSolarIrradiance;
 	}
 
-	// [TODO]
-	float3 white_point = float3(1, 1, 1);
-	float exposure = 10.0;
-	return 1 - exp(-radiance / white_point * exposure);
+	return RadianceToLuminance(radiance);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -729,15 +804,12 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 		}
 		
 		hit_info.mAlbedo = InstanceDataBuffer[InstanceID()].mAlbedo;
-		hit_info.mEmission = InstanceDataBuffer[InstanceID()].mEmission;
+		hit_info.mEmission = InstanceDataBuffer[InstanceID()].mEmission * (kEmissionScale * kPreExposure);
 	}
 
 	// Participating Media
 	{
-		// [TODO]
-		float3 white_point = float3(1, 1, 1);
-		float exposure = 10.0;
-		hit_info.mInScattering = 1 - exp(-sky_radiance / white_point * exposure);
+		hit_info.mInScattering = RadianceToLuminance(sky_radiance);
 		hit_info.mTransmittance = transmittance;
 	}
 
@@ -790,10 +862,15 @@ float4 ScreenspaceTriangleVS(uint id : SV_VertexID) : SV_POSITION
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-Texture2D<float4> CopyFromTexture : register(t0, space1);
-[RootSignature("DescriptorTable(SRV(t0, numDescriptors = 1, space = 1))")]
+Texture2D<float4> InputTexture : register(t0, space1);
+[RootSignature("DescriptorTable(CBV(b0, numDescriptors = 1, space = 0), SRV(t0, numDescriptors = 1, space = 1))")]
 float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 {
-	float3 srgb = ApplySRGBCurve(CopyFromTexture.Load(int3(position.xy, 0)).xyz);
-	return float4(srgb, 1);
+	float3 color = InputTexture.Load(int3(position.xy, 0)).xyz;
+
+	if (mPerFrame.mOutputLuminance)
+		color = LuminanceToColor(color /* as luminance */);
+
+	float3 srgb_color = ApplySRGBCurve(color);
+	return float4(srgb_color, 1);
 }

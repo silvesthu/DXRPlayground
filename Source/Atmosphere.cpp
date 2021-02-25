@@ -18,8 +18,8 @@ void PrecomputedAtmosphereScattering::Update()
 	atmosphere->mTopRadius							= UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.TopRadius());
 	atmosphere->mSceneScale							= gAtmosphereProfile.mSceneInKilometer ? 1.0f : 0.001f;
 
-	atmosphere->mMode								= static_cast<glm::uint32>(gAtmosphereProfile.mMode);
-	atmosphere->mMuSEncodingMode					= static_cast<glm::uint32>(gAtmosphereProfile.mMuSEncodingMode);
+	atmosphere->mMode								= gAtmosphereProfile.mMode;
+	atmosphere->mMuSEncodingMode					= gAtmosphereProfile.mMuSEncodingMode;
 	atmosphere->mSliceCount							= gPrecomputedAtmosphereScatteringResources.mSliceCount;
 
 	atmosphere->mConstantColor						= gAtmosphereProfile.mConstantColor;
@@ -171,10 +171,10 @@ void PrecomputedAtmosphereScattering::Initialize()
 	{
 		// [NOTE] Strictly speaking, binding same texture as UAV and SRV at the same time is not ok, and there should be barriers for state transition
 
-		std::vector<Shader::DescriptorEntry> common_binding;
+		std::vector<ID3D12Resource*> common_binding;
 		{
 			// CBV
-			common_binding.push_back(gPrecomputedAtmosphereScatteringResources.mConstantUploadBuffer->GetGPUVirtualAddress());
+			common_binding.push_back(gPrecomputedAtmosphereScatteringResources.mConstantUploadBuffer.Get());
 
 			// UAV
 			for (auto&& texture : gPrecomputedAtmosphereScatteringResources.mTextures)

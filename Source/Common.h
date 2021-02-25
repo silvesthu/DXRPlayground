@@ -71,16 +71,7 @@ struct Shader
 	SHADER_MEMBER(const wchar_t*, PSName, nullptr);
 	SHADER_MEMBER(const wchar_t*, CSName, nullptr);
 
-	struct DescriptorEntry
-	{
-		DescriptorEntry(ID3D12Resource* inResource) { mResource = inResource; }
-		DescriptorEntry(D3D12_GPU_VIRTUAL_ADDRESS inAddress) { mAddress = inAddress; }
-
-		ID3D12Resource* mResource = nullptr;
-		D3D12_GPU_VIRTUAL_ADDRESS mAddress = 0;
-	};
-
-	void InitializeDescriptors(const std::vector<Shader::DescriptorEntry>& inEntries);
+	void InitializeDescriptors(const std::vector<ID3D12Resource*>& inEntries);
 	void SetupGraphics();
 	void SetupCompute();
 	void Reset() { mData = {}; }
@@ -179,6 +170,44 @@ enum class DebugInstanceMode : glm::uint32
 
 	Barycentrics,
 	Mirror,
+
+	Count
+};
+
+enum class TonemapMode : glm::uint32
+{
+	Passthrough,
+
+	knarkowicz,
+
+	Count
+};
+
+enum class AtmosphereMode
+{
+	ConstantColor = 0,
+
+	RaymarchAtmosphereOnly,
+	PrecomputedAtmosphere,
+
+	Count
+};
+
+enum class AtmosphereMuSEncodingMode
+{
+	Bruneton17 = 0,
+	Bruneton08,
+	Elek09,
+	Yusov13,
+
+	Count
+};
+
+enum class CloudMode
+{
+	None = 0,
+
+	RuntimeNoise,
 
 	Count
 };

@@ -309,6 +309,7 @@ template <typename T>
 static void sWriteEnum(std::ofstream& ioEnumFile)
 {
 	ioEnumFile << "// enum " << nameof::nameof_enum_type<T>().data() << "\n";
+	ioEnumFile << "typedef uint " << nameof::nameof_enum_type<T>().data() << ";\n";
 
 	for (int i = 0; i < (int)T::Count; i++)
 	{
@@ -416,6 +417,7 @@ void gCreatePipelineState()
 
 		sWriteEnum<DebugMode>(enum_file);
 		sWriteEnum<DebugInstanceMode>(enum_file);
+		sWriteEnum<TonemapMode>(enum_file);
 		sWriteEnum<AtmosphereMode>(enum_file);
 		sWriteEnum<AtmosphereMuSEncodingMode>(enum_file);
 		sWriteEnum<CloudMode>(enum_file);

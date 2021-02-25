@@ -4,15 +4,6 @@
 
 // [Schneider16] GPU Pro 7 Advanced Rendering Techniques, Real-Time Volumetric Cloudscapes
 
-enum class CloudMode
-{
-	None = 0,
-
-	RuntimeNoise,
-
-	Count
-};
-
 struct CloudProfile
 {
 	CloudMode mMode = CloudMode::RuntimeNoise;
