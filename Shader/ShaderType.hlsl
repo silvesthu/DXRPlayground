@@ -147,6 +147,9 @@ struct Atmosphere
 	float3					mSolarIrradiance		CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	float					mSunAngularRadius		CONSTANT_DEFAULT(0);
 
+	float3					mPad5;
+	uint					mPrecomputeWithSolarIrradiance	CONSTANT_DEFAULT(0);
+
 	float3					mGroundAlbedo			CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	float					mAerialPerspective		CONSTANT_DEFAULT(0);
 

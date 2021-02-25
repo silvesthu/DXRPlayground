@@ -97,3 +97,8 @@ float PhaseFunction_CornetteShanks(float g, float cosine)
         /
         (4.0 * MATH_PI * 2.0 * (2.0 + g * g) * pow(1.0 + g * g - 2.0 * g * cosine, 3.0 / 2.0));
 }
+
+float PhaseFunction_Isotropic()
+{
+    return 1.0 / (4.0 * MATH_PI);
+}

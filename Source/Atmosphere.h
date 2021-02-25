@@ -8,13 +8,13 @@
 // [Zotti07][ZWP07] A Critical Review of the Preetham Skylight Model https://www.cg.tuwien.ac.at/research/publications/2007/zotti-2007-wscg/zotti-2007-wscg-paper.pdf
 // [Bruneton08] Precomputed Atmospheric Scattering https://hal.inria.fr/inria-00288758/document
 // [Bruneton08Doc] https://ebruneton.github.io/precomputed_atmospheric_scattering/atmosphere/functions.glsl.html
-// [Bruneton08Impl] https://github.com/ebruneton/precomputed_atmospheric_scattering
 // [Elek09] Rendering Parametrizable Planetary Atmospheres with Multiple Scattering in Real-Time http://www.klayge.org/material/4_0/Atmospheric/Rendering%20Parametrizable%20Planetary%20Atmospheres%20with%20Multiple%20Scattering%20in%20Real-Time.pdf
 // [Yusov13] Outdoor Light Scattering Sample Update https://software.intel.com/content/www/us/en/develop/blogs/otdoor-light-scattering-sample-update.html
 // [Hillaire16] Physically Based Sky, Atmosphere and Cloud Rendering in Frostbite https://media.contentapi.ea.com/content/dam/eacom/frostbite/files/s2016-pbs-frostbite-sky-clouds-new.pdf
+// [Bruneton17] https://github.com/ebruneton/precomputed_atmospheric_scattering
 // [Carpentier17] Decima Engine : Advances in Lighting and AA https://www.guerrilla-games.com/read/decima-engine-advances-in-lighting-and-aa
 // [Hillaire20] A Scalable and Production Ready Sky and Atmosphere Rendering Technique https://sebh.github.io/publications/egsr2020.pdf
-// [UE4 SkyAtmosphere] SkyAtmosphere.usf SkyAtmosphereComponent.cpp https://docs.unrealengine.com/en-US/BuildingWorlds/FogEffects/SkyAtmosphere/index.html
+// [Epic20] SkyAtmosphere.usf SkyAtmosphereComponent.cpp https://docs.unrealengine.com/en-US/BuildingWorlds/FogEffects/SkyAtmosphere/index.html
 
 enum class AtmosphereMode
 {
@@ -28,7 +28,7 @@ enum class AtmosphereMode
 
 enum class AtmosphereMuSEncodingMode
 {
-	Bruneton08Impl = 0,
+	Bruneton17 = 0,
 	Bruneton08,
 	Elek09,
 	Yusov13,
@@ -53,7 +53,7 @@ struct AtmosphereProfile
 	// Geometry
 	struct GeometryReference
 	{
-		static void Bruneton08Impl(AtmosphereProfile& profile)
+		static void Bruneton17(AtmosphereProfile& profile)
 		{
 			profile.mBottomRadius						= 6360000.0;										// m
 			profile.mAtmosphereThickness				= 60000.0;											// m
@@ -74,7 +74,7 @@ struct AtmosphereProfile
 	// Rayleigh
 	struct RayleighReference
 	{
-		static void Bruneton08Impl(AtmosphereProfile& profile)
+		static void Bruneton17(AtmosphereProfile& profile)
 		{
 			static constexpr double kRayleighScaleHeight = 8000.0;
 
@@ -92,14 +92,14 @@ struct AtmosphereProfile
 
 		static void Bruneton08(AtmosphereProfile& profile) // 2.1 [REK*04] Table 3
 		{
-			Bruneton08Impl(profile);
+			Bruneton17(profile);
 
 			profile.mRayleighScatteringCoefficient = glm::dvec3(5.8, 13.5, 33.1) * 1e-6; // m^-1
 		}
 
 		static void Preetham99(AtmosphereProfile& profile)
 		{
-			Bruneton08Impl(profile);
+			Bruneton17(profile);
 
 			constexpr double pi = glm::pi<double>();
 			double n = 1.0003; // index of refraction of air
@@ -133,7 +133,7 @@ struct AtmosphereProfile
 	// Mie
 	struct MieReference
 	{
-		static void Bruneton08Impl(AtmosphereProfile& profile)
+		static void Bruneton17(AtmosphereProfile& profile)
 		{
 			static constexpr double kMieScaleHeight = 1200.0;
 
@@ -156,7 +156,7 @@ struct AtmosphereProfile
 
 		static void Bruneton08(AtmosphereProfile& profile) // 2.1 (3), beta_M(0, lambda)
 		{
-			Bruneton08Impl(profile);
+			Bruneton17(profile);
 
 			profile.mMieScatteringCoefficient = glm::dvec3(20.0, 20.0, 20.0) * 1e-6;
 			profile.mMieExtinctionCoefficient = profile.mMieScatteringCoefficient / 0.9;
@@ -197,7 +197,7 @@ struct AtmosphereProfile
 			profile.mOzoneDensityProfile.mLayer1 = { kDummy, 0.0f, 0.0f, layer_1_linear_term, layer_1_constant_term };
 		}
 
-		static void Bruneton08Impl(AtmosphereProfile& profile)				
+		static void Bruneton17(AtmosphereProfile& profile)				
 		{ 
 			profile.mEnableOzone = true;
 
@@ -223,25 +223,30 @@ struct AtmosphereProfile
 	// Solar
 	struct SolarIrradianceReference
 	{
-		static void Bruneton08ImplConstant(AtmosphereProfile& profile)		
+		static void Bruneton17Constant(AtmosphereProfile& profile)		
 		{ 
 			profile.mSolarIrradiance = glm::vec3(1.5f); 
 		}
 
-		static void Bruneton08Impl(AtmosphereProfile& profile)
+		static void Bruneton17(AtmosphereProfile& profile)
 		{ 
 			// http://rredc.nrel.gov/solar/spectra/am1.5/ASTMG173/ASTMG173.html
 			profile.mSolarIrradiance = glm::vec3(1.474000f, 1.850400f, 1.911980f); 
 		}
 	};
-	glm::vec3 mSolarIrradiance							= {}; // W.m^-2
+	glm::vec3 mSolarIrradiance							= {}; // kW/m^2. why is this W/m^2 in [Bruneton17]
+	bool mPrecomputeWithSolarIrradiance					= true;
+
 	// [Note] Calculated based on Sun seen from Earth
 	// https://sciencing.com/calculate-angular-diameter-sun-8592633.html
 	// Angular Radius = Angular Diameter / 2.0 = arctan(Sun radius / Sun-Earth distance)
-	double kSunAngularRadius							= 0.00935f / 2.0f; // Radian, from [Bruneton08Impl] demo.cc
+	double kSunAngularRadius							= 0.00935f / 2.0f; // Radian, from [Bruneton17] demo.cc
+
+	// https://en.wikipedia.org/wiki/Luminous_efficacy
+	double kMaxLuminousEfficacy							= 683.0; // lm/W
 
 	// Encoding Config
-	AtmosphereMuSEncodingMode mMuSEncodingMode			= AtmosphereMuSEncodingMode::Bruneton08Impl;
+	AtmosphereMuSEncodingMode mMuSEncodingMode			= AtmosphereMuSEncodingMode::Bruneton17;
 
 	// Multiple Scattering
 	glm::uint mScatteringOrder							= 4;
@@ -257,11 +262,11 @@ struct AtmosphereProfile
 	// Default
 	AtmosphereProfile()
 	{
-		GeometryReference::Bruneton08Impl(*this);
-		RayleighReference::Bruneton08Impl(*this);
-		MieReference::Bruneton08Impl(*this);
-		OzoneReference::Bruneton08Impl(*this);
-		SolarIrradianceReference::Bruneton08Impl(*this);
+		GeometryReference::Bruneton17(*this);
+		RayleighReference::Bruneton17(*this);
+		MieReference::Bruneton17(*this);
+		OzoneReference::Bruneton17(*this);
+		SolarIrradianceReference::Bruneton17(*this);
 	}
 };
 
@@ -328,7 +333,7 @@ struct PrecomputedAtmosphereScatteringResources
 
 	Texture mDeltaScatteringDensityTexture		= Texture().Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Delta Scattering Density");
 
-	static void Bruneton08Impl(PrecomputedAtmosphereScatteringResources& resource)
+	static void Bruneton17(PrecomputedAtmosphereScatteringResources& resource)
 	{
 		constexpr glm::uvec3 kDimension = glm::uvec3(256, 128, 32);
 
@@ -370,7 +375,7 @@ struct PrecomputedAtmosphereScatteringResources
 	// Default
 	PrecomputedAtmosphereScatteringResources()
 	{
-		Bruneton08Impl(*this);
+		Bruneton17(*this);
 		// Yusov13(*this);
 	}
 };

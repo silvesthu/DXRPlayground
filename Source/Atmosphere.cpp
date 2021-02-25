@@ -25,6 +25,7 @@ void PrecomputedAtmosphereScattering::Update()
 	atmosphere->mConstantColor						= gAtmosphereProfile.mConstantColor;
 
 	atmosphere->mSolarIrradiance					= gAtmosphereProfile.mSolarIrradiance;
+	atmosphere->mPrecomputeWithSolarIrradiance		= gAtmosphereProfile.mPrecomputeWithSolarIrradiance;
 	atmosphere->mSunAngularRadius					= static_cast<float>(gAtmosphereProfile.kSunAngularRadius);
 
 	atmosphere->mAerialPerspective					= (gAtmosphereProfile.mMode == AtmosphereMode::PrecomputedAtmosphere && gAtmosphereProfile.mAerialPerspective) ? 1.0f : 0.0f;
@@ -231,9 +232,11 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 
 		ImGui::Text("Solar Irradiance");
 		ImGui::ColorEdit3("", &gAtmosphereProfile.mSolarIrradiance[0], ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
-		if (ImGui::SmallButton("Bruneton08Impl")) AtmosphereProfile::SolarIrradianceReference::Bruneton08Impl(gAtmosphereProfile);
+		ImGui::Checkbox("Precompute With Solar Irradiance", &gAtmosphereProfile.mPrecomputeWithSolarIrradiance);
+
+		if (ImGui::SmallButton("Bruneton17")) AtmosphereProfile::SolarIrradianceReference::Bruneton17(gAtmosphereProfile);
 		ImGui::SameLine(); 
-		if (ImGui::SmallButton("Bruneton08ImplConstant")) AtmosphereProfile::SolarIrradianceReference::Bruneton08ImplConstant(gAtmosphereProfile);
+		if (ImGui::SmallButton("Bruneton17Constant")) AtmosphereProfile::SolarIrradianceReference::Bruneton17Constant(gAtmosphereProfile);
 
 		ImGui::TreePop();
 	}
@@ -247,7 +250,7 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 
 		ImGui::PopItemWidth();
 
-		SMALL_BUTTON(AtmosphereProfile::GeometryReference::Bruneton08Impl);
+		SMALL_BUTTON(AtmosphereProfile::GeometryReference::Bruneton17);
 		ImGui::SameLine();
 		SMALL_BUTTON(AtmosphereProfile::GeometryReference::Yusov13);
 
@@ -312,7 +315,7 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 			}
 			popup_density_profile();
 
-			SMALL_BUTTON(AtmosphereProfile::RayleighReference::Bruneton08Impl);
+			SMALL_BUTTON(AtmosphereProfile::RayleighReference::Bruneton17);
 			ImGui::SameLine();
 			SMALL_BUTTON(AtmosphereProfile::RayleighReference::Bruneton08);
 			ImGui::SameLine();
@@ -342,7 +345,7 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 			}
 			popup_density_profile();
 
-			SMALL_BUTTON(AtmosphereProfile::MieReference::Bruneton08Impl);
+			SMALL_BUTTON(AtmosphereProfile::MieReference::Bruneton17);
 			ImGui::SameLine();
 			SMALL_BUTTON(AtmosphereProfile::MieReference::Bruneton08);
 			ImGui::SameLine();
@@ -383,7 +386,7 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 				ImGui::EndPopup();
 			}
 
-			if (ImGui::SmallButton("Bruneton08Impl")) AtmosphereProfile::OzoneReference::Bruneton08Impl(gAtmosphereProfile);
+			if (ImGui::SmallButton("Bruneton17")) AtmosphereProfile::OzoneReference::Bruneton17(gAtmosphereProfile);
 
 			ImGui::TreePop();
 		}

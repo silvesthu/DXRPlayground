@@ -147,6 +147,25 @@ float3 PlanetCenter() { return float3(0, -mAtmosphere.mBottomRadius, 0); }
 float PlanetRadius() { return mAtmosphere.mBottomRadius; }
 float3 GetSunDirection() { return mPerFrame.mSunDirection.xyz; }
 
+float3 GetExtrapolatedSingleMieScattering(float4 scattering)
+{
+	// Algebraically this can never be negative, but rounding errors can produce
+	// that effect for sufficiently short view rays.
+	if (scattering.r <= 0.0)
+		return 0.0;
+
+	return scattering.rgb * scattering.a / scattering.r * (mAtmosphere.mRayleighScattering.r / mAtmosphere.mMieScattering.r) * (mAtmosphere.mMieScattering / mAtmosphere.mRayleighScattering);
+}
+
+float3 GetCombinedScattering(float r, float mu, float mu_s, float nu, bool ray_r_mu_intersects_ground, out float3 single_mie_scattering)
+{
+	float4 scattering = GetScattering(ScatteringSRV, r, mu, mu_s, nu, ray_r_mu_intersects_ground);
+	single_mie_scattering = GetExtrapolatedSingleMieScattering(scattering);
+
+	float3 solar_irradiance = mAtmosphere.mPrecomputeWithSolarIrradiance ? 1.0 : mAtmosphere.mSolarIrradiance;
+	return solar_irradiance * scattering;
+}
+
 void GetSkyRadiance(out float3 sky_radiance, out float3 transmittance_to_top)
 {
 	sky_radiance = 0;
@@ -285,10 +304,11 @@ void GetSunAndSkyIrradiance(float3 hit_position, float3 normal, out float3 sun_i
 	float mu_s = dot(local_position, sun_direction) / r;
 
 	// Indirect irradiance (approximated if the surface is not horizontal).
-	sky_irradiance = GetIrradiance(r, mu_s) * (1.0 + dot(normal, local_position) / r) * 0.5;
+	float3 solar_irradiance = mAtmosphere.mPrecomputeWithSolarIrradiance ? 1.0 : mAtmosphere.mSolarIrradiance;
+	sky_irradiance = solar_irradiance* GetIrradiance(r, mu_s)* (1.0 + dot(normal, local_position) / r) * 0.5;
 
 	// Direct irradiance.
-	sun_irradiance = mAtmosphere.mSolarIrradiance * GetTransmittanceToSun(r, mu_s) * max(dot(normal, sun_direction), 0.0);
+	sun_irradiance = 0;// mAtmosphere.mSolarIrradiance* GetTransmittanceToSun(r, mu_s)* max(dot(normal, sun_direction), 0.0);
 }
 
 float GetSunVisibility(float3 position)
@@ -312,6 +332,8 @@ float3 GetEnvironmentEmission()
 	float3 transmittance_to_top = 0;
 	GetSkyRadiance(radiance, transmittance_to_top);
 
+	// radiance *= float3(1.474000f, 1.850400f, 1.911980f);
+
 	// Ground (the planet)
 	float2 distance = 0;
 	if (IntersectRaySphere(RayOrigin(), RayDirection(), PlanetCenter(), PlanetRadius(), distance) && distance.x > 0)
@@ -325,7 +347,7 @@ float3 GetEnvironmentEmission()
 		float3 sky_irradiance = 0;
 		float3 sun_irradiance = 0;
 		GetSunAndSkyIrradiance(hit_position, normal, sun_irradiance, sky_irradiance);
-		float3 ground_radiance = kGroundAlbedo * (1.0 / MATH_PI) * (sun_irradiance * GetSunVisibility(hit_position) + sky_irradiance * GetSkyVisibility(hit_position));
+		float3 ground_radiance = kGroundAlbedo* (1.0 / MATH_PI)* (sun_irradiance * GetSunVisibility(hit_position) + sky_irradiance * GetSkyVisibility(hit_position));
 
 		// [TODO] lightshaft
 
@@ -359,6 +381,27 @@ float3 GetEnvironmentEmission()
 			radiance = ground_radiance;
 		else
 			radiance = radiance + transmittance_to_ground * ground_radiance;
+	}
+	else
+	{
+		// Debug - Global
+		if (mPerFrame.mDebugMode != DebugMode_None && mPerFrame.mDebugMode != DebugMode_RecursionCount)
+		{
+			switch (mPerFrame.mDebugMode)
+			{
+			case DebugMode_Barycentrics: 			return 0;
+			case DebugMode_Vertex: 					return RayDirection(); // rays are supposed to go infinity
+			case DebugMode_Normal: 					return -RayDirection();
+			case DebugMode_Albedo: 					return 0;
+			case DebugMode_Reflectance: 			return 0;
+			case DebugMode_Emission: 				return 0;
+			case DebugMode_Roughness: 				return 1;
+			case DebugMode_Transmittance:			return transmittance_to_top;
+			case DebugMode_InScattering:			return radiance;
+			default:
+				break;
+			}
+		}
 	}
 
 	// Sun
