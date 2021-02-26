@@ -383,10 +383,10 @@ void GetSunAndSkyIrradiance(float3 hit_position, float3 normal, out float3 sun_i
 
 	// Indirect irradiance (approximated if the surface is not horizontal).
 	float3 solar_irradiance = mAtmosphere.mPrecomputeWithSolarIrradiance ? 1.0 : mAtmosphere.mSolarIrradiance;
-	sky_irradiance = solar_irradiance* GetIrradiance(r, mu_s)* (1.0 + dot(normal, local_position) / r) * 0.5;
+	sky_irradiance = solar_irradiance * GetIrradiance(r, mu_s)* (1.0 + dot(normal, local_position) / r) * 0.5;
 
 	// Direct irradiance.
-	sun_irradiance = 0;// mAtmosphere.mSolarIrradiance* GetTransmittanceToSun(r, mu_s)* max(dot(normal, sun_direction), 0.0);
+	sun_irradiance = mAtmosphere.mSolarIrradiance * GetTransmittanceToSun(r, mu_s) * max(dot(normal, sun_direction), 0.0);
 }
 
 float GetSunVisibility(float3 position)
@@ -410,8 +410,6 @@ float3 GetEnvironmentEmission()
 	float3 transmittance_to_top = 0;
 	GetSkyRadiance(radiance, transmittance_to_top);
 
-	// radiance *= float3(1.474000f, 1.850400f, 1.911980f);
-
 	// Ground (the planet)
 	float2 distance = 0;
 	if (IntersectRaySphere(RayOrigin(), RayDirection(), PlanetCenter(), PlanetRadius(), distance) && distance.x > 0)
@@ -425,7 +423,7 @@ float3 GetEnvironmentEmission()
 		float3 sky_irradiance = 0;
 		float3 sun_irradiance = 0;
 		GetSunAndSkyIrradiance(hit_position, normal, sun_irradiance, sky_irradiance);
-		float3 ground_radiance = kGroundAlbedo* (1.0 / MATH_PI)* (sun_irradiance * GetSunVisibility(hit_position) + sky_irradiance * GetSkyVisibility(hit_position));
+		float3 ground_radiance = kGroundAlbedo * (1.0 / MATH_PI) * (sun_irradiance * GetSunVisibility(hit_position) + sky_irradiance * GetSkyVisibility(hit_position));
 
 		// [TODO] lightshaft
 
