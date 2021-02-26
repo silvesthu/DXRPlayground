@@ -14,8 +14,8 @@ void PrecomputedAtmosphereScattering::Update()
 
 	auto inv_m_to_inv_km							= [](glm::f64 inInvM) { return static_cast<float>(inInvM * 1000.0); };
 
-	atmosphere->mBottomRadius						= UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.BottomRadius());
-	atmosphere->mTopRadius							= UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.TopRadius());
+	atmosphere->mBottomRadius						= static_cast<float>(gAtmosphereProfile.BottomRadius());
+	atmosphere->mTopRadius							= static_cast<float>(gAtmosphereProfile.TopRadius());
 	atmosphere->mSceneScale							= gAtmosphereProfile.mSceneInKilometer ? 1.0f : 0.001f;
 
 	atmosphere->mMode								= gAtmosphereProfile.mMode;
@@ -36,7 +36,7 @@ void PrecomputedAtmosphereScattering::Update()
 		// Rayleigh
 		{
 			// Scattering Coefficient
-			atmosphere->mRayleighScattering			= UnitHelper::sInverseMeterToInverseKilometer<glm::vec3>(gAtmosphereProfile.mRayleighScatteringCoefficient);
+			atmosphere->mRayleighScattering			= gAtmosphereProfile.mRayleighScatteringCoefficient;
 
 			// Extinction Coefficient
 			atmosphere->mRayleighExtinction			= atmosphere->mRayleighScattering;
@@ -48,10 +48,10 @@ void PrecomputedAtmosphereScattering::Update()
 		// Mie
 		{
 			// Scattering Coefficient
-			atmosphere->mMieScattering				= UnitHelper::sInverseMeterToInverseKilometer<glm::vec3>(gAtmosphereProfile.mMieScatteringCoefficient);
+			atmosphere->mMieScattering				= gAtmosphereProfile.mMieScatteringCoefficient;
 
 			// Extinction Coefficient
-			atmosphere->mMieExtinction				= UnitHelper::sInverseMeterToInverseKilometer<glm::vec3>(gAtmosphereProfile.mMieExtinctionCoefficient);
+			atmosphere->mMieExtinction				= gAtmosphereProfile.mMieExtinctionCoefficient;
 
 			// Phase function
 			atmosphere->mMiePhaseFunctionG			= static_cast<float>(gAtmosphereProfile.mMiePhaseFunctionG);
@@ -63,7 +63,7 @@ void PrecomputedAtmosphereScattering::Update()
 		// Ozone
 		{
 			// Extinction Coefficient
-			atmosphere->mOzoneExtinction			= gAtmosphereProfile.mEnableOzone ? UnitHelper::sInverseMeterToInverseKilometer<glm::vec3>(gAtmosphereProfile.mOZoneAbsorptionCoefficient) : glm::vec3();
+			atmosphere->mOzoneExtinction			= gAtmosphereProfile.mEnableOzone ? gAtmosphereProfile.mOZoneAbsorptionCoefficient : glm::dvec3();
 
 			// Density
 			atmosphere->mOzoneDensity				= gAtmosphereProfile.mEnableOzone ? gAtmosphereProfile.mOzoneDensityProfile : ShaderType::DensityProfile();
@@ -245,8 +245,8 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 	{
 		ImGui::PushItemWidth(200);
 
-		ImGui::SliderDouble("Earth Radius (m)", &gAtmosphereProfile.mBottomRadius, 1000.0, 10000000.0);
-		ImGui::SliderDouble("Atmosphere Thickness (m)", &gAtmosphereProfile.mAtmosphereThickness, 1000.0, 100000.0);
+		ImGui::SliderDouble("Earth Radius (km)", &gAtmosphereProfile.mBottomRadius, 1.0, 10000.0);
+		ImGui::SliderDouble("Atmosphere Thickness (km)", &gAtmosphereProfile.mAtmosphereThickness, 1.0, 100.0);
 
 		ImGui::PopItemWidth();
 
@@ -296,16 +296,22 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 				ImGui::SliderFloat("LinearTerm", &sDensityProfile->mLayer1.mLinearTerm, -2.0f, 2.0f);
 				ImGui::SliderFloat("ConstantTerm", &sDensityProfile->mLayer1.mConstantTerm, -2.0f, 2.0f);
 
+				ImGui::NewLine();
+
+				float scale_height = -1.0f / sDensityProfile->mLayer1.mExpScale;
+				if (ImGui::SliderFloat("Scale Height (km) -> ExpScale", &scale_height, 0.1f, 100.0f))
+					sDensityProfile->mLayer1.mExpScale = -1.0f / scale_height;
+
 				ImGui::EndPopup();
 			}
 		};
 
 		if (ImGui::TreeNodeEx("Rayleigh", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			ImGui::SliderDouble3("Scattering  (/m)", &gAtmosphereProfile.mRayleighScatteringCoefficient.x, 1.0e-8, 1.0e-4, "%.3e");
+			ImGui::SliderDouble3("Scattering  (/m)", &gAtmosphereProfile.mRayleighScatteringCoefficient.x, 1.0e-5, 1.0e-1, "%.3e");
 
 			DensityPlot plot;
-			plot.mMax = UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.mAtmosphereThickness);
+			plot.mMax = static_cast<float>(gAtmosphereProfile.mAtmosphereThickness);
 			plot.mProfile = &gAtmosphereProfile.mRayleighDensityProfile;
 			ImGui::PlotLines("Density", DensityPlot::Func, &plot, plot.mCount, 0, nullptr, 0.0f, 1.0f, ImVec2(0, 40));
 			if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
@@ -328,13 +334,13 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 
 		if (ImGui::TreeNodeEx("Mie", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			ImGui::SliderDouble3("Extinction (/m)", &gAtmosphereProfile.mMieExtinctionCoefficient[0], 1.0e-8, 1.0e-4, "%.3e");
-			ImGui::SliderDouble3("Scattering (/m)", &gAtmosphereProfile.mMieScatteringCoefficient[0], 1.0e-8, 1.0e-4, "%.3e");
+			ImGui::SliderDouble3("Extinction (/km)", &gAtmosphereProfile.mMieExtinctionCoefficient[0], 1.0e-5, 1.0e-1, "%.3e");
+			ImGui::SliderDouble3("Scattering (/km)", &gAtmosphereProfile.mMieScatteringCoefficient[0], 1.0e-5, 1.0e-1, "%.3e");
 			ImGui::SliderDouble("Phase Function G", &gAtmosphereProfile.mMiePhaseFunctionG, -1.0f, 1.0f);
 
 			DensityPlot plot;
 			plot.mMin = 0.0f;
-			plot.mMax = UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.mAtmosphereThickness);
+			plot.mMax = static_cast<float>(gAtmosphereProfile.mAtmosphereThickness);
 			plot.mCount = 500;
 			plot.mProfile = &gAtmosphereProfile.mMieDensityProfile;
 			ImGui::PlotLines("Density", DensityPlot::Func, &plot, plot.mCount, 0, nullptr, 0.0f, 1.0f, ImVec2(0, 40));
@@ -358,11 +364,11 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 		{
 			ImGui::Checkbox("Enable", &gAtmosphereProfile.mEnableOzone);
 
-			ImGui::SliderDouble3("Absorption (/m)", &gAtmosphereProfile.mOZoneAbsorptionCoefficient[0], 0.0, 1.0e-5, "%.3e");
+			ImGui::SliderDouble3("Absorption (/km)", &gAtmosphereProfile.mOZoneAbsorptionCoefficient[0], 1.0e-5, 1.0e-1, "%.3e");
 			
 			DensityPlot plot;
 			plot.mMin = 0.0f;
-			plot.mMax = UnitHelper::stMeterToKilometer<float>(gAtmosphereProfile.mAtmosphereThickness);
+			plot.mMax = static_cast<float>(gAtmosphereProfile.mAtmosphereThickness);
 			plot.mCount = 500;
 			plot.mProfile = &gAtmosphereProfile.mOzoneDensityProfile;
 			ImGui::PlotLines("Density", DensityPlot::Func, &plot, plot.mCount, 0, nullptr, 0.0f, 1.0f, ImVec2(0, 40));

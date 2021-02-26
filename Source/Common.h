@@ -403,30 +403,3 @@ inline D3D12_RESOURCE_DESC gGetUAVResourceDesc(UINT64 width)
 	desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 	return desc;
 }
-
-namespace UnitHelper
-{
-	template <typename ToType, typename FromType>
-	static ToType stMeterToKilometer(const FromType& meter)
-	{
-		return ToType(meter * 1e-3);
-	}
-
-	template <typename ToType, typename FromType>
-	static ToType sNanometerToMeter(const FromType& nanometer)
-	{
-		return ToType(nanometer * 1e-9);
-	}
-
-	template <typename ToType, typename FromType>
-	static ToType sInverseMeterToInverseKilometer(const FromType& inverse_meter)
-	{
-		return ToType(inverse_meter * 1e3);
-	}
-
-	template <typename ToType, typename FromType>
-	static ToType sInverseNanometerToInverseKilometer(const FromType& inverse_nanometer)
-	{
-		return ToType(inverse_nanometer * 1e12);
-	}
-}

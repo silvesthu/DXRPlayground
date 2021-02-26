@@ -25,46 +25,47 @@ struct AtmosphereProfile
 	glm::vec4 mConstantColor							= glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
 
 	// Wavelength
-	static constexpr double kLambdaR					= 680.0;											// nm
-	static constexpr double kLambdaG					= 550.0;											// nm
-	static constexpr double kLambdaB					= 440.0;											// nm
-	static constexpr glm::dvec3 kLambda					= glm::dvec3(kLambdaR, kLambdaG, kLambdaB);			// nm
+	static constexpr double kLambdaR					= 680.0e-9;											// m <- nm
+	static constexpr double kLambdaG					= 550.0e-9;											// m <- nm
+	static constexpr double kLambdaB					= 440.0e-9;											// m <- nm
+	static constexpr glm::dvec3 kLambda					= glm::dvec3(kLambdaR, kLambdaG, kLambdaB);			// m
 
 	// Geometry
 	struct GeometryReference
 	{
 		static void Bruneton17(AtmosphereProfile& profile)
 		{
-			profile.mBottomRadius						= 6360000.0;										// m
-			profile.mAtmosphereThickness				= 60000.0;											// m
+			profile.mBottomRadius						= 6360.0;											// km
+			profile.mAtmosphereThickness				= 60.0;												// km
 		}
 
 		static void Yusov13(AtmosphereProfile& profile)
 		{
-			profile.mBottomRadius						= 6360000.0;										// m
-			profile.mAtmosphereThickness				= 80000.0;											// m
+			profile.mBottomRadius						= 6360.0;											// km
+			profile.mAtmosphereThickness				= 80.0;												// km
 		}
 	};
 
-	double mBottomRadius								= {};												// m
-	double mAtmosphereThickness							= {};												// m
-	double BottomRadius() const							{ return mBottomRadius; }							// m
-	double TopRadius() const							{ return mBottomRadius + mAtmosphereThickness; }	// m
+	double mBottomRadius								= {};												// km
+	double mAtmosphereThickness							= {};												// km
+	double BottomRadius() const							{ return mBottomRadius; }							// km
+	double TopRadius() const							{ return mBottomRadius + mAtmosphereThickness; }	// km
 
 	// Rayleigh
 	struct RayleighReference
 	{
 		static void Bruneton17(AtmosphereProfile& profile)
 		{
-			static constexpr double kRayleighScaleHeight = 8000.0;
+			static constexpr double kRayleighScaleHeight = 8.0;
 
 			constexpr double kRayleigh = 1.24062e-6 * 1e-24; // m^4 <- um^4 (?)
-			profile.mRayleighScatteringCoefficient = kRayleigh / glm::pow(UnitHelper::sNanometerToMeter<glm::dvec3>(AtmosphereProfile::kLambda), glm::dvec3(4.0));
+			profile.mRayleighScatteringCoefficient = kRayleigh / glm::pow(AtmosphereProfile::kLambda, glm::dvec3(4.0));
+			profile.mRayleighScatteringCoefficient *= 1e3; // km^-1 <- m^-1
 
 			// [Bruneton08] 2.1 (1), e^(-1/H_R) Density decrease exponentially
 			static constexpr float kDummy = 0.0f;
 			profile.mRayleighDensityProfile.mLayer0 = { kDummy, kDummy, kDummy, kDummy, kDummy };
-			profile.mRayleighDensityProfile.mLayer1 = { kDummy, 1.0f, -1.0f / UnitHelper::stMeterToKilometer<float>(kRayleighScaleHeight), 0.0f, 0.0f };
+			profile.mRayleighDensityProfile.mLayer1 = { kDummy, 1.0f, -1.0f / static_cast<float>(kRayleighScaleHeight), 0.0f, 0.0f };
 
 			// How to get scale height?
 			// https://en.wikipedia.org/wiki/Scale_height
@@ -74,7 +75,7 @@ struct AtmosphereProfile
 		{
 			Bruneton17(profile);
 
-			profile.mRayleighScatteringCoefficient = glm::dvec3(5.8, 13.5, 33.1) * 1e-6; // m^-1
+			profile.mRayleighScatteringCoefficient = glm::dvec3(5.8, 13.5, 33.1) * 1e-3; // km^-1
 		}
 
 		static void Preetham99(AtmosphereProfile& profile)
@@ -89,7 +90,8 @@ struct AtmosphereProfile
 				((8.0 * glm::pow(pi, 3.0) * glm::pow((n * n - 1.0), 2.0)) * (6.0 + 3.0 * p_n)) // Why [Bruneton08] 2.1 (1) omit the right half?
 				/ // -----------------------------------------------------------------------------------------
 				((3.0 * N) * (6.0 - 7.0 * p_n));
-			profile.mRayleighScatteringCoefficient = kRayleigh / glm::pow(UnitHelper::sNanometerToMeter<glm::dvec3>(AtmosphereProfile::kLambda), glm::dvec3(4.0));
+			profile.mRayleighScatteringCoefficient = kRayleigh / glm::pow(AtmosphereProfile::kLambda, glm::dvec3(4.0));
+			profile.mRayleighScatteringCoefficient *= 1e3; // km^-1 <- m^-1
 
 			// [NOTE]
 			// Total Scattering Coefficient = Integral of Angular Scattering Coefficient in all directions
@@ -100,22 +102,22 @@ struct AtmosphereProfile
 		{
 			Preetham99(profile);
 
-			static constexpr double kRayleighScaleHeight = 7994.0;
+			static constexpr double kRayleighScaleHeight = 7.994;
 
 			static constexpr float kDummy = 0.0f;
 			profile.mRayleighDensityProfile.mLayer0 = { kDummy, kDummy, kDummy, kDummy, kDummy };
-			profile.mRayleighDensityProfile.mLayer1 = { kDummy, 1.0f, -1.0f / UnitHelper::stMeterToKilometer<float>(kRayleighScaleHeight), 0.0f, 0.0f };
+			profile.mRayleighDensityProfile.mLayer1 = { kDummy, 1.0f, -1.0f / static_cast<float>(kRayleighScaleHeight), 0.0f, 0.0f };
 		}
 	};
 	ShaderType::DensityProfile mRayleighDensityProfile	= {}; // km
-	glm::dvec3 mRayleighScatteringCoefficient			= {}; // m^-1
+	glm::dvec3 mRayleighScatteringCoefficient			= {}; // km^-1
 
 	// Mie
 	struct MieReference
 	{
 		static void Bruneton17(AtmosphereProfile& profile)
 		{
-			static constexpr double kMieScaleHeight = 1200.0;
+			static constexpr double kMieScaleHeight = 1.2; // km
 
 			// [Wikipedia] The Angstrom exponent is a parameter that describes how the optical thickness of an aerosol typically depends on the wavelength of the light.
 			static constexpr double kMieAngstromAlpha = 0.0;
@@ -123,23 +125,23 @@ struct AtmosphereProfile
 			static constexpr double kMieSingleScatteringAlbedo = 0.9;
 
 			// [TODO] Different from paper?
-			profile.mMieExtinctionCoefficient = kMieAngstromBeta / kMieScaleHeight * glm::pow(profile.kLambda, glm::dvec3(-kMieAngstromAlpha));
-			profile.mMieScatteringCoefficient = profile.mMieExtinctionCoefficient * kMieSingleScatteringAlbedo;
+			profile.mMieExtinctionCoefficient = kMieAngstromBeta / kMieScaleHeight * glm::pow(profile.kLambda, glm::dvec3(-kMieAngstromAlpha)); // km^-1
+			profile.mMieScatteringCoefficient = profile.mMieExtinctionCoefficient * kMieSingleScatteringAlbedo; // km^-1
 
 			profile.mMiePhaseFunctionG = 0.8;
 
 			// [Bruneton08] 2.1 (3), e^(-1/H_M) Density decrease exponentially
 			static constexpr float kDummy = 0.0f;
 			profile.mMieDensityProfile.mLayer0 = { kDummy, kDummy, kDummy, kDummy, kDummy };
-			profile.mMieDensityProfile.mLayer1 = { kDummy, 1.0f, -1.0f / UnitHelper::stMeterToKilometer<float>(kMieScaleHeight), 0.0f, 0.0f };
+			profile.mMieDensityProfile.mLayer1 = { kDummy, 1.0f, -1.0f / static_cast<float>(kMieScaleHeight), 0.0f, 0.0f };
 		}
 
 		static void Bruneton08(AtmosphereProfile& profile) // 2.1 (3), beta_M(0, lambda)
 		{
 			Bruneton17(profile);
 
-			profile.mMieScatteringCoefficient = glm::dvec3(20.0, 20.0, 20.0) * 1e-6;
-			profile.mMieExtinctionCoefficient = profile.mMieScatteringCoefficient / 0.9;
+			profile.mMieScatteringCoefficient = glm::dvec3(20.0, 20.0, 20.0) * 1e-3; // km^-1
+			profile.mMieExtinctionCoefficient = profile.mMieScatteringCoefficient / 0.9; // km^-1
 
 			profile.mMiePhaseFunctionG = 0.76;
 		}
@@ -152,8 +154,8 @@ struct AtmosphereProfile
 		}
 	};
 	ShaderType::DensityProfile mMieDensityProfile		= {}; // km
-	glm::dvec3 mMieScatteringCoefficient				= {}; // m^-1
-	glm::dvec3 mMieExtinctionCoefficient				= {}; // m^-1
+	glm::dvec3 mMieScatteringCoefficient				= {}; // km^-1
+	glm::dvec3 mMieExtinctionCoefficient				= {}; // km^-1
 	double mMiePhaseFunctionG							= {};
 
 	// Ozone 
@@ -162,9 +164,9 @@ struct AtmosphereProfile
 		static void UpdateDensityProfile(AtmosphereProfile& profile)
 		{
 			// Density increase linearly, then decrease linearly
-			float ozone_bottom_altitude = UnitHelper::stMeterToKilometer<float>(profile.mOzoneBottomAltitude);
-			float ozone_mid_altitude = UnitHelper::stMeterToKilometer<float>(profile.mOzoneMidAltitude);
-			float ozone_top_altitude = UnitHelper::stMeterToKilometer<float>(profile.mOzoneTopAltitude);
+			float ozone_bottom_altitude = static_cast<float>(profile.mOzoneBottomAltitude);
+			float ozone_mid_altitude = static_cast<float>(profile.mOzoneMidAltitude);
+			float ozone_top_altitude = static_cast<float>(profile.mOzoneTopAltitude);
 			float layer_0_linear_term, layer_0_constant_term, layer_1_linear_term, layer_1_constant_term;
 			{
 				// Altitude -> Density
@@ -185,24 +187,25 @@ struct AtmosphereProfile
 		{ 
 			profile.mEnableOzone = true;
 
-			profile.mOzoneBottomAltitude				= 10000.0;
-			profile.mOzoneMidAltitude					= 25000.0;
-			profile.mOzoneTopAltitude					= 40000.0;
+			profile.mOzoneBottomAltitude				= 10.0;
+			profile.mOzoneMidAltitude					= 25.0;
+			profile.mOzoneTopAltitude					= 40.0;
 
 			constexpr double kDobsonUnit = 2.687e20; // m^-2
 			constexpr double kMaxOzoneNumberDensity	= 300.0 * kDobsonUnit / 15000.0; // m^-2
 			constexpr glm::dvec3 kOzoneCrossSection	= glm::dvec3(1.209e-25, 3.5e-25, 1.582e-26); // m^2
 			profile.mOZoneAbsorptionCoefficient = kMaxOzoneNumberDensity * kOzoneCrossSection;
+			profile.mOZoneAbsorptionCoefficient *= 1e3; // km^1 <- m^-1
 
 			UpdateDensityProfile(profile);
 		}
 	};
 	bool mEnableOzone									= {};
-	double mOzoneBottomAltitude							= {}; // m
-	double mOzoneMidAltitude							= {}; // m
-	double mOzoneTopAltitude							= {}; // m
+	double mOzoneBottomAltitude							= {}; // km
+	double mOzoneMidAltitude							= {}; // km
+	double mOzoneTopAltitude							= {}; // km
 	ShaderType::DensityProfile mOzoneDensityProfile		= {}; // km
-	glm::dvec3 mOZoneAbsorptionCoefficient				= {}; // m^-1
+	glm::dvec3 mOZoneAbsorptionCoefficient				= {}; // km^-1
 
 	// Solar
 	struct SolarIrradianceReference
