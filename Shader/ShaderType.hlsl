@@ -1,6 +1,7 @@
 // Code shared between HLSL and C++
 
 static const uint sRecursionCountMax = 4;
+static const float kSunLuminousEfficacy = 93.0; // lm/W
 
 struct PerFrame
 {

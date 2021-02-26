@@ -25,8 +25,7 @@ float3 RadianceToLuminance(float3 radiance)
 	// https://en.wikipedia.org/wiki/Luminous_efficacy
 	// https://en.wikipedia.org/wiki/Sunlight#Measurement
 
-	float kW_to_W = 1000.0; // W/kW
-	float kSunLuminousEfficacy = 93.0; // lm/W
+	float kW_to_W = 1000.0;
 	float3 luminance = radiance * kW_to_W * kSunLuminousEfficacy * kPreExposure;
 	return luminance;
 
@@ -383,7 +382,7 @@ void GetSunAndSkyIrradiance(float3 hit_position, float3 normal, out float3 sun_i
 
 	// Indirect irradiance (approximated if the surface is not horizontal).
 	float3 solar_irradiance = mAtmosphere.mPrecomputeWithSolarIrradiance ? 1.0 : mAtmosphere.mSolarIrradiance;
-	sky_irradiance = solar_irradiance * GetIrradiance(r, mu_s)* (1.0 + dot(normal, local_position) / r) * 0.5;
+	sky_irradiance = solar_irradiance * GetIrradiance(r, mu_s) * (1.0 + dot(normal, local_position) / r) * 0.5;
 
 	// Direct irradiance.
 	sun_irradiance = mAtmosphere.mSolarIrradiance * GetTransmittanceToSun(r, mu_s) * max(dot(normal, sun_direction), 0.0);

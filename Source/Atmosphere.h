@@ -222,6 +222,7 @@ struct AtmosphereProfile
 		}
 	};
 	glm::vec3 mSolarIrradiance							= {}; // kW/m^2. why is this W/m^2 in [Bruneton17]
+	bool mShowSolarIrradianceAsLuminance				= false;
 	bool mPrecomputeWithSolarIrradiance					= true;
 
 	// [Note] Calculated based on Sun seen from Earth
