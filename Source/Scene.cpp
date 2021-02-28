@@ -518,6 +518,23 @@ void Scene::CreateShaderResource()
 
 			handle.ptr += increment_size;
 		}
+
+		// t, space3 - Cloud
+		for (auto&& texture : gCloudResources.mTextures)
+		{
+			if (texture->mResource == nullptr)
+				continue;
+
+			D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
+			srv_desc.Format = texture->mFormat;
+			srv_desc.ViewDimension = texture->mDepth == 1 ? D3D12_SRV_DIMENSION_TEXTURE2D : D3D12_SRV_DIMENSION_TEXTURE3D;
+			srv_desc.Texture2D.MipLevels = (UINT)-1;
+			srv_desc.Texture2D.MostDetailedMip = 0;
+			srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+			gDevice->CreateShaderResourceView(texture->mResource.Get(), &srv_desc, handle);
+
+			handle.ptr += increment_size;
+		}
 	}
 }
 

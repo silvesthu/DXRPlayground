@@ -122,7 +122,7 @@ void GenerateGlobalRootSignatureDescriptor(RootSignatureDescriptor& outDesc)
 	descriptor_range.RegisterSpace = 2;
 	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 	descriptor_range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-	for (int i = 0; i <= 6; i++)
+	for (int i = 0; i < gPrecomputedAtmosphereScatteringResources.mTextures.size(); i++)
 	{
 		descriptor_range.BaseShaderRegister = i;
 		outDesc.mDescriptorRanges.push_back(descriptor_range);
@@ -137,6 +137,18 @@ void GenerateGlobalRootSignatureDescriptor(RootSignatureDescriptor& outDesc)
 	descriptor_range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 	outDesc.mDescriptorRanges.push_back(descriptor_range);
 
+	// t, space3 - Cloud
+	descriptor_range = {};
+	descriptor_range.NumDescriptors = 1;
+	descriptor_range.RegisterSpace = 3;
+	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	descriptor_range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	for (int i = 0; i < gCloudResources.mTextures.size(); i++)
+	{
+		descriptor_range.BaseShaderRegister = i;
+		outDesc.mDescriptorRanges.push_back(descriptor_range);
+	}
+
 	// Table
 	D3D12_ROOT_PARAMETER root_parameter = {};
 	root_parameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
@@ -145,9 +157,6 @@ void GenerateGlobalRootSignatureDescriptor(RootSignatureDescriptor& outDesc)
 	outDesc.mRootParameters.push_back(root_parameter);
 
 	D3D12_STATIC_SAMPLER_DESC sampler = {};
-	sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-	sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-	sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
 	sampler.MipLODBias = 0.f;
 	sampler.MaxAnisotropy = 0;
 	sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
@@ -158,10 +167,16 @@ void GenerateGlobalRootSignatureDescriptor(RootSignatureDescriptor& outDesc)
 	sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
 	sampler.ShaderRegister = 0;
-	sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+	sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+	sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+	sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+	sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
 	outDesc.mStaticSamplerDescs.push_back(sampler);
 
 	sampler.ShaderRegister = 1;
+	sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+	sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+	sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
 	sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
 	outDesc.mStaticSamplerDescs.push_back(sampler);
 
@@ -437,6 +452,9 @@ void gCreatePipelineState()
 		succeed &= sCreatePipelineState(shader_filename, shader_stream,	gCompositeShader);
 
 		for (auto&& shader : gPrecomputedAtmosphereScatteringResources.mShaders)
+			succeed &= sCreatePipelineState(shader_filename, shader_stream, *shader);
+
+		for (auto&& shader : gCloudResources.mShaders)
 			succeed &= sCreatePipelineState(shader_filename, shader_stream, *shader);
 
 		if (!succeed)

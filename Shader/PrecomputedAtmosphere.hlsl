@@ -31,8 +31,8 @@ Texture3D<float4> DeltaScatteringDensitySRV : register(t6, space2);
 	", SRV(t0, space = 2, numDescriptors = 7)"			\
 ")"														\
 ", RootConstants(num32BitConstants=4, b1, space = 2)"	\
-", StaticSampler(s0, filter = FILTER_MIN_MAG_MIP_POINT, addressU = TEXTURE_ADDRESS_CLAMP, addressV = TEXTURE_ADDRESS_CLAMP, addressW = TEXTURE_ADDRESS_CLAMP)"	\
-", StaticSampler(s1, filter = FILTER_MIN_MAG_MIP_LINEAR, addressU = TEXTURE_ADDRESS_CLAMP, addressV = TEXTURE_ADDRESS_CLAMP, addressW = TEXTURE_ADDRESS_CLAMP)"
+", StaticSampler(s0, filter = FILTER_MIN_MAG_MIP_LINEAR, addressU = TEXTURE_ADDRESS_CLAMP, addressV = TEXTURE_ADDRESS_CLAMP, addressW = TEXTURE_ADDRESS_CLAMP)"	\
+", StaticSampler(s1, filter = FILTER_MIN_MAG_MIP_LINEAR, addressU = TEXTURE_ADDRESS_WRAP, addressV = TEXTURE_ADDRESS_WRAP, addressW = TEXTURE_ADDRESS_WRAP)"
 
 float invlerp(float a, float b, float x)
 {
@@ -1069,7 +1069,7 @@ void ComputeMultipleScattering(float4 r_mu_mu_s_nu, bool intersects_ground, out 
 
 		// The Rayleigh and Mie multiple scattering at the current sample point.
 		float3 rayleigh_mie_i =
-			GetScattering(DeltaScatteringDensitySRV, r_i, mu_i, mu_s_i, nu, intersects_ground)
+			GetScattering(DeltaScatteringDensitySRV, r_i, mu_i, mu_s_i, nu, intersects_ground).xyz
 			*
 			GetTransmittance(r, mu, d_i, intersects_ground)
 			*

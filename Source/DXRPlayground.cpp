@@ -52,7 +52,7 @@ static ScenePreset kScenePresets[(int)ScenePresetType::COUNT] =
 
 	{ "Rungholt",								"Asset/extra/rungholt/rungholt.obj",												glm::vec4(-234.0f, 88.0f, 98.0f, 0.0f),		glm::vec4(0.88f, -0.15f, -0.45f, 0.0f), glm::mat4x4(1.0f) },
 
-	{ "Debug",									"Asset/primitives/sphere.obj",														glm::vec4(0.0f, 0.0f, 9.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		glm::translate(glm::vec3(0.0f, 1.0f, 0.0f)) },
+	{ "Debug",									"Asset/primitives/sphere.obj",														glm::vec4(0.0f, 0.0f, 9.0f, 0.0f),			glm::vec4(0.0f, 0.4f, -0.9f, 0.0f),		glm::translate(glm::vec3(0.0f, 1.0f, 0.0f)) },
 };
 static ScenePresetType sCurrentScene = ScenePresetType::Debug;
 static ScenePresetType sPreviousScene = ScenePresetType::Debug;
@@ -314,7 +314,7 @@ static void sUpdate()
 				ImGui::TreePop();
 			}
 
-			if (ImGui::TreeNodeEx("Atmosphere", ImGuiTreeNodeFlags_DefaultOpen))
+			if (ImGui::TreeNodeEx("Atmosphere"))
 			{
 				gPrecomputedAtmosphereScattering.UpdateImGui();
 				ImGui::TreePop();
@@ -354,6 +354,7 @@ static void sUpdate()
 			gPerFrameConstantBuffer.mReset = 1;
 
 			gPrecomputedAtmosphereScattering.mRecomputeRequested = true;
+			gCloud.mRecomputeRequested = true;
 		}
 	}
 }
@@ -545,6 +546,7 @@ void sRender()
 	// Cloud
 	{
 		gCloud.Update();
+		gCloud.Precompute();
 	}
 
 	// Raytrace

@@ -1,6 +1,9 @@
 // Code shared between HLSL and C++
 
 static const uint sRecursionCountMax = 4;
+
+// https://en.wikipedia.org/wiki/Luminous_efficacy
+// https://en.wikipedia.org/wiki/Sunlight#Measurement
 static const float kSunLuminousEfficacy = 93.0; // lm/W
 
 struct PerFrame
@@ -166,16 +169,47 @@ struct Atmosphere
 
 struct AtmospherePerDraw
 {
-	uint					mScatteringOrder		CONSTANT_DEFAULT(0);
-	uint					mPad0;
-	uint					mPad1;
-	uint					mPad2;
+	uint						mScatteringOrder		CONSTANT_DEFAULT(0);
+	uint						mPad0;
+	uint						mPad1;
+	uint						mPad2;
+};
+
+struct CloudRaymarch
+{
+	uint						mSampleCount			CONSTANT_DEFAULT(0);
+	uint						mLightSampleCount		CONSTANT_DEFAULT(0);
+	float						mLightSampleLength		CONSTANT_DEFAULT(0);
+	float						mPad;
+};
+
+struct CloudGeometry
+{
+	float						mStrato					CONSTANT_DEFAULT(0);
+	float						mAlto					CONSTANT_DEFAULT(0);
+	float						mCirro					CONSTANT_DEFAULT(0);
+	float						mPad;
+};
+
+struct CloudShapeNoise
+{
+	float3						mOffset					CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	float						mPad3;
+
+	float						mFrequency				CONSTANT_DEFAULT(0);
+	float						mPower					CONSTANT_DEFAULT(0);
+	float						mScale					CONSTANT_DEFAULT(0);
+	float						mPad4;
 };
 
 struct Cloud
 {
-	CloudMode				mMode					CONSTANT_DEFAULT(CloudMode::RuntimeNoise);
-	uint					mPad0;
-	uint					mPad1;
-	uint					mPad2;
+	CloudMode					mMode					CONSTANT_DEFAULT(CloudMode::Noise);
+	uint						mPad0;
+	uint						mPad1;
+	uint						mPad2;
+
+	CloudRaymarch				mRaymarch;
+	CloudGeometry				mGeometry;
+	CloudShapeNoise				mShapeNoise;
 };

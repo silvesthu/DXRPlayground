@@ -163,7 +163,6 @@ void Texture::Initialize()
 	
 	// SRV for ImGui
 	ImGui_ImplDX12_AllocateDescriptor(mCPUHandle, mGPUHandle);
-
 	D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
 	srv_desc.Format = mFormat;
 	srv_desc.ViewDimension = mDepth == 1 ? D3D12_SRV_DIMENSION_TEXTURE2D : D3D12_SRV_DIMENSION_TEXTURE3D;
@@ -171,4 +170,101 @@ void Texture::Initialize()
 	srv_desc.Texture2D.MostDetailedMip = 0;
 	srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 	gDevice->CreateShaderResourceView(mResource.Get(), &srv_desc, mCPUHandle);
+
+	// Prepare intermediate resource
+	if (mPath != nullptr)
+	{
+		DirectX::GetMetadataFromTGAFile(mPath, mMetadata);
+		CreateTextureEx(gDevice, mMetadata, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, false, &mIntermediateResource);
+	}
+}
+
+void Texture::Load()
+{
+	if (mPath == nullptr)
+		return;
+
+	// Load file
+	DirectX::ScratchImage scratch_image;
+	DirectX::LoadFromTGAFile(mPath, nullptr, scratch_image);
+
+	// Prepare upload resource
+	std::vector<D3D12_SUBRESOURCE_DATA> subresources;
+	PrepareUpload(gDevice, scratch_image.GetImages(), scratch_image.GetImageCount(), scratch_image.GetMetadata(), subresources);
+	UINT64 byte_count = GetRequiredIntermediateSize(mIntermediateResource.Get(), 0, UINT(subresources.size()));
+	D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(byte_count);
+	D3D12_HEAP_PROPERTIES upload_properties = gGetUploadHeapProperties();
+	gValidate(gDevice->CreateCommittedResource(&upload_properties, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mUploadResource)));
+
+	// Upload
+	UpdateSubresources(gCommandList, mIntermediateResource.Get(), mUploadResource.Get(), 0, 0, (UINT)subresources.size(), subresources.data());
+}
+
+void ImGuiShowTextures(std::vector<Texture*>& textures)
+{
+	static float ui_scale = 1.0f;
+	static bool flip_y = false;
+
+	if (ImGui::TreeNodeEx("Textures", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		static Texture* sTexture = nullptr;
+		auto add_texture = [&](Texture& inTexture)
+		{
+			ImVec2 uv0 = ImVec2(0, 0);
+			ImVec2 uv1 = ImVec2(1, 1);
+
+			if (flip_y)
+				std::swap(uv0.y, uv1.y);
+
+			float item_ui_scale = inTexture.mUIScale * ui_scale;
+			ImGui::Image((ImTextureID)inTexture.mGPUHandle.ptr, ImVec2(inTexture.mWidth * item_ui_scale, inTexture.mHeight * item_ui_scale), uv0, uv1);
+			if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+			{
+				sTexture = &inTexture;
+				ImGui::OpenPopup("Image Options");
+			}
+
+			ImGui::SameLine();
+			std::string text = "-----------------------------------\n";
+			text += inTexture.mName;
+			text += "\n";
+			text += std::to_string(inTexture.mWidth) + " x " + std::to_string(inTexture.mHeight) + (inTexture.mDepth == 1 ? "" : " x " + std::to_string(inTexture.mDepth));
+			text += "\n";
+			text += nameof::nameof_enum(inTexture.mFormat);
+			ImGui::Text(text.c_str());
+		};
+
+		if (ImGui::BeginPopup("Image Options"))
+		{
+			if (sTexture != nullptr)
+			{
+				ImGui::Text(sTexture->mName);
+
+				if (ImGui::Button("Dump"))
+					gDumpTexture = sTexture;
+
+				ImGui::Separator();
+			}
+
+			ImGui::TextureOption();
+
+			// Extra options
+			{
+				ImGui::PushItemWidth(100);
+
+				ImGui::SliderFloat("UI Scale", &ui_scale, 1.0, 4.0f);
+				ImGui::SameLine();
+				ImGui::Checkbox("Flip Y", &flip_y);
+
+				ImGui::PopItemWidth();
+			}
+
+			ImGui::EndPopup();
+		}
+
+		for (auto&& texture : textures)
+			add_texture(*texture);
+
+		ImGui::TreePop();
+	}
 }

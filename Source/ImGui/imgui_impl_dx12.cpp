@@ -63,7 +63,7 @@ namespace ImGui
 	{
 		ImGui::PushItemWidth(100);
 
-        ImGui::Text("Image Options");
+		ImGui::Text("Image Options");
 		ImGui::SliderFloat("Min", &g_TextureMin, 0.0, 1.0f); ImGui::SameLine(); ImGui::SliderFloat("Max", &g_TextureMax, 0.0, 1.0f);
 		ImGui::SliderFloat("Depth Slice", &g_TextureDepth, 0.0, 1.0f);
 		ImGui::Checkbox("Show Alpha", &g_TextureAlpha);

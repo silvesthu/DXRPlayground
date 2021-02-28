@@ -213,7 +213,7 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 		if (gAtmosphereProfile.mMode == AtmosphereMode::ConstantColor)
 			ImGui::ColorEdit3("Color", (float*)&gAtmosphereProfile.mConstantColor, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
 
-		ImGui::Checkbox("Scene Unit: Kilometer : Meter", &gAtmosphereProfile.mSceneInKilometer);
+		ImGui::Checkbox("Scene Unit is Kilometer, otherwise Meter", &gAtmosphereProfile.mSceneInKilometer);
 
 		ImGui::Checkbox("Aerial Perspective", &gAtmosphereProfile.mAerialPerspective);
 
@@ -421,59 +421,5 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 		ImGui::TreePop();
 	}
 
-	if (ImGui::TreeNodeEx("Textures", ImGuiTreeNodeFlags_DefaultOpen))
-	{
-		ImGui::PushItemWidth(100); ImGui::SliderFloat("UI Scale", &mUIScale, 1.0, 4.0f); ImGui::PopItemWidth();
-		ImGui::SameLine();
-		ImGui::Checkbox("UI Flip Y", &mUIFlipY);
-
-		static Texture* sTexture = nullptr;
-		auto add_texture = [&](Texture& inTexture)
-		{
-			ImVec2 uv0 = ImVec2(0, 0);
-			ImVec2 uv1 = ImVec2(1, 1);
-			
-			if (mUIFlipY)
-				std::swap(uv0.y, uv1.y);
-
-			float ui_scale = inTexture.mUIScale * mUIScale;
-			ImGui::Image((ImTextureID)inTexture.mGPUHandle.ptr, ImVec2(inTexture.mWidth * ui_scale, inTexture.mHeight * ui_scale), uv0, uv1);
-			if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
-			{
-				sTexture = &inTexture;
-				ImGui::OpenPopup("Image Options");
-			}
-
-			ImGui::SameLine();
-			std::string text = "-----------------------------------\n"; 
-			text += inTexture.mName;
-			text += "\n";
-			text += std::to_string(inTexture.mWidth) + " x " + std::to_string(inTexture.mHeight) + (inTexture.mDepth == 1 ? "" : " x " + std::to_string(inTexture.mDepth));
-			text += "\n";
-			text += nameof::nameof_enum(inTexture.mFormat);
-			ImGui::Text(text.c_str());
-		};
-
-		if (ImGui::BeginPopup("Image Options"))
-		{
-			if (sTexture != nullptr)
-			{
-				ImGui::Text(sTexture->mName);
-
-				if (ImGui::Button("Dump"))
-					gDumpTexture = sTexture;
-
-				ImGui::Separator();
-			}
-
-			ImGui::TextureOption();
-
-			ImGui::EndPopup();
-		}
-
-		for (auto&& texture : gPrecomputedAtmosphereScatteringResources.mTextures)
-			add_texture(*texture);
-
-		ImGui::TreePop();
-	}
+	ImGuiShowTextures(gPrecomputedAtmosphereScatteringResources.mTextures);
 }

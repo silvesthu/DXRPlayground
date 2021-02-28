@@ -242,7 +242,7 @@ struct AtmosphereProfile
 	glm::vec3 mRuntimeGroundAlbedo						= glm::vec3(0.0f, 0.0f, 0.04f);
 
 	// Unit
-	bool mSceneInKilometer								= true; // Meter otherwise
+	bool mSceneInKilometer								= false; // Meter otherwise
 
 	// Default
 	AtmosphereProfile()
@@ -276,9 +276,6 @@ public:
 
 	bool mRecomputeRequested = true;
 	bool mRecomputeEveryFrame = false;
-
-	float mUIScale = 1.0f;
-	bool mUIFlipY = false;
 };
 
 struct PrecomputedAtmosphereScatteringResources
@@ -357,7 +354,6 @@ struct PrecomputedAtmosphereScatteringResources
 		&mDeltaScatteringDensityTexture
 	};
 
-	// Default
 	PrecomputedAtmosphereScatteringResources()
 	{
 		Bruneton17(*this);

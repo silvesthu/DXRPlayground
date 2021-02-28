@@ -23,6 +23,7 @@ using Microsoft::WRL::ComPtr;
 #include "Thirdparty/glm/glm/gtx/transform.hpp"
 #include "Thirdparty/nameof/include/nameof.hpp"
 #include "Thirdparty/DirectXTex/DirectXTex/DirectXTex.h"
+#include "Thirdparty/DirectXTex/DirectXTex/d3dx12.h"
 #include "ImGui/imgui_impl_helper.h"
 
 // System
@@ -96,6 +97,7 @@ struct Texture
 	TEXTURE_MEMBER(DXGI_FORMAT, Format, DXGI_FORMAT_R32G32B32A32_FLOAT);
 	TEXTURE_MEMBER(const char*, Name, nullptr);
 	TEXTURE_MEMBER(float, UIScale, 1.0f);
+	TEXTURE_MEMBER(const wchar_t*, Path, nullptr);
 
 	Texture& Dimension(glm::uvec3 dimension) 
 	{
@@ -106,10 +108,15 @@ struct Texture
 	}
 
 	void Initialize();
+	void Load();
 
 	ComPtr<ID3D12Resource> mResource;
 	D3D12_CPU_DESCRIPTOR_HANDLE mCPUHandle = {};
 	D3D12_GPU_DESCRIPTOR_HANDLE mGPUHandle = {};
+
+	ComPtr<ID3D12Resource> mIntermediateResource;
+	ComPtr<ID3D12Resource> mUploadResource;
+	DirectX::TexMetadata mMetadata = {};
 };
 
 extern Shader								gCompositeShader;
@@ -207,7 +214,7 @@ enum class CloudMode
 {
 	None = 0,
 
-	RuntimeNoise,
+	Noise,
 
 	Count
 };
@@ -339,6 +346,26 @@ inline void gBarrierTransition(ID3D12GraphicsCommandList4* command_list, ID3D12R
 	command_list->ResourceBarrier(1, &barrier);
 }
 
+struct BarrierScope
+{
+	BarrierScope(ID3D12GraphicsCommandList4* command_list, ID3D12Resource* resource, D3D12_RESOURCE_STATES state_before, D3D12_RESOURCE_STATES state_after)
+		: mCommandList(command_list), mResource(resource), mStateBefore(state_before), mStateAfter(state_after)
+	{
+		gBarrierTransition(mCommandList, mResource, mStateBefore, mStateAfter);
+	}
+
+	~BarrierScope()
+	{
+		gBarrierTransition(mCommandList, mResource, mStateAfter, mStateBefore);
+	}
+
+private:
+	ID3D12GraphicsCommandList4* mCommandList{};
+	ID3D12Resource* mResource{};
+	D3D12_RESOURCE_STATES mStateBefore{};
+	D3D12_RESOURCE_STATES mStateAfter{};
+};
+
 inline void gBarrierUAV(ID3D12GraphicsCommandList4* command_list, ID3D12Resource* resource)
 {
 	D3D12_RESOURCE_BARRIER barrier = {};
@@ -403,3 +430,5 @@ inline D3D12_RESOURCE_DESC gGetUAVResourceDesc(UINT64 width)
 	desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 	return desc;
 }
+
+void ImGuiShowTextures(std::vector<Texture*>& textures);

@@ -26,6 +26,11 @@ namespace ImGui
 	{
 		return SliderScalarN(label, ImGuiDataType_Double, v, 3, &v_min, &v_max, format, power);
 	}
+
+	inline bool SliderUint(const char* label, unsigned int* v, unsigned int v_min, unsigned int v_max, const char* format = "%d")
+	{
+		return SliderScalar(label, ImGuiDataType_U32, v, &v_min, &v_max, format);
+	}
 }
 
 struct ExampleAppLog

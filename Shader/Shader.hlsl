@@ -15,8 +15,8 @@ cbuffer PerFrameBuffer : register(b0, space0)
 	PerFrame mPerFrame;
 };
 
-SamplerState PointSampler : register(s0);
-SamplerState BilinearSampler : register(s1);
+SamplerState BilinearSampler : register(s0);
+SamplerState BilinearWrapSampler : register(s1);
 
 //////////////////////////////////////////////////////////////////////////////////
 
@@ -40,6 +40,9 @@ float3 RadianceToLuminance(float3 radiance)
 
 #include "PrecomputedAtmosphere.hlsl"
 #include "Cloud.hlsl"
+
+Texture3D<float4> CloudShapeNoiseSRV : register(t0, space3);
+Texture3D<float4> CloudErosionNoiseSRV : register(t1, space3);
 
 //////////////////////////////////////////////////////////////////////////////////
 
@@ -115,6 +118,12 @@ float3 LuminanceToColor(float3 luminance)
 
 		float exposure_normalization_factor = 1.0 / (pow(2.0, mPerFrame.mEV100) * kLensSaturation); // = 1.0 / luminance_max
 		normalized_luminance = luminance * (exposure_normalization_factor / kPreExposure);
+
+		// [Reference]
+		// https://en.wikipedia.org/wiki/Exposure_value
+		// https://knarkowicz.wordpress.com/2016/01/09/automatic-exposure/
+		// https://seblagarde.files.wordpress.com/2015/07/course_notes_moving_frostbite_to_pbr_v32.pdf
+		// https://docs.unrealengine.com/en-US/RenderingAndGraphics/PostProcessEffects/ColorGrading/index.html
 	}
 
 	float3 tonemapped_color = 0;
@@ -126,6 +135,10 @@ float3 LuminanceToColor(float3 luminance)
 		case TonemapMode_Passthrough: tonemapped_color = normalized_luminance; break;
 		case TonemapMode_knarkowicz: tonemapped_color = Tonemap_knarkowicz(normalized_luminance); break;
 		}
+
+		// [Reference]
+		// https://github.com/ampas/aces-dev
+		// https://docs.unrealengine.com/en-US/RenderingAndGraphics/PostProcessEffects/ColorGrading/index.html
 	}
 
 	return tonemapped_color;
@@ -532,23 +545,55 @@ float fbm(float3 p)
 // [Schneider16]
 float SampleCloudDensity(float3 p, bool sample_coarse)
 {
-	float3 wind_direction = float3(1, 0, 0);
-	float wind_speed = 1.0;
-	float3 scroll = mPerFrame.mTime * wind_direction * wind_speed;
+	float density = 0;
 
-	// [TODO] use noise texture
-	float noise = fbm(p * 0.02 + scroll);
-	return pow(noise, 10.0) * 1.0;
+	// FBM noise
+	if (false)
+	{
+		float frequency = mCloud.mShapeNoise.mFrequency * 10.0;
+		float power = mCloud.mShapeNoise.mPower * 0.2;
+		float scale = mCloud.mShapeNoise.mScale;
+		float3 offset = mCloud.mShapeNoise.mOffset;
+
+		float shape = fbm((p + offset) * frequency);
+		shape = pow(shape, power) * scale;
+
+		density = shape;
+	}
+
+	// Noise texture
+	// if (false)
+	{
+		float frequency = mCloud.mShapeNoise.mFrequency;
+		float power = mCloud.mShapeNoise.mPower;
+		float scale = mCloud.mShapeNoise.mScale;
+		float3 offset = mCloud.mShapeNoise.mOffset;
+
+		// [TODO] Skew
+
+		float shape = CloudShapeNoiseSRV.SampleLevel(BilinearWrapSampler, (p + offset) * frequency, 0).x;
+		shape = pow(shape, power) * scale;
+
+		float erosion = CloudErosionNoiseSRV.SampleLevel(BilinearWrapSampler, (p + offset * 0.9) * frequency * 2, 0).x;
+		// shape *= saturate(pow(erosion, 4));
+
+		density = shape;
+	}
+
+	// Debug
+	// density = 0.02;
+
+	return density;
 }
 
-float SampleCloudDensityAlongCone(float3 p, float3 ray_direction)
+float SampleCloudDensityAlongCone(float3 p, float3 ray_direction, out float3 ray_end)
 {
-	int sample_count = 6;
-	float light_step_length = 100.0; // m
-	float3 light_step = ray_direction * light_step_length;
-
 	float accumulated_density = 0.0;
-	for (int i = 0; i < sample_count; i++)
+
+	float3 light_step = ray_direction * mCloud.mRaymarch.mLightSampleLength;
+
+	p += light_step * 0.5;
+	for (int i = 0; i < mCloud.mRaymarch.mLightSampleCount; i++)
 	{
 		// [TODO] line -> cone
 		p += light_step;
@@ -556,35 +601,73 @@ float SampleCloudDensityAlongCone(float3 p, float3 ray_direction)
 		// [TODO] utilize coarse
 		accumulated_density += SampleCloudDensity(p, false);
 	}
+	p += light_step * 0.5;
+	ray_end = p;
 
 	return accumulated_density;
 }
 
 float3 RaymarchCloud(out float3 transmittance)
 {
+	transmittance = 1.0;
+
 	float3 accumulated_light = 0;
 	float accumulated_density = 0.0;
 
 	// Cloud
 	{
-		// [Schneider16]
-
 		// Stubs
-		int sample_count = 20;
 		int zero_density_max = 6;
-		float step_length = 10.0;
 
-		float3 position = RayOrigin();
+		// Bottom of cloud scape
+		float2 distance_range = 0;
+
+		// Ignore alto for now
+		float2 distance_to_planet = 0;
+		bool hit_planet = IntersectRaySphere(RayOrigin(), RayDirection(), PlanetCenter(), PlanetRadius() + 0, distance_to_planet);
+		float2 distance_to_strato = 0;
+		bool hit_strato = IntersectRaySphere(RayOrigin(), RayDirection(), PlanetCenter(), PlanetRadius() + mCloud.mGeometry.mStrato, distance_to_strato);
+		float2 distance_to_cirro = 0;
+		bool hit_cirro = IntersectRaySphere(RayOrigin(), RayDirection(), PlanetCenter(), PlanetRadius() + mCloud.mGeometry.mCirro, distance_to_cirro);
+
+		if (!hit_cirro || distance_to_cirro.y < 0)
+			return 0; // Hit nothing
+
+		if (!hit_strato || distance_to_strato.y < 0)
+			distance_range = float2(0, distance_to_cirro.y); // Hit cirro only, inside cloud scape
+		else
+		{
+			if (distance_to_strato.x > 0)
+				distance_range = float2(0, distance_to_strato.x); // Hit strato, inside cloud scape
+			else
+				if (hit_planet && distance_to_planet.x > 0 && distance_to_planet.x < distance_to_strato.y)
+					return 1; // Hit ground
+				else
+					distance_range = float2(distance_to_strato.y, distance_to_cirro.y); // Hit strato, below cloud scape
+		}
+
+		int sample_count = mCloud.mRaymarch.mSampleCount;
+		float step_length = (distance_range.y - distance_range.x) / sample_count;
 		float3 step = RayDirection() * step_length;
 
-		// move positon to bottom of cloudscape
-		position += RayDirection() * 100;
+		// [Debug]
+		if (false)
+		{
+			transmittance = 0;
+			return distance_range.y - distance_range.x;
+		}
 
 		int zero_density_count = 0;
 		bool sample_coarse = true;
 
+		// Move start position
+		float3 position = RayOrigin();
+		position += RayDirection() * (distance_range.x + step_length * 0.5);
 		for (int i = 0; i < sample_count; i++)
 		{
+			// [Debug]
+			sample_coarse = false; // Not supported yet
+
 			float density = SampleCloudDensity(position, sample_coarse);
 			if (sample_coarse)
 			{
@@ -611,10 +694,16 @@ float3 RaymarchCloud(out float3 transmittance)
 
 				// Lighting
 				{
-					float density_towards_light = SampleCloudDensityAlongCone(position, GetSunDirection());
+					float3 ray_end;
+					float density = SampleCloudDensityAlongCone(position, GetSunDirection(), ray_end);
 
-					float light_samples = density_towards_light * 10;
+					float light_samples = density * 1.0;
 
+					float3 sky_irradiance = 0;
+					float3 sun_irradiance = 0;
+					GetSunAndSkyIrradiance(ray_end, normalize(ray_end - PlanetCenter()), sun_irradiance, sky_irradiance);
+
+					// [Schneider16]
 					float powder_sugar_effect = 1.0 - exp(-light_samples * 2.0);
 					float beers_law = exp(-light_samples);
 					float light_energy = 2.0 * beers_law * powder_sugar_effect;
@@ -622,7 +711,7 @@ float3 RaymarchCloud(out float3 transmittance)
 					float phase = PhaseFunction_HenyeyGreenstein(0.2, dot(RayDirection(), GetSunDirection()));
 					light_energy *= phase;
 
-					accumulated_light += (1 - accumulated_density) * light_energy;
+					accumulated_light += (1 - accumulated_density) * light_energy * (sun_irradiance + sky_irradiance);
 				}
 
 				accumulated_density += density;
@@ -667,7 +756,7 @@ void DefaultMiss(inout RayPayload payload)
 	{
 	default:
 	case CloudMode_None:							break;
-	case CloudMode_RuntimeNoise:					cloud = RaymarchCloud(cloud_transmittance); break;
+	case CloudMode_Noise:							cloud = RaymarchCloud(cloud_transmittance); break;
 	}
 
 	// [TODO] How to mix contributions to get best result?
@@ -870,4 +959,42 @@ float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 
 	float3 srgb_color = ApplySRGBCurve(color);
 	return float4(srgb_color, 1);
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+RWTexture2D<float4> InputUAV : register(u0, space1);
+RWTexture3D<float4> OutputUAV : register(u1, space1);
+[RootSignature("DescriptorTable(UAV(u0, space = 1, numDescriptors = 2))")]
+[numthreads(8, 8, 1)]
+void CloudShapeNoiseCS(
+	uint3 inGroupThreadID : SV_GroupThreadID,
+	uint3 inGroupID : SV_GroupID,
+	uint3 inDispatchThreadID : SV_DispatchThreadID,
+	uint inGroupIndex : SV_GroupIndex)
+{
+	float3 xyz = DispatchThreadID_to_XYZ(inDispatchThreadID.xyz, OutputUAV);
+
+	uint2 coords = inDispatchThreadID.xy;
+	coords.x += inDispatchThreadID.z * 128;
+
+	float4 input = InputUAV[coords.xy];
+	OutputUAV[inDispatchThreadID.xyz] = pow(input, 1);
+}
+
+[RootSignature("DescriptorTable(UAV(u0, space = 1, numDescriptors = 2))")]
+[numthreads(8, 8, 1)]
+void CloudErosionNoiseCS(
+	uint3 inGroupThreadID : SV_GroupThreadID,
+	uint3 inGroupID : SV_GroupID,
+	uint3 inDispatchThreadID : SV_DispatchThreadID,
+	uint inGroupIndex : SV_GroupIndex)
+{
+	float3 xyz = DispatchThreadID_to_XYZ(inDispatchThreadID.xyz, OutputUAV);
+
+	uint2 coords = inDispatchThreadID.xy;
+	coords.x += inDispatchThreadID.z * 32;
+
+	float4 input = InputUAV[coords.xy];
+	OutputUAV[inDispatchThreadID.xyz] = pow(input, 1);
 }
