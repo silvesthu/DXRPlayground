@@ -19,7 +19,7 @@
 struct AtmosphereProfile
 {
 	// Config
-	AtmosphereMode mMode								= AtmosphereMode::PrecomputedAtmosphere;
+	AtmosphereMode mMode								= AtmosphereMode::ConstantColor;
 
 	// Constant Color
 	glm::vec4 mConstantColor							= glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);

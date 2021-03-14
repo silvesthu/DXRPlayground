@@ -167,6 +167,15 @@ enum class DebugMode : glm::uint32
 	_Newline3,
 
 	RecursionCount,
+	RussianRouletteCount,
+
+	Count
+};
+
+enum class RecursionMode : glm::uint32
+{
+	FixedCount = 0,
+	RussianRoulette,
 
 	Count
 };

@@ -7,7 +7,7 @@
 
 struct CloudProfile
 {
-	CloudMode mMode = CloudMode::Noise;
+	CloudMode mMode = CloudMode::None;
 	glm::vec3 mWind = glm::vec3(0.0f, 0.0f, 0.0f);
 
 	struct RaymarchReference

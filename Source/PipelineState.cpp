@@ -321,7 +321,7 @@ struct GlobalRootSignature : public StateSubobjectHolder<ID3D12RootSignature*, D
 };
 
 template <typename T>
-static void sWriteEnum(std::ofstream& ioEnumFile)
+static void sWriteEnum(std::ofstream& ioEnumFile, T* inCurrentValue = nullptr)
 {
 	ioEnumFile << "// enum " << nameof::nameof_enum_type<T>().data() << "\n";
 	ioEnumFile << "typedef uint " << nameof::nameof_enum_type<T>().data() << ";\n";
@@ -336,6 +336,16 @@ static void sWriteEnum(std::ofstream& ioEnumFile)
 	}
 
 	ioEnumFile << "\n";
+
+	if (inCurrentValue != nullptr)
+	{
+		ioEnumFile
+			<< nameof::nameof_enum_type<T>().data()
+			<< " " << nameof::nameof_enum_type<T>().data() << "_Current = "
+			<< nameof::nameof_enum_type<T>().data() << "_" << nameof::nameof_enum(*inCurrentValue) << ";\n";
+
+		ioEnumFile << "\n";
+	}
 }
 
 bool sCreateVSPSPipelineState(const char* inShaderFileName, std::stringstream& inShaderStream, const wchar_t* inVSName, const wchar_t* inPSName, Shader& ioSystemShader)
@@ -430,6 +440,7 @@ void gCreatePipelineState()
 		enum_file << "// Auto-generated for enum\n";
 		enum_file << "\n";
 
+		sWriteEnum<RecursionMode>(enum_file);
 		sWriteEnum<DebugMode>(enum_file);
 		sWriteEnum<DebugInstanceMode>(enum_file);
 		sWriteEnum<TonemapMode>(enum_file);
@@ -521,7 +532,7 @@ void gCreatePipelineState()
 
 	// Pipeline config
 	//  MaxTraceRecursionDepth
-	PipelineConfig pipeline_config(ShaderType::sRecursionCountMax + 1);
+	PipelineConfig pipeline_config(31); // [0, 31] https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_raytracing_pipeline_config
 	subobjects[index++] = pipeline_config.mStateSubobject;
 
 	// Global root signature

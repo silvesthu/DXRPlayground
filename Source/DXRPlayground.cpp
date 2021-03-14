@@ -54,8 +54,8 @@ static ScenePreset kScenePresets[(int)ScenePresetType::COUNT] =
 
 	{ "Debug",									"Asset/primitives/sphere.obj",														glm::vec4(0.0f, 0.0f, 9.0f, 0.0f),			glm::vec4(0.0f, 0.4f, -0.9f, 0.0f),		glm::translate(glm::vec3(0.0f, 1.0f, 0.0f)) },
 };
-static ScenePresetType sCurrentScene = ScenePresetType::Debug;
-static ScenePresetType sPreviousScene = ScenePresetType::Debug;
+static ScenePresetType sCurrentScene = ScenePresetType::CornellBox;
+static ScenePresetType sPreviousScene = ScenePresetType::CornellBox;
 
 static bool sReloadRequested = false;
 
@@ -196,7 +196,7 @@ static void sUpdate()
 				if (ImGui::Button("Reload Shader") || ImGui::IsKeyPressed(VK_F5))
 					sReloadRequested = true;
 
-				if (ImGui::Button("Dump Output") || ImGui::IsKeyPressed(VK_F6))
+				if (ImGui::Button("Dump Output") || ImGui::IsKeyPressed(VK_F9))
 				{
 					gDumpTextureProxy.mResource = gScene.GetOutputResource();
 					gDumpTextureProxy.mName = "Output";
@@ -260,7 +260,14 @@ static void sUpdate()
 
 			if (ImGui::TreeNodeEx("Render"))
 			{
-				ImGui::SliderInt("Recursion Count Max", (int*)&gPerFrameConstantBuffer.mRecursionCountMax, 0, ShaderType::sRecursionCountMax);
+				ImGui::Text("Recursion Mode");
+				for (int i = 0; i < (int)RecursionMode::Count; i++)
+				{
+					const auto& name = nameof::nameof_enum((RecursionMode)i);
+					ImGui::SameLine();
+					ImGui::RadioButton(name.data(), (int*)&gPerFrameConstantBuffer.mRecursionMode, i);
+				}
+				ImGui::SliderInt("Recursion Count Max", (int*)&gPerFrameConstantBuffer.mRecursionCountMax, 0, 8);
 
 				for (int i = 0; i < (int)DebugMode::Count; i++)
 				{

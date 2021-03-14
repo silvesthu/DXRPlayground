@@ -1,7 +1,5 @@
 // Code shared between HLSL and C++
 
-static const uint sRecursionCountMax = 4;
-
 // https://en.wikipedia.org/wiki/Luminous_efficacy
 // https://en.wikipedia.org/wiki/Sunlight#Measurement
 static const float kSunLuminousEfficacy = 93.0; // lm/W
@@ -30,13 +28,14 @@ struct PerFrame
 	uint					mDebugInstanceIndex		CONSTANT_DEFAULT(0);
 	uint					_1						CONSTANT_DEFAULT(0);
 
-	uint					mRecursionCountMax		CONSTANT_DEFAULT(sRecursionCountMax);
+	RecursionMode			mRecursionMode			CONSTANT_DEFAULT(RecursionMode::RussianRoulette);
+	uint					mRecursionCountMax		CONSTANT_DEFAULT(4);
 	uint					mFrameIndex				CONSTANT_DEFAULT(0);
 	uint					mAccumulationFrameCount CONSTANT_DEFAULT(1);
-	uint					mReset					CONSTANT_DEFAULT(0);
 
 	uint2					mDebugCoord				CONSTANT_DEFAULT(uint2(0, 0));
-	uint2					_2						CONSTANT_DEFAULT(uint2(0, 0));
+	uint					mReset					CONSTANT_DEFAULT(0);
+	uint					_2						CONSTANT_DEFAULT(0);
 };
 
 struct InstanceData
@@ -72,8 +71,8 @@ struct RayPayload
 {
     uint mRandomState;
 
-	float3 mAlbedo;
-	float3 mEmission;
+	float3 mThroughput; // [0, 1]		Accumulated throughput
+	float3 mEmission;	// [0, +inf]	Accumulated emission
 	
     float3 mPosition;
     float3 mReflectionDirection;

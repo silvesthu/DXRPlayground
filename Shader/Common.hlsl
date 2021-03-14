@@ -1,5 +1,10 @@
 #define MATH_PI 3.14159265359f
 
+float4 remap(float4 x, float4 a, float4 b, float4 c, float4 d)
+{
+    return (((x - a) / (b - a)) * (d - c)) + c;
+}
+
 // From https://www.shadertoy.com/view/tsBBWW
 uint wang_hash(inout uint seed)
 {
@@ -101,4 +106,18 @@ float PhaseFunction_CornetteShanks(float g, float cosine)
 float PhaseFunction_Isotropic()
 {
     return 1.0 / (4.0 * MATH_PI);
+}
+
+// http://www.pbr-book.org/3ed-2018/Monte_Carlo_Integration/Importance_Sampling.html#PowerHeuristic
+float MIS_PowerHeuristic(int nf, float fPdf, int ng, float gPdf, float power)
+{
+    float f = nf * fPdf;
+    float g = ng * gPdf;
+    return pow(f, power) / (pow(f, power) + pow(g, power));
+}
+
+// http://www.pbr-book.org/3ed-2018/Monte_Carlo_Integration/Importance_Sampling.html#BalanceHeuristic
+float MIS_BalanceHeuristic(int nf, float fPdf, int ng, float gPdf)
+{
+    return MIS_PowerHeuristic(nf, fPdf, ng, gPdf, 1.0);
 }

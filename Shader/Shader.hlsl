@@ -163,11 +163,11 @@ void DefaultRayGeneration()
 	ray.TMax = 100000;				// Far
 
 	RayPayload payload = (RayPayload)0;
-	payload.mAlbedo = 1; // camera gather 100% light
+	payload.mThroughput = 1; // Camera gather all the light
 	payload.mRandomState = uint(uint(DispatchRaysIndex().x) * uint(1973) + uint(DispatchRaysIndex().y) * uint(9277) + uint(mPerFrame.mAccumulationFrameCount) * uint(26699)) | uint(1); // From https://www.shadertoy.com/view/tsBBWW
 
 	uint recursion = 0;
-	for (; recursion <= mPerFrame.mRecursionCountMax; recursion++)
+	for (;;)
 	{
 		TraceRay(
 			RaytracingScene, 		// RaytracingAccelerationStructure
@@ -185,6 +185,29 @@ void DefaultRayGeneration()
 
 		ray.Origin = payload.mPosition;
 		ray.Direction = payload.mReflectionDirection;
+
+		// Russian Roulette
+		// http://www.pbr-book.org/3ed-2018/Monte_Carlo_Integration/Russian_Roulette_and_Splitting.html
+		// https://computergraphics.stackexchange.com/questions/2316/is-russian-roulette-really-the-answer
+		if (recursion >= mPerFrame.mRecursionCountMax)
+		{
+			if (mPerFrame.mRecursionMode == RecursionMode_RussianRoulette && recursion <= 8)
+			{
+				// Probability can be chosen in almost any manner
+				// Based on throughput here (basically albedo)
+				float3 throughput = payload.mThroughput;
+				float termination_probability = max(0.25, 1.0 - max(throughput.x, max(throughput.y, throughput.z)));
+
+				if (RandomFloat01(payload.mRandomState) < termination_probability)
+					break;
+
+				payload.mThroughput /= (1 - termination_probability);
+			}
+			else
+				break;
+		}
+
+		recursion++;
 	}
 
 	// [Debug]
@@ -213,6 +236,9 @@ void DefaultRayGeneration()
 
 		if (mPerFrame.mDebugMode == DebugMode_RecursionCount)
 			mixed_output = hsv2rgb(float3(recursion * 1.0 / (mPerFrame.mRecursionCountMax + 1), 1, 1));
+
+		if (mPerFrame.mDebugMode == DebugMode_RussianRouletteCount)
+			mixed_output = hsv2rgb(float3(max(0.0, (recursion * 1.0 - mPerFrame.mRecursionCountMax * 1.0)) / 10.0 /* for visualization only */, 1, 1));
 
 		// [TODO] Ray visualization ?
 		// if (all(abs((int2)DispatchRaysIndex().xy - (int2)mDebugCoord) < DEBUG_PIXEL_RADIUS))
@@ -446,22 +472,18 @@ float3 GetEnvironmentEmission()
 		float3 transmittance_to_ground = GetTransmittance(r, mu, distance.x, true);
 
 		// Debug - Global
-		if (mPerFrame.mDebugMode != DebugMode_None && mPerFrame.mDebugMode != DebugMode_RecursionCount)
+		switch (mPerFrame.mDebugMode)
 		{
-			switch (mPerFrame.mDebugMode)
-			{
-			case DebugMode_Barycentrics: 			return 0;
-			case DebugMode_Vertex: 					return hit_position;
-			case DebugMode_Normal: 					return normal;
-			case DebugMode_Albedo: 					return kGroundAlbedo;
-			case DebugMode_Reflectance: 			return 0;
-			case DebugMode_Emission: 				return 0;
-			case DebugMode_Roughness: 				return 1;
-			case DebugMode_Transmittance:			return transmittance_to_ground;
-			case DebugMode_InScattering:			return radiance;
-			default:
-				break;
-			}
+		case DebugMode_Barycentrics: 			return 0;
+		case DebugMode_Vertex: 					return hit_position;
+		case DebugMode_Normal: 					return normal;
+		case DebugMode_Albedo: 					return kGroundAlbedo;
+		case DebugMode_Reflectance: 			return 0;
+		case DebugMode_Emission: 				return 0;
+		case DebugMode_Roughness: 				return 1;
+		case DebugMode_Transmittance:			return transmittance_to_ground;
+		case DebugMode_InScattering:			return radiance;
+		default:								break;
 		}
 
 		// Blend
@@ -473,22 +495,18 @@ float3 GetEnvironmentEmission()
 	else
 	{
 		// Debug - Global
-		if (mPerFrame.mDebugMode != DebugMode_None && mPerFrame.mDebugMode != DebugMode_RecursionCount)
+		switch (mPerFrame.mDebugMode)
 		{
-			switch (mPerFrame.mDebugMode)
-			{
-			case DebugMode_Barycentrics: 			return 0;
-			case DebugMode_Vertex: 					return RayDirection(); // rays are supposed to go infinity
-			case DebugMode_Normal: 					return -RayDirection();
-			case DebugMode_Albedo: 					return 0;
-			case DebugMode_Reflectance: 			return 0;
-			case DebugMode_Emission: 				return 0;
-			case DebugMode_Roughness: 				return 1;
-			case DebugMode_Transmittance:			return transmittance_to_top;
-			case DebugMode_InScattering:			return radiance;
-			default:
-				break;
-			}
+		case DebugMode_Barycentrics: 			return 0;
+		case DebugMode_Vertex: 					return RayDirection(); // rays are supposed to go infinity
+		case DebugMode_Normal: 					return -RayDirection();
+		case DebugMode_Albedo: 					return 0;
+		case DebugMode_Reflectance: 			return 0;
+		case DebugMode_Emission: 				return 0;
+		case DebugMode_Roughness: 				return 1;
+		case DebugMode_Transmittance:			return transmittance_to_top;
+		case DebugMode_InScattering:			return radiance;
+		default:								break;
 		}
 	}
 
@@ -764,7 +782,7 @@ void DefaultMiss(inout RayPayload payload)
 	emission = atmosphere;
 	emission = lerp(emission, cloud, 1.0 - cloud_transmittance);
 
-	payload.mEmission = payload.mEmission + payload.mAlbedo * emission;
+	payload.mEmission = payload.mEmission + payload.mThroughput * emission;
 }
 
 HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attributes)
@@ -818,8 +836,8 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	GetSkyRadianceToPoint(sky_radiance, transmittance);
 
     // Debug - Global
-	if (mPerFrame.mDebugMode != DebugMode_None && mPerFrame.mDebugMode != DebugMode_RecursionCount)
 	{
+		bool terminate = true;
 		switch (mPerFrame.mDebugMode)
 	    {
 	    	case DebugMode_Barycentrics: 			hit_info.mEmission = barycentrics; break;
@@ -831,12 +849,14 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	    	case DebugMode_Roughness: 				hit_info.mEmission = InstanceDataBuffer[InstanceID()].mRoughness; break;
 			case DebugMode_Transmittance:			hit_info.mEmission = transmittance; break;
 			case DebugMode_InScattering:			hit_info.mEmission = sky_radiance; break;
-	    	default:
-	    		break;
+			default:								terminate = false; break;
 	    }
 
-	    hit_info.mDone = true;
-	    return hit_info;
+		if (terminate)
+		{
+			hit_info.mDone = true;
+			return hit_info;
+		}
 	}
 
 	// Debug - Per instance
@@ -848,6 +868,15 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 			case DebugInstanceMode_Mirror: 			hit_info.mAlbedo = 1; hit_info.mReflectionDirection = reflect(WorldRayDirection(), normal); return hit_info;	// Mirror
 			default: break;
 		}
+	}
+
+	// Material
+	{
+		hit_info.mAlbedo = InstanceDataBuffer[InstanceID()].mAlbedo;
+		hit_info.mEmission = InstanceDataBuffer[InstanceID()].mEmission * (kEmissionScale * kPreExposure);
+
+		if (dot(hit_info.mEmission, 1) > 0) // no reflection from surface with emission
+			hit_info.mDone = true;
 	}
 
 	// Lambertian
@@ -888,9 +917,20 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 			hit_info.mScatteringPDF = cosine <= 0 ? 0 : cosine / MATH_PI;
 			hit_info.mPDF = cosine <= 0 ? 0 : cosine / MATH_PI;
 		}
-		
-		hit_info.mAlbedo = InstanceDataBuffer[InstanceID()].mAlbedo;
-		hit_info.mEmission = InstanceDataBuffer[InstanceID()].mEmission * (kEmissionScale * kPreExposure);
+	}
+
+	// Sun light
+	if (false)
+	{
+		float sun_light_pdf = 0.01; // sun size over sphere?
+		float sun_light_weight = 0.5;
+		if (RandomFloat01(payload.mRandomState) < sun_light_weight)
+		{
+			hit_info.mReflectionDirection = GetSunDirection(); // should be random on sun disk to get soft shadow
+			hit_info.mPDF = (1 - sun_light_weight) * hit_info.mPDF + sun_light_weight * sun_light_pdf;
+
+			// how to feedback if sun is not hit?
+		}
 	}
 
 	// Participating Media
@@ -915,12 +955,8 @@ void DefaultClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionA
 	payload.mReflectionDirection = hit_info.mReflectionDirection;
 
 	// Material
-	payload.mEmission = payload.mEmission + payload.mAlbedo * hit_info.mTransmittance * hit_info.mEmission + hit_info.mInScattering;
-	bool use_pdf = true;
-	if (use_pdf)
-		payload.mAlbedo = hit_info.mPDF <= 0 ? 0 : payload.mAlbedo * hit_info.mAlbedo * hit_info.mTransmittance * hit_info.mScatteringPDF / hit_info.mPDF;
-	else
-		payload.mAlbedo = payload.mAlbedo * hit_info.mAlbedo * hit_info.mTransmittance;
+	payload.mEmission = payload.mEmission + payload.mThroughput * hit_info.mTransmittance * hit_info.mEmission + hit_info.mInScattering;
+	payload.mThroughput = hit_info.mPDF <= 0 ? 0 : payload.mThroughput * hit_info.mAlbedo * hit_info.mTransmittance * hit_info.mScatteringPDF / hit_info.mPDF;
 }
 
 [shader("closesthit")]
