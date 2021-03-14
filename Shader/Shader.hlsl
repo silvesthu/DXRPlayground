@@ -194,6 +194,8 @@ void DefaultRayGeneration()
 			if (mPerFrame.mRecursionMode == RecursionMode_RussianRoulette && recursion <= 8)
 			{
 				// Probability can be chosen in almost any manner
+				// e.g. Fixed threshold
+				// e.g. Veach's Efficiency-Optimized Russian roulette is based on average variance and cost
 				// Based on throughput here (basically albedo)
 				float3 throughput = payload.mThroughput;
 				float termination_probability = max(0.25, 1.0 - max(throughput.x, max(throughput.y, throughput.z)));
@@ -201,6 +203,7 @@ void DefaultRayGeneration()
 				if (RandomFloat01(payload.mRandomState) < termination_probability)
 					break;
 
+				// Weight the sample to keep result unbiased
 				payload.mThroughput /= (1 - termination_probability);
 			}
 			else
