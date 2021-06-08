@@ -440,4 +440,4 @@ inline D3D12_RESOURCE_DESC gGetUAVResourceDesc(UINT64 width)
 	return desc;
 }
 
-void ImGuiShowTextures(std::vector<Texture*>& textures);
+void ImGuiShowTextures(std::vector<Texture*> textures, std::string name = "Texture");

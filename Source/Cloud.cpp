@@ -1,4 +1,3 @@
-#include "Common.h"
 #include "Cloud.h"
 
 #include "ImGui/imgui_impl_dx12.h"

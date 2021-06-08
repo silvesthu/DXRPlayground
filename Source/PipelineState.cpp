@@ -1,6 +1,7 @@
 #include "Common.h"
 #include "Atmosphere.h"
 #include "Cloud.h"
+#include "DDGI.h"
 
 #include <fstream>
 #include <sstream>
@@ -466,6 +467,9 @@ void gCreatePipelineState()
 			succeed &= sCreatePipelineState(shader_filename, shader_stream, *shader);
 
 		for (auto&& shader : gCloudResources.mShaders)
+			succeed &= sCreatePipelineState(shader_filename, shader_stream, *shader);
+
+		for (auto&& shader : gDDGIResources.mShaders)
 			succeed &= sCreatePipelineState(shader_filename, shader_stream, *shader);
 
 		if (!succeed)

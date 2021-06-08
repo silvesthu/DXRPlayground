@@ -39,8 +39,10 @@ float3 RadianceToLuminance(float3 radiance)
 }
 
 #include "PrecomputedAtmosphere.hlsl"
-#include "Cloud.hlsl"
-
+cbuffer CloudBuffer : register(b0, space3)
+{
+	Cloud mCloud;
+}
 Texture3D<float4> CloudShapeNoiseSRV : register(t0, space3);
 Texture3D<float4> CloudErosionNoiseSRV : register(t1, space3);
 
@@ -1036,4 +1038,15 @@ void CloudErosionNoiseCS(
 
 	float4 input = InputUAV[coords.xy];
 	OutputUAV[inDispatchThreadID.xyz] = pow(input, 1);
+}
+
+[RootSignature("DescriptorTable(UAV(u0, space = 1, numDescriptors = 2))")] 
+[numthreads(8, 8, 1)]
+void DDGIPrecompute(
+	uint3 inGroupThreadID : SV_GroupThreadID,
+	uint3 inGroupID : SV_GroupID,
+	uint3 inDispatchThreadID : SV_DispatchThreadID,
+	uint inGroupIndex : SV_GroupIndex)
+{
+	// float3 xyz = DispatchThreadID_to_XYZ(inDispatchThreadID.xyz, OutputUAV);
 }

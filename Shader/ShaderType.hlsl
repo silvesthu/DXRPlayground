@@ -212,3 +212,8 @@ struct Cloud
 	CloudGeometry				mGeometry;
 	CloudShapeNoise				mShapeNoise;
 };
+
+struct DDGI
+{
+	float4						mData;
+};

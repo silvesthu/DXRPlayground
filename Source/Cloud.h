@@ -88,10 +88,6 @@ struct CloudResources
 		&mShapeNoiseTexture,
 		&mErosionNoiseTexture
 	};
-
-	CloudResources()
-	{
-	}
 };
 
 extern CloudProfile gCloudProfile;

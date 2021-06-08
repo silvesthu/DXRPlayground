@@ -156,6 +156,9 @@
     <ClInclude Include="Source\Cloud.h">
       <Filter>Source</Filter>
     </ClInclude>
+    <ClInclude Include="Source\DDGI.h">
+      <Filter>Source</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Thirdparty\imgui\imgui_widgets.cpp">
@@ -206,6 +209,9 @@
     <ClCompile Include="Source\Cloud.cpp">
       <Filter>Source</Filter>
     </ClCompile>
+    <ClCompile Include="Source\DDGI.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <CopyFileToFolders Include="Shader\Shader.hlsl">
@@ -220,14 +226,7 @@
     <CopyFileToFolders Include="Shader\RaymarchAtmosphere.hlsl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Shader\Generated\Enum.hlsl">
-      <Filter>Shader</Filter>
-    </None>
-    <None Include="Shader\Cloud.hlsl" />
-    <None Include="Shader\PrecomputedAtmosphere.hlsl">
-      <Filter>Shader</Filter>
-    </None>
+    <CopyFileToFolders Include="Shader\Generated\Enum.hlsl" />
+    <CopyFileToFolders Include="Shader\PrecomputedAtmosphere.hlsl" />
   </ItemGroup>
 </Project>

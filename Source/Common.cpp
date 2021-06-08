@@ -200,12 +200,12 @@ void Texture::Load()
 	UpdateSubresources(gCommandList, mIntermediateResource.Get(), mUploadResource.Get(), 0, 0, (UINT)subresources.size(), subresources.data());
 }
 
-void ImGuiShowTextures(std::vector<Texture*>& textures)
+void ImGuiShowTextures(std::vector<Texture*> textures, std::string name)
 {
 	static float ui_scale = 1.0f;
 	static bool flip_y = false;
 
-	if (ImGui::TreeNodeEx("Textures", ImGuiTreeNodeFlags_DefaultOpen))
+	if (ImGui::TreeNodeEx(name.c_str()))
 	{
 		static Texture* sTexture = nullptr;
 		auto add_texture = [&](Texture& inTexture)
