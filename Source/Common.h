@@ -54,12 +54,6 @@ struct ShaderTable
 	glm::uint32								mHitGroupCount = 0;
 };
 
-extern ComPtr<ID3D12Resource>				gConstantGPUBuffer;
-
-extern ComPtr<ID3D12RootSignature>			gDXRGlobalRootSignature;
-extern ComPtr<ID3D12StateObject>			gDXRStateObject;
-extern ShaderTable							gDXRShaderTable;
-
 #define MEMBER(parent_type, type, name, default_value) \
 	parent_type& name(type in##name) { m##name = in##name; return *this; } \
 	type m##name = default_value;
@@ -72,7 +66,16 @@ struct Shader
 	SHADER_MEMBER(const wchar_t*, PSName, nullptr);
 	SHADER_MEMBER(const wchar_t*, CSName, nullptr);
 
-	void InitializeDescriptors(const std::vector<ID3D12Resource*>& inEntries);
+	struct DescriptorInfo
+	{
+		DescriptorInfo(ID3D12Resource* inResource) : mResource(inResource) {}
+		DescriptorInfo(ID3D12Resource* inResource, glm::uint inStride) : mResource(inResource), mStride(inStride) {}
+
+		ID3D12Resource*		mResource = nullptr;
+		glm::uint			mStride = 0;
+	};
+
+	void InitializeDescriptors(const std::vector<DescriptorInfo>& inEntries);
 	void SetupGraphics();
 	void SetupCompute();
 	void Reset() { mData = {}; }
@@ -119,7 +122,14 @@ struct Texture
 	DirectX::TexMetadata mMetadata = {};
 };
 
+extern ComPtr<ID3D12Resource>				gConstantGPUBuffer;
+extern ComPtr<ID3D12RootSignature>			gDXRGlobalRootSignature;
+extern ComPtr<ID3D12StateObject>			gDXRStateObject;
+extern ShaderTable							gDXRShaderTable;
 extern Shader								gCompositeShader;
+
+extern bool									gUseDXRInlineShader;
+extern Shader								gDXRInlineShader;
 
 // Frame
 enum

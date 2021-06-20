@@ -171,7 +171,7 @@ void PrecomputedAtmosphereScattering::Initialize()
 	{
 		// [NOTE] Strictly speaking, binding same texture as UAV and SRV at the same time is not ok, and there should be barriers for state transition
 
-		std::vector<ID3D12Resource*> common_binding;
+		std::vector<Shader::DescriptorInfo> common_binding;
 		{
 			// CBV
 			common_binding.push_back(gPrecomputedAtmosphereScatteringResources.mConstantUploadBuffer.Get());

@@ -4,10 +4,15 @@
 #include "Generated/Enum.hlsl"
 #include "ShaderType.hlsl"
 
+#ifndef SHADER_PROFILE_LIB
+#define ENABLE_INLINE_RAYTRACING
+#endif // SHADER_PROFILE_LIB
+
 const static float kPreExposure = 1.0e-4;
 const static float kEmissionScale = 1.0e4;
 
 //////////////////////////////////////////////////////////////////////////////////
+// Common
 
 RWTexture2D<float4> RaytracingOutput : register(u0, space0);
 cbuffer PerFrameBuffer : register(b0, space0)
@@ -19,6 +24,7 @@ SamplerState BilinearSampler : register(s0);
 SamplerState BilinearWrapSampler : register(s1);
 
 //////////////////////////////////////////////////////////////////////////////////
+// Atmosphere & Cloud
 
 float3 RadianceToLuminance(float3 radiance)
 {
@@ -47,53 +53,106 @@ Texture3D<float4> CloudShapeNoiseSRV : register(t0, space3);
 Texture3D<float4> CloudErosionNoiseSRV : register(t1, space3);
 
 //////////////////////////////////////////////////////////////////////////////////
+// DXR
+
+// Proxies
+static uint3 sDispatchRaysIndex;
+uint3 sGetDispatchRaysIndex() 
+{
+#ifdef ENABLE_INLINE_RAYTRACING
+	return sDispatchRaysIndex;
+#else
+	return DispatchRaysIndex();
+#endif // ENABLE_INLINE_RAYTRACING
+}
+
+static uint3 sDispatchRaysDimensions;
+uint3 sGetDispatchRaysDimensions() 
+{
+#ifdef ENABLE_INLINE_RAYTRACING
+	return sDispatchRaysDimensions;
+#else
+	return DispatchRaysDimensions();
+#endif // ENABLE_INLINE_RAYTRACING
+}
+
+static float3 sWorldRayOrigin;
+float3 sGetWorldRayOrigin()
+{
+#ifdef ENABLE_INLINE_RAYTRACING
+	return sWorldRayOrigin;
+#else
+	return WorldRayOrigin();
+#endif // ENABLE_INLINE_RAYTRACING
+}
+
+static float3 sWorldRayDirection;
+float3 sGetWorldRayDirection()
+{
+#ifdef ENABLE_INLINE_RAYTRACING
+	return sWorldRayDirection;
+#else
+	return WorldRayDirection();
+#endif // ENABLE_INLINE_RAYTRACING
+}
+
+static float sRayTCurrent;
+float sGetRayTCurrent()
+{
+#ifdef ENABLE_INLINE_RAYTRACING
+	return sRayTCurrent;
+#else
+	return RayTCurrent();
+#endif // ENABLE_INLINE_RAYTRACING
+}
+
+static uint sInstanceIndex;
+uint sGetInstanceIndex()
+{
+#ifdef ENABLE_INLINE_RAYTRACING
+	return sInstanceIndex;
+#else
+	return InstanceIndex();
+#endif // ENABLE_INLINE_RAYTRACING
+}
+
+static uint sPrimitiveIndex;
+uint sGetPrimitiveIndex()
+{
+#ifdef ENABLE_INLINE_RAYTRACING
+	return sPrimitiveIndex;
+#else
+	return PrimitiveIndex();
+#endif // ENABLE_INLINE_RAYTRACING
+}
+
+static uint sGeometryIndex;
+uint sGetGeometryIndex()
+{
+#ifdef ENABLE_INLINE_RAYTRACING
+	return sGeometryIndex;
+#else
+	return GeometryIndex();
+#endif // ENABLE_INLINE_RAYTRACING
+}
+
+static uint sInstanceID;
+uint sGetInstanceID()
+{
+#ifdef ENABLE_INLINE_RAYTRACING
+	return sInstanceID;
+#else
+	return InstanceID();
+#endif // ENABLE_INLINE_RAYTRACING
+}
 
 RaytracingAccelerationStructure RaytracingScene : register(t0, space0);
 StructuredBuffer<InstanceData> InstanceDataBuffer : register(t1, space0);
-ByteAddressBuffer Indices : register(t2, space0);
+StructuredBuffer<uint> Indices : register(t2, space0);
 StructuredBuffer<float3> Vertices : register(t3, space0);
 StructuredBuffer<float3> Normals : register(t4, space0);
 
 #define DEBUG_PIXEL_RADIUS (3)
-
-// From D3D12Raytracing
-// Load three 16 bit indices from a byte addressed buffer.
-uint3 Load3x16BitIndices(uint offsetBytes)
-{
-    uint3 indices;
-
-    // ByteAdressBuffer loads must be aligned at a 4 byte boundary.
-    // Since we need to read three 16 bit indices: { 0, 1, 2 } 
-    // aligned at a 4 byte boundary as: { 0 1 } { 2 0 } { 1 2 } { 0 1 } ...
-    // we will load 8 bytes (~ 4 indices { a b | c d }) to handle two possible index triplet layouts,
-    // based on first index's offsetBytes being aligned at the 4 byte boundary or not:
-    //  Aligned:     { 0 1 | 2 - }
-    //  Not aligned: { - 0 | 1 2 }
-    const uint dwordAlignedOffset = offsetBytes & ~3;
-    const uint2 four16BitIndices = Indices.Load2(dwordAlignedOffset);
-
-    // Aligned: { 0 1 | 2 - } => retrieve first three 16bit indices
-    if (dwordAlignedOffset == offsetBytes)
-    {
-        indices.x = four16BitIndices.x & 0xffff;
-        indices.y = (four16BitIndices.x >> 16) & 0xffff;
-        indices.z = four16BitIndices.y & 0xffff;
-    }
-    else // Not aligned: { - 0 | 1 2 } => retrieve last three 16bit indices
-    {
-        indices.x = (four16BitIndices.x >> 16) & 0xffff;
-        indices.y = four16BitIndices.y & 0xffff;
-        indices.z = (four16BitIndices.y >> 16) & 0xffff;
-    }
-
-    return indices;
-}
-
-uint3 Load3x32BitIndices(uint offsetBytes)
-{
-	const uint4 four32BitIndices = Indices.Load4(offsetBytes);
-	return four32BitIndices.xyz;
-}
 
 // https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
 float3 Tonemap_knarkowicz(float3 x)
@@ -146,121 +205,14 @@ float3 LuminanceToColor(float3 luminance)
 	return tonemapped_color;
 }
 
-[shader("raygeneration")]
-void DefaultRayGeneration()
-{
-	uint3 launchIndex = DispatchRaysIndex();
-	uint3 launchDim = DispatchRaysDimensions();
 
-	float2 crd = float2(launchIndex.xy);
-	float2 dims = float2(launchDim.xy);
-
-	float2 d = ((crd/dims) * 2.f - 1.f); // 0~1 => -1~1
-	d.y = -d.y;
-	
-	RayDesc ray;
-	ray.Origin = mPerFrame.mCameraPosition.xyz;
-	ray.Direction = normalize(mPerFrame.mCameraDirection.xyz + mPerFrame.mCameraRightExtend.xyz * d.x + mPerFrame.mCameraUpExtend.xyz * d.y);
-	ray.TMin = 0.001;				// Near
-	ray.TMax = 100000;				// Far
-
-	RayPayload payload = (RayPayload)0;
-	payload.mThroughput = 1; // Camera gather all the light
-	payload.mRandomState = uint(uint(DispatchRaysIndex().x) * uint(1973) + uint(DispatchRaysIndex().y) * uint(9277) + uint(mPerFrame.mAccumulationFrameCount) * uint(26699)) | uint(1); // From https://www.shadertoy.com/view/tsBBWW
-
-	uint recursion = 0;
-	for (;;)
-	{
-		TraceRay(
-			RaytracingScene, 		// RaytracingAccelerationStructure
-			0,						// RayFlags 
-			0xFF,					// InstanceInclusionMask
-			0,						// RayContributionToHitGroupIndex, 4bits
-			0,						// MultiplierForGeometryContributuionToHitGroupIndex, 16bits
-			0,						// MissShaderIndex
-			ray,					// RayDesc
-			payload					// payload_t
-		);
-
-		if (payload.mDone)
-			break;
-
-		ray.Origin = payload.mPosition;
-		ray.Direction = payload.mReflectionDirection;
-
-		// Russian Roulette
-		// http://www.pbr-book.org/3ed-2018/Monte_Carlo_Integration/Russian_Roulette_and_Splitting.html
-		// https://computergraphics.stackexchange.com/questions/2316/is-russian-roulette-really-the-answer
-		if (recursion >= mPerFrame.mRecursionCountMax)
-		{
-			if (mPerFrame.mRecursionMode == RecursionMode_RussianRoulette && recursion <= 8)
-			{
-				// Probability can be chosen in almost any manner
-				// e.g. Fixed threshold
-				// e.g. Veach's Efficiency-Optimized Russian roulette is based on average variance and cost
-				// Based on throughput here (basically albedo)
-				float3 throughput = payload.mThroughput;
-				float termination_probability = max(0.25, 1.0 - max(throughput.x, max(throughput.y, throughput.z)));
-
-				if (RandomFloat01(payload.mRandomState) < termination_probability)
-					break;
-
-				// Weight the sample to keep result unbiased
-				payload.mThroughput /= (1 - termination_probability);
-			}
-			else
-				break;
-		}
-
-		recursion++;
-	}
-
-	// [Debug]
-	// payload.mEmission = RemoveSRGBCurve(payload.mEmission);
-	// payload.mEmission = (uint3)(RemoveSRGBCurve(payload.mEmission) * 255.0) / 255.0;
-
-	float3 scene_luminance = payload.mEmission;
-	float3 output = LuminanceToColor(scene_luminance);
-
-	if (mPerFrame.mOutputLuminance)
-		output = scene_luminance;
-
-	if (mPerFrame.mDebugMode != DebugMode_None)
-		output = scene_luminance;
-
-	// Accumulation
-	{
-		float3 current_output = output;
-
-		float3 previous_output = RaytracingOutput[DispatchRaysIndex().xy].xyz;
-		previous_output = max(0, previous_output); // Eliminate nan
-		float3 mixed_output = lerp(previous_output, current_output, 1.0f / (float)(mPerFrame.mAccumulationFrameCount));
-
-		if (recursion == 0)
-			mixed_output = current_output;
-
-		if (mPerFrame.mDebugMode == DebugMode_RecursionCount)
-			mixed_output = hsv2rgb(float3(recursion * 1.0 / (mPerFrame.mRecursionCountMax + 1), 1, 1));
-
-		if (mPerFrame.mDebugMode == DebugMode_RussianRouletteCount)
-			mixed_output = hsv2rgb(float3(max(0.0, (recursion * 1.0 - mPerFrame.mRecursionCountMax * 1.0)) / 10.0 /* for visualization only */, 1, 1));
-
-		// [TODO] Ray visualization ?
-		// if (all(abs((int2)DispatchRaysIndex().xy - (int2)mDebugCoord) < DEBUG_PIXEL_RADIUS))
-		// 	mixed_output = 0;
-
-		output = mixed_output;
-	}
-
-	RaytracingOutput[DispatchRaysIndex().xy] = float4(output, 1);
-}
 
 #include "RaymarchAtmosphere.hlsl"
 
 // Adapters
-float3 RayOrigin() { return WorldRayOrigin() * mAtmosphere.mSceneScale; }
-float3 RayDirection() { return WorldRayDirection(); }
-float3 RayHitPosition() { return (WorldRayOrigin() + WorldRayDirection() * RayTCurrent()) * mAtmosphere.mSceneScale; }
+float3 RayOrigin() { return sGetWorldRayOrigin() * mAtmosphere.mSceneScale; }
+float3 RayDirection() { return sGetWorldRayDirection(); }
+float3 RayHitPosition() { return (sGetWorldRayOrigin() + sGetWorldRayDirection() * sGetRayTCurrent()) * mAtmosphere.mSceneScale; }
 float3 PlanetCenter() { return float3(0, -mAtmosphere.mBottomRadius, 0); }
 float PlanetRadius() { return mAtmosphere.mBottomRadius; }
 float3 GetSunDirection() { return mPerFrame.mSunDirection.xyz; }
@@ -826,26 +778,20 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	// See https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html for more system value intrinsics
 	float3 barycentrics = float3(1.0 - attributes.barycentrics.x - attributes.barycentrics.y, attributes.barycentrics.x, attributes.barycentrics.y);
 
-	bool use_16bit_index = false;
-
-	// Get the base index of the triangle's first 16 or 32 bit index.
-	uint index_size_in_bytes = use_16bit_index ? 2 : 4;
+	// 16bit index is not supported. See https://github.com/microsoft/DirectX-Graphics-Samples/blob/master/Samples/Desktop/D3D12Raytracing/src/D3D12RaytracingSimpleLighting/Raytracing.hlsl for reference
 	uint index_count_per_triangle = 3;
-	uint triangle_index_stride = index_count_per_triangle * index_size_in_bytes;
-	uint base_index = PrimitiveIndex() * triangle_index_stride + InstanceDataBuffer[InstanceID()].mIndexOffset * index_size_in_bytes;
+	uint base_index = sGetPrimitiveIndex() * index_count_per_triangle + InstanceDataBuffer[sGetInstanceID()].mIndexOffset;
+	uint3 indices = uint3(Indices[base_index], Indices[base_index + 1], Indices[base_index + 2]);
 
-	// Load up 3 16 bit indices for the triangle.
-	uint3 indices = use_16bit_index ? Load3x16BitIndices(base_index) : Load3x32BitIndices(base_index);
+	// Attributes
+	float3 normals[3] = { Normals[indices[0]], Normals[indices[1]], Normals[indices[2]] };
+	float3 normal = normalize(normals[0] * barycentrics.x + normals[1] * barycentrics.y + normals[2] * barycentrics.z);
 
-    // Attributes
-    float3 normals[3] = { Normals[indices[0]], Normals[indices[1]], Normals[indices[2]] };
-    float3 normal = normalize(normals[0] * barycentrics.x + normals[1] * barycentrics.y + normals[2] * barycentrics.z);
+	float3 vertices[3] = { Vertices[indices[0]], Vertices[indices[1]], Vertices[indices[2]] };
+	float3 vertex = vertices[0] * barycentrics.x + vertices[1] * barycentrics.y + vertices[2] * barycentrics.z;
 
-    float3 vertices[3] = { Vertices[indices[0]], Vertices[indices[1]], Vertices[indices[2]] };
-    float3 vertex = vertices[0] * barycentrics.x + vertices[1] * barycentrics.y + vertices[2] * barycentrics.z;
-
-    // Handle front face only
-	if (dot(normal, -WorldRayDirection()) < 0)
+	// Handle front face only
+	if (dot(normal, -sGetWorldRayDirection()) < 0)
 	{
 		bool flip_normal = true;
 		if (flip_normal)
@@ -858,29 +804,29 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	}
 
 	// Hit position
-	float3 raw_hit_position = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
+	float3 raw_hit_position = sGetWorldRayOrigin() + sGetWorldRayDirection() * sGetRayTCurrent();
 	hit_info.mPosition = raw_hit_position + normal * 0.001;
 
 	float3 sky_radiance = 0;
 	float3 transmittance = 0;
 	GetSkyRadianceToPoint(sky_radiance, transmittance);
 
-    // Debug - Global
+	// Debug - Global
 	{
 		bool terminate = true;
 		switch (mPerFrame.mDebugMode)
-	    {
-	    	case DebugMode_Barycentrics: 			hit_info.mEmission = barycentrics; break;
-	    	case DebugMode_Vertex: 					hit_info.mEmission = vertex; break;
-	    	case DebugMode_Normal: 					hit_info.mEmission = normal * 0.5 + 0.5; break;
-	    	case DebugMode_Albedo: 					hit_info.mEmission = InstanceDataBuffer[InstanceID()].mAlbedo; break;
-	    	case DebugMode_Reflectance: 			hit_info.mEmission = InstanceDataBuffer[InstanceID()].mReflectance; break;
-	    	case DebugMode_Emission: 				hit_info.mEmission = InstanceDataBuffer[InstanceID()].mEmission; break;
-	    	case DebugMode_Roughness: 				hit_info.mEmission = InstanceDataBuffer[InstanceID()].mRoughness; break;
+		{
+			case DebugMode_Barycentrics: 			hit_info.mEmission = barycentrics; break;
+			case DebugMode_Vertex: 					hit_info.mEmission = vertex; break;
+			case DebugMode_Normal: 					hit_info.mEmission = normal * 0.5 + 0.5; break;
+			case DebugMode_Albedo: 					hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mAlbedo; break;
+			case DebugMode_Reflectance: 			hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mReflectance; break;
+			case DebugMode_Emission: 				hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mEmission; break;
+			case DebugMode_Roughness: 				hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mRoughness; break;
 			case DebugMode_Transmittance:			hit_info.mEmission = transmittance; break;
 			case DebugMode_InScattering:			hit_info.mEmission = sky_radiance; break;
 			default:								terminate = false; break;
-	    }
+		}
 
 		if (terminate)
 		{
@@ -890,20 +836,20 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	}
 
 	// Debug - Per instance
-	if (mPerFrame.mDebugInstanceIndex == InstanceID())
+	if (mPerFrame.mDebugInstanceIndex == sGetInstanceID())
 	{
 		switch (mPerFrame.mDebugInstanceMode)
 		{
 			case DebugInstanceMode_Barycentrics: 	hit_info.mEmission = barycentrics; hit_info.mDone = true; return hit_info;										// Barycentrics
-			case DebugInstanceMode_Mirror: 			hit_info.mAlbedo = 1; hit_info.mReflectionDirection = reflect(WorldRayDirection(), normal); return hit_info;	// Mirror
+			case DebugInstanceMode_Mirror: 			hit_info.mAlbedo = 1; hit_info.mReflectionDirection = reflect(sGetWorldRayDirection(), normal); return hit_info;	// Mirror
 			default: break;
 		}
 	}
 
 	// Material
 	{
-		hit_info.mAlbedo = InstanceDataBuffer[InstanceID()].mAlbedo;
-		hit_info.mEmission = InstanceDataBuffer[InstanceID()].mEmission * (kEmissionScale * kPreExposure);
+		hit_info.mAlbedo = InstanceDataBuffer[sGetInstanceID()].mAlbedo;
+		hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mEmission * (kEmissionScale * kPreExposure);
 
 		if (dot(hit_info.mEmission, 1) > 0) // no reflection from surface with emission
 			hit_info.mDone = true;
@@ -1000,6 +946,183 @@ void ShadowMiss(inout ShadowPayload payload)
 {
 	payload.mHit = false;
 }
+
+void TraceRay()
+{
+	uint3 launchIndex = sGetDispatchRaysIndex();
+	uint3 launchDim = sGetDispatchRaysDimensions();
+
+	float2 crd = float2(launchIndex.xy);
+	float2 dims = float2(launchDim.xy);
+
+	float2 d = ((crd/dims) * 2.f - 1.f); // 0~1 => -1~1
+	d.y = -d.y;
+	
+	RayDesc ray;
+	ray.Origin = mPerFrame.mCameraPosition.xyz;
+	ray.Direction = normalize(mPerFrame.mCameraDirection.xyz + mPerFrame.mCameraRightExtend.xyz * d.x + mPerFrame.mCameraUpExtend.xyz * d.y);
+	ray.TMin = 0.001;				// Near
+	ray.TMax = 100000;				// Far
+
+	RayPayload payload = (RayPayload)0;
+	payload.mThroughput = 1; // Camera gather all the light
+	payload.mRandomState = uint(uint(sGetDispatchRaysIndex().x) * uint(1973) + uint(sGetDispatchRaysIndex().y) * uint(9277) + uint(mPerFrame.mAccumulationFrameCount) * uint(26699)) | uint(1); // From https://www.shadertoy.com/view/tsBBWW
+
+#ifdef ENABLE_INLINE_RAYTRACING
+	RayQuery<RAY_FLAG_CULL_NON_OPAQUE|RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES|RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH> query;
+	uint additional_ray_flags = 0;
+	uint ray_instance_mask = 0xffffffff;
+#endif // ENABLE_INLINE_RAYTRACING
+
+	uint recursion = 0;
+	for (;;)
+	{
+#ifdef ENABLE_INLINE_RAYTRACING
+		sWorldRayOrigin 		= ray.Origin;
+		sWorldRayDirection		= ray.Direction;
+
+		query.TraceRayInline(RaytracingScene, additional_ray_flags, ray_instance_mask, ray);
+		query.Proceed();
+
+		if (query.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
+		{
+			sRayTCurrent		= query.CommittedRayT();
+
+			sInstanceIndex 		= query.CommittedInstanceIndex();
+			sPrimitiveIndex 	= query.CommittedPrimitiveIndex();
+			sGeometryIndex 		= query.CommittedGeometryIndex();
+			sInstanceID 		= query.CommittedInstanceID();
+
+			BuiltInTriangleIntersectionAttributes attributes;
+			attributes.barycentrics = query.CommittedTriangleBarycentrics();
+
+			DefaultClosestHit(payload, attributes);
+		}
+		else
+		{
+			DefaultMiss(payload);
+		}
+#else
+		TraceRay(
+			RaytracingScene, 		// RaytracingAccelerationStructure
+			0,						// RayFlags 
+			0xFF,					// InstanceInclusionMask
+			0,						// RayContributionToHitGroupIndex, 4bits
+			0,						// MultiplierForGeometryContributuionToHitGroupIndex, 16bits
+			0,						// MissShaderIndex
+			ray,					// RayDesc
+			payload					// payload_t
+		);
+#endif // ENABLE_INLINE_RAYTRACING
+
+		if (payload.mDone)
+			break;
+
+		ray.Origin = payload.mPosition;
+		ray.Direction = payload.mReflectionDirection;
+
+		// Russian Roulette
+		// http://www.pbr-book.org/3ed-2018/Monte_Carlo_Integration/Russian_Roulette_and_Splitting.html
+		// https://computergraphics.stackexchange.com/questions/2316/is-russian-roulette-really-the-answer
+		if (recursion >= mPerFrame.mRecursionCountMax)
+		{
+			if (mPerFrame.mRecursionMode == RecursionMode_RussianRoulette && recursion <= 8)
+			{
+				// Probability can be chosen in almost any manner
+				// e.g. Fixed threshold
+				// e.g. Veach's Efficiency-Optimized Russian roulette is based on average variance and cost
+				// Based on throughput here (basically albedo)
+				float3 throughput = payload.mThroughput;
+				float termination_probability = max(0.25, 1.0 - max(throughput.x, max(throughput.y, throughput.z)));
+
+				if (RandomFloat01(payload.mRandomState) < termination_probability)
+					break;
+
+				// Weight the sample to keep result unbiased
+				payload.mThroughput /= (1 - termination_probability);
+			}
+			else
+				break;
+		}
+
+		recursion++;
+	}
+
+	// [Debug]
+	// payload.mEmission = RemoveSRGBCurve(payload.mEmission);
+	// payload.mEmission = (uint3)(RemoveSRGBCurve(payload.mEmission) * 255.0) / 255.0;
+
+	float3 scene_luminance = payload.mEmission;
+	float3 output = LuminanceToColor(scene_luminance);
+
+	if (mPerFrame.mOutputLuminance)
+		output = scene_luminance;
+
+	if (mPerFrame.mDebugMode != DebugMode_None)
+		output = scene_luminance;
+
+	// Accumulation
+	{
+		float3 current_output = output;
+
+		float3 previous_output = RaytracingOutput[sGetDispatchRaysIndex().xy].xyz;
+		previous_output = max(0, previous_output); // Eliminate nan
+		float3 mixed_output = lerp(previous_output, current_output, 1.0f / (float)(mPerFrame.mAccumulationFrameCount));
+
+		if (recursion == 0)
+			mixed_output = current_output;
+
+		if (mPerFrame.mDebugMode == DebugMode_RecursionCount)
+			mixed_output = hsv2rgb(float3(recursion * 1.0 / (mPerFrame.mRecursionCountMax + 1), 1, 1));
+
+		if (mPerFrame.mDebugMode == DebugMode_RussianRouletteCount)
+			mixed_output = hsv2rgb(float3(max(0.0, (recursion * 1.0 - mPerFrame.mRecursionCountMax * 1.0)) / 10.0 /* for visualization only */, 1, 1));
+
+		// [TODO] Ray visualization ?
+		// if (all(abs((int2)sGetDispatchRaysIndex().xy - (int2)mDebugCoord) < DEBUG_PIXEL_RADIUS))
+		// 	mixed_output = 0;
+
+		output = mixed_output;
+	}
+
+	RaytracingOutput[sGetDispatchRaysIndex().xy] = float4(output, 1);
+}
+
+[shader("raygeneration")]
+void DefaultRayGeneration()
+{
+	TraceRay();
+}
+
+#ifdef ENABLE_INLINE_RAYTRACING
+[RootSignature("DescriptorTable(" 				\
+	"SRV(t0, space = 0, numDescriptors = 1),"	\
+	"UAV(u0, space = 0, numDescriptors = 1)," 	\
+	"CBV(b0, space = 0, numDescriptors = 1)," 	\
+	"SRV(t1, space = 0, numDescriptors = 4),"	\
+	"CBV(b0, space = 2, numDescriptors = 1),"	\
+	"SRV(t0, space = 2, numDescriptors = 7),"	\
+	"CBV(b0, space = 3, numDescriptors = 1),"	\
+	"SRV(t0, space = 3, numDescriptors = 2)),"	\
+	"StaticSampler(s0, filter = FILTER_MIN_MAG_MIP_LINEAR, addressU = TEXTURE_ADDRESS_CLAMP, addressV = TEXTURE_ADDRESS_CLAMP, addressW = TEXTURE_ADDRESS_CLAMP),"	\
+	"StaticSampler(s1, filter = FILTER_MIN_MAG_MIP_LINEAR, addressU = TEXTURE_ADDRESS_WRAP, addressV = TEXTURE_ADDRESS_WRAP, addressW = TEXTURE_ADDRESS_WRAP)"		\
+)]
+[numthreads(8, 8, 1)]
+void InlineRaytracingCS(	
+	uint3 inGroupThreadID : SV_GroupThreadID,
+	uint3 inGroupID : SV_GroupID,
+	uint3 inDispatchThreadID : SV_DispatchThreadID,
+	uint inGroupIndex : SV_GroupIndex)
+{
+	uint2 output_dimensions;
+	RaytracingOutput.GetDimensions(output_dimensions.x, output_dimensions.y);
+
+	sDispatchRaysIndex.xyz = inDispatchThreadID.xyz;
+	sDispatchRaysDimensions = uint3(output_dimensions.xy, 1);
+
+	TraceRay();
+}
+#endif // ENABLE_INLINE_RAYTRACING
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

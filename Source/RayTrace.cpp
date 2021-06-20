@@ -4,12 +4,20 @@
 
 void gRaytrace()
 {
+	DXGI_SWAP_CHAIN_DESC1 swap_chain_desc;
+	gSwapChain->GetDesc1(&swap_chain_desc);
+
+	if (gUseDXRInlineShader)
+	{
+		// Inline Raytracing
+		gDXRInlineShader.SetupCompute();
+		gCommandList->Dispatch(swap_chain_desc.Width / 8, swap_chain_desc.Height / 8, 1);
+		return;
+	}
+
 	// Setup D3D12_DISPATCH_RAYS_DESC
 	D3D12_DISPATCH_RAYS_DESC dispatch_rays_desc = {};
 	{
-		DXGI_SWAP_CHAIN_DESC1 swap_chain_desc;
-		gSwapChain->GetDesc1(&swap_chain_desc);
-
 		dispatch_rays_desc.Width = swap_chain_desc.Width;
 		dispatch_rays_desc.Height = swap_chain_desc.Height;
 		dispatch_rays_desc.Depth = 1;

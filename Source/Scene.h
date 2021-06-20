@@ -94,6 +94,7 @@ public:
 
 	glm::uint32 GetInstanceCount() const { return (glm::uint32)mObjectInstances.size(); }
 
+	ID3D12Resource* GetResource() const						{ return mDest.Get(); }
 	D3D12_GPU_VIRTUAL_ADDRESS GetGPUVirtualAddress() const	{ return mDest->GetGPUVirtualAddress(); }
 	ID3D12Resource* GetInstanceBuffer()	const				{ return mInstanceBuffer.Get(); }
 
@@ -120,7 +121,7 @@ using TLASRef = std::shared_ptr<TLAS>;
 class Scene
 {
 public:
-	using IndexType = glm::uint32; // glm::uint16;
+	using IndexType = glm::uint32;
 	using VertexType = glm::vec3;
 	using NormalType = glm::vec3;
 

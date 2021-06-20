@@ -23,6 +23,9 @@ ComPtr<ID3D12RootSignature>			gDXRGlobalRootSignature = nullptr;
 ComPtr<ID3D12StateObject>			gDXRStateObject = nullptr;
 ShaderTable							gDXRShaderTable = {};
 
+bool								gUseDXRInlineShader = true;
+Shader								gDXRInlineShader = Shader().CSName(L"InlineRaytracingCS");
+
 Shader								gCompositeShader = Shader().VSName(L"ScreenspaceTriangleVS").PSName(L"CompositePS");
 
 // Frame
@@ -34,7 +37,7 @@ ShaderType::PerFrame				gPerFrameConstantBuffer = {};
 Texture*							gDumpTexture = nullptr;
 Texture								gDumpTextureProxy = {};
 
-void Shader::InitializeDescriptors(const std::vector<ID3D12Resource*>& inEntries)
+void Shader::InitializeDescriptors(const std::vector<Shader::DescriptorInfo>& inEntries)
 {
 	// Check if root signature is supported
 	const D3D12_ROOT_SIGNATURE_DESC* root_signature_desc = mData.mRootSignatureDeserializer->GetRootSignatureDesc();
@@ -69,21 +72,51 @@ void Shader::InitializeDescriptors(const std::vector<ID3D12Resource*>& inEntries
 			{
 				for (UINT j = 0; j < range.NumDescriptors; j++)
 				{
+					const DescriptorInfo& info = inEntries[entry_index];
+					ID3D12Resource* resource = inEntries[entry_index].mResource;
+					D3D12_RESOURCE_DESC resource_desc = inEntries[entry_index].mResource->GetDesc();
+
 					D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
 					desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-					if (inEntries[entry_index]->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D)
+					desc.Format = resource_desc.Format;
+					switch (resource_desc.Dimension)
+					{
+					case D3D12_RESOURCE_DIMENSION_TEXTURE2D:
 					{
 						desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 						desc.Texture2D.MipLevels = (UINT)-1;
 						desc.Texture2D.MostDetailedMip = 0;
+						break;
 					}
-					else
+					case D3D12_RESOURCE_DIMENSION_TEXTURE3D:
 					{
 						desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
 						desc.Texture3D.MipLevels = (UINT)-1;
 						desc.Texture3D.MostDetailedMip = 0;
+						break;
 					}
-					gDevice->CreateShaderResourceView(inEntries[entry_index], &desc, handle);
+					case D3D12_RESOURCE_DIMENSION_BUFFER:
+					{
+						if (info.mStride == 0)
+						{
+							desc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
+							desc.RaytracingAccelerationStructure.Location = resource->GetGPUVirtualAddress();
+							resource = nullptr;
+						}
+						else
+						{
+							desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+							desc.Buffer.NumElements = (UINT)(resource_desc.Width / info.mStride);
+							desc.Buffer.StructureByteStride = info.mStride;
+							desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+						}
+						break;
+					}
+					default:
+						assert(false);
+						break;
+					}
+					gDevice->CreateShaderResourceView(resource, &desc, handle);
 
 					entry_index++;
 					handle.ptr += increment_size;
@@ -95,7 +128,7 @@ void Shader::InitializeDescriptors(const std::vector<ID3D12Resource*>& inEntries
 				for (UINT j = 0; j < range.NumDescriptors; j++)
 				{
 					D3D12_UNORDERED_ACCESS_VIEW_DESC desc = {};
-					if (inEntries[entry_index]->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D)
+					if (inEntries[entry_index].mResource->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D)
 					{
 						desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
 						desc.Texture2D.MipSlice = 0;
@@ -106,9 +139,9 @@ void Shader::InitializeDescriptors(const std::vector<ID3D12Resource*>& inEntries
 						desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE3D;
 						desc.Texture3D.MipSlice = 0;
 						desc.Texture3D.FirstWSlice = 0;
-						desc.Texture3D.WSize = inEntries[entry_index]->GetDesc().DepthOrArraySize;
+						desc.Texture3D.WSize = inEntries[entry_index].mResource->GetDesc().DepthOrArraySize;
 					}
-					gDevice->CreateUnorderedAccessView(inEntries[entry_index], nullptr, &desc, handle);
+					gDevice->CreateUnorderedAccessView(inEntries[entry_index].mResource, nullptr, &desc, handle);
 
 					entry_index++;
 					handle.ptr += increment_size;
@@ -120,8 +153,8 @@ void Shader::InitializeDescriptors(const std::vector<ID3D12Resource*>& inEntries
 				for (UINT j = 0; j < range.NumDescriptors; j++)
 				{
 					D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
-					desc.SizeInBytes = (UINT)inEntries[entry_index]->GetDesc().Width;
-					desc.BufferLocation = inEntries[entry_index]->GetGPUVirtualAddress();
+					desc.SizeInBytes = gAlignUp((UINT)inEntries[entry_index].mResource->GetDesc().Width, (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+					desc.BufferLocation = inEntries[entry_index].mResource->GetGPUVirtualAddress();
 					gDevice->CreateConstantBufferView(&desc, handle);
 
 					entry_index++;

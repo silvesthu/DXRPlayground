@@ -33,6 +33,21 @@ static IDxcBlob* sCompileShader(const char* inFilename, const char* inSource, gl
 	std::string filename(inFilename);
 	std::wstring wfilename(filename.begin(), filename.end());
 
+	std::vector<DxcDefine> defines;
+	std::wstring_view profile(inProfile);
+	DxcDefine dxc_define_profile {};
+	dxc_define_profile.Name = L"SHADER_PROFILE_UNKNOWN";
+	dxc_define_profile.Value = L"1";
+	if (profile._Starts_with(L"lib"))
+		dxc_define_profile.Name = L"SHADER_PROFILE_LIB";
+	if (profile._Starts_with(L"cs"))
+		dxc_define_profile.Name = L"SHADER_PROFILE_CS";
+	if (profile._Starts_with(L"ps"))
+		dxc_define_profile.Name = L"SHADER_PROFILE_PS";
+	if (profile._Starts_with(L"VS"))
+		dxc_define_profile.Name = L"SHADER_PROFILE_VS";
+	defines.push_back(dxc_define_profile);
+
 	IDxcOperationResult* operation_result;
 	if (FAILED(compiler->Compile(
 		blob_encoding,								// program text
@@ -40,7 +55,7 @@ static IDxcBlob* sCompileShader(const char* inFilename, const char* inSource, gl
 		inEntryPoint,								// entry point function
 		inProfile,									// target profile
 		nullptr, 0,									// compilation arguments and their count
-		nullptr, 0,									// name/value defines and their count
+		defines.data(), (UINT32)defines.size(),		// name/value defines and their count
 		include_handler.Get(),						// handler for #include directives
 		&operation_result)))
 		assert(false);
@@ -351,8 +366,8 @@ static void sWriteEnum(std::ofstream& ioEnumFile, T* inCurrentValue = nullptr)
 
 bool sCreateVSPSPipelineState(const char* inShaderFileName, std::stringstream& inShaderStream, const wchar_t* inVSName, const wchar_t* inPSName, Shader& ioSystemShader)
 {
-	IDxcBlob* vs_blob = sCompileShader(inShaderFileName, inShaderStream.str().c_str(), (glm::uint32)inShaderStream.str().length(), inVSName, L"vs_6_3");
-	IDxcBlob* ps_blob = sCompileShader(inShaderFileName, inShaderStream.str().c_str(), (glm::uint32)inShaderStream.str().length(), inPSName, L"ps_6_3");
+	IDxcBlob* vs_blob = sCompileShader(inShaderFileName, inShaderStream.str().c_str(), (glm::uint32)inShaderStream.str().length(), inVSName, L"vs_6_5");
+	IDxcBlob* ps_blob = sCompileShader(inShaderFileName, inShaderStream.str().c_str(), (glm::uint32)inShaderStream.str().length(), inPSName, L"ps_6_5");
 	if (vs_blob == nullptr || ps_blob == nullptr)
 		return false;
 
@@ -394,7 +409,7 @@ bool sCreateVSPSPipelineState(const char* inShaderFileName, std::stringstream& i
 
 bool sCreateCSPipelineState(const char* inShaderFileName, std::stringstream& inShaderStream, const wchar_t* inCSName, Shader& ioSystemShader)
 {
-	IDxcBlob* cs_blob = sCompileShader(inShaderFileName, inShaderStream.str().c_str(), (glm::uint32)inShaderStream.str().length(), inCSName, L"cs_6_3");
+	IDxcBlob* cs_blob = sCompileShader(inShaderFileName, inShaderStream.str().c_str(), (glm::uint32)inShaderStream.str().length(), inCSName, L"cs_6_5");
 	if (cs_blob == nullptr)
 		return false;
 
@@ -457,11 +472,13 @@ void gCreatePipelineState()
 	std::stringstream shader_stream;
 	shader_stream << shader_file.rdbuf();
 	
-	// Create non-DXR shaders
+	// Create non-lib shaders
 	{
 		bool succeed = true;
 
 		succeed &= sCreatePipelineState(shader_filename, shader_stream,	gCompositeShader);
+
+		succeed &= sCreatePipelineState(shader_filename, shader_stream, gDXRInlineShader);
 
 		for (auto&& shader : gPrecomputedAtmosphereScatteringResources.mShaders)
 			succeed &= sCreatePipelineState(shader_filename, shader_stream, *shader);
@@ -479,9 +496,9 @@ void gCreatePipelineState()
 		}
 	}
 
-	// Create DXR shaders
+	// Create lib shaders
 	const wchar_t* entry_points[] = { kDefaultRayGenerationShader, kDefaultMissShader, kDefaultClosestHitShader, kShadowMissShader, kShadowClosestHitShader };
-	IDxcBlob* blob = sCompileShader(shader_filename, shader_stream.str().c_str(), (glm::uint32)shader_stream.str().length(), L"", L"lib_6_3");
+	IDxcBlob* blob = sCompileShader(shader_filename, shader_stream.str().c_str(), (glm::uint32)shader_stream.str().length(), L"", L"lib_6_5");
 	if (blob == nullptr)
 	{
 		assert(gDXRStateObject != nullptr); // Check fail on startup
@@ -559,5 +576,6 @@ void gCleanupPipelineState()
 	gDXRStateObject = nullptr;
 	gDXRGlobalRootSignature = nullptr;
 
+	gDXRInlineShader.Reset();
 	gCompositeShader.Reset();
 }

@@ -207,6 +207,10 @@ static void sUpdate()
 				ImGui::SameLine();
 
 				ImGui::CheckboxFlags("Output Luminance", &gPerFrameConstantBuffer.mOutputLuminance, 0x1);
+
+				ImGui::SameLine();
+
+				ImGui::Checkbox("Inline Raytracing", &gUseDXRInlineShader);
 			}
 
 			// Always update
@@ -705,9 +709,9 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		D3D12_FEATURE_DATA_D3D12_OPTIONS5 features5;
 		memset(&features5, 0, sizeof(features5));
 		HRESULT hr = gDevice->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &features5, sizeof(D3D12_FEATURE_DATA_D3D12_OPTIONS5));
-		if (FAILED(hr) || features5.RaytracingTier == D3D12_RAYTRACING_TIER_NOT_SUPPORTED)
+		if (FAILED(hr) || features5.RaytracingTier < D3D12_RAYTRACING_TIER_1_1)
 		{
-			std::cout << "DXR is not supported" << std::endl;
+			std::cout << "DXR1.1 is not supported" << std::endl;
 			return false;
 		}
 	}

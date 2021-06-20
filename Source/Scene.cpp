@@ -140,7 +140,7 @@ void TLAS::Initialize(std::vector<ObjectInstanceRef>&& inObjectInstances)
 		D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
 		D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(sizeof(ShaderType::InstanceData) * mObjectInstances.size());
 		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mInstanceBuffer)));
-		gSetName(mDest, mName, L".TLAS.InstanceBuffer");
+		gSetName(mInstanceBuffer, mName, L".TLAS.InstanceBuffer");
 
 		// Map once
 		mInstanceBuffer->Map(0, nullptr, (void**)&mInstanceBufferPointer);
@@ -373,6 +373,27 @@ void Scene::CreateShaderResource()
 		mOutputResource->SetName(L"Scene.OutputResource");
 	}
 
+	// DXR Inline
+	{
+		std::vector<Shader::DescriptorInfo> infos;
+		infos.push_back(mTLAS->GetResource());
+		infos.push_back(mOutputResource.Get());
+		infos.push_back(gConstantGPUBuffer.Get());
+ 		infos.push_back({ mTLAS->GetInstanceBuffer(),	sizeof(ShaderType::InstanceData) });
+ 		infos.push_back({ mIndexBuffer.Get(),			sizeof(Scene::IndexType) });
+ 		infos.push_back({ mVertexBuffer.Get(),			sizeof(Scene::VertexType) });
+ 		infos.push_back({ mNormalBuffer.Get(),			sizeof(Scene::NormalType) });
+		infos.push_back(gPrecomputedAtmosphereScatteringResources.mConstantUploadBuffer.Get());
+		for (auto&& texture : gPrecomputedAtmosphereScatteringResources.mTextures)
+			infos.push_back(texture->mResource.Get());
+ 		infos.push_back(gCloudResources.mConstantUploadBuffer.Get());
+ 		for (auto&& texture : gCloudResources.mTextures)
+ 			infos.push_back(texture->mResource.Get());
+		
+		if (std::all_of(infos.begin(), infos.end(), [](const Shader::DescriptorInfo& info) { return info.mResource != nullptr; }))
+			gDXRInlineShader.InitializeDescriptors(infos);
+	}
+
 	// Composite 
 	{
 		gCompositeShader.InitializeDescriptors(
@@ -445,10 +466,9 @@ void Scene::CreateShaderResource()
 			D3D12_RESOURCE_DESC resource_desc = mIndexBuffer->GetDesc();
 			D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
 			desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-			desc.Format = DXGI_FORMAT_R32_TYPELESS;
 			desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			desc.Buffer.NumElements = (UINT)(resource_desc.Width / sizeof(glm::uint32)); // RAW is counted as 32-bit typeless
-			desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
+			desc.Buffer.NumElements = (UINT)(resource_desc.Width / sizeof(Scene::IndexType));
+			desc.Buffer.StructureByteStride = sizeof(Scene::IndexType);
 			gDevice->CreateShaderResourceView(mIndexBuffer.Get(), &desc, handle);
 
 			handle.ptr += increment_size;

@@ -834,7 +834,7 @@ float3 GetScattering(float r, float mu, float mu_s, float nu, bool intersects_gr
 		return rayleigh * RayleighPhaseFunction(nu) + mie * MiePhaseFunction(mAtmosphere.mMiePhaseFunctionG, nu);
 	}
 	
-	return GetScattering(DeltaRayleighScatteringSRV, r, mu, mu_s, nu, intersects_ground);
+	return GetScattering(DeltaRayleighScatteringSRV, r, mu, mu_s, nu, intersects_ground).xyz;
 }
 
 float3 ComputeScatteringDensity(float4 r_mu_mu_s_nu, bool intersects_ground)
@@ -1006,7 +1006,7 @@ float3 ComputeIndirectIrradiance(float2 mu_s_r)
 		Encode4D(float4(r, 0, mu_s, 0), false, DeltaRayleighScatteringSRV, uvw0, uvw1, s);
 		return uvw0;
 		return lerp(DeltaRayleighScatteringSRV.SampleLevel(BilinearSampler, uvw0, 0), DeltaRayleighScatteringSRV.SampleLevel(BilinearSampler, uvw1, 0), s).xyz;
-		return GetScattering(DeltaRayleighScatteringSRV, r, 0, mu_s, 0, false);
+		return GetScattering(DeltaRayleighScatteringSRV, r, 0, mu_s, 0, false).xyz;
 	}
 
 	return result;
