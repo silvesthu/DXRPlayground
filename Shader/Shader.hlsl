@@ -317,6 +317,15 @@ void GetSkyRadiance(out float3 sky_radiance, out float3 transmittance_to_top)
 	float nu = dot(view_ray, sun_direction);
 	bool ray_r_mu_intersects_ground = RayIntersectsGround(r, mu);
 
+	// override
+	{
+		//r = 6360;
+		//mu = 0.0;
+		//mu_s = 0.0;
+		//nu = 0.0;
+		//ray_r_mu_intersects_ground = false;
+	}
+
 	transmittance_to_top = ray_r_mu_intersects_ground ? 0 : GetTransmittanceToTopAtmosphereBoundary(r, mu);
 
 	// [TODO] shadow
@@ -327,6 +336,16 @@ void GetSkyRadiance(out float3 sky_radiance, out float3 transmittance_to_top)
 	// [TODO] light shafts
 
 	sky_radiance = rayleigh_scattering * RayleighPhaseFunction(nu) + single_mie_scattering * MiePhaseFunction(mAtmosphere.mMiePhaseFunctionG, nu);
+
+	// override
+	{
+		//sky_radiance = float3(1.1, 1.2, 1.3);
+		//float3 uvw0, uvw1;
+		//float s;
+		//Encode4D(float4(r, mu, mu_s, nu), ray_r_mu_intersects_ground, ScatteringSRV, uvw0, uvw1, s);
+		//rayleigh_scattering = uvw0;
+		//rayleigh_scattering = ScatteringSRV.SampleLevel(BilinearSampler, uvw0, 0);
+	}
 }
 
 // Aerial Perspective
@@ -519,6 +538,12 @@ float3 GetEnvironmentEmission()
 	if (dot(RayDirection(), GetSunDirection()) > cos(mAtmosphere.mSunAngularRadius))
 	{
 		radiance = radiance + transmittance_to_top * mAtmosphere.mSolarIrradiance;
+	}
+
+	// Debug
+	{
+		// return sqrt(radiance);
+		// return radiance;
 	}
 
 	return RadianceToLuminance(radiance);

@@ -230,14 +230,14 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 		ImGui::SliderAngle("Azimuth Angle", &gPerFrameConstantBuffer.mSunAzimuth, 0, 360.0f);
 		ImGui::SliderAngle("Zenith Angle", &gPerFrameConstantBuffer.mSunZenith, 0, 180.0f);
 
-		ImGui::Text(gAtmosphereProfile.mShowSolarIrradianceAsLuminance ? "Solar Irradiance (kLux)" : "Solar Irradiance (kW)");
+		ImGui::Text(gAtmosphereProfile.mShowSolarIrradianceAsLuminance ? "Solar Irradiance (klm)" : "Solar Irradiance (kW)");
 		float scale = gAtmosphereProfile.mShowSolarIrradianceAsLuminance ? ShaderType::kSunLuminousEfficacy : 1.0f;
 		glm::vec3 solar_value = gAtmosphereProfile.mSolarIrradiance * scale;
 		if (ImGui::ColorEdit3("", &solar_value[0], ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR))
 			gAtmosphereProfile.mSolarIrradiance = solar_value / scale;
 		ImGui::Checkbox("Use Luminance", &gAtmosphereProfile.mShowSolarIrradianceAsLuminance);
 		ImGui::SameLine();
-		ImGui::Text("(Luminous Efficacy = %.2f Lux/W)", ShaderType::kSunLuminousEfficacy);
+		ImGui::Text("(Luminous Efficacy = %.2f lm/W)", ShaderType::kSunLuminousEfficacy);
 		ImGui::Checkbox("Precompute With Solar Irradiance", &gAtmosphereProfile.mPrecomputeWithSolarIrradiance);
 
 		if (ImGui::SmallButton("Bruneton17")) AtmosphereProfile::SolarIrradianceReference::Bruneton17(gAtmosphereProfile);
