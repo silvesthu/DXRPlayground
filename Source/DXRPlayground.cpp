@@ -326,13 +326,13 @@ static void sUpdate()
 				ImGui::TreePop();
 			}
 
-			if (ImGui::TreeNodeEx("Atmosphere"))
+			if (ImGui::TreeNodeEx("Atmosphere", ImGuiTreeNodeFlags_DefaultOpen))
 			{
 				gPrecomputedAtmosphereScattering.UpdateImGui();
 				ImGui::TreePop();
 			}
 
-			if (ImGui::TreeNodeEx("Cloud", ImGuiTreeNodeFlags_DefaultOpen))
+			if (ImGui::TreeNodeEx("Cloud"))
 			{
 				gCloud.UpdateImGui();
 				ImGui::TreePop();
@@ -562,6 +562,7 @@ void sRender()
 	{
 		gPrecomputedAtmosphereScattering.Update();
 		gPrecomputedAtmosphereScattering.Precompute();
+		gPrecomputedAtmosphereScattering.Compute();
 	}
 
 	// Cloud

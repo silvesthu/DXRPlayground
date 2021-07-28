@@ -23,7 +23,7 @@ void BLAS::Initialize(D3D12_GPU_VIRTUAL_ADDRESS inVertexBaseAddress, D3D12_GPU_V
 	{
 		mDesc.Triangles.IndexBuffer = inIndexBaseAddress + mPrimitive->GetIndexOffset() * sizeof(Scene::IndexType);
 		mDesc.Triangles.IndexCount = mPrimitive->GetIndexCount();
-		mDesc.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT; //DXGI_FORMAT_R16_UINT;
+		mDesc.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
 	}
 	mDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
 

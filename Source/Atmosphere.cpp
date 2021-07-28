@@ -17,6 +17,7 @@ void PrecomputedAtmosphereScattering::Update()
 	atmosphere->mBottomRadius						= static_cast<float>(gAtmosphereProfile.BottomRadius());
 	atmosphere->mTopRadius							= static_cast<float>(gAtmosphereProfile.TopRadius());
 	atmosphere->mSceneScale							= gAtmosphereProfile.mSceneInKilometer ? 1.0f : 0.001f;
+	atmosphere->mDensitySampleCount					= gAtmosphereProfile.mDensitySampleCount;
 
 	atmosphere->mMode								= gAtmosphereProfile.mMode;
 	atmosphere->mMuSEncodingMode					= gAtmosphereProfile.mMuSEncodingMode;
@@ -149,6 +150,35 @@ void PrecomputedAtmosphereScattering::Precompute()
 	mRecomputeRequested = false;
 }
 
+void PrecomputedAtmosphereScattering::Compute()
+{
+	// [Hillaire20]
+	TransLUT();
+	NewMultiScatCS();
+	SkyViewLut();
+	CameraVolumes();
+}
+
+void PrecomputedAtmosphereScattering::TransLUT()
+{
+
+}
+
+void PrecomputedAtmosphereScattering::NewMultiScatCS()
+{
+
+}
+
+void PrecomputedAtmosphereScattering::SkyViewLut()
+{
+
+}
+
+void PrecomputedAtmosphereScattering::CameraVolumes()
+{
+
+}
+
 void PrecomputedAtmosphereScattering::Initialize()
 {
 	// Buffer
@@ -210,6 +240,10 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 				gAtmosphereProfile.mMode = (AtmosphereMode)i;
 		}
 
+		SMALL_BUTTON(AtmosphereProfile::Preset::Bruneton17);
+		ImGui::SameLine();
+		SMALL_BUTTON(AtmosphereProfile::Preset::Hillaire20);
+
 		if (gAtmosphereProfile.mMode == AtmosphereMode::ConstantColor)
 			ImGui::ColorEdit3("Color", (float*)&gAtmosphereProfile.mConstantColor, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
 
@@ -224,7 +258,22 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 		ImGui::TreePop();
 	}
 
-	if (ImGui::TreeNodeEx("Sun", ImGuiTreeNodeFlags_DefaultOpen))
+	if (ImGui::TreeNodeEx("Control"))
+	{
+		ImGui::PushItemWidth(200);
+
+		ImGui::SliderUint("Density Sample Count", &gAtmosphereProfile.mDensitySampleCount, 1, 500);
+
+		ImGui::PopItemWidth();
+
+		SMALL_BUTTON(AtmosphereProfile::Control::Bruneton17);
+		ImGui::SameLine();
+		SMALL_BUTTON(AtmosphereProfile::Control::Hillaire20);
+
+		ImGui::TreePop();
+	}
+
+	if (ImGui::TreeNodeEx("Sun"))
 	{
 		ImGui::Text("Direction");
 		ImGui::SliderAngle("Azimuth Angle", &gPerFrameConstantBuffer.mSunAzimuth, 0, 360.0f);
@@ -259,6 +308,8 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 		SMALL_BUTTON(AtmosphereProfile::GeometryReference::Bruneton17);
 		ImGui::SameLine();
 		SMALL_BUTTON(AtmosphereProfile::GeometryReference::Yusov13);
+		ImGui::SameLine();
+		SMALL_BUTTON(AtmosphereProfile::GeometryReference::Hillaire20);
 
 		ImGui::TreePop();
 	}
@@ -271,7 +322,7 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 		ImGui::TreePop();
 	}
 
-	if (ImGui::TreeNodeEx("Coefficients & Density", ImGuiTreeNodeFlags_DefaultOpen))
+	if (ImGui::TreeNodeEx("Coefficients & Density"))
 	{
 		struct DensityPlot
 		{
@@ -312,7 +363,7 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 			}
 		};
 
-		if (ImGui::TreeNodeEx("Rayleigh", ImGuiTreeNodeFlags_DefaultOpen))
+		if (ImGui::TreeNodeEx("Rayleigh"))
 		{
 			ImGui::SliderDouble3("Scattering  (/m)", &gAtmosphereProfile.mRayleighScatteringCoefficient.x, 1.0e-5, 1.0e-1, "%.3e");
 
@@ -338,7 +389,7 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 			ImGui::TreePop();
 		}
 
-		if (ImGui::TreeNodeEx("Mie", ImGuiTreeNodeFlags_DefaultOpen))
+		if (ImGui::TreeNodeEx("Mie"))
 		{
 			ImGui::SliderDouble3("Extinction (/km)", &gAtmosphereProfile.mMieExtinctionCoefficient[0], 1.0e-5, 1.0e-1, "%.3e");
 			ImGui::SliderDouble3("Scattering (/km)", &gAtmosphereProfile.mMieScatteringCoefficient[0], 1.0e-5, 1.0e-1, "%.3e");
@@ -366,7 +417,7 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 			ImGui::TreePop();
 		}
 
-		if (ImGui::TreeNodeEx("Ozone", ImGuiTreeNodeFlags_DefaultOpen))
+		if (ImGui::TreeNodeEx("Ozone"))
 		{
 			ImGui::Checkbox("Enable", &gAtmosphereProfile.mEnableOzone);
 
@@ -406,7 +457,7 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 		ImGui::TreePop();
 	}
 
-	if (ImGui::TreeNodeEx("Encoding", ImGuiTreeNodeFlags_DefaultOpen))
+	if (ImGui::TreeNodeEx("Encoding"))
 	{
 		ImGui::Text(nameof::nameof_enum_type<AtmosphereMuSEncodingMode>().data());
 		for (int i = 0; i < (int)AtmosphereMuSEncodingMode::Count; i++)
@@ -421,5 +472,5 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 		ImGui::TreePop();
 	}
 
-	ImGuiShowTextures(gPrecomputedAtmosphereScatteringResources.mTextures);
+	ImGuiShowTextures(gPrecomputedAtmosphereScatteringResources.mTextures, "Texture", ImGuiTreeNodeFlags_DefaultOpen);
 }

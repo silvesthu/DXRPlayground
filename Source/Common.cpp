@@ -23,7 +23,7 @@ ComPtr<ID3D12RootSignature>			gDXRGlobalRootSignature = nullptr;
 ComPtr<ID3D12StateObject>			gDXRStateObject = nullptr;
 ShaderTable							gDXRShaderTable = {};
 
-bool								gUseDXRInlineShader = true;
+bool								gUseDXRInlineShader = false; // Somehow ray penetrates the first hit with inline shader...
 Shader								gDXRInlineShader = Shader().CSName(L"InlineRaytracingCS");
 
 Shader								gCompositeShader = Shader().VSName(L"ScreenspaceTriangleVS").PSName(L"CompositePS");
@@ -233,12 +233,12 @@ void Texture::Load()
 	UpdateSubresources(gCommandList, mIntermediateResource.Get(), mUploadResource.Get(), 0, 0, (UINT)subresources.size(), subresources.data());
 }
 
-void ImGuiShowTextures(std::vector<Texture*> textures, std::string name)
+void ImGuiShowTextures(std::vector<Texture*> textures, std::string name, ImGuiTreeNodeFlags flags)
 {
 	static float ui_scale = 1.0f;
 	static bool flip_y = false;
 
-	if (ImGui::TreeNodeEx(name.c_str()))
+	if (ImGui::TreeNodeEx(name.c_str(), flags))
 	{
 		static Texture* sTexture = nullptr;
 		auto add_texture = [&](Texture& inTexture)

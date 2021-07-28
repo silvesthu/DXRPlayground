@@ -128,7 +128,7 @@ struct Atmosphere
 	float						mBottomRadius			CONSTANT_DEFAULT(0);
 	float						mTopRadius				CONSTANT_DEFAULT(0);
 	float						mSceneScale				CONSTANT_DEFAULT(0);
-	float						mPad0;
+	uint						mDensitySampleCount		CONSTANT_DEFAULT(0);
 
 	AtmosphereMode				mMode					CONSTANT_DEFAULT(AtmosphereMode::PrecomputedAtmosphere);
 	uint						mSliceCount				CONSTANT_DEFAULT(0);

@@ -44,6 +44,12 @@ struct AtmosphereProfile
 			profile.mBottomRadius						= 6360.0;											// km
 			profile.mAtmosphereThickness				= 80.0;												// km
 		}
+
+		static void Hillaire20(AtmosphereProfile& profile)
+		{
+			profile.mBottomRadius						= 6360.0;											// km
+			profile.mAtmosphereThickness				= 100.0;											// km
+		}
 	};
 
 	double mBottomRadius								= {};												// km
@@ -244,14 +250,47 @@ struct AtmosphereProfile
 	// Unit
 	bool mSceneInKilometer								= false; // Meter otherwise
 
+	struct Control
+	{
+		static void Bruneton17(AtmosphereProfile& profile)
+		{
+			profile.mDensitySampleCount					= 500;
+		}
+
+		static void Hillaire20(AtmosphereProfile& profile)
+		{
+			profile.mDensitySampleCount					= 40;
+		}
+	};
+	glm::uint mDensitySampleCount						= 500;
+
+	struct Preset
+	{
+		static void Bruneton17(AtmosphereProfile& profile)
+		{
+			GeometryReference::Bruneton17(profile);
+			RayleighReference::Bruneton17(profile);
+			MieReference::Bruneton17(profile);
+			OzoneReference::Bruneton17(profile);
+			SolarIrradianceReference::Bruneton17(profile);
+			Control::Bruneton17(profile);
+		}
+
+		static void Hillaire20(AtmosphereProfile& profile)
+		{
+			GeometryReference::Hillaire20(profile);
+			RayleighReference::Bruneton17(profile);
+			MieReference::Bruneton17(profile);
+			OzoneReference::Bruneton17(profile);
+			SolarIrradianceReference::Bruneton17(profile);
+			Control::Hillaire20(profile);
+		}
+	};
+
 	// Default
 	AtmosphereProfile()
 	{
-		GeometryReference::Bruneton17(*this);
-		RayleighReference::Bruneton17(*this);
-		MieReference::Bruneton17(*this);
-		OzoneReference::Bruneton17(*this);
-		SolarIrradianceReference::Bruneton17(*this);
+		Preset::Bruneton17(*this);
 	}
 };
 
@@ -263,6 +302,7 @@ public:
 	void UpdateImGui();
 	void Update();
 	void Precompute();
+	void Compute();
 
 	void ComputeTransmittance();
 	void ComputeDirectIrradiance();
@@ -276,6 +316,11 @@ public:
 
 	bool mRecomputeRequested = true;
 	bool mRecomputeEveryFrame = false;
+
+	void TransLUT();
+	void NewMultiScatCS();
+	void SkyViewLut();
+	void CameraVolumes();
 };
 
 struct PrecomputedAtmosphereScatteringResources
@@ -315,6 +360,12 @@ struct PrecomputedAtmosphereScatteringResources
 
 	Texture mDeltaScatteringDensityTexture		= Texture().Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Delta Scattering Density");
 
+	// [Hillaire20]
+	Texture mTransmittanceTex					= Texture().Width(256).Height(64).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Hillaire20.TransmittanceTex");
+	Texture mSkyViewLutTex						= Texture().Width(192).Height(108).Format(DXGI_FORMAT_R11G11B10_FLOAT).Name("Hillaire20.SkyViewLutTex");
+	Texture mMultiScattTex						= Texture().Width(32).Height(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Hillaire20.MultiScattTex");
+	Texture mAtmosphereCameraScatteringVolume	= Texture().Width(32).Height(32).Depth(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Hillaire20.AtmosphereCameraScatteringVolume");
+
 	static void Bruneton17(PrecomputedAtmosphereScatteringResources& resource)
 	{
 		constexpr glm::uvec3 kDimension = glm::uvec3(256, 128, 32);
@@ -351,7 +402,13 @@ struct PrecomputedAtmosphereScatteringResources
 		&mDeltaMieScatteringTexture,
 		&mScatteringTexture,
 
-		&mDeltaScatteringDensityTexture
+		&mDeltaScatteringDensityTexture,
+
+		// [Hillaire20]
+		&mTransmittanceTex,
+		&mSkyViewLutTex,
+		&mMultiScattTex,
+		&mAtmosphereCameraScatteringVolume
 	};
 
 	PrecomputedAtmosphereScatteringResources()

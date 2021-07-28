@@ -226,7 +226,14 @@
     <CopyFileToFolders Include="Shader\RaymarchAtmosphere.hlsl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\Generated\Enum.hlsl" />
-    <CopyFileToFolders Include="Shader\PrecomputedAtmosphere.hlsl" />
+    <CopyFileToFolders Include="Shader\PrecomputedAtmosphere.hlsl">
+      <Filter>Shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Shader\Generated\Enum.hlsl">
+      <Filter>Shader</Filter>
+    </CopyFileToFolders>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
   </ItemGroup>
 </Project>

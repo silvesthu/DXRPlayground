@@ -545,14 +545,14 @@ void Encode4D(float4 r_mu_mu_s_nu, bool intersects_ground, Texture3D<float4> inT
 
 float IntegrateDensity(DensityProfile inProfile, float2 mu_r)
 {
-	const int SAMPLE_COUNT = 500;
+	int sample_count = mAtmosphere.mDensitySampleCount;
 
 	float mu = mu_r.x;
 	float r = mu_r.y;
 
-	float step_distance = DistanceToTopAtmosphereBoundary(r, mu) / float(SAMPLE_COUNT);
+	float step_distance = DistanceToTopAtmosphereBoundary(r, mu) / float(sample_count);
 	float result = 0.0;
-	for (int i = 0; i <= SAMPLE_COUNT; ++i) 
+	for (int i = 0; i <= sample_count; ++i)
 	{
 		float d_i = float(i) * step_distance;
 
@@ -564,7 +564,7 @@ float IntegrateDensity(DensityProfile inProfile, float2 mu_r)
 		float beta_i = GetProfileDensity(inProfile, altitude);
 
 		// Sample weight (from the trapezoidal rule).
-		float weight_i = (i == 0 || i == SAMPLE_COUNT) ? 0.5 : 1.0;
+		float weight_i = (i == 0 || i == sample_count) ? 0.5 : 1.0;
 
 		result += beta_i * weight_i * step_distance;
 	}
