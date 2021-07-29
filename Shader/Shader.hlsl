@@ -44,7 +44,7 @@ float3 RadianceToLuminance(float3 radiance)
 	}
 }
 
-#include "PrecomputedAtmosphere.hlsl"
+#include "Atmosphere.hlsl"
 cbuffer CloudBuffer : register(b0, space3)
 {
 	Cloud mCloud;
@@ -204,10 +204,6 @@ float3 LuminanceToColor(float3 luminance)
 
 	return tonemapped_color;
 }
-
-
-
-#include "RaymarchAtmosphere.hlsl"
 
 // Adapters
 float3 RayOrigin() { return sGetWorldRayOrigin() * mAtmosphere.mSceneScale; }
@@ -748,6 +744,7 @@ void DefaultMiss(inout RayPayload payload)
 	case AtmosphereMode_ConstantColor: 				atmosphere = mAtmosphere.mConstantColor.xyz; break;
 	case AtmosphereMode_RaymarchAtmosphereOnly: 	atmosphere = RaymarchAtmosphereScattering(RayOrigin(), RayDirection()); break;
 	case AtmosphereMode_PrecomputedAtmosphere: 		atmosphere = GetEnvironmentEmission(); break;
+	case AtmosphereMode_Hillaire20: 				atmosphere = GetEnvironmentEmission(); break;
 	}
 
 	float3 cloud = 0;

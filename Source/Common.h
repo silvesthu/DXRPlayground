@@ -215,6 +215,7 @@ enum class AtmosphereMode
 
 	RaymarchAtmosphereOnly,
 	PrecomputedAtmosphere,
+	Hillaire20,
 
 	Count
 };

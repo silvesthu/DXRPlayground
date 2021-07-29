@@ -226,10 +226,16 @@
     <CopyFileToFolders Include="Shader\RaymarchAtmosphere.hlsl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\PrecomputedAtmosphere.hlsl">
+    <CopyFileToFolders Include="Shader\Atmosphere.hlsl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
     <CopyFileToFolders Include="Shader\Generated\Enum.hlsl">
+      <Filter>Shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Shader\Hillaire20.hlsl">
+      <Filter>Shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Shader\Bruneton17.hlsl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
   </ItemGroup>

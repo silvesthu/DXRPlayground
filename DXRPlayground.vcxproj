@@ -104,12 +104,22 @@
     </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="Shader\PrecomputedAtmosphere.hlsl">
+    <CopyFileToFolders Include="Shader\Atmosphere.hlsl">
       <FileType>Document</FileType>
     </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <CopyFileToFolders Include="Shader\Hillaire20.hlsl">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
+  </ItemGroup>
+  <ItemGroup>
+    <CopyFileToFolders Include="Shader\Bruneton17.hlsl">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

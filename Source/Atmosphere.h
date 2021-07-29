@@ -6,8 +6,7 @@
 // [Preetham99][PSS99] A Practical Analytic Model for Daylight https://www2.cs.duke.edu/courses/cps124/spring08/assign/07_papers/p91-preetham.pdf
 // [Riley04][REK*04] Efficient Rendering of Atmospheric Phenomena https://people.cs.clemson.edu/~jtessen/reports/papers_files/Atmos_EGSR_Elec.pdf
 // [Zotti07][ZWP07] A Critical Review of the Preetham Skylight Model https://www.cg.tuwien.ac.at/research/publications/2007/zotti-2007-wscg/zotti-2007-wscg-paper.pdf
-// [Bruneton08] Precomputed Atmospheric Scattering https://hal.inria.fr/inria-00288758/document
-// [Bruneton08Doc] https://ebruneton.github.io/precomputed_atmospheric_scattering/atmosphere/functions.glsl.html
+// [Bruneton08] Precomputed Atmospheric Scattering https://hal.inria.fr/inria-00288758/document https://ebruneton.github.io/precomputed_atmospheric_scattering/atmosphere/functions.glsl.html
 // [Elek09] Rendering Parametrizable Planetary Atmospheres with Multiple Scattering in Real-Time http://www.klayge.org/material/4_0/Atmospheric/Rendering%20Parametrizable%20Planetary%20Atmospheres%20with%20Multiple%20Scattering%20in%20Real-Time.pdf
 // [Yusov13] Outdoor Light Scattering Sample Update https://software.intel.com/content/www/us/en/develop/blogs/otdoor-light-scattering-sample-update.html
 // [Hillaire16] Physically Based Sky, Atmosphere and Cloud Rendering in Frostbite https://media.contentapi.ea.com/content/dam/eacom/frostbite/files/s2016-pbs-frostbite-sky-clouds-new.pdf
@@ -19,7 +18,7 @@
 struct AtmosphereProfile
 {
 	// Config
-	AtmosphereMode mMode								= AtmosphereMode::ConstantColor;
+	AtmosphereMode mMode								= AtmosphereMode::Hillaire20;
 
 	// Constant Color
 	glm::vec4 mConstantColor							= glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
@@ -75,6 +74,8 @@ struct AtmosphereProfile
 
 			// How to get scale height?
 			// https://en.wikipedia.org/wiki/Scale_height
+
+			profile.mEnableRayleigh = true;
 		}
 
 		static void Bruneton08(AtmosphereProfile& profile) // 2.1 [REK*04] Table 3
@@ -114,7 +115,15 @@ struct AtmosphereProfile
 			profile.mRayleighDensityProfile.mLayer0 = { kDummy, kDummy, kDummy, kDummy, kDummy };
 			profile.mRayleighDensityProfile.mLayer1 = { kDummy, 1.0f, -1.0f / static_cast<float>(kRayleighScaleHeight), 0.0f, 0.0f };
 		}
+
+		static void Hillaire20(AtmosphereProfile& profile)
+		{
+			Bruneton17(profile);
+
+			profile.mRayleighScatteringCoefficient = glm::dvec3(5.802, 13.558, 33.1) * 1e-3; // km^-1
+		}
 	};
+	bool mEnableRayleigh								= {};
 	ShaderType::DensityProfile mRayleighDensityProfile	= {}; // km
 	glm::dvec3 mRayleighScatteringCoefficient			= {}; // km^-1
 
@@ -140,6 +149,8 @@ struct AtmosphereProfile
 			static constexpr float kDummy = 0.0f;
 			profile.mMieDensityProfile.mLayer0 = { kDummy, kDummy, kDummy, kDummy, kDummy };
 			profile.mMieDensityProfile.mLayer1 = { kDummy, 1.0f, -1.0f / static_cast<float>(kMieScaleHeight), 0.0f, 0.0f };
+
+			profile.mEnableMie = true;
 		}
 
 		static void Bruneton08(AtmosphereProfile& profile) // 2.1 (3), beta_M(0, lambda)
@@ -158,7 +169,18 @@ struct AtmosphereProfile
 
 			profile.mMiePhaseFunctionG = 0.76;
 		}
+
+		static void Hillaire20(AtmosphereProfile& profile)
+		{
+			Bruneton17(profile);
+
+			profile.mMieScatteringCoefficient = glm::dvec3(3.996, 3.996, 3.996) * 1e-3; // km^-1
+			profile.mMieExtinctionCoefficient = glm::dvec3(4.44, 4.44, 4.44) * 1e-3; // km^-1
+
+			profile.mMiePhaseFunctionG = 0.8;
+		}
 	};
+	bool mEnableMie										= {};
 	ShaderType::DensityProfile mMieDensityProfile		= {}; // km
 	glm::dvec3 mMieScatteringCoefficient				= {}; // km^-1
 	glm::dvec3 mMieExtinctionCoefficient				= {}; // km^-1
@@ -205,6 +227,13 @@ struct AtmosphereProfile
 
 			UpdateDensityProfile(profile);
 		}
+
+		static void Hillaire20(AtmosphereProfile& profile)
+		{
+			Bruneton17(profile);
+
+			profile.mOZoneAbsorptionCoefficient = glm::dvec3(0.65, 1.881, 0.85) * 1e-3; // km^-1
+		}
 	};
 	bool mEnableOzone									= {};
 	double mOzoneBottomAltitude							= {}; // km
@@ -225,6 +254,11 @@ struct AtmosphereProfile
 		{ 
 			// http://rredc.nrel.gov/solar/spectra/am1.5/ASTMG173/ASTMG173.html
 			profile.mSolarIrradiance = glm::vec3(1.474000f, 1.850400f, 1.911980f); 
+		}
+
+		static void Hillaire20(AtmosphereProfile& profile)
+		{
+			profile.mSolarIrradiance = glm::vec3(1.0f, 1.0f, 1.0f);
 		}
 	};
 	glm::vec3 mSolarIrradiance							= {}; // kW/m^2. why is this W/m^2 in [Bruneton17]
@@ -250,20 +284,6 @@ struct AtmosphereProfile
 	// Unit
 	bool mSceneInKilometer								= false; // Meter otherwise
 
-	struct Control
-	{
-		static void Bruneton17(AtmosphereProfile& profile)
-		{
-			profile.mDensitySampleCount					= 500;
-		}
-
-		static void Hillaire20(AtmosphereProfile& profile)
-		{
-			profile.mDensitySampleCount					= 40;
-		}
-	};
-	glm::uint mDensitySampleCount						= 500;
-
 	struct Preset
 	{
 		static void Bruneton17(AtmosphereProfile& profile)
@@ -273,24 +293,26 @@ struct AtmosphereProfile
 			MieReference::Bruneton17(profile);
 			OzoneReference::Bruneton17(profile);
 			SolarIrradianceReference::Bruneton17(profile);
-			Control::Bruneton17(profile);
 		}
 
 		static void Hillaire20(AtmosphereProfile& profile)
 		{
 			GeometryReference::Hillaire20(profile);
-			RayleighReference::Bruneton17(profile);
-			MieReference::Bruneton17(profile);
-			OzoneReference::Bruneton17(profile);
-			SolarIrradianceReference::Bruneton17(profile);
-			Control::Hillaire20(profile);
+			RayleighReference::Hillaire20(profile);
+			MieReference::Hillaire20(profile);
+			OzoneReference::Hillaire20(profile);
+			SolarIrradianceReference::Hillaire20(profile);
 		}
 	};
 
 	// Default
 	AtmosphereProfile()
 	{
-		Preset::Bruneton17(*this);
+		switch (mMode)
+		{
+		case AtmosphereMode::Hillaire20:	Preset::Hillaire20(*this); break;
+		default:							Preset::Bruneton17(*this); break;
+		}		
 	}
 };
 
@@ -307,13 +329,10 @@ public:
 	void ComputeTransmittance();
 	void ComputeDirectIrradiance();
 	void ComputeSingleScattering();
-
 	void ComputeScatteringDensity(glm::uint scattering_order);
 	void ComputeIndirectIrradiance(glm::uint scattering_order);
 	void AccumulateMultipleScattering();
-
 	void ComputeMultipleScattering(glm::uint scattering_order);
-
 	bool mRecomputeRequested = true;
 	bool mRecomputeEveryFrame = false;
 
@@ -328,43 +347,34 @@ struct PrecomputedAtmosphereScatteringResources
 	ComPtr<ID3D12Resource> mConstantUploadBuffer;
 	void* mConstantUploadBufferPointer = nullptr;
 
+	// [Bruneton17]
 	Shader mComputeTransmittanceShader			= Shader().CSName(L"ComputeTransmittanceCS");
 	Shader mComputeDirectIrradianceShader		= Shader().CSName(L"ComputeDirectIrradianceCS");
 	Shader mComputeSingleScatteringShader		= Shader().CSName(L"ComputeSingleScatteringCS");
-
 	Shader mComputeScatteringDensityShader		= Shader().CSName(L"ComputeScatteringDensityCS");
 	Shader mComputeIndirectIrradianceShader		= Shader().CSName(L"ComputeIndirectIrradianceCS");
 	Shader mComputeMultipleScatteringShader		= Shader().CSName(L"ComputeMultipleScatteringCS");
-
-	// Put shaders in array to use in loop (use std::span when C++20 is available)
-	std::vector<Shader*> mShaders = 
-	{ 
-		&mComputeTransmittanceShader, 
-		&mComputeDirectIrradianceShader,
-		&mComputeSingleScatteringShader,
-
-		&mComputeScatteringDensityShader,
-		&mComputeIndirectIrradianceShader,
-		&mComputeMultipleScatteringShader
-	};
-
-	Texture mTransmittanceTexture				= Texture().Width(256).Height(64).Format(DXGI_FORMAT_R32G32B32A32_FLOAT).Name("Transmittance");
-
+	
+	Texture mTransmittanceTexture				= Texture().Width(256).Height(64).Format(DXGI_FORMAT_R32G32B32A32_FLOAT).Name("Transmittance").UIScale(1.0f);
 	Texture mDeltaIrradianceTexture				= Texture().Width(64).Height(16).Format(DXGI_FORMAT_R32G32B32A32_FLOAT).Name("Delta Irradiance").UIScale(4.0f);
-	Texture mIrradianceTexture					= Texture().Width(64).Height(16).Format(DXGI_FORMAT_R32G32B32A32_FLOAT).Name("Irradiance").UIScale(4.0f);
-
-	glm::uint mSliceCount						= 0; // Slice axis to use 3D texture as 4D storage
+	Texture mIrradianceTexture					= Texture().Width(64).Height(16).Format(DXGI_FORMAT_R32G32B32A32_FLOAT).Name("Irradiance").UIScale(4.0f);	
 	Texture mDeltaRayleighScatteringTexture		= Texture().Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Delta Rayleigh Scattering");
 	Texture mDeltaMieScatteringTexture			= Texture().Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Delta Mie Scattering");
 	Texture mScatteringTexture					= Texture().Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Scattering");
-
 	Texture mDeltaScatteringDensityTexture		= Texture().Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Delta Scattering Density");
 
+	glm::uint mSliceCount = 0; // Slice axis to use 3D texture as 4D storage
+
 	// [Hillaire20]
-	Texture mTransmittanceTex					= Texture().Width(256).Height(64).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Hillaire20.TransmittanceTex");
-	Texture mSkyViewLutTex						= Texture().Width(192).Height(108).Format(DXGI_FORMAT_R11G11B10_FLOAT).Name("Hillaire20.SkyViewLutTex");
-	Texture mMultiScattTex						= Texture().Width(32).Height(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Hillaire20.MultiScattTex");
-	Texture mAtmosphereCameraScatteringVolume	= Texture().Width(32).Height(32).Depth(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Hillaire20.AtmosphereCameraScatteringVolume");
+	Shader mTransLUTShader						= Shader().CSName(L"TransLUT");
+	Shader mNewMultiScatCSShader				= Shader().CSName(L"NewMultiScatCS");
+	Shader mSkyViewLutShader					= Shader().CSName(L"SkyViewLut");
+	Shader mCameraVolumesShader					= Shader().CSName(L"CameraVolumes");
+
+	Texture mTransmittanceTex					= Texture().Width(256).Height(64).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Hillaire20.TransmittanceTex").UIScale(1.0f);
+	Texture mSkyViewLutTex						= Texture().Width(128).Height(80).Format(DXGI_FORMAT_R11G11B10_FLOAT).Name("Hillaire20.SkyViewLutTex").UIScale(2.0f);
+	Texture mMultiScattTex						= Texture().Width(32).Height(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Hillaire20.MultiScattTex").UIScale(8.0f);
+	Texture mAtmosphereCameraScatteringVolume	= Texture().Width(32).Height(32).Depth(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Hillaire20.AtmosphereCameraScatteringVolume").UIScale(8.0f);
 
 	static void Bruneton17(PrecomputedAtmosphereScatteringResources& resource)
 	{
@@ -389,19 +399,34 @@ struct PrecomputedAtmosphereScatteringResources
 
 		resource.mSliceCount = 16;
 	}
+
+	// Put shaders in array to use in loop (use std::span when C++20 is available)
+	std::vector<Shader*> mShaders =
+	{
+		// [Bruneton17]
+		&mComputeTransmittanceShader,
+		&mComputeDirectIrradianceShader,
+		&mComputeSingleScatteringShader,
+		&mComputeScatteringDensityShader,
+		&mComputeIndirectIrradianceShader,
+		&mComputeMultipleScatteringShader,
+
+		// [Hillaire20]
+		&mTransLUTShader,
+		&mNewMultiScatCSShader,
+		&mSkyViewLutShader,
+		&mCameraVolumesShader,
+	};
 	
-	// Put textures in array to use in loop
 	std::vector<Texture*> mTextures =
 	{
+		// [Bruneton17]
 		&mTransmittanceTexture,
-
 		&mDeltaIrradianceTexture,
 		&mIrradianceTexture,
-
 		&mDeltaRayleighScatteringTexture,
 		&mDeltaMieScatteringTexture,
 		&mScatteringTexture,
-
 		&mDeltaScatteringDensityTexture,
 
 		// [Hillaire20]
