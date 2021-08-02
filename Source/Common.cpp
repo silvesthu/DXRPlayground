@@ -23,8 +23,8 @@ ComPtr<ID3D12RootSignature>			gDXRGlobalRootSignature = nullptr;
 ComPtr<ID3D12StateObject>			gDXRStateObject = nullptr;
 ShaderTable							gDXRShaderTable = {};
 
-bool								gUseDXRInlineShader = false; // Somehow ray penetrates the first hit with inline shader...
-Shader								gDXRInlineShader = Shader().CSName(L"InlineRaytracingCS");
+bool								gUseDXRInlineShader = true;
+Shader								gDXRInlineShader = Shader().CSName(L"InlineRaytracingCS").UseGlobalRootSignature(true);
 
 Shader								gCompositeShader = Shader().VSName(L"ScreenspaceTriangleVS").PSName(L"CompositePS");
 
@@ -101,6 +101,7 @@ void Shader::InitializeDescriptors(const std::vector<Shader::DescriptorInfo>& in
 						{
 							desc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
 							desc.RaytracingAccelerationStructure.Location = resource->GetGPUVirtualAddress();
+							assert(desc.RaytracingAccelerationStructure.Location != NULL);
 							resource = nullptr;
 						}
 						else
@@ -155,6 +156,7 @@ void Shader::InitializeDescriptors(const std::vector<Shader::DescriptorInfo>& in
 					D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
 					desc.SizeInBytes = gAlignUp((UINT)inEntries[entry_index].mResource->GetDesc().Width, (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
 					desc.BufferLocation = inEntries[entry_index].mResource->GetGPUVirtualAddress();
+					assert(desc.BufferLocation != NULL);
 					gDevice->CreateConstantBufferView(&desc, handle);
 
 					entry_index++;
@@ -177,12 +179,12 @@ void Shader::SetupGraphics()
 	gCommandList->SetPipelineState(mData.mPipelineState.Get());
 }
 
-void Shader::SetupCompute()
+void Shader::SetupCompute(ID3D12DescriptorHeap* descriptor_heap)
 {
 	gCommandList->SetComputeRootSignature(mData.mRootSignature.Get());
-	ID3D12DescriptorHeap* descriptor_heap = mData.mDescriptorHeap.Get();
-	gCommandList->SetDescriptorHeaps(1, &descriptor_heap);
-	gCommandList->SetComputeRootDescriptorTable(0, mData.mDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+	ID3D12DescriptorHeap* heap = descriptor_heap != nullptr ? descriptor_heap : mData.mDescriptorHeap.Get();
+	gCommandList->SetDescriptorHeaps(1, &heap);
+	gCommandList->SetComputeRootDescriptorTable(0, heap->GetGPUDescriptorHandleForHeapStart());
 	gCommandList->SetPipelineState(mData.mPipelineState.Get());
 }
 
@@ -207,7 +209,13 @@ void Texture::Initialize()
 	// Prepare intermediate resource
 	if (mPath != nullptr)
 	{
-		DirectX::GetMetadataFromTGAFile(mPath, mMetadata);
+		HRESULT hr = E_FAIL;
+		if (FAILED(hr))
+			hr = DirectX::GetMetadataFromTGAFile(mPath, mMetadata);
+		if (FAILED(hr))
+			hr = DirectX::GetMetadataFromDDSFile(mPath, DirectX::DDS_FLAGS_NONE, mMetadata);
+		assert(!FAILED(hr));
+
 		CreateTextureEx(gDevice, mMetadata, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, false, &mIntermediateResource);
 	}
 }
@@ -217,9 +225,17 @@ void Texture::Load()
 	if (mPath == nullptr)
 		return;
 
+	if (mUploadResource != nullptr) // Only support upload once
+		return;
+
 	// Load file
 	DirectX::ScratchImage scratch_image;
-	DirectX::LoadFromTGAFile(mPath, nullptr, scratch_image);
+	HRESULT hr = E_FAIL;
+	if (FAILED(hr))
+		hr = DirectX::LoadFromTGAFile(mPath, nullptr, scratch_image);
+	if (FAILED(hr))
+		hr = DirectX::LoadFromDDSFile(mPath, DirectX::DDS_FLAGS_NONE, nullptr, scratch_image);
+	assert(!FAILED(hr));
 
 	// Prepare upload resource
 	std::vector<D3D12_SUBRESOURCE_DATA> subresources;
@@ -231,6 +247,14 @@ void Texture::Load()
 
 	// Upload
 	UpdateSubresources(gCommandList, mIntermediateResource.Get(), mUploadResource.Get(), 0, 0, (UINT)subresources.size(), subresources.data());
+	if (mCopyAfterUpload)
+	{
+		gBarrierTransition(gCommandList, mIntermediateResource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COPY_SOURCE);
+		gBarrierTransition(gCommandList, mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
+		gCommandList->CopyResource(mResource.Get(), mIntermediateResource.Get());
+		gBarrierTransition(gCommandList, mIntermediateResource.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
+		gBarrierTransition(gCommandList, mResource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE);
+	}
 }
 
 void ImGuiShowTextures(std::vector<Texture*> textures, std::string name, ImGuiTreeNodeFlags flags)

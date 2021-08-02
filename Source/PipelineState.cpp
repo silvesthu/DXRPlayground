@@ -48,13 +48,17 @@ static IDxcBlob* sCompileShader(const char* inFilename, const char* inSource, gl
 		dxc_define_profile.Name = L"SHADER_PROFILE_VS";
 	defines.push_back(dxc_define_profile);
 
+	std::vector<LPCWSTR> arguments;
+	arguments.push_back(DXC_ARG_DEBUG); //-Zi
+	arguments.push_back(DXC_ARG_WARNINGS_ARE_ERRORS); //-WX
+	
 	IDxcOperationResult* operation_result;
 	if (FAILED(compiler->Compile(
 		blob_encoding,								// program text
 		wfilename.c_str(),							// file name, mostly for error messages
 		inEntryPoint,								// entry point function
 		inProfile,									// target profile
-		nullptr, 0,									// compilation arguments and their count
+		arguments.data(), (UINT32)arguments.size(),	// compilation arguments and their count
 		defines.data(), (UINT32)defines.size(),		// name/value defines and their count
 		include_handler.Get(),						// handler for #include directives
 		&operation_result)))
@@ -117,13 +121,13 @@ void GenerateGlobalRootSignatureDescriptor(RootSignatureDescriptor& outDesc)
 	descriptor_range.RegisterSpace = 0;
 	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 	descriptor_range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-	for (int i = 0; i <= 4; i++)
+	for (int i = 0; i < 5; i++)
 	{
 		descriptor_range.BaseShaderRegister = i;
 		outDesc.mDescriptorRanges.push_back(descriptor_range);
 	}
 
-	// b, space2 - PrecomputedAtmosphere
+	// b0, space2 - PrecomputedAtmosphere
 	descriptor_range = {};
 	descriptor_range.BaseShaderRegister = 0;
 	descriptor_range.NumDescriptors = 1;
@@ -413,12 +417,20 @@ bool sCreateCSPipelineState(const char* inShaderFileName, std::stringstream& inS
 	if (cs_blob == nullptr)
 		return false;
 
-	if (FAILED(gDevice->CreateRootSignature(0, cs_blob->GetBufferPointer(), cs_blob->GetBufferSize(), IID_PPV_ARGS(&ioSystemShader.mData.mRootSignature))))
-		return false;
+	LPVOID root_signature_pointer = cs_blob->GetBufferPointer();
+	SIZE_T root_signature_size = cs_blob->GetBufferSize();
 
-	ComPtr<ID3D12RootSignatureDeserializer> deserializer;
-	if (FAILED(D3D12CreateRootSignatureDeserializer(cs_blob->GetBufferPointer(), cs_blob->GetBufferSize(), IID_PPV_ARGS(&ioSystemShader.mData.mRootSignatureDeserializer))))
-		return false;
+	if (ioSystemShader.mUseGlobalRootSignature)
+		ioSystemShader.mData.mRootSignature = gDXRGlobalRootSignature;
+	else
+	{
+		if (FAILED(gDevice->CreateRootSignature(0, root_signature_pointer, root_signature_size, IID_PPV_ARGS(&ioSystemShader.mData.mRootSignature))))
+			return false;
+
+		ComPtr<ID3D12RootSignatureDeserializer> deserializer;
+		if (FAILED(D3D12CreateRootSignatureDeserializer(cs_blob->GetBufferPointer(), cs_blob->GetBufferSize(), IID_PPV_ARGS(&ioSystemShader.mData.mRootSignatureDeserializer))))
+			return false;
+	}
 
 	D3D12_RASTERIZER_DESC rasterizer_desc = {};
 	rasterizer_desc.FillMode = D3D12_FILL_MODE_SOLID;
@@ -448,6 +460,8 @@ bool sCreatePipelineState(const char* inShaderFileName, std::stringstream& inSha
 
 void gCreatePipelineState()
 {
+	static bool startup = true;
+
 	// Generate enum
 	const char* enum_filename = "Shader/Generated/Enum.hlsl";
 	::CreateDirectoryA("Shader/Generated", nullptr);
@@ -472,36 +486,13 @@ void gCreatePipelineState()
 	std::stringstream shader_stream;
 	shader_stream << shader_file.rdbuf();
 	
-	// Create non-lib shaders
-	{
-		bool succeed = true;
-
-		succeed &= sCreatePipelineState(shader_filename, shader_stream,	gCompositeShader);
-
-		succeed &= sCreatePipelineState(shader_filename, shader_stream, gDXRInlineShader);
-
-		for (auto&& shader : gPrecomputedAtmosphereScatteringResources.mShaders)
-			succeed &= sCreatePipelineState(shader_filename, shader_stream, *shader);
-
-		for (auto&& shader : gCloudResources.mShaders)
-			succeed &= sCreatePipelineState(shader_filename, shader_stream, *shader);
-
-		for (auto&& shader : gDDGIResources.mShaders)
-			succeed &= sCreatePipelineState(shader_filename, shader_stream, *shader);
-
-		if (!succeed)
-		{
-			assert(gDXRStateObject != nullptr); // Check fail on startup
-			return;
-		}
-	}
-
 	// Create lib shaders
 	const wchar_t* entry_points[] = { kDefaultRayGenerationShader, kDefaultMissShader, kDefaultClosestHitShader, kShadowMissShader, kShadowClosestHitShader };
 	IDxcBlob* blob = sCompileShader(shader_filename, shader_stream.str().c_str(), (glm::uint32)shader_stream.str().length(), L"", L"lib_6_5");
 	if (blob == nullptr)
 	{
-		assert(gDXRStateObject != nullptr); // Check fail on startup
+		if (startup)
+			assert(gDXRStateObject != nullptr);
 		return;
 	}
 
@@ -569,6 +560,33 @@ void gCreatePipelineState()
 	desc.pSubobjects = subobjects.data();
 	desc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
 	gValidate(gDevice->CreateStateObject(&desc, IID_PPV_ARGS(&gDXRStateObject)));
+
+	// Create non-lib shaders
+	{
+		bool succeed = true;
+
+		succeed &= sCreatePipelineState(shader_filename, shader_stream, gCompositeShader);
+
+		succeed &= sCreatePipelineState(shader_filename, shader_stream, gDXRInlineShader);
+
+		for (auto&& shader : gPrecomputedAtmosphereScatteringResources.mShaders)
+			succeed &= sCreatePipelineState(shader_filename, shader_stream, *shader);
+
+		for (auto&& shader : gCloudResources.mShaders)
+			succeed &= sCreatePipelineState(shader_filename, shader_stream, *shader);
+
+		for (auto&& shader : gDDGIResources.mShaders)
+			succeed &= sCreatePipelineState(shader_filename, shader_stream, *shader);
+
+		if (!succeed)
+		{
+			if (startup)
+				assert(gDXRStateObject != nullptr);
+			return;
+		}
+	}
+
+	startup = false; // disable assert for unsuccessful shader reload
 }
 
 void gCleanupPipelineState()
@@ -577,5 +595,6 @@ void gCleanupPipelineState()
 	gDXRGlobalRootSignature = nullptr;
 
 	gDXRInlineShader.Reset();
+
 	gCompositeShader.Reset();
 }

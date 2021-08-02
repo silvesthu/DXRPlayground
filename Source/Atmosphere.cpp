@@ -71,6 +71,12 @@ void PrecomputedAtmosphereScattering::Update()
 	} // Density Profile
 }
 
+void PrecomputedAtmosphereScattering::Load()
+{
+	for (auto&& texture : gPrecomputedAtmosphereScatteringResources.mTextures)
+		texture->Load();
+}
+
 void PrecomputedAtmosphereScattering::ComputeTransmittance()
 {
 	gPrecomputedAtmosphereScatteringResources.mComputeTransmittanceShader.SetupCompute();
@@ -161,19 +167,19 @@ void PrecomputedAtmosphereScattering::Compute()
 void PrecomputedAtmosphereScattering::TransLUT()
 {
 	gPrecomputedAtmosphereScatteringResources.mTransLUTShader.SetupCompute();
-	gCommandList->Dispatch(gPrecomputedAtmosphereScatteringResources.mTransmittanceTex.mWidth / 8, gPrecomputedAtmosphereScatteringResources.mTransmittanceTex.mHeight / 8, gPrecomputedAtmosphereScatteringResources.mTransmittanceTex.mDepth);
+	gCommandList->Dispatch(gPrecomputedAtmosphereScatteringResources.mTransmittanceTex.mWidth / 8, gPrecomputedAtmosphereScatteringResources.mTransmittanceTex.mHeight / 8, 1);
 }
 
 void PrecomputedAtmosphereScattering::NewMultiScatCS()
 {
 	gPrecomputedAtmosphereScatteringResources.mNewMultiScatCSShader.SetupCompute();
-	gCommandList->Dispatch(gPrecomputedAtmosphereScatteringResources.mMultiScattTex.mWidth / 8, gPrecomputedAtmosphereScatteringResources.mMultiScattTex.mHeight / 8, gPrecomputedAtmosphereScatteringResources.mMultiScattTex.mDepth);
+	gCommandList->Dispatch(gPrecomputedAtmosphereScatteringResources.mMultiScattTex.mWidth, gPrecomputedAtmosphereScatteringResources.mMultiScattTex.mHeight, 1);
 }
 
 void PrecomputedAtmosphereScattering::SkyViewLut()
 {
 	gPrecomputedAtmosphereScatteringResources.mSkyViewLutShader.SetupCompute();
-	gCommandList->Dispatch(gPrecomputedAtmosphereScatteringResources.mSkyViewLutTex.mWidth / 8, gPrecomputedAtmosphereScatteringResources.mSkyViewLutTex.mHeight / 8, gPrecomputedAtmosphereScatteringResources.mSkyViewLutTex.mDepth);
+	gCommandList->Dispatch(gPrecomputedAtmosphereScatteringResources.mSkyViewLutTex.mWidth / 8, gPrecomputedAtmosphereScatteringResources.mSkyViewLutTex.mHeight / 8, 1);
 }
 
 void PrecomputedAtmosphereScattering::CameraVolumes()

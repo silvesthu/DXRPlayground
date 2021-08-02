@@ -68,9 +68,9 @@ struct CameraSettings
 	struct ExposureControl
 	{
 		// Sunny 16 rule
-		float			mAperture = 16.0;						// N, f-stops
-		float			mInvShutterSpeed = 100.0;				// t, seconds
-		float			mSensitivity = 100.0f;					// S, ISO
+		float		mAperture = 16.0;						// N, f-stops
+		float		mInvShutterSpeed = 100.0;				// t, seconds
+		float		mSensitivity = 100.0f;					// S, ISO
 	};
 	ExposureControl mExposureControl;
 
@@ -561,6 +561,7 @@ void sRender()
 	// Atmosphere
 	{
 		gPrecomputedAtmosphereScattering.Update();
+		gPrecomputedAtmosphereScattering.Load();
 		gPrecomputedAtmosphereScattering.Precompute();
 		gPrecomputedAtmosphereScattering.Compute();
 	}
@@ -695,7 +696,7 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		{
 			dx12Debug->EnableDebugLayer();
 
-			// GBV don't work well with DXR
+			// GBV don't work well yet
 // 			if (SUCCEEDED(dx12Debug->QueryInterface(IID_PPV_ARGS(&dx12Debug1))))
 // 				dx12Debug1->SetEnableGPUBasedValidation(true);
 		}

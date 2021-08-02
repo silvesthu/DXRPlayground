@@ -120,7 +120,7 @@ struct AtmosphereProfile
 		{
 			Bruneton17(profile);
 
-			profile.mRayleighScatteringCoefficient = glm::dvec3(5.802, 13.558, 33.1) * 1e-3; // km^-1
+			profile.mRayleighScatteringCoefficient = glm::dvec3(0.005802f, 0.013558f, 0.033100f); // km^-1
 		}
 	};
 	bool mEnableRayleigh								= {};
@@ -174,8 +174,8 @@ struct AtmosphereProfile
 		{
 			Bruneton17(profile);
 
-			profile.mMieScatteringCoefficient = glm::dvec3(3.996, 3.996, 3.996) * 1e-3; // km^-1
-			profile.mMieExtinctionCoefficient = glm::dvec3(4.44, 4.44, 4.44) * 1e-3; // km^-1
+			profile.mMieScatteringCoefficient = glm::dvec3(0.003996f, 0.003996f, 0.003996f); // km^-1
+			profile.mMieExtinctionCoefficient = glm::dvec3(0.004440f, 0.004440f, 0.004440f); // km^-1
 
 			profile.mMiePhaseFunctionG = 0.8;
 		}
@@ -232,7 +232,7 @@ struct AtmosphereProfile
 		{
 			Bruneton17(profile);
 
-			profile.mOZoneAbsorptionCoefficient = glm::dvec3(0.65, 1.881, 0.85) * 1e-3; // km^-1
+			profile.mOZoneAbsorptionCoefficient = glm::dvec3(0.000650f, 0.001881f, 0.000085f); // km^-1
 		}
 	};
 	bool mEnableOzone									= {};
@@ -277,6 +277,18 @@ struct AtmosphereProfile
 	glm::uint mScatteringOrder							= 4;
 
 	// Ground
+	struct GroundReference
+	{
+		static void Bruneton17(AtmosphereProfile& profile)
+		{
+			profile.mGroundAlbedo						= glm::vec3(0.1f);
+		}
+
+		static void Hillaire20(AtmosphereProfile& profile)
+		{
+			profile.mGroundAlbedo						= glm::vec3(0.0f);
+		}
+	};
 	bool mAerialPerspective								= true;
 	glm::vec3 mGroundAlbedo								= glm::vec3(0.1f);
 	glm::vec3 mRuntimeGroundAlbedo						= glm::vec3(0.0f, 0.0f, 0.04f);
@@ -293,6 +305,7 @@ struct AtmosphereProfile
 			MieReference::Bruneton17(profile);
 			OzoneReference::Bruneton17(profile);
 			SolarIrradianceReference::Bruneton17(profile);
+			GroundReference::Bruneton17(profile);
 		}
 
 		static void Hillaire20(AtmosphereProfile& profile)
@@ -302,6 +315,7 @@ struct AtmosphereProfile
 			MieReference::Hillaire20(profile);
 			OzoneReference::Hillaire20(profile);
 			SolarIrradianceReference::Hillaire20(profile);
+			GroundReference::Hillaire20(profile);
 		}
 	};
 
@@ -323,6 +337,7 @@ public:
 	void Finalize();
 	void UpdateImGui();
 	void Update();
+	void Load();
 	void Precompute();
 	void Compute();
 

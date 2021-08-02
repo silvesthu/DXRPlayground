@@ -65,6 +65,7 @@ struct Shader
 	SHADER_MEMBER(const wchar_t*, VSName, nullptr);
 	SHADER_MEMBER(const wchar_t*, PSName, nullptr);
 	SHADER_MEMBER(const wchar_t*, CSName, nullptr);
+	SHADER_MEMBER(bool, UseGlobalRootSignature, false);
 
 	struct DescriptorInfo
 	{
@@ -77,7 +78,7 @@ struct Shader
 
 	void InitializeDescriptors(const std::vector<DescriptorInfo>& inEntries);
 	void SetupGraphics();
-	void SetupCompute();
+	void SetupCompute(ID3D12DescriptorHeap* descriptor_heap = nullptr);
 	void Reset() { mData = {}; }
 
 	struct Data
@@ -101,6 +102,7 @@ struct Texture
 	TEXTURE_MEMBER(const char*, Name, nullptr);
 	TEXTURE_MEMBER(float, UIScale, 1.0f);
 	TEXTURE_MEMBER(const wchar_t*, Path, nullptr);
+	TEXTURE_MEMBER(bool, CopyAfterUpload, false);
 
 	Texture& Dimension(glm::uvec3 dimension) 
 	{
@@ -125,11 +127,13 @@ struct Texture
 extern ComPtr<ID3D12Resource>				gConstantGPUBuffer;
 extern ComPtr<ID3D12RootSignature>			gDXRGlobalRootSignature;
 extern ComPtr<ID3D12StateObject>			gDXRStateObject;
+
 extern ShaderTable							gDXRShaderTable;
-extern Shader								gCompositeShader;
 
 extern bool									gUseDXRInlineShader;
 extern Shader								gDXRInlineShader;
+
+extern Shader								gCompositeShader;
 
 // Frame
 enum

@@ -1,4 +1,4 @@
-#define MATH_PI 3.14159265359f
+#define MATH_PI 3.1415926535897932384626433832795f
 
 float4 remap(float4 x, float4 a, float4 b, float4 c, float4 d)
 {

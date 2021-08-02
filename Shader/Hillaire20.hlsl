@@ -1,10 +1,17 @@
+// Sample at center of each segment
+// #define HILLAIRE20_ADJUST_INTEGRATION
+
 // Adapter
 #define PI MATH_PI
-#define ILLUMINANCE_IS_ONE
+// #define ILLUMINANCE_IS_ONE								// Use SolarIrradiance
 #define PLANET_RADIUS_OFFSET 0.01f							// ?
 #define RayMarchMinMaxSPP float2(4, 14)						// ?
 #define TransmittanceLutTexture TransmittanceTexSRV
 #define samplerLinearClamp BilinearSampler
+
+// We should precompute those terms from resolutions (Or set resolution as #defined constants)
+float fromUnitToSubUvs(float u, float resolution) { return (u + 0.5f / resolution) * (resolution / (resolution + 1.0f)); }
+float fromSubUvsToUnit(float u, float resolution) { return (u - 0.5f / resolution) * (resolution / (resolution - 1.0f)); }
 
 float getAlbedo(float scattering, float extinction)
 {
@@ -188,6 +195,9 @@ SingleScatteringResult IntegrateScatteredLuminance(
 	in bool ground, in float SampleCountIni, in float DepthBufferValue, in bool VariableSampleCount,
 	in bool MieRayPhase, in float tMaxMax = 9000000.0f)
 {
+	// Adapter
+	float3 gSunIlluminance = mAtmosphere.mSolarIrradiance;
+
 	SingleScatteringResult result = (SingleScatteringResult)0;
 
 #if 0 // Used in rendering
@@ -275,7 +285,11 @@ SingleScatteringResult IntegrateScatteredLuminance(
 	float3 OpticalDepth = 0.0;
 	float t = 0.0f;
 	float tPrev = 0.0;
+#ifdef HILLAIRE20_ADJUST_INTEGRATION
+	const float SampleSegmentT = VariableSampleCount ? 0.3f : 0.5f;
+#else
 	const float SampleSegmentT = 0.3f;
+#endif // const float SampleSegmentT = 0.3f;
 	for (float s = 0.0f; s < SampleCount; s += 1.0f)
 	{
 		if (VariableSampleCount)
@@ -310,6 +324,11 @@ SingleScatteringResult IntegrateScatteredLuminance(
 			t = NewT;
 		}
 		float3 P = WorldPos + t * WorldDir;
+
+#ifdef HILLAIRE20_ADJUST_INTEGRATION
+		if (!VariableSampleCount)
+			dt = tMax / SampleCount;
+#endif // HILLAIRE20_ADJUST_INTEGRATION
 
 		MediumSampleRGB medium = sampleMediumRGB(P, Atmosphere);
 		const float3 SampleOpticalDepth = medium.extinction * dt;
@@ -466,17 +485,33 @@ void TransLUT(
 	uint inGroupIndex : SV_GroupIndex)
 {
 	// Adapter
-	uint TRANSMITTANCE_TEXTURE_WIDTH;
-	uint TRANSMITTANCE_TEXTURE_HEIGHT;
-	TransmittanceTexUAV.GetDimensions(TRANSMITTANCE_TEXTURE_WIDTH, TRANSMITTANCE_TEXTURE_HEIGHT);
+	uint TRANSMITTANCE_TEXTURE_WIDTH = 256;
+	uint TRANSMITTANCE_TEXTURE_HEIGHT = 64;
+	// TransmittanceTexUAV.GetDimensions(TRANSMITTANCE_TEXTURE_WIDTH, TRANSMITTANCE_TEXTURE_HEIGHT); // calculate in shader introduce extra error
 	float2 pixPos = inDispatchThreadID.xy + 0.5; // half pixel offset
 	float3 sun_direction = float3(1, 0, 0); // dummy
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	// float2 pixPos = Input.position.xy;
 	AtmosphereParameters Atmosphere = GetAtmosphereParameters();
 
 	// Compute camera position from LUT coords
 	float2 uv = (pixPos) / float2(TRANSMITTANCE_TEXTURE_WIDTH, TRANSMITTANCE_TEXTURE_HEIGHT);
+
+// #define APPLY_SUB_UVS_TO_UNIT
+#ifdef APPLY_SUB_UVS_TO_UNIT
+	// uv = float2(fromSubUvsToUnit(uv.x, TRANSMITTANCE_TEXTURE_WIDTH), fromSubUvsToUnit(uv.y, TRANSMITTANCE_TEXTURE_HEIGHT));
+
+	// w/o Adjust
+	//	viewHeight			= [6360, 6460]
+	//	viewZenithCosAngle	= [0.97949, -0.00107] [0.25928, -0.17358]
+	// 
+	// w/ Adjust - discontinuity on viewZenithCosAngle, also first and last row is not correct from ray-sphere intersection
+	//	viewHeight			= [6360, 6460]
+	//	viewZenithCosAngle	= [1.0, 0.0] [1.0, -0.00069, ..., -0.17517] 
+#endif // APPLY_SUB_UVS_TO_UNIT
+
 	float viewHeight;
 	float viewZenithCosAngle;
 	UvToLutTransmittanceParams(Atmosphere, viewHeight, viewZenithCosAngle, uv);
@@ -486,25 +521,159 @@ void TransLUT(
 	float3 WorldDir = float3(0.0f, sqrt(1.0 - viewZenithCosAngle * viewZenithCosAngle), viewZenithCosAngle);
 
 	const bool ground = false;
-	const float SampleCountIni = 40.0f;	// Can go a low as 10 sample but energy lost starts to be visible.
+	const float SampleCountIni = 40.0;	// Can go a low as 10 sample but energy lost starts to be visible.
 	const float DepthBufferValue = -1.0;
 	const bool VariableSampleCount = false;
 	const bool MieRayPhase = false;
 	float3 transmittance = exp(-IntegrateScatteredLuminance(pixPos, WorldPos, WorldDir, sun_direction, Atmosphere, ground, SampleCountIni, DepthBufferValue, VariableSampleCount, MieRayPhase).OpticalDepth);
 
 	TransmittanceTexUAV[inDispatchThreadID.xy] = float4(transmittance, 1);
+
+	// Debug
+	// TransmittanceTexUAV[inDispatchThreadID.xy] = float4(viewZenithCosAngle, viewHeight, 0, 1);
+	// TransmittanceTexUAV[inDispatchThreadID.xy] = float4(WorldDir, 1);
+	// TransmittanceTexUAV[inDispatchThreadID.xy] = float4(uv, 0, 1);
+	// TransmittanceTexUAV[inDispatchThreadID.xy] = float4(pixPos, 0, 1);
 }
 
+groupshared float3 MultiScatAs1SharedMem[64];
+groupshared float3 LSharedMem[64];
+
 [RootSignature(AtmosphereRootSignature)]
-[numthreads(8, 8, 1)]
+[numthreads(1, 1, 64)]
 void NewMultiScatCS(
 	uint3 inGroupThreadID : SV_GroupThreadID,
 	uint3 inGroupID : SV_GroupID,
 	uint3 inDispatchThreadID : SV_DispatchThreadID,
 	uint inGroupIndex : SV_GroupIndex)
 {
-	MultiScattTexUAV[inDispatchThreadID.xy] = float4(1, 0, 0, 1);
+	// Adapter
+	uint3 ThreadId = inDispatchThreadID.xyz;
+	uint MultiScatteringLUTRes = 32;
+	float MultipleScatteringFactor = 1.0;
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	float2 pixPos = float2(ThreadId.xy) + 0.5f;
+	float2 uv = pixPos / MultiScatteringLUTRes;
+
+
+	uv = float2(fromSubUvsToUnit(uv.x, MultiScatteringLUTRes), fromSubUvsToUnit(uv.y, MultiScatteringLUTRes));
+
+	AtmosphereParameters Atmosphere = GetAtmosphereParameters();
+
+	float cosSunZenithAngle = uv.x * 2.0 - 1.0;
+	float3 sunDir = float3(0.0, sqrt(saturate(1.0 - cosSunZenithAngle * cosSunZenithAngle)), cosSunZenithAngle);
+	// We adjust again viewHeight according to PLANET_RADIUS_OFFSET to be in a valid range.
+	float viewHeight = Atmosphere.BottomRadius + saturate(uv.y + PLANET_RADIUS_OFFSET) * (Atmosphere.TopRadius - Atmosphere.BottomRadius - PLANET_RADIUS_OFFSET);
+
+	float3 WorldPos = float3(0.0f, 0.0f, viewHeight);
+	float3 WorldDir = float3(0.0f, 0.0f, 1.0f);
+
+
+	const bool ground = true;
+	const float SampleCountIni = 20;// a minimum set of step is required for accuracy unfortunately
+	const float DepthBufferValue = -1.0;
+	const bool VariableSampleCount = false;
+	const bool MieRayPhase = false;
+
+	const float SphereSolidAngle = 4.0 * PI;
+	const float IsotropicPhase = 1.0 / SphereSolidAngle;
+
+
+	// Reference. Since there are many sample, it requires MULTI_SCATTERING_POWER_SERIE to be true for accuracy and to avoid divergences (see declaration for explanations)
+#define SQRTSAMPLECOUNT 8
+	const float sqrtSample = float(SQRTSAMPLECOUNT);
+	float i = 0.5f + float(ThreadId.z / SQRTSAMPLECOUNT);
+	float j = 0.5f + float(ThreadId.z - float((ThreadId.z / SQRTSAMPLECOUNT) * SQRTSAMPLECOUNT));
+	{
+		float randA = i / sqrtSample;
+		float randB = j / sqrtSample;
+		float theta = 2.0f * PI * randA;
+		float phi = PI * randB;
+		float cosPhi = cos(phi);
+		float sinPhi = sin(phi);
+		float cosTheta = cos(theta);
+		float sinTheta = sin(theta);
+		WorldDir.x = cosTheta * sinPhi;
+		WorldDir.y = sinTheta * sinPhi;
+		WorldDir.z = cosPhi;
+		SingleScatteringResult result = IntegrateScatteredLuminance(pixPos, WorldPos, WorldDir, sunDir, Atmosphere, ground, SampleCountIni, DepthBufferValue, VariableSampleCount, MieRayPhase);
+
+		MultiScatAs1SharedMem[ThreadId.z] = result.MultiScatAs1 * SphereSolidAngle / (sqrtSample * sqrtSample);
+		LSharedMem[ThreadId.z] = result.L * SphereSolidAngle / (sqrtSample * sqrtSample);
+	}
+#undef SQRTSAMPLECOUNT
+
+	GroupMemoryBarrierWithGroupSync();
+
+	// 64 to 32
+	if (ThreadId.z < 32)
+	{
+		MultiScatAs1SharedMem[ThreadId.z] += MultiScatAs1SharedMem[ThreadId.z + 32];
+		LSharedMem[ThreadId.z] += LSharedMem[ThreadId.z + 32];
+	}
+	GroupMemoryBarrierWithGroupSync();
+
+	// 32 to 16
+	if (ThreadId.z < 16)
+	{
+		MultiScatAs1SharedMem[ThreadId.z] += MultiScatAs1SharedMem[ThreadId.z + 16];
+		LSharedMem[ThreadId.z] += LSharedMem[ThreadId.z + 16];
+	}
+	GroupMemoryBarrierWithGroupSync();
+
+	// 16 to 8 (16 is thread group min hardware size with intel, no sync required from there)
+	if (ThreadId.z < 8)
+	{
+		MultiScatAs1SharedMem[ThreadId.z] += MultiScatAs1SharedMem[ThreadId.z + 8];
+		LSharedMem[ThreadId.z] += LSharedMem[ThreadId.z + 8];
+	}
+	GroupMemoryBarrierWithGroupSync();
+	if (ThreadId.z < 4)
+	{
+		MultiScatAs1SharedMem[ThreadId.z] += MultiScatAs1SharedMem[ThreadId.z + 4];
+		LSharedMem[ThreadId.z] += LSharedMem[ThreadId.z + 4];
+	}
+	GroupMemoryBarrierWithGroupSync();
+	if (ThreadId.z < 2)
+	{
+		MultiScatAs1SharedMem[ThreadId.z] += MultiScatAs1SharedMem[ThreadId.z + 2];
+		LSharedMem[ThreadId.z] += LSharedMem[ThreadId.z + 2];
+	}
+	GroupMemoryBarrierWithGroupSync();
+	if (ThreadId.z < 1)
+	{
+		MultiScatAs1SharedMem[ThreadId.z] += MultiScatAs1SharedMem[ThreadId.z + 1];
+		LSharedMem[ThreadId.z] += LSharedMem[ThreadId.z + 1];
+	}
+	GroupMemoryBarrierWithGroupSync();
+	if (ThreadId.z > 0)
+		return;
+
+	float3 MultiScatAs1 = MultiScatAs1SharedMem[0] * IsotropicPhase;			// Equation 7 f_ms
+	float3 InScatteredLuminance = LSharedMem[0] * IsotropicPhase;				// Equation 5 L_2ndOrder
+
+	// MultiScatAs1 represents the amount of luminance scattered as if the integral of scattered luminance over the sphere would be 1.
+	//  - 1st order of scattering: one can ray-march a straight path as usual over the sphere. That is InScatteredLuminance.
+	//  - 2nd order of scattering: the inscattered luminance is InScatteredLuminance at each of samples of fist order integration. Assuming a uniform phase function that is represented by MultiScatAs1,
+	//  - 3nd order of scattering: the inscattered luminance is (InScatteredLuminance * MultiScatAs1 * MultiScatAs1)
+	//  - etc.
+#if	MULTI_SCATTERING_POWER_SERIE==0
+	float3 MultiScatAs1SQR = MultiScatAs1 * MultiScatAs1;
+	float3 L = InScatteredLuminance * (1.0 + MultiScatAs1 + MultiScatAs1SQR + MultiScatAs1 * MultiScatAs1SQR + MultiScatAs1SQR * MultiScatAs1SQR);
+#else
+	// For a serie, sum_{n=0}^{n=+inf} = 1 + r + r^2 + r^3 + ... + r^n = 1 / (1.0 - r), see https://en.wikipedia.org/wiki/Geometric_series 
+	const float3 r = MultiScatAs1;
+	const float3 SumOfAllMultiScatteringEventsContribution = 1.0f / (1.0 - r);
+	float3 L = InScatteredLuminance * SumOfAllMultiScatteringEventsContribution;// Equation 10 Psi_ms
+#endif
+
+	// OutputTexture[ThreadId.xy] = float4(MultipleScatteringFactor * L, 1.0f);
+	MultiScattTexUAV[ThreadId.xy] = float4(MultipleScatteringFactor * L, 1.0f);
 }
+
+
 
 [RootSignature(AtmosphereRootSignature)]
 [numthreads(8, 8, 1)]
@@ -514,7 +683,7 @@ void SkyViewLut(
 	uint3 inDispatchThreadID : SV_DispatchThreadID,
 	uint inGroupIndex : SV_GroupIndex)
 {
-	SkyViewLutTexUAV[inDispatchThreadID.xy] = float4(1, 0, 0, 1);
+
 }
 
 [RootSignature(AtmosphereRootSignature)]

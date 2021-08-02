@@ -10,7 +10,7 @@ void gRaytrace()
 	if (gUseDXRInlineShader)
 	{
 		// Inline Raytracing
-		gDXRInlineShader.SetupCompute();
+		gDXRInlineShader.SetupCompute(gScene.GetDXRDescriptorHeap());
 		gCommandList->Dispatch(swap_chain_desc.Width / 8, swap_chain_desc.Height / 8, 1);
 		return;
 	}

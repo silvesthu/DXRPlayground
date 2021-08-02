@@ -966,7 +966,9 @@ void TraceRay()
 	payload.mRandomState = uint(uint(sGetDispatchRaysIndex().x) * uint(1973) + uint(sGetDispatchRaysIndex().y) * uint(9277) + uint(mPerFrame.mAccumulationFrameCount) * uint(26699)) | uint(1); // From https://www.shadertoy.com/view/tsBBWW
 
 #ifdef ENABLE_INLINE_RAYTRACING
-	RayQuery<RAY_FLAG_CULL_NON_OPAQUE | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH> query;
+	// Note that RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH will give first hit for "Any Hit". The result may not be the closest one
+	// https://docs.microsoft.com/en-us/windows/win32/direct3d12/ray_flag
+	RayQuery<RAY_FLAG_CULL_NON_OPAQUE | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> query;
 	uint additional_ray_flags = 0;
 	uint ray_instance_mask = 0xffffffff;
 #endif // ENABLE_INLINE_RAYTRACING
@@ -1092,18 +1094,6 @@ void DefaultRayGeneration()
 }
 
 #ifdef ENABLE_INLINE_RAYTRACING
-[RootSignature("DescriptorTable(" 				\
-	"SRV(t0, space = 0, numDescriptors = 1),"	\
-	"UAV(u0, space = 0, numDescriptors = 1)," 	\
-	"CBV(b0, space = 0, numDescriptors = 1)," 	\
-	"SRV(t1, space = 0, numDescriptors = 4),"	\
-	"CBV(b0, space = 2, numDescriptors = 1),"	\
-	"SRV(t0, space = 2, numDescriptors = 7),"	\
-	"CBV(b0, space = 3, numDescriptors = 1),"	\
-	"SRV(t0, space = 3, numDescriptors = 2)),"	\
-	"StaticSampler(s0, filter = FILTER_MIN_MAG_MIP_LINEAR, addressU = TEXTURE_ADDRESS_CLAMP, addressV = TEXTURE_ADDRESS_CLAMP, addressW = TEXTURE_ADDRESS_CLAMP),"	\
-	"StaticSampler(s1, filter = FILTER_MIN_MAG_MIP_LINEAR, addressU = TEXTURE_ADDRESS_WRAP, addressV = TEXTURE_ADDRESS_WRAP, addressW = TEXTURE_ADDRESS_WRAP)"		\
-)]
 [numthreads(8, 8, 1)]
 void InlineRaytracingCS(	
 	uint3 inGroupThreadID : SV_GroupThreadID,
@@ -1184,6 +1174,8 @@ void CloudErosionNoiseCS(
 	float4 input = InputUAV[coords.xy];
 	OutputUAV[inDispatchThreadID.xyz] = pow(input, 1);
 }
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 [RootSignature("DescriptorTable(UAV(u0, space = 1, numDescriptors = 2))")] 
 [numthreads(8, 8, 1)]

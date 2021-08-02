@@ -113,18 +113,27 @@ bool RayIntersectsGround(float r, float mu)
 	return mu < 0.0 && (r * r * (mu * mu - 1.0) + mAtmosphere.mBottomRadius * mAtmosphere.mBottomRadius) >= 0.0;
 }
 
+#define USE_HALF_PIXEL_OFFSET
 float2 DispatchThreadID_to_XY(uint2 inDispatchThreadID, RWTexture2D<float4> inTexture)
 {
 	uint2 size;
 	inTexture.GetDimensions(size.x, size.y);
-	return inDispatchThreadID.xy / (size - 1.0);
+#ifdef USE_HALF_PIXEL_OFFSET
+	return (inDispatchThreadID.xy + 0.5) / size;
+#else
+	return (inDispatchThreadID.xy) / (size - 1.0);
+#endif // USE_HALF_PIXEL_OFFSET
 }
 
 float3 DispatchThreadID_to_XYZ(uint3 inDispatchThreadID, RWTexture3D<float4> inTexture)
 {
 	uint3 size;
 	inTexture.GetDimensions(size.x, size.y, size.z);
-	return inDispatchThreadID.xyz / (size - 1.0);
+#ifdef USE_HALF_PIXEL_OFFSET
+	return (inDispatchThreadID.xyz + 0.5) / size;
+#else
+	return (inDispatchThreadID.xyz) / (size - 1.0);
+#endif // USE_HALF_PIXEL_OFFSET
 }
 
 float X_to_U(float x, uint size)

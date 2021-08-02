@@ -1,3 +1,9 @@
+// Sample at center of each segment
+#define BRUNETON17_ADJUST_INTEGRATION
+
+const static int DENSITY_SAMPLE_COUNT = 500;
+// const static int DENSITY_SAMPLE_COUNT = 40; // match Hillaire20
+
 // [Bruneton08] 4. Precomputations.Parameterization
 float Encode_R_Transmittance(float r)
 {
@@ -400,16 +406,24 @@ void Encode4D(float4 r_mu_mu_s_nu, bool intersects_ground, Texture3D<float4> inT
 
 float IntegrateDensity(DensityProfile inProfile, float2 mu_r)
 {
-	const int SAMPLE_COUNT = 40;
+	const int SAMPLE_COUNT = DENSITY_SAMPLE_COUNT;
 
 	float mu = mu_r.x;
 	float r = mu_r.y;
 
 	float step_distance = DistanceToTopAtmosphereBoundary(r, mu) / float(SAMPLE_COUNT);
 	float result = 0.0;
+#ifdef BRUNETON17_ADJUST_INTEGRATION
+	for (int i = 0; i < SAMPLE_COUNT; ++i)
+#else
 	for (int i = 0; i <= SAMPLE_COUNT; ++i)
+#endif // BRUNETON17_ADJUST_INTEGRATION
 	{
+#ifdef BRUNETON17_ADJUST_INTEGRATION
+		float d_i = float(i + 0.5) * step_distance;
+#else
 		float d_i = float(i) * step_distance;
+#endif // BRUNETON17_ADJUST_INTEGRATION
 
 		// Distance between the current sample point and the planet center.
 		float r_i = sqrt(d_i * d_i + 2.0 * r * mu * d_i + r * r);
@@ -419,7 +433,11 @@ float IntegrateDensity(DensityProfile inProfile, float2 mu_r)
 		float beta_i = GetProfileDensity(inProfile, altitude);
 
 		// Sample weight (from the trapezoidal rule).
+#ifdef BRUNETON17_ADJUST_INTEGRATION
+		float weight_i = 1.0;
+#else
 		float weight_i = (i == 0 || i == SAMPLE_COUNT) ? 0.5 : 1.0;
+#endif // BRUNETON17_ADJUST_INTEGRATION
 
 		result += beta_i * weight_i * step_distance;
 	}
@@ -432,9 +450,9 @@ float3 ComputeTransmittance(float2 mu_r)
 	// See [Bruneton08] 2.2 (5)
 	// Extinction Coefficients at sea level is extracted out of integration
 
-	float3 rayleigh = mAtmosphere.mRayleighExtinction.xyz * IntegrateDensity(mAtmosphere.mRayleighDensity, mu_r);
-	float3 mie = mAtmosphere.mMieExtinction.xyz * IntegrateDensity(mAtmosphere.mMieDensity, mu_r);
-	float3 ozone = mAtmosphere.mOzoneExtinction.xyz * IntegrateDensity(mAtmosphere.mOzoneDensity, mu_r);
+	float3 rayleigh		= mAtmosphere.mRayleighExtinction.xyz * IntegrateDensity(mAtmosphere.mRayleighDensity, mu_r);
+	float3 mie			= mAtmosphere.mMieExtinction.xyz *		IntegrateDensity(mAtmosphere.mMieDensity, mu_r);
+	float3 ozone		= mAtmosphere.mOzoneExtinction.xyz *	IntegrateDensity(mAtmosphere.mOzoneDensity, mu_r);
 
 	float3 transmittance = exp(-(rayleigh + mie + ozone));
 	return transmittance;
@@ -531,8 +549,8 @@ void ComputeTransmittanceCS(
 	// debug = mu.xxx;
 	// debug = IntegrateDensity(mAtmosphere.mRayleighDensity, r, mu).xxx;
 	// TransmittanceUAV[inDispatchThreadID.xy] = float4(debug, 1.0);
+	// TransmittanceUAV[inDispatchThreadID.xy] = float4(mu_r.xy, 0, 1);
 	// TransmittanceUAV[inDispatchThreadID.xy] = float4(xy, 0, 1);
-	// TransmittanceUAV[inDispatchThreadID.xy] = float4(mu_r.yx, 0, 1);
 }
 
 [RootSignature(AtmosphereRootSignature)]

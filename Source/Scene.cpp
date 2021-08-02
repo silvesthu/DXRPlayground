@@ -373,27 +373,6 @@ void Scene::CreateShaderResource()
 		mOutputResource->SetName(L"Scene.OutputResource");
 	}
 
-	// DXR Inline
-	{
-		std::vector<Shader::DescriptorInfo> infos;
-		infos.push_back(mTLAS->GetResource());
-		infos.push_back(mOutputResource.Get());
-		infos.push_back(gConstantGPUBuffer.Get());
- 		infos.push_back({ mTLAS->GetInstanceBuffer(),	sizeof(ShaderType::InstanceData) });
- 		infos.push_back({ mIndexBuffer.Get(),			sizeof(Scene::IndexType) });
- 		infos.push_back({ mVertexBuffer.Get(),			sizeof(Scene::VertexType) });
- 		infos.push_back({ mNormalBuffer.Get(),			sizeof(Scene::NormalType) });
-		infos.push_back(gPrecomputedAtmosphereScatteringResources.mConstantUploadBuffer.Get());
-		for (auto&& texture : gPrecomputedAtmosphereScatteringResources.mTextures)
-			infos.push_back(texture->mResource.Get());
- 		infos.push_back(gCloudResources.mConstantUploadBuffer.Get());
- 		for (auto&& texture : gCloudResources.mTextures)
- 			infos.push_back(texture->mResource.Get());
-		
-		if (std::all_of(infos.begin(), infos.end(), [](const Shader::DescriptorInfo& info) { return info.mResource != nullptr; }))
-			gDXRInlineShader.InitializeDescriptors(infos);
-	}
-
 	// Composite 
 	{
 		gCompositeShader.InitializeDescriptors(
