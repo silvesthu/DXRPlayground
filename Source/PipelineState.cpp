@@ -370,8 +370,8 @@ static void sWriteEnum(std::ofstream& ioEnumFile, T* inCurrentValue = nullptr)
 
 bool sCreateVSPSPipelineState(const char* inShaderFileName, std::stringstream& inShaderStream, const wchar_t* inVSName, const wchar_t* inPSName, Shader& ioSystemShader)
 {
-	IDxcBlob* vs_blob = sCompileShader(inShaderFileName, inShaderStream.str().c_str(), (glm::uint32)inShaderStream.str().length(), inVSName, L"vs_6_5");
-	IDxcBlob* ps_blob = sCompileShader(inShaderFileName, inShaderStream.str().c_str(), (glm::uint32)inShaderStream.str().length(), inPSName, L"ps_6_5");
+	IDxcBlob* vs_blob = sCompileShader(inShaderFileName, inShaderStream.str().c_str(), (glm::uint32)inShaderStream.str().length(), inVSName, L"vs_6_6");
+	IDxcBlob* ps_blob = sCompileShader(inShaderFileName, inShaderStream.str().c_str(), (glm::uint32)inShaderStream.str().length(), inPSName, L"ps_6_6");
 	if (vs_blob == nullptr || ps_blob == nullptr)
 		return false;
 
@@ -413,7 +413,7 @@ bool sCreateVSPSPipelineState(const char* inShaderFileName, std::stringstream& i
 
 bool sCreateCSPipelineState(const char* inShaderFileName, std::stringstream& inShaderStream, const wchar_t* inCSName, Shader& ioSystemShader)
 {
-	IDxcBlob* cs_blob = sCompileShader(inShaderFileName, inShaderStream.str().c_str(), (glm::uint32)inShaderStream.str().length(), inCSName, L"cs_6_5");
+	IDxcBlob* cs_blob = sCompileShader(inShaderFileName, inShaderStream.str().c_str(), (glm::uint32)inShaderStream.str().length(), inCSName, L"cs_6_6");
 	if (cs_blob == nullptr)
 		return false;
 
@@ -488,7 +488,7 @@ void gCreatePipelineState()
 	
 	// Create lib shaders
 	const wchar_t* entry_points[] = { kDefaultRayGenerationShader, kDefaultMissShader, kDefaultClosestHitShader, kShadowMissShader, kShadowClosestHitShader };
-	IDxcBlob* blob = sCompileShader(shader_filename, shader_stream.str().c_str(), (glm::uint32)shader_stream.str().length(), L"", L"lib_6_5");
+	IDxcBlob* blob = sCompileShader(shader_filename, shader_stream.str().c_str(), (glm::uint32)shader_stream.str().length(), L"", L"lib_6_6");
 	if (blob == nullptr)
 	{
 		if (startup)

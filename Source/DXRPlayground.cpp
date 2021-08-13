@@ -11,6 +11,10 @@
 #include "Cloud.h"
 #include "DDGI.h"
 
+// Use Agility SDK
+extern "C" { __declspec(dllexport) extern const UINT D3D12SDKVersion = 4; }
+extern "C" { __declspec(dllexport) extern const char* D3D12SDKPath = u8".\\D3D12\\"; }
+
 #define DX12_ENABLE_DEBUG_LAYER			(1)
 
 static const wchar_t*					kApplicationTitleW = L"DXR Playground";
@@ -697,26 +701,27 @@ static bool sCreateDeviceD3D(HWND hWnd)
 			dx12Debug->EnableDebugLayer();
 
 			// GBV don't work well yet
-// 			if (SUCCEEDED(dx12Debug->QueryInterface(IID_PPV_ARGS(&dx12Debug1))))
-// 				dx12Debug1->SetEnableGPUBasedValidation(true);
+//  		if (SUCCEEDED(dx12Debug->QueryInterface(IID_PPV_ARGS(&dx12Debug1))))
+//  			dx12Debug1->SetEnableGPUBasedValidation(true);
 		}
 	}
 
-	D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL::D3D_FEATURE_LEVEL_12_0;
-	if (D3D12CreateDevice(nullptr, featureLevel, IID_PPV_ARGS(&gDevice)) != S_OK)
+	// Create device with highest feature level as possible
+	D3D_FEATURE_LEVEL feature_level = D3D_FEATURE_LEVEL::D3D_FEATURE_LEVEL_12_2;
+	if (D3D12CreateDevice(nullptr, feature_level, IID_PPV_ARGS(&gDevice)) != S_OK)
+		return false;
+
+	// Check shader model
+	D3D12_FEATURE_DATA_SHADER_MODEL shader_model = { D3D_SHADER_MODEL_6_6 };
+	if (FAILED(gDevice->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &shader_model, sizeof(shader_model)))
+		|| (shader_model.HighestShaderModel < D3D_SHADER_MODEL_6_6))
 		return false;
 
 	// Check DXR
-	{
-		D3D12_FEATURE_DATA_D3D12_OPTIONS5 features5;
-		memset(&features5, 0, sizeof(features5));
-		HRESULT hr = gDevice->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &features5, sizeof(D3D12_FEATURE_DATA_D3D12_OPTIONS5));
-		if (FAILED(hr) || features5.RaytracingTier < D3D12_RAYTRACING_TIER_1_1)
-		{
-			std::cout << "DXR1.1 is not supported" << std::endl;
-			return false;
-		}
-	}
+	D3D12_FEATURE_DATA_D3D12_OPTIONS5 options5 = {};
+	if (FAILED(gDevice->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &options5, sizeof(D3D12_FEATURE_DATA_D3D12_OPTIONS5)))
+		|| options5.RaytracingTier < D3D12_RAYTRACING_TIER_1_1)
+		return false;
 
 	// RTV Descriptor Heap
 	{
