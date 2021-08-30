@@ -285,6 +285,30 @@ void GetSkyRadiance(out float3 sky_radiance, out float3 transmittance_to_top)
 
 	sky_radiance = rayleigh_scattering * RayleighPhaseFunction(nu) + single_mie_scattering * MiePhaseFunction(mAtmosphere.mMiePhaseFunctionG, nu);
 
+	// Hillaire20
+	if (mAtmosphere.mMode == AtmosphereMode_Hillaire20)
+	{
+		AtmosphereParameters Atmosphere = GetAtmosphereParameters();
+
+		float3 UpVector = normalize(camera);
+		float3 WorldDir = view_ray;
+
+		// Lat/Long mapping in SkyViewLut()
+		float3 sideVector = normalize(cross(UpVector, WorldDir));		// assumes non parallel vectors
+		float3 forwardVector = normalize(cross(sideVector, UpVector));	// aligns toward the sun light but perpendicular to up vector
+		float2 lightOnPlane = float2(dot(sun_direction, forwardVector), dot(sun_direction, sideVector));
+		lightOnPlane = normalize(lightOnPlane);
+		float lightViewCosAngle = lightOnPlane.x;
+
+		float2 uv;
+		SkyViewLutParamsToUv(Atmosphere, ray_r_mu_intersects_ground, mu, lightViewCosAngle, r, uv);
+		sky_radiance = SkyViewLutTexSRV.SampleLevel(samplerLinearClamp, uv, 0).rgb;
+
+		// Debug
+		// sky_radiance = 0.1234;
+		// sky_radiance = float3(lightViewCosAngle, 0, 0);
+	}
+
 	// override
 	{
 		//sky_radiance = float3(1.1, 1.2, 1.3);
@@ -772,10 +796,10 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	hit_info.mTransmittance = 1.0;
 	hit_info.mInScattering = 0.0;
 
-	// See https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html for more system value intrinsics
+	// For more system value intrinsics, see https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html 
 	float3 barycentrics = float3(1.0 - attributes.barycentrics.x - attributes.barycentrics.y, attributes.barycentrics.x, attributes.barycentrics.y);
 
-	// 16bit index is not supported. See https://github.com/microsoft/DirectX-Graphics-Samples/blob/master/Samples/Desktop/D3D12Raytracing/src/D3D12RaytracingSimpleLighting/Raytracing.hlsl for reference
+	// Only support 32bit index, see https://github.com/microsoft/DirectX-Graphics-Samples/blob/master/Samples/Desktop/D3D12Raytracing/src/D3D12RaytracingSimpleLighting/Raytracing.hlsl for reference
 	uint index_count_per_triangle = 3;
 	uint base_index = sGetPrimitiveIndex() * index_count_per_triangle + InstanceDataBuffer[sGetInstanceID()].mIndexOffset;
 	uint3 indices = uint3(Indices[base_index], Indices[base_index + 1], Indices[base_index + 2]);
@@ -949,10 +973,10 @@ void TraceRay()
 	uint3 launchIndex = sGetDispatchRaysIndex();
 	uint3 launchDim = sGetDispatchRaysDimensions();
 
-	float2 crd = float2(launchIndex.xy);
+	float2 crd = float2(launchIndex.xy) + 0.5;
 	float2 dims = float2(launchDim.xy);
 
-	float2 d = ((crd/dims) * 2.f - 1.f); // 0~1 => -1~1
+	float2 d = ((crd / dims) * 2.f - 1.f); // 0~1 => -1~1
 	d.y = -d.y;
 	
 	RayDesc ray;

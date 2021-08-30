@@ -167,7 +167,7 @@ void PrecomputedAtmosphereScattering::Compute()
 void PrecomputedAtmosphereScattering::TransLUT()
 {
 	gPrecomputedAtmosphereScatteringResources.mTransLUTShader.SetupCompute();
-	gCommandList->Dispatch(gPrecomputedAtmosphereScatteringResources.mTransmittanceTex.mWidth / 8, gPrecomputedAtmosphereScatteringResources.mTransmittanceTex.mHeight / 8, 1);
+	gCommandList->Dispatch((gPrecomputedAtmosphereScatteringResources.mTransmittanceTex.mWidth + 7) / 8, (gPrecomputedAtmosphereScatteringResources.mTransmittanceTex.mHeight + 7) / 8, 1);
 }
 
 void PrecomputedAtmosphereScattering::NewMultiScatCS()
@@ -179,13 +179,13 @@ void PrecomputedAtmosphereScattering::NewMultiScatCS()
 void PrecomputedAtmosphereScattering::SkyViewLut()
 {
 	gPrecomputedAtmosphereScatteringResources.mSkyViewLutShader.SetupCompute();
-	gCommandList->Dispatch(gPrecomputedAtmosphereScatteringResources.mSkyViewLutTex.mWidth / 8, gPrecomputedAtmosphereScatteringResources.mSkyViewLutTex.mHeight / 8, 1);
+	gCommandList->Dispatch((gPrecomputedAtmosphereScatteringResources.mSkyViewLutTex.mWidth + 7) / 8, (gPrecomputedAtmosphereScatteringResources.mSkyViewLutTex.mHeight + 7) / 8, 1);
 }
 
 void PrecomputedAtmosphereScattering::CameraVolumes()
 {
 	gPrecomputedAtmosphereScatteringResources.mCameraVolumesShader.SetupCompute();
-	gCommandList->Dispatch(gPrecomputedAtmosphereScatteringResources.mAtmosphereCameraScatteringVolume.mWidth / 8, gPrecomputedAtmosphereScatteringResources.mAtmosphereCameraScatteringVolume.mHeight / 8, gPrecomputedAtmosphereScatteringResources.mAtmosphereCameraScatteringVolume.mDepth);
+	gCommandList->Dispatch((gPrecomputedAtmosphereScatteringResources.mAtmosphereCameraScatteringVolume.mWidth + 7) / 8, (gPrecomputedAtmosphereScatteringResources.mAtmosphereCameraScatteringVolume.mHeight + 7) / 8, gPrecomputedAtmosphereScatteringResources.mAtmosphereCameraScatteringVolume.mDepth);
 }
 
 void PrecomputedAtmosphereScattering::Initialize()
@@ -212,6 +212,9 @@ void PrecomputedAtmosphereScattering::Initialize()
 
 		std::vector<Shader::DescriptorInfo> common_binding;
 		{
+			// CBV
+			common_binding.push_back(gConstantGPUBuffer.Get());
+
 			// CBV
 			common_binding.push_back(gPrecomputedAtmosphereScatteringResources.mConstantUploadBuffer.Get());
 
@@ -243,8 +246,15 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 		for (int i = 0; i < (int)AtmosphereMode::Count; i++)
 		{
 			const auto& name = nameof::nameof_enum((AtmosphereMode)i);
+			if (name[0] == '_')
+			{
+				ImGui::NewLine();
+				continue;
+			} 
+
 			if (i != 0)
-				ImGui::SameLine();			
+				ImGui::SameLine();
+
 			if (ImGui::RadioButton(name.data(), (int)gAtmosphereProfile.mMode == i))
 				gAtmosphereProfile.mMode = (AtmosphereMode)i;
 		}
@@ -476,6 +486,7 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 				const auto& name = nameof::nameof_enum((AtmosphereMuSEncodingMode)i);
 				if (i != 0)
 					ImGui::SameLine();
+
 				if (ImGui::RadioButton(name.data(), (int)gAtmosphereProfile.mMuSEncodingMode == i))
 					gAtmosphereProfile.mMuSEncodingMode = (AtmosphereMuSEncodingMode)i;
 			}

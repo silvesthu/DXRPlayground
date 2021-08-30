@@ -48,6 +48,12 @@ static IDxcBlob* sCompileShader(const char* inFilename, const char* inSource, gl
 		dxc_define_profile.Name = L"SHADER_PROFILE_VS";
 	defines.push_back(dxc_define_profile);
 
+	std::wstring entry_point_name = L"ENTRY_POINT_";
+	entry_point_name += inEntryPoint;
+	DxcDefine dxc_define_entry_point {};
+	dxc_define_entry_point.Name = entry_point_name.c_str();
+	defines.push_back(dxc_define_entry_point);
+
 	std::vector<LPCWSTR> arguments;
 	arguments.push_back(DXC_ARG_DEBUG); //-Zi
 	arguments.push_back(DXC_ARG_WARNINGS_ARE_ERRORS); //-WX

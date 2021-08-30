@@ -32,7 +32,7 @@ enum class ScenePresetType
 	// Extra (use download_extra_asset.ps1 to download)
 	Rungholt,
 
-	Debug,
+	Hillaire20,
 
 	COUNT,
 };
@@ -43,24 +43,27 @@ struct ScenePreset
 	const char* mPath;
 	glm::vec4 mCameraPosition;
 	glm::vec4 mCameraDirection;
+	float mHorizontalFovDegree;
 	glm::mat4x4 mTransform;
+	float mSunAzimuth;
+	float mSunZenith;
 };
 
 static ScenePreset kScenePresets[(int)ScenePresetType::COUNT] =
 {
-	{ "None",									nullptr,																			glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		glm::mat4x4(1.0f) },
-	{ "CornellBox",								"Asset/raytracing-references/cornellbox/cornellbox.obj",							glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		glm::mat4x4(1.0f) },
-	{ "VeachMIS",								"Asset/raytracing-references/veach-mis/veach-mis.obj",								glm::vec4(0.0f, 1.0f, 13.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		glm::mat4x4(1.0f) },
-	{ "Furnance",								"Asset/raytracing-references/furnace-light-sampling/furnace-light-sampling.obj",	glm::vec4(0.0f, 1.0f, 13.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		glm::mat4x4(1.0f) },
-	{ "PrecomputedAtmosphere",					"Asset/primitives/sphere.obj",														glm::vec4(0.0f, 0.0f, 9.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		glm::translate(glm::vec3(0.0f, 1.0f, 0.0f)) },
-	{ "PrecomputedAtmosphere_Artifact_Mu",		"Asset/primitives/sphere.obj",														glm::vec4(0.0f, 80.0f, 150.0f, 0.0f),		glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		glm::scale(glm::vec3(100.0f, 100.0f, 100.0f)) },
+	{ "None",									nullptr,																			glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f, glm::mat4x4(1.0f),											0.0f, glm::pi<float>() / 4.0f,},
+	{ "CornellBox",								"Asset/raytracing-references/cornellbox/cornellbox.obj",							glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f, glm::mat4x4(1.0f),											0.0f, glm::pi<float>() / 4.0f,},
+	{ "VeachMIS",								"Asset/raytracing-references/veach-mis/veach-mis.obj",								glm::vec4(0.0f, 1.0f, 13.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f, glm::mat4x4(1.0f),											0.0f, glm::pi<float>() / 4.0f,},
+	{ "Furnance",								"Asset/raytracing-references/furnace-light-sampling/furnace-light-sampling.obj",	glm::vec4(0.0f, 1.0f, 13.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f, glm::mat4x4(1.0f),											0.0f, glm::pi<float>() / 4.0f,},
+	{ "PrecomputedAtmosphere",					"Asset/primitives/sphere.obj",														glm::vec4(0.0f, 0.0f, 9.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f, glm::translate(glm::vec3(0.0f, 1.0f, 0.0f)),					0.0f, glm::pi<float>() / 4.0f,},
+	{ "PrecomputedAtmosphere_Artifact_Mu",		"Asset/primitives/sphere.obj",														glm::vec4(0.0f, 80.0f, 150.0f, 0.0f),		glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f, glm::scale(glm::vec3(100.0f, 100.0f, 100.0f)),				0.0f, glm::pi<float>() / 4.0f,},
 
-	{ "Rungholt",								"Asset/extra/rungholt/rungholt.obj",												glm::vec4(-234.0f, 88.0f, 98.0f, 0.0f),		glm::vec4(0.88f, -0.15f, -0.45f, 0.0f), glm::mat4x4(1.0f) },
+	{ "Rungholt",								"Asset/extra/rungholt/rungholt.obj",												glm::vec4(-234.0f, 88.0f, 98.0f, 0.0f),		glm::vec4(0.88f, -0.15f, -0.45f, 0.0f), 90.0f, glm::mat4x4(1.0f),											0.0f, glm::pi<float>() / 4.0f,},
 
-	{ "Debug",									"Asset/primitives/sphere.obj",														glm::vec4(0.0f, 0.0f, 9.0f, 0.0f),			glm::vec4(0.0f, 0.4f, -0.9f, 0.0f),		glm::translate(glm::vec3(0.0f, 1.0f, 0.0f)) },
+	{ "Hillaire20",								nullptr,																			glm::vec4(0.0f, 0.5, -1.0f, 0.0f),			glm::vec4(0.0f, 0.0f, 1.0f, 0.0f),		98.8514328f, glm::translate(glm::vec3(0.0f, 1.0f, 0.0f)),		0.0f, glm::pi<float>() / 2.0f - 0.45f,},
 };
-static ScenePresetType sCurrentScene = ScenePresetType::CornellBox;
-static ScenePresetType sPreviousScene = ScenePresetType::CornellBox;
+static ScenePresetType sCurrentScene = ScenePresetType::Hillaire20;
+static ScenePresetType sPreviousScene = ScenePresetType::Hillaire20;
 
 static bool sReloadRequested = false;
 
@@ -77,8 +80,6 @@ struct CameraSettings
 		float		mSensitivity = 100.0f;					// S, ISO
 	};
 	ExposureControl mExposureControl;
-
-	void			ResetTransform()	{ mHorizontalFovDegree = CameraSettings().mHorizontalFovDegree; }
 	void			ResetExposure()		{ mExposureControl = ExposureControl(); }
 };
 CameraSettings		gCameraSettings = {};
@@ -192,8 +193,7 @@ static void sUpdate()
 				{
 					gPerFrameConstantBuffer.mCameraPosition = kScenePresets[(int)sCurrentScene].mCameraPosition;
 					gPerFrameConstantBuffer.mCameraDirection = glm::normalize(kScenePresets[(int)sCurrentScene].mCameraDirection);
-
-					gCameraSettings.ResetTransform();
+					gCameraSettings.mHorizontalFovDegree = kScenePresets[(int)sCurrentScene].mHorizontalFovDegree;
 				}
 
 				ImGui::SameLine();
@@ -352,6 +352,28 @@ static void sUpdate()
 			{
 				ImGui::Checkbox("Vsync", &gDisplaySettings.mVsync);
 
+				auto resize = [](int width, int height)
+				{
+					RECT rect = { 0, 0, width, height };
+					AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, false);
+					::SetWindowPos(::GetActiveWindow(), NULL, 0, 0, rect.right - rect.left, rect.bottom - rect.top, SWP_NOMOVE | SWP_NOOWNERZORDER | SWP_NOZORDER);
+				};
+
+				if (ImGui::Button("640 x 480"))
+					resize(640, 480);
+
+				if (ImGui::Button("800 x 600"))
+					resize(800, 600);
+
+				if (ImGui::Button("1280 x 720"))
+					resize(1280, 720);
+
+				if (ImGui::Button("1280 x 800"))
+					resize(1280, 800);
+
+				if (ImGui::Button("1920 x 1080"))
+					resize(1920, 1080);
+
 				ImGui::TreePop();
 			}
 
@@ -388,7 +410,10 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 	// Create application window
 	WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, sWndProc, 0L, 0L, GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, kApplicationTitleW, nullptr };
 	::RegisterClassEx(&wc);
-	HWND hwnd = ::CreateWindow(wc.lpszClassName, kApplicationTitleW, WS_OVERLAPPEDWINDOW, 100, 100, 1280, 800, nullptr, nullptr, wc.hInstance, nullptr);
+
+	RECT rect = { 0, 0, 1280, 720 };
+	AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, false);
+	HWND hwnd = ::CreateWindow(wc.lpszClassName, kApplicationTitleW, WS_OVERLAPPEDWINDOW, 100, 100, rect.right - rect.left, rect.bottom - rect.top, nullptr, nullptr, wc.hInstance, nullptr);
 
 	// Initialize Direct3D
 	if (!sCreateDeviceD3D(hwnd))
@@ -418,7 +443,10 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 	gScene.Load(kScenePresets[(int)sCurrentScene].mPath, kScenePresets[(int)sCurrentScene].mTransform);
 	gScene.Build(gCommandList);
 	gPerFrameConstantBuffer.mCameraPosition = kScenePresets[(int)sCurrentScene].mCameraPosition;
-	gPerFrameConstantBuffer.mCameraDirection = kScenePresets[(int)sCurrentScene].mCameraDirection;
+	gPerFrameConstantBuffer.mCameraDirection = glm::normalize(kScenePresets[(int)sCurrentScene].mCameraDirection);
+	gCameraSettings.mHorizontalFovDegree = kScenePresets[(int)sCurrentScene].mHorizontalFovDegree;
+	gPerFrameConstantBuffer.mSunAzimuth = kScenePresets[(int)sCurrentScene].mSunAzimuth;
+	gPerFrameConstantBuffer.mSunZenith = kScenePresets[(int)sCurrentScene].mSunZenith;
 
 	// Features (rely on ImGui, Scene)
 	gPrecomputedAtmosphereScattering.Initialize();
@@ -524,7 +552,10 @@ void sRender()
 			gScene.Build(gCommandList);
 
 			gPerFrameConstantBuffer.mCameraPosition = kScenePresets[(int)sCurrentScene].mCameraPosition;
-			gPerFrameConstantBuffer.mCameraDirection = kScenePresets[(int)sCurrentScene].mCameraDirection;
+			gPerFrameConstantBuffer.mCameraDirection = glm::normalize(kScenePresets[(int)sCurrentScene].mCameraDirection);
+			gCameraSettings.mHorizontalFovDegree = kScenePresets[(int)sCurrentScene].mHorizontalFovDegree;
+			gPerFrameConstantBuffer.mSunAzimuth = kScenePresets[(int)sCurrentScene].mSunAzimuth;
+			gPerFrameConstantBuffer.mSunZenith = kScenePresets[(int)sCurrentScene].mSunZenith;
 		}
 		else
 			gScene.Update(gCommandList);

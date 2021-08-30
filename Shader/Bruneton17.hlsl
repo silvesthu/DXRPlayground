@@ -551,6 +551,7 @@ void ComputeTransmittanceCS(
 	// TransmittanceUAV[inDispatchThreadID.xy] = float4(debug, 1.0);
 	// TransmittanceUAV[inDispatchThreadID.xy] = float4(mu_r.xy, 0, 1);
 	// TransmittanceUAV[inDispatchThreadID.xy] = float4(xy, 0, 1);
+	// TransmittanceUAV[inDispatchThreadID.xy] = float4(1,0,0, 1.0);
 }
 
 [RootSignature(AtmosphereRootSignature)]

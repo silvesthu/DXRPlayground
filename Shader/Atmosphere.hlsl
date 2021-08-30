@@ -16,8 +16,8 @@ RWTexture3D<float4> DeltaMieScatteringUAV							: register(u4, space2);
 RWTexture3D<float4> ScatteringUAV									: register(u5, space2);
 RWTexture3D<float4> DeltaScatteringDensityUAV						: register(u6, space2);
 RWTexture2D<float4> TransmittanceTexUAV								: register(u7, space2);
-RWTexture2D<float4> SkyViewLutTexUAV								: register(u8, space2);
-RWTexture2D<float4> MultiScattTexUAV								: register(u9, space2);
+RWTexture2D<float4> MultiScattTexUAV								: register(u8, space2);
+RWTexture2D<float4> SkyViewLutTexUAV								: register(u9, space2);
 RWTexture3D<float4> AtmosphereCameraScatteringVolumeUAV				: register(u10, space2);
 
 Texture2D<float4> TransmittanceSRV									: register(t0, space2);
@@ -28,13 +28,14 @@ Texture3D<float4> DeltaMieScatteringSRV								: register(t4, space2);
 Texture3D<float4> ScatteringSRV										: register(t5, space2);
 Texture3D<float4> DeltaScatteringDensitySRV							: register(t6, space2);
 Texture2D<float4> TransmittanceTexSRV								: register(t7, space2);
-Texture2D<float4> SkyViewLutTexSRV									: register(t8, space2);
-Texture2D<float4> MultiScattTexSRV									: register(t9, space2);
+Texture2D<float4> MultiScattTexSRV									: register(t8, space2);
+Texture2D<float4> SkyViewLutTexSRV									: register(t9, space2);
 Texture3D<float4> AtmosphereCameraScatteringVolumeSRV				: register(t10, space2);
 
 #define AtmosphereRootSignature							\
 "DescriptorTable("										\
-	"  CBV(b0, space = 2)"								\
+	"  CBV(b0, space = 0)"								\
+	", CBV(b0, space = 2)"								\
 	", UAV(u0, space = 2, numDescriptors = 11)"			\
 	", SRV(t0, space = 2, numDescriptors = 11)"			\
 ")"														\

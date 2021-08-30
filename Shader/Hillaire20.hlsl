@@ -2,11 +2,34 @@
 // #define HILLAIRE20_ADJUST_INTEGRATION
 
 // Adapter
+#if !defined(ENTRY_POINT_NewMultiScatCS)
+#define MULTISCATAPPROX_ENABLED 1							// Sample MultiScatTexture
+#else
+#define MULTISCATAPPROX_ENABLED 0
+#endif // !defined(ENTRY_POINT_NewMultiScatCS)
+// #define FASTAERIALPERSPECTIVE_ENABLED 1					// [TODO] Mie not too weak ?
 #define PI MATH_PI
 // #define ILLUMINANCE_IS_ONE								// Use SolarIrradiance
+
+#define MultiScatteringLUTRes 32
+
 #define PLANET_RADIUS_OFFSET 0.01f							// ?
 #define RayMarchMinMaxSPP float2(4, 14)						// ?
+
+#define AP_SLICE_COUNT 32.0f
+#define AP_KM_PER_SLICE 4.0f
+
+float AerialPerspectiveDepthToSlice(float depth)
+{
+	return depth * (1.0f / AP_KM_PER_SLICE);
+}
+float AerialPerspectiveSliceToDepth(float slice)
+{
+	return slice * AP_KM_PER_SLICE;
+}
+
 #define TransmittanceLutTexture TransmittanceTexSRV
+#define MultiScatTexture MultiScattTexSRV
 #define samplerLinearClamp BilinearSampler
 
 // We should precompute those terms from resolutions (Or set resolution as #defined constants)
@@ -179,6 +202,108 @@ void LutTransmittanceParamsToUv(AtmosphereParameters Atmosphere, in float viewHe
 	//uv = float2(fromUnitToSubUvs(uv.x, TRANSMITTANCE_TEXTURE_WIDTH), fromUnitToSubUvs(uv.y, TRANSMITTANCE_TEXTURE_HEIGHT)); // No real impact so off
 }
 
+
+#define NONLINEARSKYVIEWLUT 1
+void UvToSkyViewLutParams(AtmosphereParameters Atmosphere, out float viewZenithCosAngle, out float lightViewCosAngle, in float viewHeight, in float2 uv)
+{
+	// Constrain uvs to valid sub texel range (avoid zenith derivative issue making LUT usage visible)
+	uv = float2(fromSubUvsToUnit(uv.x, 192.0f), fromSubUvsToUnit(uv.y, 108.0f));
+
+	float Vhorizon = sqrt(viewHeight * viewHeight - Atmosphere.BottomRadius * Atmosphere.BottomRadius);
+	float CosBeta = Vhorizon / viewHeight;				// GroundToHorizonCos
+	float Beta = acos(CosBeta);
+	float ZenithHorizonAngle = PI - Beta;
+
+	if (uv.y < 0.5f)
+	{
+		float coord = 2.0 * uv.y;
+		coord = 1.0 - coord;
+#if NONLINEARSKYVIEWLUT
+		coord *= coord;
+#endif
+		coord = 1.0 - coord;
+		viewZenithCosAngle = cos(ZenithHorizonAngle * coord);
+	}
+	else
+	{
+		float coord = uv.y * 2.0 - 1.0;
+#if NONLINEARSKYVIEWLUT
+		coord *= coord;
+#endif
+		viewZenithCosAngle = cos(ZenithHorizonAngle + Beta * coord);
+	}
+
+	float coord = uv.x;
+	coord *= coord;
+	lightViewCosAngle = -(coord * 2.0 - 1.0);
+}
+
+void SkyViewLutParamsToUv(AtmosphereParameters Atmosphere, in bool IntersectGround, in float viewZenithCosAngle, in float lightViewCosAngle, in float viewHeight, out float2 uv)
+{
+	float Vhorizon = sqrt(viewHeight * viewHeight - Atmosphere.BottomRadius * Atmosphere.BottomRadius);
+	float CosBeta = Vhorizon / viewHeight;				// GroundToHorizonCos
+	float Beta = acos(CosBeta);
+	float ZenithHorizonAngle = PI - Beta;
+
+	if (!IntersectGround)
+	{
+		float coord = acos(viewZenithCosAngle) / ZenithHorizonAngle;
+		coord = 1.0 - coord;
+#if NONLINEARSKYVIEWLUT
+		coord = sqrt(coord);
+#endif
+		coord = 1.0 - coord;
+		uv.y = coord * 0.5f;
+	}
+	else
+	{
+		float coord = (acos(viewZenithCosAngle) - ZenithHorizonAngle) / Beta;
+#if NONLINEARSKYVIEWLUT
+		coord = sqrt(coord);
+#endif
+		uv.y = coord * 0.5f + 0.5f;
+	}
+
+	{
+		float coord = -lightViewCosAngle * 0.5f + 0.5f;
+		coord = sqrt(coord);
+		uv.x = coord;
+	}
+
+	// Constrain uvs to valid sub texel range (avoid zenith derivative issue making LUT usage visible)
+	uv = float2(fromUnitToSubUvs(uv.x, 192.0f), fromUnitToSubUvs(uv.y, 108.0f));
+}
+
+bool MoveToTopAtmosphere(inout float3 WorldPos, in float3 WorldDir, in float AtmosphereTopRadius)
+{
+	float viewHeight = length(WorldPos);
+	if (viewHeight > AtmosphereTopRadius)
+	{
+		float tTop = raySphereIntersectNearest(WorldPos, WorldDir, float3(0.0f, 0.0f, 0.0f), AtmosphereTopRadius);
+		if (tTop >= 0.0f)
+		{
+			float3 UpVector = WorldPos / viewHeight;
+			float3 UpOffset = UpVector * -PLANET_RADIUS_OFFSET;
+			WorldPos = WorldPos + WorldDir * tTop + UpOffset;
+		}
+		else
+		{
+			// Ray is not intersecting the atmosphere
+			return false;
+		}
+	}
+	return true; // ok to start tracing
+}
+
+float3 GetMultipleScattering(AtmosphereParameters Atmosphere, float3 scattering, float3 extinction, float3 worlPos, float viewZenithCosAngle)
+{
+	float2 uv = saturate(float2(viewZenithCosAngle * 0.5f + 0.5f, (length(worlPos) - Atmosphere.BottomRadius) / (Atmosphere.TopRadius - Atmosphere.BottomRadius)));
+	uv = float2(fromUnitToSubUvs(uv.x, MultiScatteringLUTRes), fromUnitToSubUvs(uv.y, MultiScatteringLUTRes));
+
+	float3 multiScatteredLuminance = MultiScatTexture.SampleLevel(samplerLinearClamp, uv, 0).rgb;
+	return multiScatteredLuminance;
+}
+
 struct SingleScatteringResult
 {
 	float3 L;						// Scattered light (luminance)
@@ -200,7 +325,7 @@ SingleScatteringResult IntegrateScatteredLuminance(
 
 	SingleScatteringResult result = (SingleScatteringResult)0;
 
-#if 0 // Used in rendering
+#if 0
 	float3 ClipSpace = float3((pixPos / float2(gResolution)) * float2(2.0, -2.0) - float2(1.0, -1.0), 1.0);
 #endif
 
@@ -229,7 +354,7 @@ SingleScatteringResult IntegrateScatteredLuminance(
 		}
 	}
 
-#if 0 // Used in rendering
+#if 0
 	if (DepthBufferValue >= 0.0f)
 	{
 		ClipSpace.z = DepthBufferValue;
@@ -286,7 +411,7 @@ SingleScatteringResult IntegrateScatteredLuminance(
 	float t = 0.0f;
 	float tPrev = 0.0;
 #ifdef HILLAIRE20_ADJUST_INTEGRATION
-	const float SampleSegmentT = VariableSampleCount ? 0.3f : 0.5f;
+	const float SampleSegmentT = 0.5f;
 #else
 	const float SampleSegmentT = 0.3f;
 #endif // const float SampleSegmentT = 0.3f;
@@ -322,13 +447,12 @@ SingleScatteringResult IntegrateScatteredLuminance(
 			float NewT = tMax * (s + SampleSegmentT) / SampleCount;
 			dt = NewT - t;
 			t = NewT;
-		}
-		float3 P = WorldPos + t * WorldDir;
 
 #ifdef HILLAIRE20_ADJUST_INTEGRATION
-		if (!VariableSampleCount)
 			dt = tMax / SampleCount;
 #endif // HILLAIRE20_ADJUST_INTEGRATION
+		}
+		float3 P = WorldPos + t * WorldDir;
 
 		MediumSampleRGB medium = sampleMediumRGB(P, Atmosphere);
 		const float3 SampleOpticalDepth = medium.extinction * dt;
@@ -489,7 +613,7 @@ void TransLUT(
 	uint TRANSMITTANCE_TEXTURE_HEIGHT = 64;
 	// TransmittanceTexUAV.GetDimensions(TRANSMITTANCE_TEXTURE_WIDTH, TRANSMITTANCE_TEXTURE_HEIGHT); // calculate in shader introduce extra error
 	float2 pixPos = inDispatchThreadID.xy + 0.5; // half pixel offset
-	float3 sun_direction = float3(1, 0, 0); // dummy
+	float3 sun_direction = mPerFrame.mSunDirection.xyz;
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -549,7 +673,6 @@ void NewMultiScatCS(
 {
 	// Adapter
 	uint3 ThreadId = inDispatchThreadID.xyz;
-	uint MultiScatteringLUTRes = 32;
 	float MultipleScatteringFactor = 1.0;
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -599,6 +722,10 @@ void NewMultiScatCS(
 		WorldDir.y = sinTheta * sinPhi;
 		WorldDir.z = cosPhi;
 		SingleScatteringResult result = IntegrateScatteredLuminance(pixPos, WorldPos, WorldDir, sunDir, Atmosphere, ground, SampleCountIni, DepthBufferValue, VariableSampleCount, MieRayPhase);
+
+		// Debug
+		// MultiScattTexUAV[inDispatchThreadID.xy] = float4(sunDir, 1.0f);
+		// return;
 
 		MultiScatAs1SharedMem[ThreadId.z] = result.MultiScatAs1 * SphereSolidAngle / (sqrtSample * sqrtSample);
 		LSharedMem[ThreadId.z] = result.L * SphereSolidAngle / (sqrtSample * sqrtSample);
@@ -669,8 +796,9 @@ void NewMultiScatCS(
 	float3 L = InScatteredLuminance * SumOfAllMultiScatteringEventsContribution;// Equation 10 Psi_ms
 #endif
 
-	// OutputTexture[ThreadId.xy] = float4(MultipleScatteringFactor * L, 1.0f);
 	MultiScattTexUAV[ThreadId.xy] = float4(MultipleScatteringFactor * L, 1.0f);
+
+	// Debug
 }
 
 
@@ -683,7 +811,71 @@ void SkyViewLut(
 	uint3 inDispatchThreadID : SV_DispatchThreadID,
 	uint inGroupIndex : SV_GroupIndex)
 {
+	AtmosphereParameters Atmosphere = GetAtmosphereParameters();
 
+	float2 dimensions = float2(192, 108.0);
+	float3 sun_direction = mPerFrame.mSunDirection.xyz;
+
+	float2 pixPos = inDispatchThreadID.xy + 0.5; // half pixel offset
+	float2 uv = pixPos / dimensions;
+
+	float3 WorldPos = mPerFrame.mCameraPosition.xyz + float3(0, Atmosphere.BottomRadius, 0);
+	float viewHeight = length(WorldPos);
+
+	float viewZenithCosAngle;
+	float lightViewCosAngle;
+	UvToSkyViewLutParams(Atmosphere, viewZenithCosAngle, lightViewCosAngle, viewHeight, uv);
+
+	float3 SunDir;
+	{
+		float3 UpVector = WorldPos / viewHeight;
+		float sunZenithCosAngle = dot(UpVector, sun_direction);
+
+		// Debug - Validation
+		// viewHeight = 6360.5;
+		// sunZenithCosAngle = 0.5;
+
+		SunDir = normalize(float3(sqrt(1.0 - sunZenithCosAngle * sunZenithCosAngle), 0.0, sunZenithCosAngle));
+	}
+
+
+
+	WorldPos = float3(0.0f, 0.0f, viewHeight);
+	float viewZenithSinAngle = sqrt(1 - viewZenithCosAngle * viewZenithCosAngle);
+	float3 WorldDir = float3(
+		viewZenithSinAngle * lightViewCosAngle,
+		viewZenithSinAngle * sqrt(1.0 - lightViewCosAngle * lightViewCosAngle),
+		viewZenithCosAngle);
+
+	// Move to top atmospehre
+	if (!MoveToTopAtmosphere(WorldPos, WorldDir, Atmosphere.TopRadius))
+	{
+		SkyViewLutTexUAV[inDispatchThreadID.xy] = float4(1, 0, 0, 1);
+		return;
+	}
+
+	const bool ground = false;
+	const float SampleCountIni = 30;
+	const float DepthBufferValue = -1.0;
+	const bool VariableSampleCount = true;
+	const bool MieRayPhase = true;
+	SingleScatteringResult ss = IntegrateScatteredLuminance(pixPos, WorldPos, WorldDir, SunDir, Atmosphere, ground, SampleCountIni, DepthBufferValue, VariableSampleCount, MieRayPhase);
+
+	float3 L = ss.L;
+	SkyViewLutTexUAV[inDispatchThreadID.xy] = float4(L, 1); // match
+
+	// Debug
+	// SkyViewLutTexUAV[inDispatchThreadID.xy] = float4(pixPos, 0, 1); // match
+	// SkyViewLutTexUAV[inDispatchThreadID.xy] = float4(RelativeWorldPos, 1); // match
+	// SkyViewLutTexUAV[inDispatchThreadID.xy] = float4(WorldDir, 1); // tiny error
+	// SkyViewLutTexUAV[inDispatchThreadID.xy] = float4(viewZenithSinAngle, viewZenithCosAngle, 0, 1);	// tiny error, from UvToSkyViewLutParams
+	// SkyViewLutTexUAV[inDispatchThreadID.xy] = float4(uv, viewHeight, 1); // match
+	// SkyViewLutTexUAV[inDispatchThreadID.xy] = float4(SunDir, 1); // match, 0.90052, 0.00, 0.43482
+	// SkyViewLutTexUAV[inDispatchThreadID.xy] = MultiScatTexture.SampleLevel(samplerLinearClamp, uv, 0); // match
+
+	// SkyViewLutTexUAV[inDispatchThreadID.xy] = float4(WorldPos, 1);
+	// SkyViewLutTexUAV[inDispatchThreadID.xy] = float4(WorldDir, 1);
+	// SkyViewLutTexUAV[inDispatchThreadID.xy] = float4(SunDir, 1);
 }
 
 [RootSignature(AtmosphereRootSignature)]
@@ -694,5 +886,124 @@ void CameraVolumes(
 	uint3 inDispatchThreadID : SV_DispatchThreadID,
 	uint inGroupIndex : SV_GroupIndex)
 {
-	AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(1, 0, 0, 1);
+	AtmosphereParameters Atmosphere = GetAtmosphereParameters();
+
+	float2 pixPos = inDispatchThreadID.xy + 0.5; // half pixel offset
+	float2 dims = float2(32, 32);
+
+	float2 d = ((pixPos / dims) * 2.f - 1.f); // 0~1 => -1~1
+	d.y = -d.y;
+
+	float3 right = mPerFrame.mCameraRightExtend.xyz;
+	float3 up = mPerFrame.mCameraUpExtend.xyz;
+
+	// Debug
+	right = -right; // handness?
+
+	float3 WorldDir = normalize(mPerFrame.mCameraDirection.xyz + right * d.x + up * d.y);
+	WorldDir.xyz = WorldDir.xzy; // Y-up to Z-up
+	float3 SunDir = mPerFrame.mSunDirection.xzy; // Y-up to Z-up
+
+	// Debug
+	float3 WorldDir_Raw = WorldDir;
+
+	float3 camera = mPerFrame.mCameraPosition.xzy; // Y-up to Z-up
+
+	// Debug
+	camera.xy = 0; // flat
+
+	float3 camPos = camera + float3(0, 0, Atmosphere.BottomRadius);
+
+	///////////////
+
+#if 0
+	float2 pixPos = Input.position.xy;
+	AtmosphereParameters Atmosphere = GetAtmosphereParameters();
+	float3 ClipSpace = float3((pixPos / float2(gResolution)) * float2(2.0, -2.0) - float2(1.0, -1.0), 0.5);
+	float4 HPos = mul(gSkyInvViewProjMat, float4(ClipSpace, 1.0));
+	float3 WorldDir = normalize(HPos.xyz / HPos.w - camera);
+	float earthR = Atmosphere.BottomRadius;
+	float3 earthO = float3(0.0, 0.0, -earthR);
+	float3 camPos = camera + float3(0, 0, earthR);
+	float3 SunDir = sun_direction;
+	float3 SunLuminance = 0.0;
+#endif
+
+#if 0
+	float Slice = ((float(Input.sliceId) + 0.5f) / AP_SLICE_COUNT);
+#else
+	float Slice = ((float(inDispatchThreadID.z) + 0.5f) / AP_SLICE_COUNT);
+#endif
+	Slice *= Slice;	// squared distribution
+	Slice *= AP_SLICE_COUNT;
+
+	float3 WorldPos = camPos;
+	float viewHeight;
+
+
+	// Compute position from froxel information
+	float tMax = AerialPerspectiveSliceToDepth(Slice);
+	float3 newWorldPos = WorldPos + tMax * WorldDir;
+
+
+	// If the voxel is under the ground, make sure to offset it out on the ground.
+	viewHeight = length(newWorldPos);
+	if (viewHeight <= (Atmosphere.BottomRadius + PLANET_RADIUS_OFFSET))
+	{
+		// Apply a position offset to make sure no artefact are visible close to the earth boundaries for large voxel.
+		newWorldPos = normalize(newWorldPos) * (Atmosphere.BottomRadius + PLANET_RADIUS_OFFSET + 0.001f);
+		WorldDir = normalize(newWorldPos - camPos);
+		tMax = length(newWorldPos - camPos);
+	}
+	float tMaxMax = tMax;
+
+
+	// Move ray marching start up to top atmosphere.
+	viewHeight = length(WorldPos);
+	if (viewHeight >= Atmosphere.TopRadius)
+	{
+		float3 prevWorlPos = WorldPos;
+		if (!MoveToTopAtmosphere(WorldPos, WorldDir, Atmosphere.TopRadius))
+		{
+			// Ray is not intersecting the atmosphere
+			AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(0.0, 0.0, 0.0, 1.0);
+			return;
+		}
+		float LengthToAtmosphere = length(prevWorlPos - WorldPos);
+		if (tMaxMax < LengthToAtmosphere)
+		{
+			// tMaxMax for this voxel is not within earth atmosphere
+			AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(0.0, 0.0, 0.0, 1.0);
+			return;
+		}
+		// Now world position has been moved to the atmosphere boundary: we need to reduce tMaxMax accordingly. 
+		tMaxMax = max(0.0, tMaxMax - LengthToAtmosphere);
+	}
+
+
+	const bool ground = false;
+#if 0
+	const float SampleCountIni = max(1.0, float(Input.sliceId + 1.0) * 2.0f);
+#else
+	const float SampleCountIni = max(1.0, float(inDispatchThreadID.z + 1.0) * 2.0f); // ?
+#endif
+	const float DepthBufferValue = -1.0;
+	const bool VariableSampleCount = false;
+	const bool MieRayPhase = true;
+	SingleScatteringResult ss = IntegrateScatteredLuminance(pixPos, WorldPos, WorldDir, SunDir, Atmosphere, ground, SampleCountIni, DepthBufferValue, VariableSampleCount, MieRayPhase, tMaxMax);
+
+	const float Transmittance = dot(ss.Transmittance, float3(1.0f / 3.0f, 1.0f / 3.0f, 1.0f / 3.0f)); // ?
+	AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(ss.L, 1.0 - Transmittance); // almost match
+
+	// Debug
+	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(inDispatchThreadID.xyz, 1.0); // match
+	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(pixPos, 0.0, 1.0); // match
+	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(WorldPos, 1.0); // match
+	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(SunDir, 1.0); // match
+	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(SampleCountIni.xxx, 1.0); // match
+	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(mPerFrame.mCameraDirection.xzy, 1.0); // match
+	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(WorldDir_Raw, 1.0); // match	
+	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(newWorldPos, 1.0); // almost match
+	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(WorldDir, 1.0); // match
+	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(tMax.xxx, 1.0); // match
 }

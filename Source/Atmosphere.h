@@ -294,7 +294,7 @@ struct AtmosphereProfile
 	glm::vec3 mRuntimeGroundAlbedo						= glm::vec3(0.0f, 0.0f, 0.04f);
 
 	// Unit
-	bool mSceneInKilometer								= false; // Meter otherwise
+	bool mSceneInKilometer								= true; // Meter otherwise
 
 	struct Preset
 	{
@@ -387,8 +387,8 @@ struct PrecomputedAtmosphereScatteringResources
 	Shader mCameraVolumesShader					= Shader().CSName(L"CameraVolumes");
 
 	Texture mTransmittanceTex					= Texture().Width(256).Height(64).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Hillaire20.TransmittanceTex").UIScale(1.0f);
-	Texture mSkyViewLutTex						= Texture().Width(128).Height(80).Format(DXGI_FORMAT_R11G11B10_FLOAT).Name("Hillaire20.SkyViewLutTex").UIScale(2.0f);
 	Texture mMultiScattTex						= Texture().Width(32).Height(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Hillaire20.MultiScattTex").UIScale(8.0f);
+	Texture mSkyViewLutTex						= Texture().Width(192).Height(108).Format(DXGI_FORMAT_R11G11B10_FLOAT).Name("Hillaire20.SkyViewLutTex").UIScale(256.0f / 192.0f);
 	Texture mAtmosphereCameraScatteringVolume	= Texture().Width(32).Height(32).Depth(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Hillaire20.AtmosphereCameraScatteringVolume").UIScale(8.0f);
 
 	static void Bruneton17(PrecomputedAtmosphereScatteringResources& resource)
@@ -446,8 +446,8 @@ struct PrecomputedAtmosphereScatteringResources
 
 		// [Hillaire20]
 		&mTransmittanceTex,
-		&mSkyViewLutTex,
 		&mMultiScattTex,
+		&mSkyViewLutTex,
 		&mAtmosphereCameraScatteringVolume
 	};
 

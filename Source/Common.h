@@ -216,8 +216,10 @@ enum class TonemapMode : glm::uint32
 enum class AtmosphereMode
 {
 	ConstantColor = 0,
-
 	RaymarchAtmosphereOnly,
+
+	_Newline0,
+
 	PrecomputedAtmosphere,
 	Hillaire20,
 
