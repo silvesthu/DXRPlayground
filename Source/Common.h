@@ -78,7 +78,7 @@ struct Shader
 
 	void InitializeDescriptors(const std::vector<DescriptorInfo>& inEntries);
 	void SetupGraphics();
-	void SetupCompute(ID3D12DescriptorHeap* descriptor_heap = nullptr);
+	void SetupCompute(ID3D12DescriptorHeap* inHeap = nullptr, bool inUseTable = true);
 	void Reset() { mData = {}; }
 
 	struct Data
@@ -100,7 +100,7 @@ struct Texture
 	TEXTURE_MEMBER(glm::uint32, Depth, 1);
 	TEXTURE_MEMBER(DXGI_FORMAT, Format, DXGI_FORMAT_R32G32B32A32_FLOAT);
 	TEXTURE_MEMBER(const char*, Name, nullptr);
-	TEXTURE_MEMBER(float, UIScale, 1.0f);
+	TEXTURE_MEMBER(float, UIScale, 0.0f);
 	TEXTURE_MEMBER(const wchar_t*, Path, nullptr);
 	TEXTURE_MEMBER(bool, CopyAfterUpload, false);
 
@@ -116,11 +116,15 @@ struct Texture
 	void Load();
 
 	ComPtr<ID3D12Resource> mResource;
+	ComPtr<ID3D12Resource> mIntermediateResource;
+	ComPtr<ID3D12Resource> mUploadResource;
+
 	D3D12_CPU_DESCRIPTOR_HANDLE mCPUHandle = {};
 	D3D12_GPU_DESCRIPTOR_HANDLE mGPUHandle = {};
 
-	ComPtr<ID3D12Resource> mIntermediateResource;
-	ComPtr<ID3D12Resource> mUploadResource;
+	int mResourceHeapIndex = -1;
+	int mIntermediateResourceHeapIndex = -1;
+
 	DirectX::TexMetadata mMetadata = {};
 };
 
@@ -128,10 +132,17 @@ extern ComPtr<ID3D12Resource>				gConstantGPUBuffer;
 extern ComPtr<ID3D12RootSignature>			gDXRGlobalRootSignature;
 extern ComPtr<ID3D12StateObject>			gDXRStateObject;
 
+extern ComPtr<ID3D12DescriptorHeap>			gUniversalHeap;
+extern SIZE_T								gUniversalHeapHandleIncrementSize;
+extern std::atomic<int>						gUniversalHeapHandleIndex;
+
 extern ShaderTable							gDXRShaderTable;
 
 extern bool									gUseDXRInlineShader;
 extern Shader								gDXRInlineShader;
+
+extern Shader								gDiffTexture2DShader;
+extern Shader								gDiffTexture3DShader;
 
 extern Shader								gCompositeShader;
 
@@ -220,7 +231,7 @@ enum class AtmosphereMode
 
 	_Newline0,
 
-	PrecomputedAtmosphere,
+	Bruneton17,
 	Hillaire20,
 
 	Count

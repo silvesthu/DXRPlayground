@@ -26,8 +26,8 @@ enum class ScenePresetType
 	CornellBox,
 	VeachMIS,
 	Furnance,
-	PrecomputedAtmosphere,
-	PrecomputedAtmosphere_Artifact_Mu,
+	Bruneton17,
+	Bruneton17_Artifact_Mu,
 
 	// Extra (use download_extra_asset.ps1 to download)
 	Rungholt,
@@ -55,8 +55,8 @@ static ScenePreset kScenePresets[(int)ScenePresetType::COUNT] =
 	{ "CornellBox",								"Asset/raytracing-references/cornellbox/cornellbox.obj",							glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f, glm::mat4x4(1.0f),											0.0f, glm::pi<float>() / 4.0f,},
 	{ "VeachMIS",								"Asset/raytracing-references/veach-mis/veach-mis.obj",								glm::vec4(0.0f, 1.0f, 13.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f, glm::mat4x4(1.0f),											0.0f, glm::pi<float>() / 4.0f,},
 	{ "Furnance",								"Asset/raytracing-references/furnace-light-sampling/furnace-light-sampling.obj",	glm::vec4(0.0f, 1.0f, 13.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f, glm::mat4x4(1.0f),											0.0f, glm::pi<float>() / 4.0f,},
-	{ "PrecomputedAtmosphere",					"Asset/primitives/sphere.obj",														glm::vec4(0.0f, 0.0f, 9.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f, glm::translate(glm::vec3(0.0f, 1.0f, 0.0f)),					0.0f, glm::pi<float>() / 4.0f,},
-	{ "PrecomputedAtmosphere_Artifact_Mu",		"Asset/primitives/sphere.obj",														glm::vec4(0.0f, 80.0f, 150.0f, 0.0f),		glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f, glm::scale(glm::vec3(100.0f, 100.0f, 100.0f)),				0.0f, glm::pi<float>() / 4.0f,},
+	{ "Bruneton17",								"Asset/primitives/sphere.obj",														glm::vec4(0.0f, 0.0f, 9.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f, glm::translate(glm::vec3(0.0f, 1.0f, 0.0f)),					0.0f, glm::pi<float>() / 4.0f,},
+	{ "Bruneton17_Artifact_Mu",					"Asset/primitives/sphere.obj",														glm::vec4(0.0f, 80.0f, 150.0f, 0.0f),		glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f, glm::scale(glm::vec3(100.0f, 100.0f, 100.0f)),				0.0f, glm::pi<float>() / 4.0f,},
 
 	{ "Rungholt",								"Asset/extra/rungholt/rungholt.obj",												glm::vec4(-234.0f, 88.0f, 98.0f, 0.0f),		glm::vec4(0.88f, -0.15f, -0.45f, 0.0f), 90.0f, glm::mat4x4(1.0f),											0.0f, glm::pi<float>() / 4.0f,},
 
@@ -599,6 +599,7 @@ void sRender()
 		gPrecomputedAtmosphereScattering.Load();
 		gPrecomputedAtmosphereScattering.Precompute();
 		gPrecomputedAtmosphereScattering.Compute();
+		gPrecomputedAtmosphereScattering.Validate();
 	}
 
 	// Cloud
@@ -783,6 +784,20 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		desc.NodeMask = 1;
 		if (gDevice->CreateCommandQueue(&desc, IID_PPV_ARGS(&gCommandQueue)) != S_OK)
 			return false;
+	}
+
+	// Heap
+	{
+		// DescriptorHeap
+		{
+			D3D12_DESCRIPTOR_HEAP_DESC desc = {};
+			desc.NumDescriptors = 1000000; // Max
+			desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+			desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+			gValidate(gDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&gUniversalHeap)));
+			gUniversalHeap->SetName(L"UniversalHeap");			
+			gUniversalHeapHandleIncrementSize = gDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+		}
 	}
 
 	// PerFrame

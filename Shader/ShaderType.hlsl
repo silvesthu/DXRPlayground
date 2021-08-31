@@ -130,7 +130,7 @@ struct Atmosphere
 	float						mSceneScale				CONSTANT_DEFAULT(0);
 	uint						mPad0					CONSTANT_DEFAULT(0);
 
-	AtmosphereMode				mMode					CONSTANT_DEFAULT(AtmosphereMode::PrecomputedAtmosphere);
+	AtmosphereMode				mMode					CONSTANT_DEFAULT(AtmosphereMode::Bruneton17);
 	uint						mSliceCount				CONSTANT_DEFAULT(0);
 	AtmosphereMuSEncodingMode	mMuSEncodingMode		CONSTANT_DEFAULT(AtmosphereMuSEncodingMode::Bruneton17);
 	uint						mPadFlags;

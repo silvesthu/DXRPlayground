@@ -23,8 +23,15 @@ ComPtr<ID3D12RootSignature>			gDXRGlobalRootSignature = nullptr;
 ComPtr<ID3D12StateObject>			gDXRStateObject = nullptr;
 ShaderTable							gDXRShaderTable = {};
 
+ComPtr<ID3D12DescriptorHeap>		gUniversalHeap = nullptr;
+SIZE_T								gUniversalHeapHandleIncrementSize = 0;
+std::atomic<int>					gUniversalHeapHandleIndex = 0;
+
 bool								gUseDXRInlineShader = true;
 Shader								gDXRInlineShader = Shader().CSName(L"InlineRaytracingCS").UseGlobalRootSignature(true);
+
+Shader								gDiffTexture2DShader = Shader().CSName(L"DiffTexture2DShader");
+Shader								gDiffTexture3DShader = Shader().CSName(L"DiffTexture3DShader");
 
 Shader								gCompositeShader = Shader().VSName(L"ScreenspaceTriangleVS").PSName(L"CompositePS");
 
@@ -39,13 +46,6 @@ Texture								gDumpTextureProxy = {};
 
 void Shader::InitializeDescriptors(const std::vector<Shader::DescriptorInfo>& inEntries)
 {
-	// Check if root signature is supported
-	const D3D12_ROOT_SIGNATURE_DESC* root_signature_desc = mData.mRootSignatureDeserializer->GetRootSignatureDesc();
-
-	assert(root_signature_desc->NumParameters >= 1);
-	assert(root_signature_desc->pParameters[0].ParameterType == D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE);
-	const D3D12_ROOT_DESCRIPTOR_TABLE& table = root_signature_desc->pParameters[0].DescriptorTable;
-
 	// DescriptorHeap
 	{
 		D3D12_DESCRIPTOR_HEAP_DESC desc = {};
@@ -58,7 +58,15 @@ void Shader::InitializeDescriptors(const std::vector<Shader::DescriptorInfo>& in
 	}
 
 	// DescriptorTable
+	if (!inEntries.empty())
 	{
+		// Check if root signature is supported
+		const D3D12_ROOT_SIGNATURE_DESC* root_signature_desc = mData.mRootSignatureDeserializer->GetRootSignatureDesc();
+		assert(root_signature_desc->NumParameters >= 1);
+		assert(root_signature_desc->pParameters[0].ParameterType == D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE);
+
+		const D3D12_ROOT_DESCRIPTOR_TABLE& table = root_signature_desc->pParameters[0].DescriptorTable;
+
 		D3D12_CPU_DESCRIPTOR_HANDLE handle = mData.mDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
 		UINT increment_size = gDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
@@ -179,32 +187,63 @@ void Shader::SetupGraphics()
 	gCommandList->SetPipelineState(mData.mPipelineState.Get());
 }
 
-void Shader::SetupCompute(ID3D12DescriptorHeap* descriptor_heap)
+void Shader::SetupCompute(ID3D12DescriptorHeap* inHeap, bool inUseTable)
 {
 	gCommandList->SetComputeRootSignature(mData.mRootSignature.Get());
-	ID3D12DescriptorHeap* heap = descriptor_heap != nullptr ? descriptor_heap : mData.mDescriptorHeap.Get();
+	ID3D12DescriptorHeap* heap = inHeap != nullptr ? inHeap : mData.mDescriptorHeap.Get();
 	gCommandList->SetDescriptorHeaps(1, &heap);
-	gCommandList->SetComputeRootDescriptorTable(0, heap->GetGPUDescriptorHandleForHeapStart());
+	if (inUseTable)
+		gCommandList->SetComputeRootDescriptorTable(0, heap->GetGPUDescriptorHandleForHeapStart());
 	gCommandList->SetPipelineState(mData.mPipelineState.Get());
 }
 
 void Texture::Initialize()
 {
+	auto create_uav = [](ID3D12Resource* inResource, int& outHeapIndex)
+	{
+		D3D12_RESOURCE_DESC resource_desc = inResource->GetDesc();
+
+		D3D12_UNORDERED_ACCESS_VIEW_DESC desc = {};
+		if (resource_desc.DepthOrArraySize == 1)
+		{
+			desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+			desc.Texture2D.MipSlice = 0;
+			desc.Texture2D.PlaneSlice = 0;
+		}
+		else
+		{
+			desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE3D;
+			desc.Texture3D.MipSlice = 0;
+			desc.Texture3D.FirstWSlice = 0;
+			desc.Texture3D.WSize = resource_desc.DepthOrArraySize;
+		}
+		D3D12_CPU_DESCRIPTOR_HANDLE handle = gUniversalHeap->GetCPUDescriptorHandleForHeapStart();
+
+		outHeapIndex = gUniversalHeapHandleIndex++;
+		handle.ptr += outHeapIndex * gUniversalHeapHandleIncrementSize;
+		gDevice->CreateUnorderedAccessView(inResource, nullptr, &desc, handle);
+	};
+
+	std::wstring name = gToWString(mName);
+
 	D3D12_RESOURCE_DESC resource_desc = gGetTextureResourceDesc(mWidth, mHeight, mDepth, mFormat);
 	D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
 
 	gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&mResource)));
-	mResource->SetName(gToWString(mName).c_str());
+	mResource->SetName(name.c_str());
+	create_uav(mResource.Get(), mResourceHeapIndex);
 	
 	// SRV for ImGui
-	ImGui_ImplDX12_AllocateDescriptor(mCPUHandle, mGPUHandle);
-	D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
-	srv_desc.Format = mFormat;
-	srv_desc.ViewDimension = mDepth == 1 ? D3D12_SRV_DIMENSION_TEXTURE2D : D3D12_SRV_DIMENSION_TEXTURE3D;
-	srv_desc.Texture2D.MipLevels = (UINT)-1;
-	srv_desc.Texture2D.MostDetailedMip = 0;
-	srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	gDevice->CreateShaderResourceView(mResource.Get(), &srv_desc, mCPUHandle);
+	{
+		ImGui_ImplDX12_AllocateDescriptor(mCPUHandle, mGPUHandle);
+		D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
+		srv_desc.Format = mFormat;
+		srv_desc.ViewDimension = mDepth == 1 ? D3D12_SRV_DIMENSION_TEXTURE2D : D3D12_SRV_DIMENSION_TEXTURE3D;
+		srv_desc.Texture2D.MipLevels = (UINT)-1;
+		srv_desc.Texture2D.MostDetailedMip = 0;
+		srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		gDevice->CreateShaderResourceView(mResource.Get(), &srv_desc, mCPUHandle);
+	}
 
 	// Prepare intermediate resource
 	if (mPath != nullptr)
@@ -217,7 +256,14 @@ void Texture::Initialize()
 		assert(!FAILED(hr));
 
 		CreateTextureEx(gDevice, mMetadata, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, false, &mIntermediateResource);
+		std::wstring itermediate_name = name + L"_intermediate";
+		mIntermediateResource->SetName(itermediate_name.c_str());
+		create_uav(mIntermediateResource.Get(), mIntermediateResourceHeapIndex);
 	}
+
+	// UIScale
+	if (mUIScale == 0.0f)
+		mUIScale = 256.0f / mWidth;
 }
 
 void Texture::Load()

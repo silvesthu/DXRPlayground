@@ -575,6 +575,9 @@ void gCreatePipelineState()
 
 		succeed &= sCreatePipelineState(shader_filename, shader_stream, gDXRInlineShader);
 
+		succeed &= sCreatePipelineState(shader_filename, shader_stream, gDiffTexture2DShader);
+		succeed &= sCreatePipelineState(shader_filename, shader_stream, gDiffTexture3DShader);
+
 		for (auto&& shader : gPrecomputedAtmosphereScatteringResources.mShaders)
 			succeed &= sCreatePipelineState(shader_filename, shader_stream, *shader);
 
@@ -601,6 +604,8 @@ void gCleanupPipelineState()
 	gDXRGlobalRootSignature = nullptr;
 
 	gDXRInlineShader.Reset();
+
+	gDiffTexture2DShader.Reset();
 
 	gCompositeShader.Reset();
 }

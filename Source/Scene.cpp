@@ -375,11 +375,17 @@ void Scene::CreateShaderResource()
 
 	// Composite 
 	{
+		gDiffTexture2DShader.InitializeDescriptors({});
+		gDiffTexture3DShader.InitializeDescriptors({});
+	}
+
+	// Composite 
+	{
 		gCompositeShader.InitializeDescriptors(
-		{
-			gConstantGPUBuffer.Get(),
-			mOutputResource.Get()
-		});
+			{
+				gConstantGPUBuffer.Get(),
+				mOutputResource.Get()
+			});
 	}
 
 	// DXR DescriptorHeap

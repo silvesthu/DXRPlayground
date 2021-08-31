@@ -75,6 +75,9 @@ void PrecomputedAtmosphereScattering::Load()
 {
 	for (auto&& texture : gPrecomputedAtmosphereScatteringResources.mTextures)
 		texture->Load();
+
+	for (auto&& texture : gPrecomputedAtmosphereScatteringResources.mValidation.mTextures)
+		texture->Load();
 }
 
 void PrecomputedAtmosphereScattering::ComputeTransmittance()
@@ -164,6 +167,38 @@ void PrecomputedAtmosphereScattering::Compute()
 	CameraVolumes();
 }
 
+void PrecomputedAtmosphereScattering::Validate()
+{
+	auto validate = [](Texture& computed, Texture& expected)
+	{
+		BarrierScope computed_scope(gCommandList, computed.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		BarrierScope expected_scope(gCommandList, expected.mIntermediateResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		BarrierScope output_scope(gCommandList, expected.mResource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+		Shader& shader = expected.mDepth == 1 ? gDiffTexture2DShader : gDiffTexture3DShader;
+		shader.SetupCompute(gUniversalHeap.Get(), false);
+
+		gCommandList->SetComputeRoot32BitConstant(0, computed.mResourceHeapIndex, 0);
+		gCommandList->SetComputeRoot32BitConstant(0, expected.mIntermediateResourceHeapIndex, 1);
+		gCommandList->SetComputeRoot32BitConstant(0, expected.mResourceHeapIndex, 2);
+
+		gCommandList->Dispatch((expected.mWidth + 7) / 8, (expected.mHeight + 7) / 8, expected.mDepth);
+	};
+
+	validate(
+		gPrecomputedAtmosphereScatteringResources.mTransmittanceTex, 
+		gPrecomputedAtmosphereScatteringResources.mValidation.mTransmittanceTex);
+	validate(
+		gPrecomputedAtmosphereScatteringResources.mMultiScattTex,
+		gPrecomputedAtmosphereScatteringResources.mValidation.mMultiScattTex);
+	validate(
+		gPrecomputedAtmosphereScatteringResources.mSkyViewLutTex,
+		gPrecomputedAtmosphereScatteringResources.mValidation.mSkyViewLutTex);
+	validate(
+		gPrecomputedAtmosphereScatteringResources.mAtmosphereCameraScatteringVolume,
+		gPrecomputedAtmosphereScatteringResources.mValidation.mAtmosphereCameraScatteringVolume);
+}
+
 void PrecomputedAtmosphereScattering::TransLUT()
 {
 	gPrecomputedAtmosphereScatteringResources.mTransLUTShader.SetupCompute();
@@ -203,6 +238,9 @@ void PrecomputedAtmosphereScattering::Initialize()
 	// Texture
 	{
 		for (auto&& texture : gPrecomputedAtmosphereScatteringResources.mTextures)
+			texture->Initialize();
+
+		for (auto&& texture : gPrecomputedAtmosphereScatteringResources.mValidation.mTextures)
 			texture->Initialize();
 	}
 
@@ -259,9 +297,15 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 				gAtmosphereProfile.mMode = (AtmosphereMode)i;
 		}
 
-		SMALL_BUTTON(AtmosphereProfile::Preset::Bruneton17);
-		ImGui::SameLine();
-		SMALL_BUTTON(AtmosphereProfile::Preset::Hillaire20);
+		{
+			ImGui::PushID("Preset");
+
+			SMALL_BUTTON(AtmosphereProfile::Preset::Bruneton17);
+			ImGui::SameLine();
+			SMALL_BUTTON(AtmosphereProfile::Preset::Hillaire20);
+
+			ImGui::PopID();
+		}
 
 		ImGui::Checkbox("Scene Unit is Kilometer, otherwise Meter", &gAtmosphereProfile.mSceneInKilometer);
 		ImGui::Checkbox("Aerial Perspective", &gAtmosphereProfile.mAerialPerspective);
@@ -271,7 +315,7 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 			ImGui::ColorEdit3("Color", (float*)&gAtmosphereProfile.mConstantColor, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
 		}
 
-		if (gAtmosphereProfile.mMode == AtmosphereMode::PrecomputedAtmosphere)
+		if (gAtmosphereProfile.mMode == AtmosphereMode::Bruneton17)
 		{
 			ImGui::SliderInt("Scattering Order", (int*)&gAtmosphereProfile.mScatteringOrder, 1, 8);
 			ImGui::Checkbox("Recompute Every Frame", &mRecomputeEveryFrame);
@@ -478,7 +522,7 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 
 	if (ImGui::TreeNodeEx("Encoding"))
 	{
-		if (gAtmosphereProfile.mMode == AtmosphereMode::PrecomputedAtmosphere)
+		if (gAtmosphereProfile.mMode == AtmosphereMode::Bruneton17)
 		{
 			ImGui::Text(nameof::nameof_enum_type<AtmosphereMuSEncodingMode>().data());
 			for (int i = 0; i < (int)AtmosphereMuSEncodingMode::Count; i++)
@@ -496,4 +540,5 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 	}
 
 	ImGuiShowTextures(gPrecomputedAtmosphereScatteringResources.mTextures, "Texture", ImGuiTreeNodeFlags_DefaultOpen);
+	ImGuiShowTextures(gPrecomputedAtmosphereScatteringResources.mValidation.mTextures, "Validation", ImGuiTreeNodeFlags_None);
 }
