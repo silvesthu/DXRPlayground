@@ -494,7 +494,7 @@ void gCreatePipelineState()
 	
 	// Create lib shaders
 	const wchar_t* entry_points[] = { kDefaultRayGenerationShader, kDefaultMissShader, kDefaultClosestHitShader, kShadowMissShader, kShadowClosestHitShader };
-	IDxcBlob* blob = sCompileShader(shader_filename, shader_stream.str().c_str(), (glm::uint32)shader_stream.str().length(), L"", L"lib_6_6");
+	IDxcBlob* blob = sCompileShader(shader_filename, shader_stream.str().c_str(), (glm::uint32)shader_stream.str().length(), L"", L"lib_6_5");
 	if (blob == nullptr)
 	{
 		if (startup)

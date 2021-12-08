@@ -1136,6 +1136,7 @@ void InlineRaytracingCS(
 #endif // ENABLE_INLINE_RAYTRACING
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#ifndef SHADER_PROFILE_LIB
 
 cbuffer DiffTextureConstants : register(b0, space11)
 {
@@ -1176,6 +1177,7 @@ void DiffTexture3DShader(
 	output[inDispatchThreadID.xyz] = equal ? float4(0, 1, 0, 1) : float4(1, 0, 0, 1);
 }
 
+#endif // SHADER_PROFILE_LIB
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 float4 ScreenspaceTriangleVS(uint id : SV_VertexID) : SV_POSITION
