@@ -20,3 +20,6 @@
 [submodule "Source/Thirdparty/DirectXTex"]
 	path = Source/Thirdparty/DirectXTex
 	url = https://github.com/microsoft/DirectXTex.git
+[submodule "Source/Thirdparty/tinygltf"]
+	path = Source/Thirdparty/tinygltf
+	url = https://github.com/syoyo/tinygltf.git
