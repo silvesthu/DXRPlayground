@@ -372,6 +372,12 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 		ImGui::ColorEdit3("Albedo (Precomputed)", &gAtmosphereProfile.mGroundAlbedo[0], ImGuiColorEditFlags_Float);
 		ImGui::ColorEdit3("Albedo (Runtime)", &gAtmosphereProfile.mRuntimeGroundAlbedo[0], ImGuiColorEditFlags_Float);
 
+		if (ImGui::SmallButton("Bruneton17")) AtmosphereProfile::GroundReference::Bruneton17(gAtmosphereProfile);
+		ImGui::SameLine();
+		if (ImGui::SmallButton("Hillaire20")) AtmosphereProfile::GroundReference::Hillaire20(gAtmosphereProfile);
+		ImGui::SameLine();
+		if (ImGui::SmallButton("UE4")) AtmosphereProfile::GroundReference::UE4(gAtmosphereProfile);
+
 		ImGui::TreePop();
 	}
 

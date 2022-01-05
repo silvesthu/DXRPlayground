@@ -288,10 +288,15 @@ struct AtmosphereProfile
 		{
 			profile.mGroundAlbedo						= glm::vec3(0.0f);
 		}
+
+		static void UE4(AtmosphereProfile& profile)
+		{
+			profile.mGroundAlbedo						= glm::vec3(0.401977777f);
+		}
 	};
 	bool mAerialPerspective								= true;
-	glm::vec3 mGroundAlbedo								= glm::vec3(0.1f);
-	glm::vec3 mRuntimeGroundAlbedo						= glm::vec3(0.0f, 0.0f, 0.04f);
+	glm::vec3 mGroundAlbedo								= glm::vec3(0.0f);
+	glm::vec3 mRuntimeGroundAlbedo						= glm::vec3(0.0f);
 
 	// Unit
 	bool mSceneInKilometer								= true; // Meter otherwise
