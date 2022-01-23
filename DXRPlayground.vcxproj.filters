@@ -31,26 +31,11 @@
     <Filter Include="Source\Thirdparty\nameof">
       <UniqueIdentifier>{fb38af67-f2e1-4117-aa26-ca05c53cfec1}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\Thirdparty\tinygltf">
+      <UniqueIdentifier>{5d26f50b-fa5b-4b3e-857a-3c345a269b88}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Source\Thirdparty\imgui\imstb_rectpack.h">
-      <Filter>Source\Thirdparty\imgui</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Thirdparty\imgui\imstb_textedit.h">
-      <Filter>Source\Thirdparty\imgui</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Thirdparty\imgui\imstb_truetype.h">
-      <Filter>Source\Thirdparty\imgui</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Thirdparty\imgui\imconfig.h">
-      <Filter>Source\Thirdparty\imgui</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Thirdparty\imgui\imgui.h">
-      <Filter>Source\Thirdparty\imgui</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Thirdparty\imgui\imgui_internal.h">
-      <Filter>Source\Thirdparty\imgui</Filter>
-    </ClInclude>
     <ClInclude Include="Source\ShaderTable.h">
       <Filter>Source</Filter>
     </ClInclude>
@@ -159,20 +144,26 @@
     <ClInclude Include="Source\DDGI.h">
       <Filter>Source</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Thirdparty\imgui\imgui_internal.h">
+      <Filter>Source\Thirdparty\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Thirdparty\imgui\imstb_rectpack.h">
+      <Filter>Source\Thirdparty\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Thirdparty\imgui\imstb_textedit.h">
+      <Filter>Source\Thirdparty\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Thirdparty\imgui\imstb_truetype.h">
+      <Filter>Source\Thirdparty\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Thirdparty\imgui\imconfig.h">
+      <Filter>Source\Thirdparty\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Thirdparty\imgui\imgui.h">
+      <Filter>Source\Thirdparty\imgui</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Source\Thirdparty\imgui\imgui_widgets.cpp">
-      <Filter>Source\Thirdparty\imgui</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Thirdparty\imgui\imgui.cpp">
-      <Filter>Source\Thirdparty\imgui</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Thirdparty\imgui\imgui_demo.cpp">
-      <Filter>Source\Thirdparty\imgui</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Thirdparty\imgui\imgui_draw.cpp">
-      <Filter>Source\Thirdparty\imgui</Filter>
-    </ClCompile>
     <ClCompile Include="Source\DXRPlayground.cpp">
       <Filter>Source</Filter>
     </ClCompile>
@@ -211,6 +202,21 @@
     </ClCompile>
     <ClCompile Include="Source\DDGI.cpp">
       <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Thirdparty\imgui\imgui_tables.cpp">
+      <Filter>Source\Thirdparty\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Thirdparty\imgui\imgui_widgets.cpp">
+      <Filter>Source\Thirdparty\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Thirdparty\imgui\imgui.cpp">
+      <Filter>Source\Thirdparty\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Thirdparty\imgui\imgui_demo.cpp">
+      <Filter>Source\Thirdparty\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Thirdparty\imgui\imgui_draw.cpp">
+      <Filter>Source\Thirdparty\imgui</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
