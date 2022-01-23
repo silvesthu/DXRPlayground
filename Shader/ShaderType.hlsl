@@ -13,7 +13,7 @@ struct PerFrame
 
 	uint					mOutputLuminance		CONSTANT_DEFAULT(0);
 	float					mEV100					CONSTANT_DEFAULT(16.0f);
-	TonemapMode				mTonemapMode			CONSTANT_DEFAULT(TonemapMode::knarkowicz);
+	ToneMappingMode			mToneMappingMode		CONSTANT_DEFAULT(ToneMappingMode::Knarkowicz);
 	float					_0						CONSTANT_DEFAULT(0.0f);
 	
 	float					mPadding				CONSTANT_DEFAULT(0);

@@ -169,20 +169,20 @@ void PrecomputedAtmosphereScattering::Compute()
 
 void PrecomputedAtmosphereScattering::Validate()
 {
-	auto validate = [](Texture& computed, Texture& expected)
+	auto validate = [](const Texture& inComputed, const Texture& inExpected)
 	{
-		BarrierScope computed_scope(gCommandList, computed.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		BarrierScope expected_scope(gCommandList, expected.mIntermediateResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		BarrierScope output_scope(gCommandList, expected.mResource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		BarrierScope computed_scope(gCommandList, inComputed.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		BarrierScope expected_scope(gCommandList, inExpected.mIntermediateResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		BarrierScope output_scope(gCommandList, inExpected.mResource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
-		Shader& shader = expected.mDepth == 1 ? gDiffTexture2DShader : gDiffTexture3DShader;
+		Shader& shader = inExpected.mDepth == 1 ? gDiffTexture2DShader : gDiffTexture3DShader;
 		shader.SetupCompute(gUniversalHeap.Get(), false);
 
-		gCommandList->SetComputeRoot32BitConstant(0, computed.mResourceHeapIndex, 0);
-		gCommandList->SetComputeRoot32BitConstant(0, expected.mIntermediateResourceHeapIndex, 1);
-		gCommandList->SetComputeRoot32BitConstant(0, expected.mResourceHeapIndex, 2);
+		gCommandList->SetComputeRoot32BitConstant(0, inComputed.mResourceHeapIndex, 0);
+		gCommandList->SetComputeRoot32BitConstant(0, inExpected.mIntermediateResourceHeapIndex, 1);
+		gCommandList->SetComputeRoot32BitConstant(0, inExpected.mResourceHeapIndex, 2);
 
-		gCommandList->Dispatch((expected.mWidth + 7) / 8, (expected.mHeight + 7) / 8, expected.mDepth);
+		gCommandList->Dispatch((inExpected.mWidth + 7) / 8, (inExpected.mHeight + 7) / 8, inExpected.mDepth);
 	};
 
 	validate(
@@ -227,7 +227,7 @@ void PrecomputedAtmosphereScattering::Initialize()
 {
 	// Buffer
 	{
-		D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(gAlignUp((UINT)sizeof(ShaderType::Atmosphere), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
+		D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(gAlignUp(static_cast<UINT>(sizeof(ShaderType::Atmosphere)), static_cast<UINT>(D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT)));
 		D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
 
 		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gPrecomputedAtmosphereScatteringResources.mConstantUploadBuffer)));
@@ -281,9 +281,9 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 
 	if (ImGui::TreeNodeEx("Mode", ImGuiTreeNodeFlags_DefaultOpen))
 	{
-		for (int i = 0; i < (int)AtmosphereMode::Count; i++)
+		for (int i = 0; i < static_cast<int>(AtmosphereMode::Count); i++)
 		{
-			const auto& name = nameof::nameof_enum((AtmosphereMode)i);
+			const auto& name = nameof::nameof_enum(static_cast<AtmosphereMode>(i));
 			if (name[0] == '_')
 			{
 				ImGui::NewLine();
@@ -293,8 +293,8 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 			if (i != 0)
 				ImGui::SameLine();
 
-			if (ImGui::RadioButton(name.data(), (int)gAtmosphereProfile.mMode == i))
-				gAtmosphereProfile.mMode = (AtmosphereMode)i;
+			if (ImGui::RadioButton(name.data(), static_cast<int>(gAtmosphereProfile.mMode) == i))
+				gAtmosphereProfile.mMode = static_cast<AtmosphereMode>(i);
 		}
 
 		{
@@ -312,12 +312,12 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 
 		if (gAtmosphereProfile.mMode == AtmosphereMode::ConstantColor)
 		{
-			ImGui::ColorEdit3("Color", (float*)&gAtmosphereProfile.mConstantColor, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
+			ImGui::ColorEdit3("Color", reinterpret_cast<float*>(&gAtmosphereProfile.mConstantColor), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
 		}
 
 		if (gAtmosphereProfile.mMode == AtmosphereMode::Bruneton17)
 		{
-			ImGui::SliderInt("Scattering Order", (int*)&gAtmosphereProfile.mScatteringOrder, 1, 8);
+			ImGui::SliderInt("Scattering Order", reinterpret_cast<int*>(&gAtmosphereProfile.mScatteringOrder), 1, 8);
 			ImGui::Checkbox("Recompute Every Frame", &mRecomputeEveryFrame);
 		}
 
@@ -390,10 +390,10 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 			int mCount = 100;
 			ShaderType::DensityProfile* mProfile = nullptr;
 
-			static float Func(void* data, int index)
+			static float Func(void* inData, int inIndex)
 			{
-				DensityPlot& plot = *(DensityPlot*)data;
-				float altitude = (index * 1.0f / (plot.mCount - 1)) * (plot.mMax - plot.mMin) + plot.mMin;
+				DensityPlot& plot = *static_cast<DensityPlot*>(inData);
+				float altitude = (inIndex * 1.0f / (plot.mCount - 1)) * (plot.mMax - plot.mMin) + plot.mMin;
 				ShaderType::DensityProfileLayer& layer = altitude < plot.mProfile->mLayer0.mWidth ? plot.mProfile->mLayer0 : plot.mProfile->mLayer1;
 
 				// Also in ShaderType.hlsl
@@ -531,15 +531,19 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 		if (gAtmosphereProfile.mMode == AtmosphereMode::Bruneton17)
 		{
 			ImGui::Text(nameof::nameof_enum_type<AtmosphereMuSEncodingMode>().data());
-			for (int i = 0; i < (int)AtmosphereMuSEncodingMode::Count; i++)
+			for (int i = 0; i < static_cast<int>(AtmosphereMuSEncodingMode::Count); i++)
 			{
-				const auto& name = nameof::nameof_enum((AtmosphereMuSEncodingMode)i);
+				const auto& name = nameof::nameof_enum(static_cast<AtmosphereMuSEncodingMode>(i));
 				if (i != 0)
 					ImGui::SameLine();
 
-				if (ImGui::RadioButton(name.data(), (int)gAtmosphereProfile.mMuSEncodingMode == i))
-					gAtmosphereProfile.mMuSEncodingMode = (AtmosphereMuSEncodingMode)i;
+				if (ImGui::RadioButton(name.data(), static_cast<int>(gAtmosphereProfile.mMuSEncodingMode) == i))
+					gAtmosphereProfile.mMuSEncodingMode = static_cast<AtmosphereMuSEncodingMode>(i);
 			}
+		}
+		else
+		{
+			ImGui::Text("N/A");
 		}
 
 		ImGui::TreePop();

@@ -215,11 +215,10 @@ enum class DebugInstanceMode : glm::uint32
 	Count
 };
 
-enum class TonemapMode : glm::uint32
+enum class ToneMappingMode : glm::uint32
 {
 	Passthrough,
-
-	knarkowicz,
+	Knarkowicz,
 
 	Count
 };

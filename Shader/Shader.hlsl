@@ -155,7 +155,7 @@ StructuredBuffer<float3> Normals : register(t4, space0);
 #define DEBUG_PIXEL_RADIUS (3)
 
 // https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
-float3 Tonemap_knarkowicz(float3 x)
+float3 ToneMapping_ACES_Knarkowicz(float3 x)
 {
 	float a = 2.51f;
 	float b = 0.03f;
@@ -187,22 +187,24 @@ float3 LuminanceToColor(float3 luminance)
 		// https://docs.unrealengine.com/en-US/RenderingAndGraphics/PostProcessEffects/ColorGrading/index.html
 	}
 
-	float3 tonemapped_color = 0;
-	// Tonemap
+	float3 tone_mapped_color = 0;
+	// Tone Mapping
 	{
-		switch (mPerFrame.mTonemapMode)
+		switch (mPerFrame.mToneMappingMode)
 		{
 		default:
-		case TonemapMode_Passthrough: tonemapped_color = normalized_luminance; break;
-		case TonemapMode_knarkowicz: tonemapped_color = Tonemap_knarkowicz(normalized_luminance); break;
-		}
+		case ToneMappingMode_Passthrough: tone_mapped_color = normalized_luminance; break;
+            case ToneMappingMode_Knarkowicz:
+                tone_mapped_color = ToneMapping_ACES_Knarkowicz(normalized_luminance);
+                break;
+        }
 
 		// [Reference]
 		// https://github.com/ampas/aces-dev
 		// https://docs.unrealengine.com/en-US/RenderingAndGraphics/PostProcessEffects/ColorGrading/index.html
 	}
 
-	return tonemapped_color;
+	return tone_mapped_color;
 }
 
 // Adapters
@@ -323,13 +325,21 @@ void GetSkyRadiance(out float3 sky_radiance, out float3 transmittance_to_top)
 // Aerial Perspective
 void GetSkyRadianceToPoint(out float3 sky_radiance, out float3 transmittance)
 {
-	// [TODO] Occlusion?
+    switch (mAtmosphere.mMode)
+    {
+    case AtmosphereMode_Bruneton17:
+        break;
+    default:
+        return;
+    }
 
 	sky_radiance = 0;
 	transmittance = 1;
 
 	if (mAtmosphere.mAerialPerspective == 0)
 		return;
+
+	// [TODO] Occlusion?
 
 	float3 hit_position = RayHitPosition() - PlanetCenter();
 	float3 camera = RayOrigin() - PlanetCenter();

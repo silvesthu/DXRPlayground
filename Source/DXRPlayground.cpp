@@ -250,12 +250,12 @@ static void sUpdate()
 				ImGui::SameLine();
 				ImGui::Text("EV100 = %.2f", gPerFrameConstantBuffer.mEV100);
 
-				ImGui::Text("Tonemap");
-				for (int i = 0; i < (int)TonemapMode::Count; i++)
+				ImGui::Text("ToneMappingMode");
+				for (int i = 0; i < static_cast<int>(ToneMappingMode::Count); i++)
 				{
-					const auto& name = nameof::nameof_enum((TonemapMode)i);
+					const auto& name = nameof::nameof_enum(static_cast<ToneMappingMode>(i));
 					ImGui::SameLine();
-					ImGui::RadioButton(name.data(), (int*)&gPerFrameConstantBuffer.mTonemapMode, i);
+					ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gPerFrameConstantBuffer.mToneMappingMode), i);
 				}
 
 				ImGui::TreePop();
@@ -264,17 +264,17 @@ static void sUpdate()
 			if (ImGui::TreeNodeEx("Render"))
 			{
 				ImGui::Text("Recursion Mode");
-				for (int i = 0; i < (int)RecursionMode::Count; i++)
+				for (int i = 0; i < static_cast<int>(RecursionMode::Count); i++)
 				{
-					const auto& name = nameof::nameof_enum((RecursionMode)i);
+					const auto& name = nameof::nameof_enum(static_cast<RecursionMode>(i));
 					ImGui::SameLine();
-					ImGui::RadioButton(name.data(), (int*)&gPerFrameConstantBuffer.mRecursionMode, i);
+					ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gPerFrameConstantBuffer.mRecursionMode), i);
 				}
-				ImGui::SliderInt("Recursion Count Max", (int*)&gPerFrameConstantBuffer.mRecursionCountMax, 0, 8);
+				ImGui::SliderInt("Recursion Count Max", reinterpret_cast<int*>(&gPerFrameConstantBuffer.mRecursionCountMax), 0, 8);
 
-				for (int i = 0; i < (int)DebugMode::Count; i++)
+				for (int i = 0; i < static_cast<int>(DebugMode::Count); i++)
 				{
-					const auto& name = nameof::nameof_enum((DebugMode)i);
+					const auto& name = nameof::nameof_enum(static_cast<DebugMode>(i));
 					if (name[0] == '_')
 					{
 						ImGui::NewLine();
@@ -284,7 +284,7 @@ static void sUpdate()
 					if (i != 0)
 						ImGui::SameLine();
 
-					ImGui::RadioButton(name.data(), (int*)&gPerFrameConstantBuffer.mDebugMode, i);
+					ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gPerFrameConstantBuffer.mDebugMode), i);
 				}
 
 				ImGui::TreePop();
@@ -292,9 +292,9 @@ static void sUpdate()
 
 			if (ImGui::TreeNodeEx("Instance"))
 			{
-				for (int i = 0; i < (int)DebugInstanceMode::Count; i++)
+				for (int i = 0; i < static_cast<int>(DebugInstanceMode::Count); i++)
 				{
-					const auto& name = nameof::nameof_enum((DebugInstanceMode)i);
+					const auto& name = nameof::nameof_enum(static_cast<DebugInstanceMode>(i));
 					if (name[0] == '_')
 					{
 						ImGui::NewLine();
@@ -304,10 +304,10 @@ static void sUpdate()
 					if (i != 0)
 						ImGui::SameLine();
 
-					ImGui::RadioButton(name.data(), (int*)&gPerFrameConstantBuffer.mDebugInstanceMode, i);
+					ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gPerFrameConstantBuffer.mDebugInstanceMode), i);
 				}
 
-				ImGui::SliderInt("DebugInstanceIndex", (int*)&gPerFrameConstantBuffer.mDebugInstanceIndex, 0u, gScene.GetInstanceCount() - 1);
+				ImGui::SliderInt("DebugInstanceIndex", reinterpret_cast<int*>(&gPerFrameConstantBuffer.mDebugInstanceIndex), 0u, gScene.GetInstanceCount() - 1);
 				gPerFrameConstantBuffer.mDebugInstanceIndex = glm::clamp(gPerFrameConstantBuffer.mDebugInstanceIndex, 0u, gScene.GetInstanceCount() - 1);
 
 				ImGui::TreePop();
@@ -315,10 +315,10 @@ static void sUpdate()
 
 			if (ImGui::TreeNodeEx("Scene"))
 			{
-				for (int i = 0; i < (int)ScenePresetType::COUNT; i++)
+				for (int i = 0; i < static_cast<int>(ScenePresetType::COUNT); i++)
 				{
 					if (kScenePresets[i].mPath == nullptr || std::filesystem::exists(kScenePresets[i].mPath))
-						ImGui::RadioButton(kScenePresets[i].mName, (int*)&sCurrentScene, i);
+						ImGui::RadioButton(kScenePresets[i].mName, reinterpret_cast<int*>(&sCurrentScene), i);
 				}
 
 				ImGui::TreePop();
@@ -346,9 +346,9 @@ static void sUpdate()
 			{
 				ImGui::Checkbox("Vsync", &gDisplaySettings.mVsync);
 
-				auto resize = [](int width, int height)
+				auto resize = [](int inWidth, int inHeight)
 				{
-					RECT rect = { 0, 0, width, height };
+					RECT rect = { 0, 0, inWidth, inHeight };
 					AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, false);
 					::SetWindowPos(::GetActiveWindow(), NULL, 0, 0, rect.right - rect.left, rect.bottom - rect.top, SWP_NOMOVE | SWP_NOOWNERZORDER | SWP_NOZORDER);
 				};

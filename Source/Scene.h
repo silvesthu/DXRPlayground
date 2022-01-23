@@ -29,9 +29,7 @@ using PrimitiveRef = std::shared_ptr<Primitive>;
 class BLAS final
 {
 public:
-	BLAS(PrimitiveRef inPrimitive, std::wstring inName) :
-		mPrimitive(inPrimitive), mName(inName) {}
-	~BLAS() {}
+	BLAS(PrimitiveRef inPrimitive, const std::wstring& inName) : mPrimitive(inPrimitive), mName(inName) {}
 
 	void Initialize(D3D12_GPU_VIRTUAL_ADDRESS inVertexBaseAddress, D3D12_GPU_VIRTUAL_ADDRESS inIndexBaseAddress);
 	void Build(ID3D12GraphicsCommandList4* inCommandList);
@@ -41,8 +39,8 @@ public:
 private:
 	PrimitiveRef mPrimitive;
 
-	D3D12_RAYTRACING_GEOMETRY_DESC mDesc;
-	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS mInputs = {};
+	D3D12_RAYTRACING_GEOMETRY_DESC mDesc{};
+	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS mInputs{};
 
 	ComPtr<ID3D12Resource> mScratch = nullptr;
 	ComPtr<ID3D12Resource> mDest = nullptr;
@@ -56,7 +54,7 @@ using BLASRef = std::shared_ptr<BLAS>;
 class ObjectInstance
 {
 public:
-	ObjectInstance(BLASRef& inBLAS, const glm::mat4& inTransform, glm::uint32 inHitGroupIndex)
+	ObjectInstance(const BLASRef& inBLAS, const glm::mat4& inTransform, glm::uint32 inHitGroupIndex)
 		: mBLAS(inBLAS)
 		, mTransform(inTransform)
 		, mHitGroupIndex(inHitGroupIndex)
@@ -84,15 +82,14 @@ using ObjectInstanceRef = std::shared_ptr<ObjectInstance>;
 class TLAS final
 {
 public:
-	TLAS(std::wstring inName) { mName = inName; }
-	~TLAS() {}
+	explicit TLAS(const std::wstring& inName) : mName(inName) {}
 
 	void Initialize(std::vector<ObjectInstanceRef>&& inObjectInstances);
 
 	void Update(ID3D12GraphicsCommandList4* inCommandList);
 	void Build(ID3D12GraphicsCommandList4* inCommandList);
 
-	glm::uint32 GetInstanceCount() const { return (glm::uint32)mObjectInstances.size(); }
+	glm::uint32 GetInstanceCount() const					{ return static_cast<glm::uint32>(mObjectInstances.size()); }
 
 	ID3D12Resource* GetResource() const						{ return mDest.Get(); }
 	D3D12_GPU_VIRTUAL_ADDRESS GetGPUVirtualAddress() const	{ return mDest->GetGPUVirtualAddress(); }
@@ -102,9 +99,9 @@ private:
 	void BuildInternal(ID3D12GraphicsCommandList4* inCommandList, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS inFlags);
 	void UpdateObjectInstances();
 
-	std::vector<ObjectInstanceRef> mObjectInstances;
+	std::vector<ObjectInstanceRef> mObjectInstances {};
 
-	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS mInputs = {};
+	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS mInputs {};
 
 	ComPtr<ID3D12Resource> mScratch = nullptr;
 	ComPtr<ID3D12Resource> mDest = nullptr;
@@ -124,6 +121,7 @@ public:
 	using IndexType = glm::uint32;
 	using VertexType = glm::vec3;
 	using NormalType = glm::vec3;
+	using UVType = glm::vec2;
 
 	void Load(const char* inFilename, const glm::mat4x4& inTransform);
 	void Unload();
@@ -148,6 +146,7 @@ private:
 	ComPtr<ID3D12Resource>			mIndexBuffer = nullptr;
 	ComPtr<ID3D12Resource>			mVertexBuffer = nullptr;	
 	ComPtr<ID3D12Resource>			mNormalBuffer = nullptr;
+	ComPtr<ID3D12Resource>			mUVBuffer = nullptr;
 
 	ComPtr<ID3D12Resource>			mOutputResource = nullptr;
 

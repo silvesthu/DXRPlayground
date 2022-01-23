@@ -479,7 +479,7 @@ void gCreatePipelineState()
 		sWriteEnum<RecursionMode>(enum_file);
 		sWriteEnum<DebugMode>(enum_file);
 		sWriteEnum<DebugInstanceMode>(enum_file);
-		sWriteEnum<TonemapMode>(enum_file);
+		sWriteEnum<ToneMappingMode>(enum_file);
 		sWriteEnum<AtmosphereMode>(enum_file);
 		sWriteEnum<AtmosphereMuSEncodingMode>(enum_file);
 		sWriteEnum<CloudMode>(enum_file);
