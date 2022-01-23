@@ -14,7 +14,7 @@ static IDxcBlob* sCompileShader(const char* inFilename, const char* inSource, gl
 	{
 		HMODULE dll = LoadLibraryW(L"dxcompiler.dll");
 		assert(dll != nullptr);
-		DxcCreateInstance = (DxcCreateInstanceProc)GetProcAddress(dll, "DxcCreateInstance");
+		DxcCreateInstance = reinterpret_cast<DxcCreateInstanceProc>(GetProcAddress(dll, "DxcCreateInstance"));
 	}
 
 	// See https://simoncoenen.com/blog/programming/graphics/DxcRevised.html
@@ -55,18 +55,20 @@ static IDxcBlob* sCompileShader(const char* inFilename, const char* inSource, gl
 	defines.push_back(dxc_define_entry_point);
 
 	std::vector<LPCWSTR> arguments;
-	arguments.push_back(DXC_ARG_DEBUG); //-Zi
-	arguments.push_back(DXC_ARG_WARNINGS_ARE_ERRORS); //-WX
-	
+	arguments.push_back(DXC_ARG_DEBUG);						// -Zi
+	arguments.push_back(DXC_ARG_WARNINGS_ARE_ERRORS);		// -WX
+	arguments.push_back(DXC_ARG_ALL_RESOURCES_BOUND);		// -all_resources_bound
+	arguments.push_back(L"-Qembed_debug");					// -Qembed_debug
+
 	IDxcOperationResult* operation_result;
 	if (FAILED(compiler->Compile(
-		blob_encoding,								// program text
-		wfilename.c_str(),							// file name, mostly for error messages
-		inEntryPoint,								// entry point function
-		inProfile,									// target profile
-		arguments.data(), (UINT32)arguments.size(),	// compilation arguments and their count
-		defines.data(), (UINT32)defines.size(),		// name/value defines and their count
-		include_handler.Get(),						// handler for #include directives
+		blob_encoding,												// program text
+		wfilename.c_str(),											// file name, mostly for error messages
+		inEntryPoint,												// entry point function
+		inProfile,													// target profile
+		arguments.data(), static_cast<UINT32>(arguments.size()),	// compilation arguments and their count
+		defines.data(), static_cast<UINT32>(defines.size()),		// name/value defines and their count
+		include_handler.Get(),										// handler for #include directives
 		&operation_result)))
 		assert(false);
 
@@ -80,7 +82,7 @@ static IDxcBlob* sCompileShader(const char* inFilename, const char* inSource, gl
 		gValidate(operation_result->GetErrorBuffer(&blob));
 		// We can use the library to get our preferred encoding.
 		gValidate(utils->GetBlobAsUtf8(blob, &blob_8));
-		std::string str((LPCSTR)blob_8->GetBufferPointer(), (int)blob_8->GetBufferSize());
+		std::string str(static_cast<LPCSTR>(blob_8->GetBufferPointer()), blob_8->GetBufferSize());
 		str += '\n';
 		gDebugPrint(str.c_str());
 		blob->Release();
@@ -178,7 +180,7 @@ void GenerateGlobalRootSignatureDescriptor(RootSignatureDescriptor& outDesc)
 	// Table
 	D3D12_ROOT_PARAMETER root_parameter = {};
 	root_parameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	root_parameter.DescriptorTable.NumDescriptorRanges = (UINT)outDesc.mDescriptorRanges.size();
+	root_parameter.DescriptorTable.NumDescriptorRanges = static_cast<UINT>(outDesc.mDescriptorRanges.size());
 	root_parameter.DescriptorTable.pDescriptorRanges = outDesc.mDescriptorRanges.data();
 	outDesc.mRootParameters.push_back(root_parameter);
 
@@ -207,9 +209,9 @@ void GenerateGlobalRootSignatureDescriptor(RootSignatureDescriptor& outDesc)
 	outDesc.mStaticSamplerDescs.push_back(sampler);
 
 	// Descriptor to table
-	outDesc.mDesc.NumParameters = (UINT)outDesc.mRootParameters.size();
+	outDesc.mDesc.NumParameters = static_cast<UINT>(outDesc.mRootParameters.size());
 	outDesc.mDesc.pParameters = outDesc.mRootParameters.data();
-	outDesc.mDesc.NumStaticSamplers = (UINT)outDesc.mStaticSamplerDescs.size();
+	outDesc.mDesc.NumStaticSamplers = static_cast<UINT>(outDesc.mStaticSamplerDescs.size());
 	outDesc.mDesc.pStaticSamplers = outDesc.mStaticSamplerDescs.data();
 	outDesc.mDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
 }
@@ -233,12 +235,12 @@ ComPtr<ID3D12RootSignature> CreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC 
 }
 
 // Hold data for D3D12_STATE_SUBOBJECT
-template <typename DescType, D3D12_STATE_SUBOBJECT_TYPE SubObjecType>
+template <typename DescType, D3D12_STATE_SUBOBJECT_TYPE SubObjectType>
 struct StateSubobjectHolder
 {
 	StateSubobjectHolder()
 	{
-		mStateSubobject.Type = SubObjecType;
+		mStateSubobject.Type = SubObjectType;
 		mStateSubobject.pDesc = &mDesc;
 	}
 
@@ -352,7 +354,7 @@ static void sWriteEnum(std::ofstream& ioEnumFile, T* inCurrentValue = nullptr)
 	ioEnumFile << "// enum " << nameof::nameof_enum_type<T>().data() << "\n";
 	ioEnumFile << "typedef uint " << nameof::nameof_enum_type<T>().data() << ";\n";
 
-	for (int i = 0; i < (int)T::Count; i++)
+	for (int i = 0; i < static_cast<int>(T::Count); i++)
 	{
 		const auto& name = nameof::nameof_enum((T)i);
 		if (name[0] == '_')
@@ -417,9 +419,9 @@ bool sCreateVSPSPipelineState(const char* inShaderFileName, std::stringstream& i
 	return true;
 }
 
-bool sCreateCSPipelineState(const char* inShaderFileName, std::stringstream& inShaderStream, const wchar_t* inCSName, Shader& ioSystemShader)
+bool sCreateCSPipelineState(const char* inShaderFileName, const std::stringstream& inShaderStream, const wchar_t* inCSName, Shader& ioSystemShader)
 {
-	IDxcBlob* cs_blob = sCompileShader(inShaderFileName, inShaderStream.str().c_str(), (glm::uint32)inShaderStream.str().length(), inCSName, L"cs_6_6");
+	IDxcBlob* cs_blob = sCompileShader(inShaderFileName, inShaderStream.str().c_str(), static_cast<glm::uint32>(inShaderStream.str().length()), inCSName, L"cs_6_6");
 	if (cs_blob == nullptr)
 		return false;
 
@@ -494,7 +496,7 @@ void gCreatePipelineState()
 	
 	// Create lib shaders
 	const wchar_t* entry_points[] = { kDefaultRayGenerationShader, kDefaultMissShader, kDefaultClosestHitShader, kShadowMissShader, kShadowClosestHitShader };
-	IDxcBlob* blob = sCompileShader(shader_filename, shader_stream.str().c_str(), (glm::uint32)shader_stream.str().length(), L"", L"lib_6_5");
+	IDxcBlob* blob = sCompileShader(shader_filename, shader_stream.str().c_str(), static_cast<glm::uint32>(shader_stream.str().length()), L"", L"lib_6_5");
 	if (blob == nullptr)
 	{
 		if (startup)
@@ -545,8 +547,8 @@ void gCreatePipelineState()
 	//  sizeof(Payload), fully customized
 	ShaderConfig shader_config(sizeof(float) * 2, (glm::uint32)std::max(sizeof(ShaderType::RayPayload), sizeof(ShaderType::ShadowPayload)));
 	subobjects[index++] = shader_config.mStateSubobject;
-	SubobjectToExportsAssociation shader_configassociation(entry_points, ARRAYSIZE(entry_points), &(subobjects[index - 1]));
-	subobjects[index++] = shader_configassociation.mStateSubobject;
+	SubobjectToExportsAssociation shader_config_association(entry_points, ARRAYSIZE(entry_points), &(subobjects[index - 1]));
+	subobjects[index++] = shader_config_association.mStateSubobject;
 
 	// Pipeline config
 	//  MaxTraceRecursionDepth

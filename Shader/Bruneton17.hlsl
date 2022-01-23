@@ -994,3 +994,189 @@ void ComputeMultipleScatteringCS(
 	// (1.32227, 2.15625, 2.65234, 0.35205) at [95, 127] 4-order scattering
 	// (1.32227, 2.16016, 2.65625, 0.35205) at [95, 127] 4-order scattering from [Bruneton17] RenderDoc capture
 }
+
+//////////////////////////////////////////////////////////////////////////////////
+
+namespace AtmosphereIntegration { namespace Bruneton17 {
+
+float3 GetExtrapolatedSingleMieScattering(float4 scattering)
+{
+	// Algebraically this can never be negative, but rounding errors can produce
+	// that effect for sufficiently short view rays.
+	if (scattering.r <= 0.0)
+		return 0.0;
+
+	return scattering.rgb * scattering.a / scattering.r * (mAtmosphere.mRayleighScattering.r / mAtmosphere.mMieScattering.r) * (mAtmosphere.mMieScattering / mAtmosphere.mRayleighScattering);
+}
+
+void GetCombinedScattering(float r, float mu, float mu_s, float nu, bool ray_r_mu_intersects_ground, out float3 rayleigh_scattering, out float3 single_mie_scattering)
+{
+	float4 scattering = GetScattering(ScatteringSRV, r, mu, mu_s, nu, ray_r_mu_intersects_ground);
+	float3 solar_irradiance = mAtmosphere.mPrecomputeWithSolarIrradiance ? 1.0 : mAtmosphere.mSolarIrradiance;
+
+	single_mie_scattering = GetExtrapolatedSingleMieScattering(scattering) * solar_irradiance;
+	rayleigh_scattering = scattering.xyz * solar_irradiance;
+}
+
+void GetSkyRadiance(out float3 outSkyRadiance, out float3 outTransmittanceToTop)
+{
+	outSkyRadiance = 0;
+	outTransmittanceToTop = 1;
+
+	float3 camera = PlanetRayOrigin() - PlanetCenter();
+	float3 view_ray = PlanetRayDirection();
+	float3 sun_direction = GetSunDirection();
+
+	float r = length(camera);
+	float rmu = dot(camera, view_ray);
+	float distance_to_top_atmosphere_boundary = -rmu - sqrt(rmu * rmu - r * r + mAtmosphere.mTopRadius * mAtmosphere.mTopRadius);
+
+	if (distance_to_top_atmosphere_boundary > 0.0) 
+	{
+		// Outer space
+
+		// Move camera to top of atmosphere along view direction
+		camera = camera + view_ray * distance_to_top_atmosphere_boundary;
+		r = mAtmosphere.mTopRadius;
+		rmu += distance_to_top_atmosphere_boundary;
+	}
+	else if (r > mAtmosphere.mTopRadius) 
+	{
+		// No hit
+		return;
+	}
+
+	float mu = rmu / r;
+	float mu_s = dot(camera, sun_direction) / r;
+	float nu = dot(view_ray, sun_direction);
+	bool ray_r_mu_intersects_ground = RayIntersectsGround(r, mu);
+
+	// override
+	{
+		//r = 6360;
+		//mu = 0.0;
+		//mu_s = 0.0;
+		//nu = 0.0;
+		//ray_r_mu_intersects_ground = false;
+	}
+
+	outTransmittanceToTop = ray_r_mu_intersects_ground ? 0 : GetTransmittanceToTopAtmosphereBoundary(r, mu);
+
+	// [TODO] shadow
+	float3 rayleigh_scattering;
+	float3 single_mie_scattering;
+	GetCombinedScattering(r, mu, mu_s, nu, ray_r_mu_intersects_ground, rayleigh_scattering, single_mie_scattering);
+
+	// [TODO] light shafts
+
+	outSkyRadiance = rayleigh_scattering * RayleighPhaseFunction(nu) + single_mie_scattering * MiePhaseFunction(mAtmosphere.mMiePhaseFunctionG, nu);
+
+	// override
+	{
+		//outSkyRadiance = float3(1.1, 1.2, 1.3);
+		//float3 uvw0, uvw1;
+		//float s;
+		//Encode4D(float4(r, mu, mu_s, nu), ray_r_mu_intersects_ground, ScatteringSRV, uvw0, uvw1, s);
+		//rayleigh_scattering = uvw0;
+		//rayleigh_scattering = ScatteringSRV.SampleLevel(BilinearSampler, uvw0, 0);
+	}
+}
+
+void GetSkyRadianceToPoint(out float3 outSkyRadiance, out float3 outTransmittance)
+{
+	outSkyRadiance = 0;
+	outTransmittance = 1;
+
+	float3 hit_position = PlanetRayHitPosition() - PlanetCenter();
+	float3 camera = PlanetRayOrigin() - PlanetCenter();
+	float3 sun_direction = GetSunDirection();
+
+	float3 view_ray = PlanetRayDirection();
+	float r = length(camera);
+	float rmu = dot(camera, view_ray);
+	float distance_to_top_atmosphere_boundary = -rmu - sqrt(rmu * rmu - r * r + mAtmosphere.mTopRadius * mAtmosphere.mTopRadius);
+
+	// If the viewer is in space and the view ray intersects the atmosphere, move
+	// the viewer to the top atmosphere boundary (along the view ray):
+	if (distance_to_top_atmosphere_boundary > 0.0)
+	{
+		// Outer space
+
+		// Move camera to top of atmosphere along view direction
+		camera = camera + view_ray * distance_to_top_atmosphere_boundary;
+		r = mAtmosphere.mTopRadius;
+		rmu += distance_to_top_atmosphere_boundary;
+	}
+	else if (r > mAtmosphere.mTopRadius)
+	{
+		// No hit
+		return;
+	}
+
+	// Compute the r, mu, mu_s and nu parameters for the first texture lookup.
+	float mu = rmu / r;
+	float mu_s = dot(camera, sun_direction) / r;
+	float nu = dot(view_ray, sun_direction);
+	float d = length(hit_position - camera);
+	bool ray_r_mu_intersects_ground = RayIntersectsGround(r, mu);
+
+	outTransmittance = GetTransmittance(r, mu, d, ray_r_mu_intersects_ground);
+
+	float3 rayleigh_scattering;
+	float3 single_mie_scattering;
+	GetCombinedScattering(r, mu, mu_s, nu, ray_r_mu_intersects_ground, rayleigh_scattering, single_mie_scattering);
+
+	// [TODO] shadow
+	float shadow_length = 0;
+
+	// Compute the r, mu, mu_s and nu parameters for the second texture lookup.
+	// If shadow_length is not 0 (case of light shafts), we want to ignore the
+	// rayleigh_scattering along the last shadow_length meters of the view ray, which we
+	// do by subtracting shadow_length from d (this way rayleigh_scattering_p is equal to
+	// the S|x_s=x_0-lv term in Eq. (17) of our paper).
+	d = max(d - shadow_length, 0.0);
+	float r_p = ClampRadius(sqrt(d * d + 2.0 * r * mu * d + r * r));
+	float mu_p = (r * mu + d) / r_p;
+	float mu_s_p = (r * mu_s + d * nu) / r_p;
+	float3 rayleigh_scattering_p = 0;
+	float3 single_mie_scattering_p = 0;
+
+	// [TODO] artifact near horizon
+	GetCombinedScattering(r_p, mu_p, mu_s_p, nu, ray_r_mu_intersects_ground, rayleigh_scattering_p, single_mie_scattering_p);
+
+	// Combine the lookup results to get the scattering between camera and point.
+	float3 shadow_transmittance = outTransmittance;
+	if (shadow_length > 0.0)
+	{
+		// This is the T(x,x_s) term in Eq. (17) of our paper, for light shafts.
+		shadow_transmittance = GetTransmittance(r, mu, d, ray_r_mu_intersects_ground);
+	}
+
+	rayleigh_scattering = rayleigh_scattering - shadow_transmittance * rayleigh_scattering_p;
+	single_mie_scattering = single_mie_scattering - shadow_transmittance * single_mie_scattering_p;
+
+	single_mie_scattering = GetExtrapolatedSingleMieScattering(float4(rayleigh_scattering.rgb, single_mie_scattering.r));
+
+	// Hack to avoid rendering artifacts when the sun is below the horizon.
+	single_mie_scattering = single_mie_scattering * smoothstep(float(0.0), float(0.01), mu_s);
+
+	outSkyRadiance = rayleigh_scattering* RayleighPhaseFunction(nu) + single_mie_scattering * MiePhaseFunction(mAtmosphere.mMiePhaseFunctionG, nu);
+}
+
+void GetSunAndSkyIrradiance(float3 inHitPosition, float3 inNormal, out float3 outSunIrradiance, out float3 outSkyIrradiance)
+{
+	float3 local_position = inHitPosition - PlanetCenter();
+	float3 sun_direction = GetSunDirection();
+
+	float r = length(local_position);
+	float mu_s = dot(local_position, sun_direction) / r;
+
+	// Indirect irradiance from sky (approximated if the surface is not horizontal).
+	float3 solar_irradiance = mAtmosphere.mPrecomputeWithSolarIrradiance ? 1.0 : mAtmosphere.mSolarIrradiance;
+	outSkyIrradiance = solar_irradiance * GetIrradiance(r, mu_s) * (1.0 + dot(inNormal, local_position) / r) * 0.5;
+
+	// Direct irradiance from sun
+	outSunIrradiance = mAtmosphere.mSolarIrradiance * GetTransmittanceToSun(r, mu_s) * max(dot(inNormal, sun_direction), 0.0);
+}
+
+}} // namespace AtmosphereIntegration { namespace Bruneton17 {

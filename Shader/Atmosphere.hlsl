@@ -1,8 +1,3 @@
-cbuffer AtmosphereBuffer : register(b0, space2)
-{
-	Atmosphere mAtmosphere;
-}
-
 cbuffer AtmospherePerDrawBuffer : register(b1, space2)
 {
 	AtmospherePerDraw mAtmospherePerDraw;
@@ -164,3 +159,82 @@ float2 UV_to_XY(float2 uv, Texture2D<float4> texture) // GetUnitRangeFromTexture
 #include "Bruneton17.hlsl"
 #include "Hillaire20.hlsl"
 #include "RaymarchAtmosphere.hlsl"
+
+void GetSunAndSkyIrradiance(float3 inHitPosition, float3 inNormal, out float3 outSunIrradiance, out float3 outSkyIrradiance)
+{
+	outSunIrradiance = 0;
+	outSkyIrradiance = 0;
+
+	switch (mAtmosphere.mMode)
+	{
+    case AtmosphereMode_ConstantColor:				break; // Not supported
+	case AtmosphereMode_RaymarchAtmosphereOnly:		break; // Not supported
+	case AtmosphereMode_Bruneton17: 				AtmosphereIntegration::Bruneton17::GetSunAndSkyIrradiance(inHitPosition, inNormal, outSunIrradiance, outSkyIrradiance); break;
+	case AtmosphereMode_Hillaire20: 				break; // [TODO]
+	default: break;
+	}
+}
+
+void GetSkyRadiance(out float3 outSkyRadiance, out float3 outTransmittanceToTop)
+{
+	outSkyRadiance = 0;
+	outTransmittanceToTop = 1;
+
+	switch (mAtmosphere.mMode)
+	{
+	case AtmosphereMode_ConstantColor:				outSkyRadiance = mAtmosphere.mConstantColor.xyz; break;
+	case AtmosphereMode_RaymarchAtmosphereOnly:		AtmosphereIntegration::Raymarch::GetSkyRadiance(outSkyRadiance, outTransmittanceToTop); break;
+	case AtmosphereMode_Bruneton17: 				AtmosphereIntegration::Bruneton17::GetSkyRadiance(outSkyRadiance, outTransmittanceToTop); break;
+	case AtmosphereMode_Hillaire20: 				AtmosphereIntegration::Hillaire20::GetSkyRadiance(outSkyRadiance, outTransmittanceToTop); break;
+	default: break;
+	}
+}
+
+void GetSkyRadianceToPoint(out float3 outInScattering, out float3 outTransmittance)
+{
+	outInScattering = 0;
+	outTransmittance = 1;
+
+	if (mAtmosphere.mAerialPerspective == 0)
+		return;
+
+    switch (mAtmosphere.mMode)
+    {
+    case AtmosphereMode_ConstantColor:				break; // Not supported
+	case AtmosphereMode_RaymarchAtmosphereOnly:		break; // Not supported
+    case AtmosphereMode_Bruneton17: 				AtmosphereIntegration::Bruneton17::GetSkyRadianceToPoint(outInScattering, outTransmittance); break;
+    case AtmosphereMode_Hillaire20: 				break; // [TODO]
+    default: break;
+    }
+}
+
+float3 GetSkyRadiance()
+{
+	// Sky
+	float3 radiance = 0;
+	float3 transmittance_to_top = 0;
+	GetSkyRadiance(radiance, transmittance_to_top);
+
+	// Debug
+	switch (mPerFrame.mDebugMode)
+	{
+	case DebugMode_Barycentrics: 			return 0;
+	case DebugMode_Vertex: 					return PlanetRayDirection(); // rays are supposed to go infinity
+	case DebugMode_Normal: 					return -PlanetRayDirection();
+	case DebugMode_Albedo: 					return 0;
+	case DebugMode_Reflectance: 			return 0;
+	case DebugMode_Emission: 				return 0;
+	case DebugMode_Roughness: 				return 1;
+	case DebugMode_Transmittance:			return transmittance_to_top;
+	case DebugMode_InScattering:			return radiance;
+	default:								break;
+	}
+
+	// Sun
+	if (dot(PlanetRayDirection(), GetSunDirection()) > cos(mAtmosphere.mSunAngularRadius))
+	{
+		radiance = radiance + transmittance_to_top * mAtmosphere.mSolarIrradiance;
+	}
+
+	return RadianceToLuminance(radiance);
+}

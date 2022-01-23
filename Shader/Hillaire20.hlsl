@@ -816,10 +816,12 @@ void SkyViewLut(
 	float2 dimensions = float2(192, 108.0);
 	float3 sun_direction = mPerFrame.mSunDirection.xyz;
 
-	float2 pixPos = inDispatchThreadID.xy + 0.5; // half pixel offset
+	float2 pixPos = inDispatchThreadID.xy + 0.5; 		// half pixel offset
 	float2 uv = pixPos / dimensions;
 
-	float3 WorldPos = mPerFrame.mCameraPosition.xyz + float3(0, Atmosphere.BottomRadius, 0);
+	float3 camera_position = mPerFrame.mCameraPosition.xyz;
+	camera_position.y = max(camera_position.y, 0);		// Keep observer position above ground
+	float3 WorldPos = camera_position + float3(0, Atmosphere.BottomRadius, 0);
 	float viewHeight = length(WorldPos);
 
 	float viewZenithCosAngle;
@@ -837,8 +839,6 @@ void SkyViewLut(
 
 		SunDir = normalize(float3(sqrt(1.0 - sunZenithCosAngle * sunZenithCosAngle), 0.0, sunZenithCosAngle));
 	}
-
-
 
 	WorldPos = float3(0.0f, 0.0f, viewHeight);
 	float viewZenithSinAngle = sqrt(1 - viewZenithCosAngle * viewZenithCosAngle);
@@ -1007,3 +1007,61 @@ void CameraVolumes(
 	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(WorldDir, 1.0); // match
 	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(tMax.xxx, 1.0); // match
 }
+
+namespace AtmosphereIntegration { namespace Hillaire20 {
+
+void GetSkyRadiance(out float3 outSkyRadiance, out float3 outTransmittanceToTop)
+{
+	outSkyRadiance = 0;
+	outTransmittanceToTop = 1; // [TODO]
+
+	float3 camera = PlanetRayOrigin() - PlanetCenter();
+	float3 view_ray = PlanetRayDirection();
+	float3 sun_direction = GetSunDirection();
+
+	float r = length(camera);
+	float rmu = dot(camera, view_ray);
+	float distance_to_top_atmosphere_boundary = -rmu - sqrt(rmu * rmu - r * r + mAtmosphere.mTopRadius * mAtmosphere.mTopRadius);
+
+	if (distance_to_top_atmosphere_boundary > 0.0) 
+	{
+		// Outer space
+
+		// Move camera to top of atmosphere along view direction
+		camera = camera + view_ray * distance_to_top_atmosphere_boundary;
+		r = mAtmosphere.mTopRadius;
+		rmu += distance_to_top_atmosphere_boundary;
+	}
+	else if (r > mAtmosphere.mTopRadius) 
+	{
+		// No hit
+		return;
+	}
+
+	float mu = rmu / r;
+	float mu_s = dot(camera, sun_direction) / r;
+	float nu = dot(view_ray, sun_direction);
+	bool ray_r_mu_intersects_ground = RayIntersectsGround(r, mu);
+
+	AtmosphereParameters Atmosphere = GetAtmosphereParameters();
+
+	float3 UpVector = normalize(camera);
+	float3 WorldDir = view_ray;
+
+	// Lat/Long mapping in SkyViewLut()
+	float3 sideVector = normalize(cross(UpVector, WorldDir));		// assumes non parallel vectors
+	float3 forwardVector = normalize(cross(sideVector, UpVector));	// aligns toward the sun light but perpendicular to up vector
+	float2 lightOnPlane = float2(dot(sun_direction, forwardVector), dot(sun_direction, sideVector));
+	lightOnPlane = normalize(lightOnPlane);
+	float lightViewCosAngle = lightOnPlane.x;
+
+	float2 uv;
+	SkyViewLutParamsToUv(Atmosphere, ray_r_mu_intersects_ground, mu, lightViewCosAngle, r, uv);
+	outSkyRadiance = SkyViewLutTexSRV.SampleLevel(samplerLinearClamp, uv, 0).rgb;
+
+	// Debug
+	// outSkyRadiance = 0.1234;
+	// outSkyRadiance = float3(lightViewCosAngle, 0, 0);
+}
+
+}} // namespace AtmosphereIntegration { namespace Hillaire20 {

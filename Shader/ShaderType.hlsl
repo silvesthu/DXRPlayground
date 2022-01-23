@@ -51,51 +51,51 @@ struct InstanceData
 
 struct HitInfo
 {
-	float3 mAlbedo;
-	float3 mEmission;
+	float3					mAlbedo;
+	float3					mEmission;
 
-	float3 mPosition;
-	float3 mReflectionDirection;
+	float3					mPosition;
+	float3					mReflectionDirection;
 
-	float mScatteringPDF;
-	float mPDF;
+	float					mScatteringPDF;
+	float					mPDF;
 
 	// Participating Media along the ray
-	float3 mTransmittance;
-	float3 mInScattering;
+	float3 					mTransmittance;
+	float3 					mInScattering;
 
 	bool mDone;
 };
 
 struct RayPayload
 {
-    uint mRandomState;
+    uint					mRandomState;
 
-	float3 mThroughput; // [0, 1]		Accumulated throughput
-	float3 mEmission;	// [0, +inf]	Accumulated emission
+	float3 					mThroughput; // [0, 1]		Accumulated throughput
+	float3 					mEmission;	// [0, +inf]	Accumulated emission
 	
-    float3 mPosition;
-    float3 mReflectionDirection;
+    float3 					mPosition;
+    float3 					mReflectionDirection;
 
-	bool mDone;
+	bool 					mDone;
 };
 
 struct ShadowPayload
 {
-    bool mHit;
+    bool 					mHit;
 };
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct DensityProfileLayer 
 {
-	float mWidth									CONSTANT_DEFAULT(0);
-	float mExpTerm									CONSTANT_DEFAULT(0);
-	float mExpScale									CONSTANT_DEFAULT(0);
-	float mLinearTerm								CONSTANT_DEFAULT(0);
+	float 					mWidth					CONSTANT_DEFAULT(0);
+	float 					mExpTerm				CONSTANT_DEFAULT(0);
+	float 					mExpScale				CONSTANT_DEFAULT(0);
+	float 					mLinearTerm				CONSTANT_DEFAULT(0);
 
-	float mConstantTerm								CONSTANT_DEFAULT(0);
-	float3 mPad;
+	float 					mConstantTerm			CONSTANT_DEFAULT(0);
+	float3 					mPad;
 };
 
 #ifndef HLSL_AS_CPP

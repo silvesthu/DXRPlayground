@@ -1,8 +1,10 @@
 // Atmosphere scattering without precomputation
 // Based on https://www.shadertoy.com/view/lslXDr
 
-#define NUM_OUT_SCATTER 16
-#define NUM_IN_SCATTER 80
+namespace AtmosphereIntegration { namespace Raymarch {
+
+static const int kOutScatteringStepCount = 16;
+static const int kInScatteringStepCount = 80;
 
 // ray intersects sphere
 // e = -b +/- sqrt( b^2 - c )
@@ -22,11 +24,11 @@ float2 ray_vs_sphere( float3 p, float3 dir, float r )
 
 float optic( float3 p, float3 q, DensityProfile density_profile)
 {
-	float3 s = ( q - p ) / float( NUM_OUT_SCATTER );
+	float3 s = ( q - p ) / float( kOutScatteringStepCount );
 	float3 v = p + s * 0.5;
 	
 	float sum = 0.0;
-	for ( int i = 0; i < NUM_OUT_SCATTER; i++ ) 
+	for ( int i = 0; i < kOutScatteringStepCount; i++ ) 
 	{
 		sum += GetProfileDensity(density_profile, length(v) - mAtmosphere.mBottomRadius);
 		v += s;
@@ -45,7 +47,7 @@ float3 in_scatter( float3 o, float3 dir, float2 e, float3 l )
 	float n_mie0 = 0.0;
 	float n_ozone0 = 0.0;
 	
-	float len = ( e.y - e.x ) / float( NUM_IN_SCATTER );
+	float len = ( e.y - e.x ) / float( kInScatteringStepCount );
 	float3 s = dir * len;
 	float3 v = o + dir * ( e.x + len * 0.5 );
 	
@@ -54,7 +56,7 @@ float3 in_scatter( float3 o, float3 dir, float2 e, float3 l )
 	// Density is accumulated here instead of transmittance
 
 	// [TODO] Aerial Perspective and Shadow 
-	for ( int i = 0; i < NUM_IN_SCATTER; i++, v += s )
+	for ( int i = 0; i < kInScatteringStepCount; i++, v += s )
 	{
 		float d_ray = GetProfileDensity(mAtmosphere.mRayleighDensity, length(v) - mAtmosphere.mBottomRadius) * len;
 		float d_mie = GetProfileDensity(mAtmosphere.mMieDensity, length(v) - mAtmosphere.mBottomRadius) * len;
@@ -90,9 +92,13 @@ float3 in_scatter( float3 o, float3 dir, float2 e, float3 l )
 	return RadianceToLuminance(scatter);
 }
 
-float3 RaymarchAtmosphereScattering(float3 inPosition, float3 inDirection)
+void GetSkyRadiance(out float3 sky_radiance, out float3 transmittance_to_top)
 {
-	float3 output = 0;
+	sky_radiance = 0;
+	transmittance_to_top = 1;
+
+	float3 inPosition = PlanetRayOrigin();
+	float3 inDirection = PlanetRayDirection();
 
 	// Position in km
 	float3 eye = inPosition + float3(0, mAtmosphere.mBottomRadius, 0);
@@ -102,7 +108,7 @@ float3 RaymarchAtmosphereScattering(float3 inPosition, float3 inDirection)
 	float2 earth_hit = ray_vs_sphere( eye, dir, mAtmosphere.mBottomRadius );
 
 	if ( atmosphere_hit.x > atmosphere_hit.y )
-		return 0; // no hit on atmosphere
+		return; // no hit on atmosphere
 
 	bool visualize = 0;
 	float2 from_to = 0;
@@ -115,7 +121,10 @@ float3 RaymarchAtmosphereScattering(float3 inPosition, float3 inDirection)
 			from_to = float2(earth_hit.y, atmosphere_hit.y);
 
 			if (visualize)
-				return float3(1,0,0);
+			{
+				sky_radiance = float3(1,0,0);
+				return;
+			}
 		}
 		else
 		{
@@ -126,7 +135,10 @@ float3 RaymarchAtmosphereScattering(float3 inPosition, float3 inDirection)
 				from_to = float2(0, earth_hit.x);
 
 				if (visualize)
-					return float3(1,1,0);
+				{
+					sky_radiance = float3(1,1,0);
+					return;
+				}
 			}
 			else
 			{
@@ -134,7 +146,10 @@ float3 RaymarchAtmosphereScattering(float3 inPosition, float3 inDirection)
 				from_to = float2(0, atmosphere_hit.y);
 
 				if (visualize)
-					return float3(0,0,1);
+				{
+					sky_radiance = float3(0,0,1);
+					return;
+				}
 			}
 		}
 	}
@@ -144,8 +159,13 @@ float3 RaymarchAtmosphereScattering(float3 inPosition, float3 inDirection)
 		from_to = float2(atmosphere_hit.x, min(earth_hit.x, atmosphere_hit.y));
 
 		if (visualize)
-			return float3(0,1,0);
+		{
+			sky_radiance = float3(0,1,0);
+			return;
+		}
 	}
 
-	return in_scatter( eye, dir, from_to, mPerFrame.mSunDirection.xyz );
+	sky_radiance = in_scatter( eye, dir, from_to, GetSunDirection() );
 }
+
+}} // namespace AtmosphereIntegration { namespace Raymarch {

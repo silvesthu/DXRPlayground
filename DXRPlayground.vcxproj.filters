@@ -244,6 +244,9 @@
     <CopyFileToFolders Include="Shader\Bruneton17.hlsl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
+    <CopyFileToFolders Include="Shader\Planet.hlsl">
+      <Filter>Shader</Filter>
+    </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

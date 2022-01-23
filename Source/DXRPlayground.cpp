@@ -12,7 +12,7 @@
 #include "DDGI.h"
 
 // Use Agility SDK
-extern "C" { __declspec(dllexport) extern const UINT D3D12SDKVersion = 4; }
+extern "C" { __declspec(dllexport) extern const UINT D3D12SDKVersion = 600; }
 extern "C" { __declspec(dllexport) extern const char* D3D12SDKPath = u8".\\D3D12\\"; }
 
 #define DX12_ENABLE_DEBUG_LAYER			(1)
@@ -56,8 +56,8 @@ static ScenePreset kScenePresets[(int)ScenePresetType::COUNT] =
 	{ "Bruneton17_Artifact_Mu",				"Asset/primitives/sphere.obj",													glm::vec4(0.0f, 80.0f, 150.0f, 0.0f),		glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,		glm::scale(glm::vec3(100.0f, 100.0f, 100.0f)),	0.0f, glm::pi<float>() / 4.0f,},
 	{ "Hillaire20",							nullptr,																			glm::vec4(0.0f, 0.5, -1.0f, 0.0f),			glm::vec4(0.0f, 0.0f, 1.0f, 0.0f),		98.8514328f, glm::translate(glm::vec3(0.0f, 1.0f, 0.0f)),	0.0f, glm::pi<float>() / 2.0f - 0.45f,},
 };
-static ScenePresetType sCurrentScene = ScenePresetType::Hillaire20;
-static ScenePresetType sPreviousScene = ScenePresetType::Hillaire20;
+static ScenePresetType sCurrentScene = ScenePresetType::VeachMIS;
+static ScenePresetType sPreviousScene = ScenePresetType::VeachMIS;
 
 static bool sReloadRequested = false;
 
@@ -432,15 +432,16 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 	ImGui_ImplWin32_Init(hwnd);
 	ImGui_ImplDX12_Init(gDevice, NUM_FRAMES_IN_FLIGHT, DXGI_FORMAT_R8G8B8A8_UNORM);
 	ImGui_ImplDX12_CreateDeviceObjects();
-
+	
 	// Create Scene
-	gScene.Load(kScenePresets[(int)sCurrentScene].mPath, kScenePresets[(int)sCurrentScene].mTransform);
+	int current_scene_index = static_cast<int>(sCurrentScene);
+	gScene.Load(kScenePresets[current_scene_index].mPath, kScenePresets[current_scene_index].mTransform);
 	gScene.Build(gCommandList);
-	gPerFrameConstantBuffer.mCameraPosition = kScenePresets[(int)sCurrentScene].mCameraPosition;
-	gPerFrameConstantBuffer.mCameraDirection = glm::normalize(kScenePresets[(int)sCurrentScene].mCameraDirection);
-	gCameraSettings.mHorizontalFovDegree = kScenePresets[(int)sCurrentScene].mHorizontalFovDegree;
-	gPerFrameConstantBuffer.mSunAzimuth = kScenePresets[(int)sCurrentScene].mSunAzimuth;
-	gPerFrameConstantBuffer.mSunZenith = kScenePresets[(int)sCurrentScene].mSunZenith;
+	gPerFrameConstantBuffer.mCameraPosition = kScenePresets[current_scene_index].mCameraPosition;
+	gPerFrameConstantBuffer.mCameraDirection = glm::normalize(kScenePresets[current_scene_index].mCameraDirection);
+	gCameraSettings.mHorizontalFovDegree = kScenePresets[current_scene_index].mHorizontalFovDegree;
+	gPerFrameConstantBuffer.mSunAzimuth = kScenePresets[current_scene_index].mSunAzimuth;
+	gPerFrameConstantBuffer.mSunZenith = kScenePresets[current_scene_index].mSunZenith;
 
 	// Features (rely on ImGui, Scene)
 	gPrecomputedAtmosphereScattering.Initialize();
@@ -462,7 +463,7 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 		});
 
 	gCommandList->Close();
-	gCommandQueue->ExecuteCommandLists(1, (ID3D12CommandList* const*)&gCommandList);
+	gCommandQueue->ExecuteCommandLists(1, reinterpret_cast<ID3D12CommandList* const*>(&gCommandList));
 	uint64_t one_shot_fence_value = 0xff;
 	gCommandQueue->Signal(gIncrementalFence, one_shot_fence_value); // abuse fence to wait only during initialization
 	gIncrementalFence->SetEventOnCompletion(one_shot_fence_value, gIncrementalFenceEvent);
@@ -520,15 +521,15 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 void sRender()
 {
 	// Frame Context
-	FrameContext* frameCtxt = sWaitForNextFrameResources();
+	FrameContext* frame_context = sWaitForNextFrameResources();
 	glm::uint32 frame_index = gSwapChain->GetCurrentBackBufferIndex();
 	ID3D12Resource* frame_render_target_resource = gBackBufferRenderTargetResource[frame_index];
 	D3D12_CPU_DESCRIPTOR_HANDLE& frame_render_target_descriptor_handle = gBackBufferRenderTargetRTV[frame_index];
 
 	// Frame Begin
 	{
-		frameCtxt->mCommandAllocator->Reset();
-		gCommandList->Reset(frameCtxt->mCommandAllocator, nullptr);
+		frame_context->mCommandAllocator->Reset();
+		gCommandList->Reset(frame_context->mCommandAllocator, nullptr);
 		
 		gBarrierTransition(gCommandList, frame_render_target_resource, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 	}
@@ -541,15 +542,17 @@ void sRender()
 
 			sWaitForIdle();
 
+			int current_scene_index = static_cast<int>(sCurrentScene);
+
 			gScene.Unload();
-			gScene.Load(kScenePresets[(int)sCurrentScene].mPath, kScenePresets[(int)sCurrentScene].mTransform);
+			gScene.Load(kScenePresets[current_scene_index].mPath, kScenePresets[current_scene_index].mTransform);
 			gScene.Build(gCommandList);
 
-			gPerFrameConstantBuffer.mCameraPosition = kScenePresets[(int)sCurrentScene].mCameraPosition;
-			gPerFrameConstantBuffer.mCameraDirection = glm::normalize(kScenePresets[(int)sCurrentScene].mCameraDirection);
-			gCameraSettings.mHorizontalFovDegree = kScenePresets[(int)sCurrentScene].mHorizontalFovDegree;
-			gPerFrameConstantBuffer.mSunAzimuth = kScenePresets[(int)sCurrentScene].mSunAzimuth;
-			gPerFrameConstantBuffer.mSunZenith = kScenePresets[(int)sCurrentScene].mSunZenith;
+			gPerFrameConstantBuffer.mCameraPosition = kScenePresets[current_scene_index].mCameraPosition;
+			gPerFrameConstantBuffer.mCameraDirection = glm::normalize(kScenePresets[current_scene_index].mCameraDirection);
+			gCameraSettings.mHorizontalFovDegree = kScenePresets[current_scene_index].mHorizontalFovDegree;
+			gPerFrameConstantBuffer.mSunAzimuth = kScenePresets[current_scene_index].mSunAzimuth;
+			gPerFrameConstantBuffer.mSunZenith = kScenePresets[current_scene_index].mSunZenith;
 		}
 		else
 			gScene.Update(gCommandList);
@@ -566,7 +569,7 @@ void sRender()
 		{
 			static ShaderType::PerFrame sPerFrameCopy = gPerFrameConstantBuffer;
 
-			sPerFrameCopy.mDebugCoord = gPerFrameConstantBuffer.mDebugCoord = glm::uvec2((glm::uint32)ImGui::GetMousePos().x, (glm::uint32)ImGui::GetMousePos().y);
+			sPerFrameCopy.mDebugCoord = gPerFrameConstantBuffer.mDebugCoord = glm::uvec2(static_cast<glm::uint32>(ImGui::GetMousePos().x), (glm::uint32)ImGui::GetMousePos().y);
 			sPerFrameCopy.mAccumulationFrameCount = gPerFrameConstantBuffer.mAccumulationFrameCount;
 			sPerFrameCopy.mFrameIndex = gPerFrameConstantBuffer.mFrameIndex;
 			sPerFrameCopy.mTime = gPerFrameConstantBuffer.mTime;
@@ -580,10 +583,10 @@ void sRender()
 			sPerFrameCopy = gPerFrameConstantBuffer;
 		}
 		
-		memcpy(frameCtxt->mConstantUploadBufferPointer, &gPerFrameConstantBuffer, sizeof(gPerFrameConstantBuffer));
+		memcpy(frame_context->mConstantUploadBufferPointer, &gPerFrameConstantBuffer, sizeof(gPerFrameConstantBuffer));
 
 		gBarrierTransition(gCommandList, gConstantGPUBuffer.Get(), D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, D3D12_RESOURCE_STATE_COPY_DEST);
-		gCommandList->CopyResource(gConstantGPUBuffer.Get(), frameCtxt->mConstantUploadBuffer);
+		gCommandList->CopyResource(gConstantGPUBuffer.Get(), frame_context->mConstantUploadBuffer);
 		gBarrierTransition(gCommandList, gConstantGPUBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 	}
 
@@ -621,8 +624,8 @@ void sRender()
 		// Draw
 		D3D12_RESOURCE_DESC desc = frame_render_target_resource->GetDesc();
 		D3D12_VIEWPORT viewport = {};
-		viewport.Width = (float)desc.Width;
-		viewport.Height = (float)desc.Height;
+		viewport.Width = static_cast<float>(desc.Width);
+		viewport.Height = static_cast<float>(desc.Height);
 		viewport.MinDepth = 0.0f;
 		viewport.MaxDepth = 1.0f;
 		viewport.TopLeftX = 0.0f;
@@ -631,8 +634,8 @@ void sRender()
 		D3D12_RECT rect = {};
 		rect.left = 0;
 		rect.top = 0;
-		rect.right = (LONG)desc.Width;
-		rect.bottom = (LONG)desc.Height;
+		rect.right = static_cast<LONG>(desc.Width);
+		rect.bottom = static_cast<LONG>(desc.Height);
 		gCommandList->RSSetScissorRects(1, &rect);
 		gCommandList->OMSetRenderTargets(1, &frame_render_target_descriptor_handle, false, nullptr);
 		gCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -657,7 +660,7 @@ void sRender()
 	{
 		gBarrierTransition(gCommandList, frame_render_target_resource, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
 		gCommandList->Close();
-		gCommandQueue->ExecuteCommandLists(1, (ID3D12CommandList* const*)&gCommandList);
+		gCommandQueue->ExecuteCommandLists(1, reinterpret_cast<ID3D12CommandList* const*>(&gCommandList));
 
 		gPerFrameConstantBuffer.mTime += ImGui::GetIO().DeltaTime;
 		gPerFrameConstantBuffer.mFrameIndex++;
@@ -693,7 +696,7 @@ void sRender()
 		UINT64 fenceValue = gFenceLastSignaledValue + 1;
 		gCommandQueue->Signal(gIncrementalFence, fenceValue);
 		gFenceLastSignaledValue = fenceValue;
-		frameCtxt->mFenceValue = fenceValue;
+		frame_context->mFenceValue = fenceValue;
 	}
 }
 
@@ -733,7 +736,7 @@ static bool sCreateDeviceD3D(HWND hWnd)
 	}
 
 	// Create device with highest feature level as possible
-	D3D_FEATURE_LEVEL feature_level = D3D_FEATURE_LEVEL::D3D_FEATURE_LEVEL_12_2;
+	D3D_FEATURE_LEVEL feature_level = D3D_FEATURE_LEVEL_12_2;
 	if (D3D12CreateDevice(nullptr, feature_level, IID_PPV_ARGS(&gDevice)) != S_OK)
 		return false;
 
@@ -799,13 +802,13 @@ static bool sCreateDeviceD3D(HWND hWnd)
 	{
 		std::wstring name;
 
-		gValidate(gDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&gFrameContext[i].mCommandAllocator)) != S_OK);
+		gValidate(gDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&gFrameContext[i].mCommandAllocator)));
 		name = L"CommandAllocator_" + i;
 		gFrameContext[i].mCommandAllocator->SetName(name.c_str());
 
 		// Buffer
 		{
-			D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(gAlignUp((UINT)sizeof(ShaderType::PerFrame), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
+			D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(gAlignUp(static_cast<UINT>(sizeof(ShaderType::PerFrame)), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
 			D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
 
 			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gFrameContext[i].mConstantUploadBuffer)));
@@ -821,7 +824,7 @@ static bool sCreateDeviceD3D(HWND hWnd)
 	{
 		// Buffer
 		{
-			D3D12_RESOURCE_DESC resource_desc = gGetBufferResourceDesc(gAlignUp((UINT)sizeof(ShaderType::PerFrame), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
+			D3D12_RESOURCE_DESC resource_desc = gGetBufferResourceDesc(gAlignUp(static_cast<UINT>(sizeof(ShaderType::PerFrame)), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
 			D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
 
 			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, nullptr, IID_PPV_ARGS(&gConstantGPUBuffer)));
@@ -830,7 +833,7 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		}
 	}
 
-	gValidate(gDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, gFrameContext[0].mCommandAllocator, nullptr, IID_PPV_ARGS(&gCommandList)) != S_OK);
+	gValidate(gDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, gFrameContext[0].mCommandAllocator, nullptr, IID_PPV_ARGS(&gCommandList)));
 	gCommandList->SetName(L"CommandList");
 
 	if (gDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&gIncrementalFence)) != S_OK)
@@ -841,20 +844,20 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		return false;
 
 	{
-		ComPtr<IDXGIFactory4> dxgiFactory = nullptr;
-		ComPtr<IDXGISwapChain1> swapChain1 = nullptr;
+		ComPtr<IDXGIFactory4> dxgi_factory = nullptr;
+		ComPtr<IDXGISwapChain1> swap_chain = nullptr;
 
 		UINT flags = 0;
 		if (DX12_ENABLE_DEBUG_LAYER)
 			flags = DXGI_CREATE_FACTORY_DEBUG;
 
-		if (CreateDXGIFactory2(flags, IID_PPV_ARGS(&dxgiFactory)) != S_OK ||
-			dxgiFactory->CreateSwapChainForHwnd(gCommandQueue, hWnd, &sd, nullptr, nullptr, &swapChain1) != S_OK ||
-			swapChain1->QueryInterface(IID_PPV_ARGS(&gSwapChain)) != S_OK)
+		if (CreateDXGIFactory2(flags, IID_PPV_ARGS(&dxgi_factory)) != S_OK ||
+			dxgi_factory->CreateSwapChainForHwnd(gCommandQueue, hWnd, &sd, nullptr, nullptr, &swap_chain) != S_OK ||
+			swap_chain->QueryInterface(IID_PPV_ARGS(&gSwapChain)) != S_OK)
 			return false;
 
 		// Fullscreen -> Windowed cause crash on resource reference in WM_SIZE handling, disable fullscreen for now
-		dxgiFactory->MakeWindowAssociation(hWnd, DXGI_MWA_NO_ALT_ENTER);
+		dxgi_factory->MakeWindowAssociation(hWnd, DXGI_MWA_NO_ALT_ENTER);
 
 		gSwapChain->SetMaximumFrameLatency(NUM_BACK_BUFFERS);
 		gSwapChainWaitableObject = gSwapChain->GetFrameLatencyWaitableObject();
@@ -915,13 +918,13 @@ static void sWaitForIdle()
 
 static void sWaitForLastSubmittedFrame()
 {
-	FrameContext* frameCtxt = &gFrameContext[gFrameIndex % NUM_FRAMES_IN_FLIGHT];
+	FrameContext* frame_context = &gFrameContext[gFrameIndex % NUM_FRAMES_IN_FLIGHT];
 
-	UINT64 fenceValue = frameCtxt->mFenceValue;
+	UINT64 fenceValue = frame_context->mFenceValue;
 	if (fenceValue == 0)
 		return; // No fence was signaled
 
-	frameCtxt->mFenceValue = 0;
+	frame_context->mFenceValue = 0;
 	if (gIncrementalFence->GetCompletedValue() >= fenceValue)
 		return;
 
@@ -937,11 +940,11 @@ static FrameContext* sWaitForNextFrameResources()
 	HANDLE waitableObjects[] = { gSwapChainWaitableObject, nullptr };
 	DWORD numWaitableObjects = 1;
 
-	FrameContext* frameCtxt = &gFrameContext[nextFrameIndex % NUM_FRAMES_IN_FLIGHT];
-	UINT64 fenceValue = frameCtxt->mFenceValue;
+	FrameContext* frame_context = &gFrameContext[nextFrameIndex % NUM_FRAMES_IN_FLIGHT];
+	UINT64 fenceValue = frame_context->mFenceValue;
 	if (fenceValue != 0) // means no fence was signaled
 	{
-		frameCtxt->mFenceValue = 0;
+		frame_context->mFenceValue = 0;
 		gIncrementalFence->SetEventOnCompletion(fenceValue, gIncrementalFenceEvent);
 		waitableObjects[1] = gIncrementalFenceEvent;
 		numWaitableObjects = 2;
@@ -949,7 +952,7 @@ static FrameContext* sWaitForNextFrameResources()
 
 	WaitForMultipleObjects(numWaitableObjects, waitableObjects, TRUE, INFINITE);
 
-	return frameCtxt;
+	return frame_context;
 }
 
 // Win32 message handler

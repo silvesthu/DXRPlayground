@@ -23,9 +23,6 @@ cbuffer PerFrameBuffer : register(b0, space0)
 SamplerState BilinearSampler : register(s0);
 SamplerState BilinearWrapSampler : register(s1);
 
-//////////////////////////////////////////////////////////////////////////////////
-// Atmosphere & Cloud
-
 float3 RadianceToLuminance(float3 radiance)
 {
 	// https://en.wikipedia.org/wiki/Luminous_efficacy
@@ -34,26 +31,12 @@ float3 RadianceToLuminance(float3 radiance)
 	float kW_to_W = 1000.0;
 	float3 luminance = radiance * kW_to_W * kSunLuminousEfficacy * kPreExposure;
 	return luminance;
-
-	// [Bruneton17]
-	if (0)
-	{
-		float3 white_point = float3(1, 1, 1);
-		float exposure = 10.0;
-		return 1 - exp(-radiance / white_point * exposure);
-	}
 }
 
-#include "Atmosphere.hlsl"
-cbuffer CloudBuffer : register(b0, space3)
-{
-	Cloud mCloud;
-}
-Texture3D<float4> CloudShapeNoiseSRV : register(t0, space3);
-Texture3D<float4> CloudErosionNoiseSRV : register(t1, space3);
+float3 GetSunDirection() { return mPerFrame.mSunDirection.xyz; }
 
 //////////////////////////////////////////////////////////////////////////////////
-// DXR
+// DXR Adapters
 
 // Proxies
 static uint3 sDispatchRaysIndex;
@@ -146,6 +129,12 @@ uint sGetInstanceID()
 #endif // ENABLE_INLINE_RAYTRACING
 }
 
+#include "Planet.hlsl"
+#include "Atmosphere.hlsl"
+#include "Cloud.hlsl"
+
+//////////////////////////////////////////////////////////////////////////////////
+
 RaytracingAccelerationStructure RaytracingScene : register(t0, space0);
 StructuredBuffer<InstanceData> InstanceDataBuffer : register(t1, space0);
 StructuredBuffer<uint> Indices : register(t2, space0);
@@ -194,9 +183,7 @@ float3 LuminanceToColor(float3 luminance)
 		{
 		default:
 		case ToneMappingMode_Passthrough: tone_mapped_color = normalized_luminance; break;
-            case ToneMappingMode_Knarkowicz:
-                tone_mapped_color = ToneMapping_ACES_Knarkowicz(normalized_luminance);
-                break;
+		case ToneMappingMode_Knarkowicz: tone_mapped_color = ToneMapping_ACES_Knarkowicz(normalized_luminance); break;
         }
 
 		// [Reference]
@@ -207,592 +194,25 @@ float3 LuminanceToColor(float3 luminance)
 	return tone_mapped_color;
 }
 
-// Adapters
-float3 RayOrigin() { return sGetWorldRayOrigin() * mAtmosphere.mSceneScale; }
-float3 RayDirection() { return sGetWorldRayDirection(); }
-float3 RayHitPosition() { return (sGetWorldRayOrigin() + sGetWorldRayDirection() * sGetRayTCurrent()) * mAtmosphere.mSceneScale; }
-float3 PlanetCenter() { return float3(0, -mAtmosphere.mBottomRadius, 0); }
-float PlanetRadius() { return mAtmosphere.mBottomRadius; }
-float3 GetSunDirection() { return mPerFrame.mSunDirection.xyz; }
-
-float3 GetExtrapolatedSingleMieScattering(float4 scattering)
-{
-	// Algebraically this can never be negative, but rounding errors can produce
-	// that effect for sufficiently short view rays.
-	if (scattering.r <= 0.0)
-		return 0.0;
-
-	return scattering.rgb * scattering.a / scattering.r * (mAtmosphere.mRayleighScattering.r / mAtmosphere.mMieScattering.r) * (mAtmosphere.mMieScattering / mAtmosphere.mRayleighScattering);
-}
-
-void GetCombinedScattering(float r, float mu, float mu_s, float nu, bool ray_r_mu_intersects_ground, out float3 rayleigh_scattering, out float3 single_mie_scattering)
-{
-	float4 scattering = GetScattering(ScatteringSRV, r, mu, mu_s, nu, ray_r_mu_intersects_ground);
-	float3 solar_irradiance = mAtmosphere.mPrecomputeWithSolarIrradiance ? 1.0 : mAtmosphere.mSolarIrradiance;
-
-	single_mie_scattering = GetExtrapolatedSingleMieScattering(scattering) * solar_irradiance;
-	rayleigh_scattering = scattering.xyz * solar_irradiance;
-}
-
-void GetSkyRadiance(out float3 sky_radiance, out float3 transmittance_to_top)
-{
-	sky_radiance = 0;
-	transmittance_to_top = 1;
-
-	float3 camera = RayOrigin() - PlanetCenter();
-	float3 view_ray = RayDirection();
-	float3 sun_direction = GetSunDirection();
-
-	float r = length(camera);
-	float rmu = dot(camera, view_ray);
-	float distance_to_top_atmosphere_boundary = -rmu - sqrt(rmu * rmu - r * r + mAtmosphere.mTopRadius * mAtmosphere.mTopRadius);
-
-	if (distance_to_top_atmosphere_boundary > 0.0) 
-	{
-		// Outer space
-
-		// Move camera to top of atmosphere along view direction
-		camera = camera + view_ray * distance_to_top_atmosphere_boundary;
-		r = mAtmosphere.mTopRadius;
-		rmu += distance_to_top_atmosphere_boundary;
-	}
-	else if (r > mAtmosphere.mTopRadius) 
-	{
-		// No hit
-		return;
-	}
-
-	float mu = rmu / r;
-	float mu_s = dot(camera, sun_direction) / r;
-	float nu = dot(view_ray, sun_direction);
-	bool ray_r_mu_intersects_ground = RayIntersectsGround(r, mu);
-
-	// override
-	{
-		//r = 6360;
-		//mu = 0.0;
-		//mu_s = 0.0;
-		//nu = 0.0;
-		//ray_r_mu_intersects_ground = false;
-	}
-
-	transmittance_to_top = ray_r_mu_intersects_ground ? 0 : GetTransmittanceToTopAtmosphereBoundary(r, mu);
-
-	// [TODO] shadow
-	float3 rayleigh_scattering;
-	float3 single_mie_scattering;
-	GetCombinedScattering(r, mu, mu_s, nu, ray_r_mu_intersects_ground, rayleigh_scattering, single_mie_scattering);
-
-	// [TODO] light shafts
-
-	sky_radiance = rayleigh_scattering * RayleighPhaseFunction(nu) + single_mie_scattering * MiePhaseFunction(mAtmosphere.mMiePhaseFunctionG, nu);
-
-	// Hillaire20
-	if (mAtmosphere.mMode == AtmosphereMode_Hillaire20)
-	{
-		AtmosphereParameters Atmosphere = GetAtmosphereParameters();
-
-		float3 UpVector = normalize(camera);
-		float3 WorldDir = view_ray;
-
-		// Lat/Long mapping in SkyViewLut()
-		float3 sideVector = normalize(cross(UpVector, WorldDir));		// assumes non parallel vectors
-		float3 forwardVector = normalize(cross(sideVector, UpVector));	// aligns toward the sun light but perpendicular to up vector
-		float2 lightOnPlane = float2(dot(sun_direction, forwardVector), dot(sun_direction, sideVector));
-		lightOnPlane = normalize(lightOnPlane);
-		float lightViewCosAngle = lightOnPlane.x;
-
-		float2 uv;
-		SkyViewLutParamsToUv(Atmosphere, ray_r_mu_intersects_ground, mu, lightViewCosAngle, r, uv);
-		sky_radiance = SkyViewLutTexSRV.SampleLevel(samplerLinearClamp, uv, 0).rgb;
-
-		// Debug
-		// sky_radiance = 0.1234;
-		// sky_radiance = float3(lightViewCosAngle, 0, 0);
-	}
-
-	// override
-	{
-		//sky_radiance = float3(1.1, 1.2, 1.3);
-		//float3 uvw0, uvw1;
-		//float s;
-		//Encode4D(float4(r, mu, mu_s, nu), ray_r_mu_intersects_ground, ScatteringSRV, uvw0, uvw1, s);
-		//rayleigh_scattering = uvw0;
-		//rayleigh_scattering = ScatteringSRV.SampleLevel(BilinearSampler, uvw0, 0);
-	}
-}
-
-// Aerial Perspective
-void GetSkyRadianceToPoint(out float3 sky_radiance, out float3 transmittance)
-{
-    switch (mAtmosphere.mMode)
-    {
-    case AtmosphereMode_Bruneton17:
-        break;
-    default:
-        return;
-    }
-
-	sky_radiance = 0;
-	transmittance = 1;
-
-	if (mAtmosphere.mAerialPerspective == 0)
-		return;
-
-	// [TODO] Occlusion?
-
-	float3 hit_position = RayHitPosition() - PlanetCenter();
-	float3 camera = RayOrigin() - PlanetCenter();
-	float3 sun_direction = GetSunDirection();
-
-	float3 view_ray = RayDirection();
-	float r = length(camera);
-	float rmu = dot(camera, view_ray);
-	float distance_to_top_atmosphere_boundary = -rmu - sqrt(rmu * rmu - r * r + mAtmosphere.mTopRadius * mAtmosphere.mTopRadius);
-
-	// If the viewer is in space and the view ray intersects the atmosphere, move
-	// the viewer to the top atmosphere boundary (along the view ray):
-	if (distance_to_top_atmosphere_boundary > 0.0)
-	{
-		// Outer space
-
-		// Move camera to top of atmosphere along view direction
-		camera = camera + view_ray * distance_to_top_atmosphere_boundary;
-		r = mAtmosphere.mTopRadius;
-		rmu += distance_to_top_atmosphere_boundary;
-	}
-	else if (r > mAtmosphere.mTopRadius)
-	{
-		// No hit
-		return;
-	}
-
-	// Compute the r, mu, mu_s and nu parameters for the first texture lookup.
-	float mu = rmu / r;
-	float mu_s = dot(camera, sun_direction) / r;
-	float nu = dot(view_ray, sun_direction);
-	float d = length(hit_position - camera);
-	bool ray_r_mu_intersects_ground = RayIntersectsGround(r, mu);
-
-	transmittance = GetTransmittance(r, mu, d, ray_r_mu_intersects_ground);
-
-	float3 rayleigh_scattering;
-	float3 single_mie_scattering;
-	GetCombinedScattering(r, mu, mu_s, nu, ray_r_mu_intersects_ground, rayleigh_scattering, single_mie_scattering);
-
-	// [TODO] shadow
-	float shadow_length = 0;
-
-	// Compute the r, mu, mu_s and nu parameters for the second texture lookup.
-	// If shadow_length is not 0 (case of light shafts), we want to ignore the
-	// rayleigh_scattering along the last shadow_length meters of the view ray, which we
-	// do by subtracting shadow_length from d (this way rayleigh_scattering_p is equal to
-	// the S|x_s=x_0-lv term in Eq. (17) of our paper).
-	d = max(d - shadow_length, 0.0);
-	float r_p = ClampRadius(sqrt(d * d + 2.0 * r * mu * d + r * r));
-	float mu_p = (r * mu + d) / r_p;
-	float mu_s_p = (r * mu_s + d * nu) / r_p;
-	float3 rayleigh_scattering_p = 0;
-	float3 single_mie_scattering_p = 0;
-
-	// [TODO] artifact near horizon
-	GetCombinedScattering(r_p, mu_p, mu_s_p, nu, ray_r_mu_intersects_ground, rayleigh_scattering_p, single_mie_scattering_p);
-
-	// Combine the lookup results to get the scattering between camera and point.
-	float3 shadow_transmittance = transmittance;
-	if (shadow_length > 0.0)
-	{
-		// This is the T(x,x_s) term in Eq. (17) of our paper, for light shafts.
-		shadow_transmittance = GetTransmittance(r, mu, d, ray_r_mu_intersects_ground);
-	}
-
-	rayleigh_scattering = rayleigh_scattering - shadow_transmittance * rayleigh_scattering_p;
-	single_mie_scattering = single_mie_scattering - shadow_transmittance * single_mie_scattering_p;
-
-	single_mie_scattering = GetExtrapolatedSingleMieScattering(float4(rayleigh_scattering.rgb, single_mie_scattering.r));
-
-	// Hack to avoid rendering artifacts when the sun is below the horizon.
-	single_mie_scattering = single_mie_scattering * smoothstep(float(0.0), float(0.01), mu_s);
-
-	sky_radiance = rayleigh_scattering* RayleighPhaseFunction(nu) + single_mie_scattering * MiePhaseFunction(mAtmosphere.mMiePhaseFunctionG, nu);
-}
-
-void GetSunAndSkyIrradiance(float3 hit_position, float3 normal, out float3 sun_irradiance, out float3 sky_irradiance)
-{
-	float3 local_position = hit_position - PlanetCenter();
-	float3 sun_direction = GetSunDirection();
-
-	float r = length(local_position);
-	float mu_s = dot(local_position, sun_direction) / r;
-
-	// Indirect irradiance (approximated if the surface is not horizontal).
-	float3 solar_irradiance = mAtmosphere.mPrecomputeWithSolarIrradiance ? 1.0 : mAtmosphere.mSolarIrradiance;
-	sky_irradiance = solar_irradiance * GetIrradiance(r, mu_s) * (1.0 + dot(normal, local_position) / r) * 0.5;
-
-	// Direct irradiance.
-	sun_irradiance = mAtmosphere.mSolarIrradiance * GetTransmittanceToSun(r, mu_s) * max(dot(normal, sun_direction), 0.0);
-}
-
-float GetSunVisibility(float3 position)
-{
-	float3 sun_direction = GetSunDirection();
-
-	// [TODO]
-	return 1.0;
-}
-
-float3 GetSkyVisibility(float3 position)
-{
-	// [TODO]
-	return 1.0;
-}
-
-float3 GetEnvironmentEmission()
-{
-	// Sky
-	float3 radiance = 0;
-	float3 transmittance_to_top = 0;
-	GetSkyRadiance(radiance, transmittance_to_top);
-
-	// Ground (the planet)
-	float2 distance = 0;
-	if (IntersectRaySphere(RayOrigin(), RayDirection(), PlanetCenter(), PlanetRadius(), distance) && distance.x > 0)
-	{
-		float3 hit_position = RayOrigin() + RayDirection() * distance.x;
-		float3 normal = normalize(hit_position - PlanetCenter());
-
-		float3 kGroundAlbedo = mAtmosphere.mRuntimeGroundAlbedo;
-
-		// Sky/Sun Irradiance -> Reflection -> Radiance
-		float3 sky_irradiance = 0;
-		float3 sun_irradiance = 0;
-		GetSunAndSkyIrradiance(hit_position, normal, sun_irradiance, sky_irradiance);
-		float3 ground_radiance = kGroundAlbedo * (1.0 / MATH_PI) * (sun_irradiance * GetSunVisibility(hit_position) + sky_irradiance * GetSkyVisibility(hit_position));
-
-		// [TODO] lightshaft
-
-		// Transmittance (merge with GetSkyRadiance()?)
-		float r = length(RayOrigin() - PlanetCenter());
-		float rmu = dot(RayOrigin() - PlanetCenter(), RayDirection());
-		float mu = rmu / r;
-		float3 transmittance_to_ground = GetTransmittance(r, mu, distance.x, true);
-
-		// Debug - Global
-		switch (mPerFrame.mDebugMode)
-		{
-		case DebugMode_Barycentrics: 			return 0;
-		case DebugMode_Vertex: 					return hit_position;
-		case DebugMode_Normal: 					return normal;
-		case DebugMode_Albedo: 					return kGroundAlbedo;
-		case DebugMode_Reflectance: 			return 0;
-		case DebugMode_Emission: 				return 0;
-		case DebugMode_Roughness: 				return 1;
-		case DebugMode_Transmittance:			return transmittance_to_ground;
-		case DebugMode_InScattering:			return radiance;
-		default:								break;
-		}
-
-		// Blend
-		if (mAtmosphere.mAerialPerspective == 0)
-			radiance = ground_radiance;
-		else
-			radiance = radiance + transmittance_to_ground * ground_radiance;
-	}
-	else
-	{
-		// Debug - Global
-		switch (mPerFrame.mDebugMode)
-		{
-		case DebugMode_Barycentrics: 			return 0;
-		case DebugMode_Vertex: 					return RayDirection(); // rays are supposed to go infinity
-		case DebugMode_Normal: 					return -RayDirection();
-		case DebugMode_Albedo: 					return 0;
-		case DebugMode_Reflectance: 			return 0;
-		case DebugMode_Emission: 				return 0;
-		case DebugMode_Roughness: 				return 1;
-		case DebugMode_Transmittance:			return transmittance_to_top;
-		case DebugMode_InScattering:			return radiance;
-		default:								break;
-		}
-	}
-
-	// Sun
-	if (dot(RayDirection(), GetSunDirection()) > cos(mAtmosphere.mSunAngularRadius))
-	{
-		radiance = radiance + transmittance_to_top * mAtmosphere.mSolarIrradiance;
-	}
-
-	// Debug
-	{
-		// return sqrt(radiance);
-		// return radiance;
-	}
-
-	return RadianceToLuminance(radiance);
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// https://www.shadertoy.com/view/ll3SWl
-
-// hash function
-float hash(float n)
-{
-	return frac(cos(n) * 114514.1919);
-}
-
-// 3d noise function
-float noise(float3 x)
-{
-	float3 p = floor(x);
-	float3 f = smoothstep(0.0, 1.0, frac(x));
-
-	float n = p.x + p.y * 10.0 + p.z * 100.0;
-
-	return lerp(
-		lerp(lerp(hash(n + 0.0), hash(n + 1.0), f.x),
-			lerp(hash(n + 10.0), hash(n + 11.0), f.x), f.y),
-		lerp(lerp(hash(n + 100.0), hash(n + 101.0), f.x),
-			lerp(hash(n + 110.0), hash(n + 111.0), f.x), f.y), f.z);
-}
-
-// Fractional Brownian motion
-float fbm(float3 p)
-{
-	float3x3 m = float3x3(0.00, 1.60, 1.20, -1.60, 0.72, -0.96, -1.20, -0.96, 1.28);
-
-	float f = 0.5000 * noise(p);
-	p = mul(m, p);
-	f += 0.2500 * noise(p);
-	p = mul(m, p);
-	f += 0.1666 * noise(p);
-	p = mul(m, p);
-	f += 0.0834 * noise(p);
-	return f;
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// [Schneider16]
-float SampleCloudDensity(float3 p, bool sample_coarse)
-{
-	float density = 0;
-
-	// FBM noise
-	if (false)
-	{
-		float frequency = mCloud.mShapeNoise.mFrequency * 10.0;
-		float power = mCloud.mShapeNoise.mPower * 0.2;
-		float scale = mCloud.mShapeNoise.mScale;
-		float3 offset = mCloud.mShapeNoise.mOffset;
-
-		float shape = fbm((p + offset) * frequency);
-		shape = pow(shape, power) * scale;
-
-		density = shape;
-	}
-
-	// Noise texture
-	// if (false)
-	{
-		float frequency = mCloud.mShapeNoise.mFrequency;
-		float power = mCloud.mShapeNoise.mPower;
-		float scale = mCloud.mShapeNoise.mScale;
-		float3 offset = mCloud.mShapeNoise.mOffset;
-
-		// [TODO] Skew
-
-		float shape = CloudShapeNoiseSRV.SampleLevel(BilinearWrapSampler, (p + offset) * frequency, 0).x;
-		shape = pow(shape, power) * scale;
-
-		float erosion = CloudErosionNoiseSRV.SampleLevel(BilinearWrapSampler, (p + offset * 0.9) * frequency * 2, 0).x;
-		// shape *= saturate(pow(erosion, 4));
-
-		density = shape;
-	}
-
-	// Debug
-	// density = 0.02;
-
-	return density;
-}
-
-float SampleCloudDensityAlongCone(float3 p, float3 ray_direction, out float3 ray_end)
-{
-	float accumulated_density = 0.0;
-
-	float3 light_step = ray_direction * mCloud.mRaymarch.mLightSampleLength;
-
-	p += light_step * 0.5;
-	for (int i = 0; i < mCloud.mRaymarch.mLightSampleCount; i++)
-	{
-		// [TODO] line -> cone
-		p += light_step;
-
-		// [TODO] utilize coarse
-		accumulated_density += SampleCloudDensity(p, false);
-	}
-	p += light_step * 0.5;
-	ray_end = p;
-
-	return accumulated_density;
-}
-
-float3 RaymarchCloud(out float3 transmittance)
-{
-	transmittance = 1.0;
-
-	float3 accumulated_light = 0;
-	float accumulated_density = 0.0;
-
-	// Cloud
-	{
-		// Stubs
-		int zero_density_max = 6;
-
-		// Bottom of cloud scape
-		float2 distance_range = 0;
-
-		// Ignore alto for now
-		float2 distance_to_planet = 0;
-		bool hit_planet = IntersectRaySphere(RayOrigin(), RayDirection(), PlanetCenter(), PlanetRadius() + 0, distance_to_planet);
-		float2 distance_to_strato = 0;
-		bool hit_strato = IntersectRaySphere(RayOrigin(), RayDirection(), PlanetCenter(), PlanetRadius() + mCloud.mGeometry.mStrato, distance_to_strato);
-		float2 distance_to_cirro = 0;
-		bool hit_cirro = IntersectRaySphere(RayOrigin(), RayDirection(), PlanetCenter(), PlanetRadius() + mCloud.mGeometry.mCirro, distance_to_cirro);
-
-		if (!hit_cirro || distance_to_cirro.y < 0)
-			return 0; // Hit nothing
-
-		if (!hit_strato || distance_to_strato.y < 0)
-			distance_range = float2(0, distance_to_cirro.y); // Hit cirro only, inside cloud scape
-		else
-		{
-			if (distance_to_strato.x > 0)
-				distance_range = float2(0, distance_to_strato.x); // Hit strato, inside cloud scape
-			else
-				if (hit_planet && distance_to_planet.x > 0 && distance_to_planet.x < distance_to_strato.y)
-					return 1; // Hit ground
-				else
-					distance_range = float2(distance_to_strato.y, distance_to_cirro.y); // Hit strato, below cloud scape
-		}
-
-		int sample_count = mCloud.mRaymarch.mSampleCount;
-		float step_length = (distance_range.y - distance_range.x) / sample_count;
-		float3 step = RayDirection() * step_length;
-
-		// [Debug]
-		if (false)
-		{
-			transmittance = 0;
-			return distance_range.y - distance_range.x;
-		}
-
-		int zero_density_count = 0;
-		bool sample_coarse = true;
-
-		// Move start position
-		float3 position = RayOrigin();
-		position += RayDirection() * (distance_range.x + step_length * 0.5);
-		for (int i = 0; i < sample_count; i++)
-		{
-			// [Debug]
-			sample_coarse = false; // Not supported yet
-
-			float density = SampleCloudDensity(position, sample_coarse);
-			if (sample_coarse)
-			{
-				if (density != 0.0)
-				{
-					i--; // step back
-					sample_coarse = false;
-					continue;
-				}
-
-				position += step;
-			}
-			else
-			{
-				if (density == 0.0)
-					zero_density_count++;
-
-				if (zero_density_count == zero_density_max)
-				{
-					zero_density_count = 0;
-					sample_coarse = true;
-					continue;
-				}
-
-				// Lighting
-				{
-					float3 ray_end;
-					float density = SampleCloudDensityAlongCone(position, GetSunDirection(), ray_end);
-
-					float light_samples = density * 1.0;
-
-					float3 sky_irradiance = 0;
-					float3 sun_irradiance = 0;
-					GetSunAndSkyIrradiance(ray_end, normalize(ray_end - PlanetCenter()), sun_irradiance, sky_irradiance);
-
-					// [Schneider16]
-					float powder_sugar_effect = 1.0 - exp(-light_samples * 2.0);
-					float beers_law = exp(-light_samples);
-					float light_energy = 2.0 * beers_law * powder_sugar_effect;
-
-					float phase = PhaseFunction_HenyeyGreenstein(0.2, dot(RayDirection(), GetSunDirection()));
-					light_energy *= phase;
-
-					accumulated_light += (1 - accumulated_density) * light_energy * (sun_irradiance + sky_irradiance);
-				}
-
-				accumulated_density += density;
-				position += step;
-			}
-
-			if (accumulated_density >= 1.0)
-			{
-				accumulated_density = 1.0;
-				break;
-			}
-		}
-
-		// [Debug]
-		// accumulated_light = SampleCloudDensity(RayOrigin() + RayDirection() * 10, true);
-		// accumulated_light = accumulated_density;
-	}
-
-	transmittance = 1.0 - accumulated_density;
-	return accumulated_light;
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 [shader("miss")]
 void DefaultMiss(inout RayPayload payload)
 {
 	payload.mDone = true;
 
-	float3 atmosphere = 0;
-	switch (mAtmosphere.mMode)
-	{
-	default:
-	case AtmosphereMode_ConstantColor: 				atmosphere = mAtmosphere.mConstantColor.xyz; break;
-	case AtmosphereMode_RaymarchAtmosphereOnly: 	atmosphere = RaymarchAtmosphereScattering(RayOrigin(), RayDirection()); break;
-	case AtmosphereMode_Bruneton17: 				atmosphere = GetEnvironmentEmission(); break;
-	case AtmosphereMode_Hillaire20: 				atmosphere = GetEnvironmentEmission(); break;
-	}
+	float3 sky_radiance = GetSkyRadiance();
 
 	float3 cloud = 0;
 	float3 cloud_transmittance = 1;
 	switch (mCloud.mMode)
 	{
 	default:
-	case CloudMode_None:							break;
-	case CloudMode_Noise:							cloud = RaymarchCloud(cloud_transmittance); break;
+	case CloudMode_None:		break;
+	case CloudMode_Noise:		cloud = RaymarchCloud(cloud_transmittance); break;
 	}
 
 	// [TODO] How to mix contributions to get best result?
 	float3 emission = 0;
-	emission = atmosphere;
+	emission = sky_radiance;
 	emission = lerp(emission, cloud, 1.0 - cloud_transmittance);
 
 	payload.mEmission = payload.mEmission + payload.mThroughput * emission;

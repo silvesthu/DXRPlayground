@@ -464,7 +464,7 @@ void Scene::CreateShaderResource()
 			D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
 			desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
 			desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			desc.Buffer.NumElements = (UINT)(resource_desc.Width / sizeof(ShaderType::InstanceData));
+			desc.Buffer.NumElements = static_cast<UINT>(resource_desc.Width / sizeof(ShaderType::InstanceData));
 			desc.Buffer.StructureByteStride = sizeof(ShaderType::InstanceData);
 			desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
 			gDevice->CreateShaderResourceView(mTLAS->GetInstanceBuffer(), &desc, handle);
