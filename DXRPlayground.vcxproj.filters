@@ -162,6 +162,9 @@
     <ClInclude Include="Source\Thirdparty\imgui\imgui.h">
       <Filter>Source\Thirdparty\imgui</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Thirdparty\tinygltf\tiny_gltf.h">
+      <Filter>Source\Thirdparty\tinygltf</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\DXRPlayground.cpp">
@@ -217,6 +220,9 @@
     </ClCompile>
     <ClCompile Include="Source\Thirdparty\imgui\imgui_draw.cpp">
       <Filter>Source\Thirdparty\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Thirdparty\tinygltf\tiny_gltf.cc">
+      <Filter>Source\Thirdparty\tinygltf</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

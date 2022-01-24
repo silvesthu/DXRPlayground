@@ -8,6 +8,7 @@
 #include "Cloud.h"
 
 #include "Thirdparty/tinyobjloader/tiny_obj_loader.h"
+#include "Thirdparty/tinygltf/tiny_gltf.h"
 
 Scene gScene;
 

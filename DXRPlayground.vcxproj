@@ -53,6 +53,7 @@
     <ClInclude Include="Source\Thirdparty\imgui\imstb_textedit.h" />
     <ClInclude Include="Source\Thirdparty\imgui\imstb_truetype.h" />
     <ClInclude Include="Source\Thirdparty\nameof\include\nameof.hpp" />
+    <ClInclude Include="Source\Thirdparty\tinygltf\tiny_gltf.h" />
     <ClInclude Include="Source\Thirdparty\tinyobjloader\tiny_obj_loader.h" />
   </ItemGroup>
   <ItemGroup>
@@ -73,6 +74,7 @@
     <ClCompile Include="Source\Thirdparty\imgui\imgui_draw.cpp" />
     <ClCompile Include="Source\Thirdparty\imgui\imgui_tables.cpp" />
     <ClCompile Include="Source\Thirdparty\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="Source\Thirdparty\tinygltf\tiny_gltf.cc" />
     <ClCompile Include="Source\Thirdparty\tinyobjloader\tiny_obj_loader.cc" />
   </ItemGroup>
   <ItemGroup>
@@ -177,7 +179,7 @@
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;STBI_MSC_SECURE_CRT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <TreatWarningAsError>true</TreatWarningAsError>
       <DisableLanguageExtensions>false</DisableLanguageExtensions>
@@ -199,7 +201,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;STBI_MSC_SECURE_CRT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <TreatWarningAsError>true</TreatWarningAsError>
