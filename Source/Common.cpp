@@ -245,22 +245,6 @@ void Texture::Initialize()
 		gDevice->CreateShaderResourceView(mResource.Get(), &srv_desc, mCPUHandle);
 	}
 
-	// Prepare intermediate resource
-	if (mPath != nullptr)
-	{
-		HRESULT hr = E_FAIL;
-		if (FAILED(hr))
-			hr = DirectX::GetMetadataFromTGAFile(mPath, mMetadata);
-		if (FAILED(hr))
-			hr = DirectX::GetMetadataFromDDSFile(mPath, DirectX::DDS_FLAGS_NONE, mMetadata);
-		assert(!FAILED(hr));
-
-		CreateTextureEx(gDevice, mMetadata, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, false, &mIntermediateResource);
-		std::wstring itermediate_name = name + L"_intermediate";
-		mIntermediateResource->SetName(itermediate_name.c_str());
-		create_uav(mIntermediateResource.Get(), mIntermediateResourceHeapIndex);
-	}
-
 	// UIScale
 	if (mUIScale == 0.0f)
 		mUIScale = 256.0f / mWidth;
@@ -286,21 +270,16 @@ void Texture::Load()
 	// Prepare upload resource
 	std::vector<D3D12_SUBRESOURCE_DATA> subresources;
 	PrepareUpload(gDevice, scratch_image.GetImages(), scratch_image.GetImageCount(), scratch_image.GetMetadata(), subresources);
-	UINT64 byte_count = GetRequiredIntermediateSize(mIntermediateResource.Get(), 0, UINT(subresources.size()));
+	UINT64 byte_count = GetRequiredIntermediateSize(mResource.Get(), 0, UINT(subresources.size()));
 	D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(byte_count);
 	D3D12_HEAP_PROPERTIES upload_properties = gGetUploadHeapProperties();
 	gValidate(gDevice->CreateCommittedResource(&upload_properties, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mUploadResource)));
+	std::wstring name = gToWString(mName);
+	mUploadResource->SetName(name.c_str());
 
 	// Upload
-	UpdateSubresources(gCommandList, mIntermediateResource.Get(), mUploadResource.Get(), 0, 0, (UINT)subresources.size(), subresources.data());
-	if (mCopyAfterUpload)
-	{
-		gBarrierTransition(gCommandList, mIntermediateResource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COPY_SOURCE);
-		gBarrierTransition(gCommandList, mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
-		gCommandList->CopyResource(mResource.Get(), mIntermediateResource.Get());
-		gBarrierTransition(gCommandList, mIntermediateResource.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
-		gBarrierTransition(gCommandList, mResource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE);
-	}
+	BarrierScope expected_scope(gCommandList, mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
+	UpdateSubresources(gCommandList, mResource.Get(), mUploadResource.Get(), 0, 0, (UINT)subresources.size(), subresources.data());
 }
 
 void ImGuiShowTextures(std::vector<Texture*> textures, std::string name, ImGuiTreeNodeFlags flags)

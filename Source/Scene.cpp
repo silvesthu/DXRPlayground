@@ -40,7 +40,7 @@ void BLAS::Initialize(D3D12_GPU_VIRTUAL_ADDRESS inVertexBaseAddress, D3D12_GPU_V
 	D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
 	D3D12_RESOURCE_DESC desc = gGetUAVResourceDesc(info.ScratchDataSizeInBytes);
 
-	gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&mScratch)));
+	gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mScratch)));
 	gSetName(mScratch, mName, L".BLAS.Scratch");
 
 	desc = gGetUAVResourceDesc(info.ResultDataMaxSizeInBytes);
@@ -116,7 +116,7 @@ void TLAS::Initialize(std::vector<ObjectInstanceRef>&& inObjectInstances)
 	{
 		D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
 		D3D12_RESOURCE_DESC desc = gGetUAVResourceDesc(info.ScratchDataSizeInBytes);
-		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&mScratch)));
+		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mScratch)));
 		gSetName(mScratch, mName, L".TLAS.Scratch");
 	}
 
@@ -354,6 +354,7 @@ void Scene::Unload()
 	mNormalBuffer = nullptr;
 	mIndexBuffer = nullptr;
 	mVertexBuffer = nullptr;
+	mUVBuffer = nullptr;
 }
 
 void Scene::Build(ID3D12GraphicsCommandList4* inCommandList)

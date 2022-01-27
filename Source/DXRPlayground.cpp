@@ -803,7 +803,7 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		std::wstring name;
 
 		gValidate(gDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&gFrameContext[i].mCommandAllocator)));
-		name = L"CommandAllocator_" + i;
+		name = L"CommandAllocator_" + std::to_wstring(i);
 		gFrameContext[i].mCommandAllocator->SetName(name.c_str());
 
 		// Buffer
@@ -812,7 +812,7 @@ static bool sCreateDeviceD3D(HWND hWnd)
 			D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
 
 			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gFrameContext[i].mConstantUploadBuffer)));
-			name = L"Constant_Upload_" + i;
+			name = L"Constant_Upload_" + std::to_wstring(i);
 			gFrameContext[i].mConstantUploadBuffer->SetName(name.c_str());
 
 			// Persistent map - https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12resource-map#advanced-usage-models
@@ -827,7 +827,7 @@ static bool sCreateDeviceD3D(HWND hWnd)
 			D3D12_RESOURCE_DESC resource_desc = gGetBufferResourceDesc(gAlignUp(static_cast<UINT>(sizeof(PerFrameConstants)), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
 			D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
 
-			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, nullptr, IID_PPV_ARGS(&gConstantGPUBuffer)));
+			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&gConstantGPUBuffer)));
 			std::wstring name = L"Constant_GPU";
 			gConstantGPUBuffer->SetName(name.c_str());
 		}
@@ -878,6 +878,7 @@ static void sCleanupDeviceD3D()
 	}
 
 	gConstantGPUBuffer = nullptr;
+	gUniversalHeap = nullptr;
 	gSafeRelease(gCommandQueue);
 	gSafeRelease(gCommandList);
 	gSafeRelease(gRTVDescriptorHeap);
@@ -898,7 +899,9 @@ static void sCreateRenderTarget()
 	ID3D12Resource* pBackBuffer;
 	for (UINT i = 0; i < NUM_BACK_BUFFERS; i++)
 	{
+		std::wstring name = L"SwapChainBuffer_" + std::to_wstring(i);
 		gSwapChain->GetBuffer(i, IID_PPV_ARGS(&pBackBuffer));
+		pBackBuffer->SetName(name.c_str());
 		gDevice->CreateRenderTargetView(pBackBuffer, nullptr, gBackBufferRenderTargetRTV[i]);
 		gBackBufferRenderTargetResource[i] = pBackBuffer;
 	}

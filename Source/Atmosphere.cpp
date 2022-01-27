@@ -170,33 +170,37 @@ void PrecomputedAtmosphereScattering::Compute()
 
 void PrecomputedAtmosphereScattering::Validate()
 {
-	auto validate = [](const Texture& inComputed, const Texture& inExpected)
+	auto diff = [](const Texture& inComputed, const Texture& inExpected, const Texture& inOutput)
 	{
 		BarrierScope computed_scope(gCommandList, inComputed.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		BarrierScope expected_scope(gCommandList, inExpected.mIntermediateResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		BarrierScope output_scope(gCommandList, inExpected.mResource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		BarrierScope expected_scope(gCommandList, inExpected.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		BarrierScope output_scope(gCommandList, inOutput.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 		Shader& shader = inExpected.mDepth == 1 ? gDiffTexture2DShader : gDiffTexture3DShader;
 		shader.SetupCompute(gUniversalHeap.Get(), false);
 
 		gCommandList->SetComputeRoot32BitConstant(0, inComputed.mResourceHeapIndex, 0);
-		gCommandList->SetComputeRoot32BitConstant(0, inExpected.mIntermediateResourceHeapIndex, 1);
-		gCommandList->SetComputeRoot32BitConstant(0, inExpected.mResourceHeapIndex, 2);
+		gCommandList->SetComputeRoot32BitConstant(0, inExpected.mResourceHeapIndex, 1);
+		gCommandList->SetComputeRoot32BitConstant(0, inOutput.mResourceHeapIndex, 2);
 
 		gCommandList->Dispatch((inExpected.mWidth + 7) / 8, (inExpected.mHeight + 7) / 8, inExpected.mDepth);
 	};
 
-	validate(
-		gPrecomputedAtmosphereScatteringResources.mTransmittanceTex, 
+	diff(
+		gPrecomputedAtmosphereScatteringResources.mTransmittanceTex,
+		gPrecomputedAtmosphereScatteringResources.mValidation.mTransmittanceTexExpected,
 		gPrecomputedAtmosphereScatteringResources.mValidation.mTransmittanceTex);
-	validate(
+	diff(
 		gPrecomputedAtmosphereScatteringResources.mMultiScattTex,
+		gPrecomputedAtmosphereScatteringResources.mValidation.mMultiScattTexExpected,
 		gPrecomputedAtmosphereScatteringResources.mValidation.mMultiScattTex);
-	validate(
+	diff(
 		gPrecomputedAtmosphereScatteringResources.mSkyViewLutTex,
+		gPrecomputedAtmosphereScatteringResources.mValidation.mSkyViewLutTexExpected,
 		gPrecomputedAtmosphereScatteringResources.mValidation.mSkyViewLutTex);
-	validate(
+	diff(
 		gPrecomputedAtmosphereScatteringResources.mAtmosphereCameraScatteringVolume,
+		gPrecomputedAtmosphereScatteringResources.mValidation.mAtmosphereCameraScatteringVolumeExpected,
 		gPrecomputedAtmosphereScatteringResources.mValidation.mAtmosphereCameraScatteringVolume);
 }
 
@@ -232,7 +236,7 @@ void PrecomputedAtmosphereScattering::Initialize()
 		D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
 
 		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gPrecomputedAtmosphereScatteringResources.mConstantUploadBuffer)));
-		gPrecomputedAtmosphereScatteringResources.mConstantUploadBuffer->SetName(L"AtmosphereConstants.Constant");
+		gPrecomputedAtmosphereScatteringResources.mConstantUploadBuffer->SetName(L"Atmosphere.Constant");
 		gPrecomputedAtmosphereScatteringResources.mConstantUploadBuffer->Map(0, nullptr, (void**)&gPrecomputedAtmosphereScatteringResources.mConstantUploadBufferPointer);
 	}
 

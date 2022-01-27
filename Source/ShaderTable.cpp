@@ -89,7 +89,7 @@ void gCreateShaderTable()
 		D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(gDXRShaderTable.mEntrySize * shader_table_entry_index);
 
 		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gDXRShaderTable.mResource)));
-		gDXRShaderTable.mResource->SetName(L"gDxrShaderTable");
+		gDXRShaderTable.mResource->SetName(L"DXR.ShaderTable");
 	}
  
 	// Copy the table

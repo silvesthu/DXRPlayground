@@ -181,6 +181,7 @@ void ImGui_ImplDX12_RenderDrawData(ImDrawData* draw_data, ID3D12GraphicsCommandL
         desc.Flags = D3D12_RESOURCE_FLAG_NONE;
         if (g_D3DDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, NULL, IID_PPV_ARGS(&fr->VertexBuffer)) < 0)
             return;
+        fr->VertexBuffer->SetName(L"ImGui.VertexBuffer");
     }
     if (fr->IndexBuffer == NULL || fr->IndexBufferSize < draw_data->TotalIdxCount)
     {
@@ -204,6 +205,7 @@ void ImGui_ImplDX12_RenderDrawData(ImDrawData* draw_data, ID3D12GraphicsCommandL
         desc.Flags = D3D12_RESOURCE_FLAG_NONE;
         if (g_D3DDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, NULL, IID_PPV_ARGS(&fr->IndexBuffer)) < 0)
             return;
+        fr->IndexBuffer->SetName(L"ImGui.IndexBuffer");
     }
 
     // Upload vertex/index data into a single contiguous GPU buffer
@@ -309,6 +311,7 @@ static void ImGui_ImplDX12_CreateFontsTexture()
         ID3D12Resource* pTexture = NULL;
         g_D3DDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc,
             D3D12_RESOURCE_STATE_COPY_DEST, NULL, IID_PPV_ARGS(&pTexture));
+        pTexture->SetName(L"ImGui.FontTexture");
 
         UINT uploadPitch = (width * 4 + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1u) & ~(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1u);
         UINT uploadSize = height * uploadPitch;
@@ -332,6 +335,7 @@ static void ImGui_ImplDX12_CreateFontsTexture()
         HRESULT hr = g_D3DDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc,
             D3D12_RESOURCE_STATE_GENERIC_READ, NULL, IID_PPV_ARGS(&uploadBuffer));
         IM_ASSERT(SUCCEEDED(hr));
+        uploadBuffer->SetName(L"ImGui.FontTexture");
 
         void* mapped = NULL;
         D3D12_RANGE range = { 0, uploadSize };

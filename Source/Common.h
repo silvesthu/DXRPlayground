@@ -102,7 +102,6 @@ struct Texture
 	TEXTURE_MEMBER(const char*, Name, nullptr);
 	TEXTURE_MEMBER(float, UIScale, 0.0f);
 	TEXTURE_MEMBER(const wchar_t*, Path, nullptr);
-	TEXTURE_MEMBER(bool, CopyAfterUpload, false);
 
 	Texture& Dimension(glm::uvec3 dimension) 
 	{
@@ -116,16 +115,12 @@ struct Texture
 	void Load();
 
 	ComPtr<ID3D12Resource> mResource;
-	ComPtr<ID3D12Resource> mIntermediateResource;
 	ComPtr<ID3D12Resource> mUploadResource;
 
 	D3D12_CPU_DESCRIPTOR_HANDLE mCPUHandle = {};
 	D3D12_GPU_DESCRIPTOR_HANDLE mGPUHandle = {};
 
 	int mResourceHeapIndex = -1;
-	int mIntermediateResourceHeapIndex = -1;
-
-	DirectX::TexMetadata mMetadata = {};
 };
 
 extern ComPtr<ID3D12Resource>				gConstantGPUBuffer;

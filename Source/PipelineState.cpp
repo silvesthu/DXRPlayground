@@ -562,6 +562,7 @@ void gCleanupPipelineState()
 	gDXRInlineShader.Reset();
 
 	gDiffTexture2DShader.Reset();
+	gDiffTexture3DShader.Reset();
 
 	gCompositeShader.Reset();
 }

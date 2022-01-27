@@ -69,8 +69,8 @@ struct CloudResources
 	ComPtr<ID3D12Resource> mConstantUploadBuffer;
 	void* mConstantUploadBufferPointer = nullptr;
 
-	Shader mShapeNoiseShader = Shader().CSName(L"CloudShapeNoiseCS");
-	Shader mErosionNoiseShader = Shader().CSName(L"CloudErosionNoiseCS");
+	Shader mShapeNoiseShader				= Shader().CSName(L"CloudShapeNoiseCS");
+	Shader mErosionNoiseShader				= Shader().CSName(L"CloudErosionNoiseCS");
 
 	// Put shaders in array to use in loop
 	std::vector<Shader*> mShaders =
@@ -79,14 +79,20 @@ struct CloudResources
 		&mErosionNoiseShader
 	};
 
-	Texture mShapeNoiseTexture = Texture().Width(128).Height(128).Depth(128).Format(DXGI_FORMAT_R8_UNORM).Name("Cloud.ShapeNoise").UIScale(2.0f).Path(L"Asset/TileableVolumeNoise/noiseShapePacked.tga");
-	Texture mErosionNoiseTexture = Texture().Width(32).Height(32).Depth(32).Format(DXGI_FORMAT_R8_UNORM).Name("Cloud.ErosionNoise").UIScale(8.0f).Path(L"Asset/TileableVolumeNoise/noiseErosionPacked.tga");
+	Texture mShapeNoiseTexture				= Texture().Width(128).Height(128).Depth(128).Format(DXGI_FORMAT_R8_UNORM).Name("Cloud.ShapeNoise").UIScale(2.0f);
+	Texture mErosionNoiseTexture			= Texture().Width(32).Height(32).Depth(32).Format(DXGI_FORMAT_R8_UNORM).Name("Cloud.ErosionNoise").UIScale(8.0f);
+
+	Texture mShapeNoiseInputTexture			= Texture().Width(128).Height(128).Depth(128).Format(DXGI_FORMAT_R8_UNORM).Name("Cloud.ShapeNoise.Input").UIScale(2.0f).Path(L"Asset/TileableVolumeNoise/noiseShapePacked.tga");
+	Texture mErosionNoiseInputTexture		= Texture().Width(32).Height(32).Depth(32).Format(DXGI_FORMAT_R8_UNORM).Name("Cloud.ErosionNoise.Input").UIScale(8.0f).Path(L"Asset/TileableVolumeNoise/noiseErosionPacked.tga");
 
 	// Put textures in array to use in loop
 	std::vector<Texture*> mTextures =
 	{
 		&mShapeNoiseTexture,
-		&mErosionNoiseTexture
+		&mErosionNoiseTexture,
+
+		&mShapeNoiseInputTexture,
+		&mErosionNoiseInputTexture
 	};
 };
 
