@@ -124,7 +124,7 @@ struct AtmosphereProfile
 		}
 	};
 	bool mEnableRayleigh								= {};
-	ShaderType::DensityProfile mRayleighDensityProfile	= {}; // km
+	DensityProfile mRayleighDensityProfile				= {}; // km
 	glm::dvec3 mRayleighScatteringCoefficient			= {}; // km^-1
 
 	// Mie
@@ -181,7 +181,7 @@ struct AtmosphereProfile
 		}
 	};
 	bool mEnableMie										= {};
-	ShaderType::DensityProfile mMieDensityProfile		= {}; // km
+	DensityProfile mMieDensityProfile					= {}; // km
 	glm::dvec3 mMieScatteringCoefficient				= {}; // km^-1
 	glm::dvec3 mMieExtinctionCoefficient				= {}; // km^-1
 	double mMiePhaseFunctionG							= {};
@@ -239,7 +239,7 @@ struct AtmosphereProfile
 	double mOzoneBottomAltitude							= {}; // km
 	double mOzoneMidAltitude							= {}; // km
 	double mOzoneTopAltitude							= {}; // km
-	ShaderType::DensityProfile mOzoneDensityProfile		= {}; // km
+	DensityProfile mOzoneDensityProfile					= {}; // km
 	glm::dvec3 mOZoneAbsorptionCoefficient				= {}; // km^-1
 
 	// Solar
@@ -376,13 +376,13 @@ struct PrecomputedAtmosphereScatteringResources
 	Shader mComputeIndirectIrradianceShader		= Shader().CSName(L"ComputeIndirectIrradianceCS");
 	Shader mComputeMultipleScatteringShader		= Shader().CSName(L"ComputeMultipleScatteringCS");
 	
-	Texture mTransmittanceTexture				= Texture().Width(256).Height(64).Format(DXGI_FORMAT_R32G32B32A32_FLOAT).Name("Transmittance");
-	Texture mDeltaIrradianceTexture				= Texture().Width(64).Height(16).Format(DXGI_FORMAT_R32G32B32A32_FLOAT).Name("Delta Irradiance");
-	Texture mIrradianceTexture					= Texture().Width(64).Height(16).Format(DXGI_FORMAT_R32G32B32A32_FLOAT).Name("Irradiance");
-	Texture mDeltaRayleighScatteringTexture		= Texture().Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Delta Rayleigh Scattering");
-	Texture mDeltaMieScatteringTexture			= Texture().Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Delta Mie Scattering");
-	Texture mScatteringTexture					= Texture().Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Scattering");
-	Texture mDeltaScatteringDensityTexture		= Texture().Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Delta Scattering Density");
+	Texture mTransmittanceTexture				= Texture().Width(256).Height(64).Format(DXGI_FORMAT_R32G32B32A32_FLOAT).Name("Bruneton17.Transmittance");
+	Texture mDeltaIrradianceTexture				= Texture().Width(64).Height(16).Format(DXGI_FORMAT_R32G32B32A32_FLOAT).Name("Bruneton17.DeltaIrradiance");
+	Texture mIrradianceTexture					= Texture().Width(64).Height(16).Format(DXGI_FORMAT_R32G32B32A32_FLOAT).Name("Bruneton17.Irradiance");
+	Texture mDeltaRayleighScatteringTexture		= Texture().Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Bruneton17.DeltaRayleighScattering");
+	Texture mDeltaMieScatteringTexture			= Texture().Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Bruneton17.DeltaMieScattering");
+	Texture mScatteringTexture					= Texture().Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Bruneton17.Scattering");
+	Texture mDeltaScatteringDensityTexture		= Texture().Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Bruneton17.DeltaScatteringDensity");
 
 	glm::uint mSliceCount = 0; // Slice axis to use 3D texture as 4D storage
 
@@ -392,7 +392,7 @@ struct PrecomputedAtmosphereScatteringResources
 	Shader mSkyViewLutShader					= Shader().CSName(L"SkyViewLut");
 	Shader mCameraVolumesShader					= Shader().CSName(L"CameraVolumes");
 
-	Texture mTransmittanceTex = Texture().Width(256).Height(64).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Hillaire20.TransmittanceTex");
+	Texture mTransmittanceTex					= Texture().Width(256).Height(64).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Hillaire20.TransmittanceTex");
 	Texture mMultiScattTex						= Texture().Width(32).Height(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Hillaire20.MultiScattTex");
 	Texture mSkyViewLutTex						= Texture().Width(192).Height(108).Format(DXGI_FORMAT_R11G11B10_FLOAT).Name("Hillaire20.SkyViewLutTex");
 	Texture mAtmosphereCameraScatteringVolume	= Texture().Width(32).Height(32).Depth(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Hillaire20.AtmosphereCameraScatteringVolume");
@@ -484,5 +484,5 @@ struct PrecomputedAtmosphereScatteringResources
 };
 
 extern AtmosphereProfile gAtmosphereProfile;
-extern PrecomputedAtmosphereScattering gPrecomputedAtmosphereScattering;
 extern PrecomputedAtmosphereScatteringResources gPrecomputedAtmosphereScatteringResources;
+extern PrecomputedAtmosphereScattering gPrecomputedAtmosphereScattering;

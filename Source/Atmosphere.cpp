@@ -5,70 +5,71 @@
 #include "ImGui/imgui_impl_helper.h"
 
 AtmosphereProfile gAtmosphereProfile;
-PrecomputedAtmosphereScattering gPrecomputedAtmosphereScattering;
 PrecomputedAtmosphereScatteringResources gPrecomputedAtmosphereScatteringResources;
+PrecomputedAtmosphereScattering gPrecomputedAtmosphereScattering;
 
 void PrecomputedAtmosphereScattering::Update()
 {
-	ShaderType::Atmosphere* atmosphere				= static_cast<ShaderType::Atmosphere*>(gPrecomputedAtmosphereScatteringResources.mConstantUploadBufferPointer);
+	AtmosphereConstants* contants				= static_cast<AtmosphereConstants*>(gPrecomputedAtmosphereScatteringResources.mConstantUploadBufferPointer);
 
-	auto inv_m_to_inv_km							= [](glm::f64 inInvM) { return static_cast<float>(inInvM * 1000.0); };
+	auto inv_m_to_inv_km						= [](glm::f64 inInvM) { return static_cast<float>(inInvM * 1000.0); };
 
-	atmosphere->mBottomRadius						= static_cast<float>(gAtmosphereProfile.BottomRadius());
-	atmosphere->mTopRadius							= static_cast<float>(gAtmosphereProfile.TopRadius());
-	atmosphere->mSceneScale							= gAtmosphereProfile.mSceneInKilometer ? 1.0f : 0.001f;
+	contants->mBottomRadius						= static_cast<float>(gAtmosphereProfile.BottomRadius());
+	contants->mTopRadius						= static_cast<float>(gAtmosphereProfile.TopRadius());
+	contants->mSceneScale						= gAtmosphereProfile.mSceneInKilometer ? 1.0f : 0.001f;
 
-	atmosphere->mMode								= gAtmosphereProfile.mMode;
-	atmosphere->mMuSEncodingMode					= gAtmosphereProfile.mMuSEncodingMode;
-	atmosphere->mSliceCount							= gPrecomputedAtmosphereScatteringResources.mSliceCount;
+	contants->mMode								= gAtmosphereProfile.mMode;
+	contants->mMuSEncodingMode					= gAtmosphereProfile.mMuSEncodingMode;
+	contants->mSliceCount						= gPrecomputedAtmosphereScatteringResources.mSliceCount;
 
-	atmosphere->mConstantColor						= gAtmosphereProfile.mConstantColor;
+	contants->mConstantColor					= gAtmosphereProfile.mConstantColor;
 
-	atmosphere->mSolarIrradiance					= gAtmosphereProfile.mSolarIrradiance;
-	atmosphere->mPrecomputeWithSolarIrradiance		= gAtmosphereProfile.mPrecomputeWithSolarIrradiance;
-	atmosphere->mSunAngularRadius					= static_cast<float>(gAtmosphereProfile.kSunAngularRadius);
+	contants->mSolarIrradiance					= gAtmosphereProfile.mSolarIrradiance;
+	contants->mPrecomputeWithSolarIrradiance	= gAtmosphereProfile.mPrecomputeWithSolarIrradiance;
+	contants->mSunAngularRadius					= static_cast<float>(gAtmosphereProfile.kSunAngularRadius);
 
-	atmosphere->mAerialPerspective					= (gAtmosphereProfile.mMode != AtmosphereMode::RaymarchAtmosphereOnly && gAtmosphereProfile.mAerialPerspective) ? 1.0f : 0.0f;
-	atmosphere->mGroundAlbedo						= gAtmosphereProfile.mGroundAlbedo;
-	atmosphere->mRuntimeGroundAlbedo				= gAtmosphereProfile.mRuntimeGroundAlbedo;
+	contants->mAerialPerspective				= (gAtmosphereProfile.mMode != AtmosphereMode::RaymarchAtmosphereOnly && gAtmosphereProfile.mAerialPerspective) ? 1.0f : 0.0f;
+	contants->mGroundAlbedo						= gAtmosphereProfile.mGroundAlbedo;
+	contants->mRuntimeGroundAlbedo				= gAtmosphereProfile.mRuntimeGroundAlbedo;
 
+	// Density Profile
 	{
 		// Rayleigh
 		{
 			// Scattering Coefficient
-			atmosphere->mRayleighScattering			= gAtmosphereProfile.mEnableRayleigh ? gAtmosphereProfile.mRayleighScatteringCoefficient : glm::dvec3(1e-9);
+			contants->mRayleighScattering		= gAtmosphereProfile.mEnableRayleigh ? gAtmosphereProfile.mRayleighScatteringCoefficient : glm::dvec3(1e-9);
 
 			// Extinction Coefficient
-			atmosphere->mRayleighExtinction			= gAtmosphereProfile.mEnableRayleigh ? gAtmosphereProfile.mRayleighScatteringCoefficient : glm::dvec3(1e-9);
+			contants->mRayleighExtinction		= gAtmosphereProfile.mEnableRayleigh ? gAtmosphereProfile.mRayleighScatteringCoefficient : glm::dvec3(1e-9);
 
 			// Density
-			atmosphere->mRayleighDensity			= gAtmosphereProfile.mRayleighDensityProfile;
+			contants->mRayleighDensity			= gAtmosphereProfile.mRayleighDensityProfile;
 		}
 
 		// Mie
 		{
 			// Scattering Coefficient
-			atmosphere->mMieScattering				= gAtmosphereProfile.mEnableMie ? gAtmosphereProfile.mMieScatteringCoefficient : glm::dvec3(1e-9);
+			contants->mMieScattering			= gAtmosphereProfile.mEnableMie ? gAtmosphereProfile.mMieScatteringCoefficient : glm::dvec3(1e-9);
 
 			// Extinction Coefficient
-			atmosphere->mMieExtinction				= gAtmosphereProfile.mEnableMie ? gAtmosphereProfile.mMieExtinctionCoefficient : glm::dvec3(1e-9);
+			contants->mMieExtinction			= gAtmosphereProfile.mEnableMie ? gAtmosphereProfile.mMieExtinctionCoefficient : glm::dvec3(1e-9);
 
 			// Phase function
-			atmosphere->mMiePhaseFunctionG			= static_cast<float>(gAtmosphereProfile.mMiePhaseFunctionG);
+			contants->mMiePhaseFunctionG		= static_cast<float>(gAtmosphereProfile.mMiePhaseFunctionG);
 
 			// Density
-			atmosphere->mMieDensity					= gAtmosphereProfile.mMieDensityProfile;
+			contants->mMieDensity				= gAtmosphereProfile.mMieDensityProfile;
 		}
 
 		// Ozone
 		{
 			// Extinction Coefficient
-			atmosphere->mOzoneExtinction			= gAtmosphereProfile.mEnableOzone ? gAtmosphereProfile.mOZoneAbsorptionCoefficient : glm::dvec3();
+			contants->mOzoneExtinction			= gAtmosphereProfile.mEnableOzone ? gAtmosphereProfile.mOZoneAbsorptionCoefficient : glm::dvec3();
 
 			// Density
-			atmosphere->mOzoneDensity				= gAtmosphereProfile.mOzoneDensityProfile;
+			contants->mOzoneDensity				= gAtmosphereProfile.mOzoneDensityProfile;
 		}
-	} // Density Profile
+	}
 }
 
 void PrecomputedAtmosphereScattering::Load()
@@ -102,9 +103,9 @@ void PrecomputedAtmosphereScattering::ComputeScatteringDensity(glm::uint scatter
 {
 	gPrecomputedAtmosphereScatteringResources.mComputeScatteringDensityShader.SetupCompute();
 
-	ShaderType::AtmospherePerDraw atmosphere_per_draw = {};
+	AtmosphereConstantsPerDraw atmosphere_per_draw = {};
 	atmosphere_per_draw.mScatteringOrder = scattering_order;
-	gCommandList->SetComputeRoot32BitConstants(1, sizeof(ShaderType::AtmospherePerDraw) / 4, &atmosphere_per_draw, 0);
+	gCommandList->SetComputeRoot32BitConstants(1, sizeof(AtmosphereConstantsPerDraw) / 4, &atmosphere_per_draw, 0);
 
 	gCommandList->Dispatch(gPrecomputedAtmosphereScatteringResources.mDeltaScatteringDensityTexture.mWidth / 8, gPrecomputedAtmosphereScatteringResources.mDeltaScatteringDensityTexture.mHeight / 8, gPrecomputedAtmosphereScatteringResources.mDeltaScatteringDensityTexture.mDepth);
 }
@@ -113,9 +114,9 @@ void PrecomputedAtmosphereScattering::ComputeIndirectIrradiance(glm::uint scatte
 {
 	gPrecomputedAtmosphereScatteringResources.mComputeIndirectIrradianceShader.SetupCompute();
 
-	ShaderType::AtmospherePerDraw atmosphere_per_draw = {};
+	AtmosphereConstantsPerDraw atmosphere_per_draw = {};
 	atmosphere_per_draw.mScatteringOrder = scattering_order - 1;
-	gCommandList->SetComputeRoot32BitConstants(1, sizeof(ShaderType::AtmospherePerDraw) / 4, &atmosphere_per_draw, 0);
+	gCommandList->SetComputeRoot32BitConstants(1, sizeof(AtmosphereConstantsPerDraw) / 4, &atmosphere_per_draw, 0);
 
 	gCommandList->Dispatch(gPrecomputedAtmosphereScatteringResources.mIrradianceTexture.mWidth / 8, gPrecomputedAtmosphereScatteringResources.mIrradianceTexture.mHeight / 8, gPrecomputedAtmosphereScatteringResources.mIrradianceTexture.mDepth);
 }
@@ -227,11 +228,11 @@ void PrecomputedAtmosphereScattering::Initialize()
 {
 	// Buffer
 	{
-		D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(gAlignUp(static_cast<UINT>(sizeof(ShaderType::Atmosphere)), static_cast<UINT>(D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT)));
+		D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(gAlignUp(static_cast<UINT>(sizeof(AtmosphereConstants)), static_cast<UINT>(D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT)));
 		D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
 
 		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gPrecomputedAtmosphereScatteringResources.mConstantUploadBuffer)));
-		gPrecomputedAtmosphereScatteringResources.mConstantUploadBuffer->SetName(L"Atmosphere.Constant");
+		gPrecomputedAtmosphereScatteringResources.mConstantUploadBuffer->SetName(L"AtmosphereConstants.Constant");
 		gPrecomputedAtmosphereScatteringResources.mConstantUploadBuffer->Map(0, nullptr, (void**)&gPrecomputedAtmosphereScatteringResources.mConstantUploadBufferPointer);
 	}
 
@@ -326,18 +327,18 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 
 	if (ImGui::TreeNodeEx("Sun"))
 	{
-		ImGui::Text("Direction");
-		ImGui::SliderAngle("Azimuth Angle", &gPerFrameConstantBuffer.mSunAzimuth, 0, 360.0f);
-		ImGui::SliderAngle("Zenith Angle", &gPerFrameConstantBuffer.mSunZenith, 0, 180.0f);
+		ImGui::SliderFloat("Luminance Scale", &gPerFrameConstantBuffer.mSunLuminanceScale, 0.0f, 1.0f);
+		ImGui::SliderAngle("Azimuth Angle", &gPerFrameConstantBuffer.mSunAzimuth, 0.0f, 360.0f);
+		ImGui::SliderAngle("Zenith Angle", &gPerFrameConstantBuffer.mSunZenith, 0.0f, 180.0f);
 
 		ImGui::Text(gAtmosphereProfile.mShowSolarIrradianceAsLuminance ? "Solar Irradiance (klm)" : "Solar Irradiance (kW)");
-		float scale = gAtmosphereProfile.mShowSolarIrradianceAsLuminance ? ShaderType::kSunLuminousEfficacy : 1.0f;
+		float scale = gAtmosphereProfile.mShowSolarIrradianceAsLuminance ? kSunLuminousEfficacy : 1.0f;
 		glm::vec3 solar_value = gAtmosphereProfile.mSolarIrradiance * scale;
 		if (ImGui::ColorEdit3("", &solar_value[0], ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR))
 			gAtmosphereProfile.mSolarIrradiance = solar_value / scale;
 		ImGui::Checkbox("Use Luminance", &gAtmosphereProfile.mShowSolarIrradianceAsLuminance);
 		ImGui::SameLine();
-		ImGui::Text("(Luminous Efficacy = %.2f lm/W)", ShaderType::kSunLuminousEfficacy);
+		ImGui::Text("(Luminous Efficacy = %.2f lm/W)", kSunLuminousEfficacy);
 		ImGui::Checkbox("Precompute With Solar Irradiance", &gAtmosphereProfile.mPrecomputeWithSolarIrradiance);
 
 		if (ImGui::SmallButton("Bruneton17")) AtmosphereProfile::SolarIrradianceReference::Bruneton17(gAtmosphereProfile);
@@ -354,7 +355,7 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 		ImGui::PushItemWidth(200);
 
 		ImGui::SliderDouble("Earth Radius (km)", &gAtmosphereProfile.mBottomRadius, 1.0, 10000.0);
-		ImGui::SliderDouble("Atmosphere Thickness (km)", &gAtmosphereProfile.mAtmosphereThickness, 1.0, 100.0);
+		ImGui::SliderDouble("AtmosphereConstants Thickness (km)", &gAtmosphereProfile.mAtmosphereThickness, 1.0, 100.0);
 
 		ImGui::PopItemWidth();
 
@@ -388,21 +389,20 @@ void PrecomputedAtmosphereScattering::UpdateImGui()
 			float mMin = 0.0;
 			float mMax = 1.0;
 			int mCount = 100;
-			ShaderType::DensityProfile* mProfile = nullptr;
+			DensityProfile* mProfile = nullptr;
 
 			static float Func(void* inData, int inIndex)
 			{
 				DensityPlot& plot = *static_cast<DensityPlot*>(inData);
 				float altitude = (inIndex * 1.0f / (plot.mCount - 1)) * (plot.mMax - plot.mMin) + plot.mMin;
-				ShaderType::DensityProfileLayer& layer = altitude < plot.mProfile->mLayer0.mWidth ? plot.mProfile->mLayer0 : plot.mProfile->mLayer1;
+				DensityProfileLayer& layer = altitude < plot.mProfile->mLayer0.mWidth ? plot.mProfile->mLayer0 : plot.mProfile->mLayer1;
 
-				// Also in ShaderType.hlsl
 				float density = layer.mExpTerm * exp(layer.mExpScale * altitude) + layer.mLinearTerm * altitude + layer.mConstantTerm;
 				return glm::clamp(density, 0.0f, 1.0f);
 			}
 		};
 
-		static ShaderType::DensityProfile* sDensityProfile = nullptr;
+		static DensityProfile* sDensityProfile = nullptr;
 		auto popup_density_profile = []()
 		{
 			if (ImGui::BeginPopup("DensityProfile") && sDensityProfile != nullptr)

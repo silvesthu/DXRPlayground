@@ -38,7 +38,7 @@ Shader								gCompositeShader = Shader().VSName(L"ScreenspaceTriangleVS").PSNam
 // Frame
 FrameContext						gFrameContext[NUM_FRAMES_IN_FLIGHT] = {};
 glm::uint32							gFrameIndex = 0;
-ShaderType::PerFrame				gPerFrameConstantBuffer = {};
+PerFrameConstants					gPerFrameConstantBuffer = {};
 
 // Capture
 Texture*							gDumpTexture = nullptr;

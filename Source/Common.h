@@ -167,111 +167,20 @@ extern glm::uint32							gFrameIndex;
 extern Texture*								gDumpTexture;
 extern Texture								gDumpTextureProxy;
 
-enum class DebugMode : glm::uint32
-{
-	None = 0,
+using float2 = glm::vec2;
+using float3 = glm::vec3;
+using float4 = glm::vec4;
 
-	_Newline0,
+using uint = glm::uint;
+using uint2 = glm::uvec2;
+using uint3 = glm::uvec3;
+using uint4 = glm::uvec4;
 
-	Barycentrics,
-	Vertex,
-	Normal,
+#define CONSTANT_DEFAULT(x) = x
+static const float MATH_PI = glm::pi<float>();
+#include "../Shader/Shared.hlsl"
 
-	_Newline1,
-
-	Albedo,
-	Reflectance,
-	Emission,
-	Roughness,
-
-	_Newline2,
-
-	Transmittance,
-	InScattering,
-
-	_Newline3,
-
-	RecursionCount,
-	RussianRouletteCount,
-
-	Count
-};
-
-enum class RecursionMode : glm::uint32
-{
-	FixedCount = 0,
-	RussianRoulette,
-
-	Count
-};
-
-enum class DebugInstanceMode : glm::uint32
-{
-	None = 0,
-
-	Barycentrics,
-	Mirror,
-
-	Count
-};
-
-enum class ToneMappingMode : glm::uint32
-{
-	Passthrough,
-	Knarkowicz,
-
-	Count
-};
-
-enum class AtmosphereMode
-{
-	ConstantColor = 0,
-	RaymarchAtmosphereOnly,
-
-	_Newline0,
-
-	Bruneton17,
-	Hillaire20,
-
-	Count
-};
-
-enum class AtmosphereMuSEncodingMode
-{
-	Bruneton17 = 0,
-	Bruneton08,
-	Elek09,
-	Yusov13,
-
-	Count
-};
-
-enum class CloudMode
-{
-	None = 0,
-
-	Noise,
-
-	Count
-};
-
-namespace ShaderType
-{
-	using float2 = glm::vec2;
-	using float3 = glm::vec3;
-	using float4 = glm::vec4;
-
-	using uint = glm::uint;
-	using uint2 = glm::uvec2;
-	using uint3 = glm::uvec3;
-	using uint4 = glm::uvec4;
-
-	#define HLSL_AS_CPP
-	#define CONSTANT_DEFAULT(x) =x
-	const static float MATH_PI = glm::pi<float>();
-	#include "../Shader/ShaderType.hlsl"
-};
-extern ShaderType::PerFrame					gPerFrameConstantBuffer;
+extern PerFrameConstants					gPerFrameConstantBuffer;
 
 // String literals
 static const wchar_t*						kDefaultRayGenerationShader	= L"DefaultRayGeneration";

@@ -8,14 +8,14 @@ DDGIResources gDDGIResources;
 
 void DDGI::Update()
 {
-	// ShaderType::DDGI* ddgi = static_cast<ShaderType::DDGI*>(gDDGIResources.mConstantUploadBufferPointer);
+	// DDGI* ddgi = static_cast<DDGI*>(gDDGIResources.mConstantUploadBufferPointer);
 }
 
 void DDGI::Initialize()
 {
 	// Buffer
 	{
-		D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(gAlignUp((UINT)sizeof(ShaderType::DDGI), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
+		D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(gAlignUp((UINT)sizeof(DDGI), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
 		D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
 
 		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gDDGIResources.mConstantUploadBuffer)));

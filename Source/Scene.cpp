@@ -139,7 +139,7 @@ void TLAS::Initialize(std::vector<ObjectInstanceRef>&& inObjectInstances)
 
 	{
 		D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
-		D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(sizeof(ShaderType::InstanceData) * mObjectInstances.size());
+		D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(sizeof(InstanceData) * mObjectInstances.size());
 		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mInstanceBuffer)));
 		gSetName(mInstanceBuffer, mName, L".TLAS.InstanceBuffer");
 
@@ -442,7 +442,7 @@ void Scene::CreateShaderResource()
 		{
 			D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
 			desc.BufferLocation = gConstantGPUBuffer->GetGPUVirtualAddress();
-			desc.SizeInBytes = gAlignUp((UINT)sizeof(ShaderType::PerFrame), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+			desc.SizeInBytes = gAlignUp((UINT)sizeof(PerFrameConstants), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
 			gDevice->CreateConstantBufferView(&desc, handle);
 
 			handle.ptr += increment_size;
@@ -465,8 +465,8 @@ void Scene::CreateShaderResource()
 			D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
 			desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
 			desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			desc.Buffer.NumElements = static_cast<UINT>(resource_desc.Width / sizeof(ShaderType::InstanceData));
-			desc.Buffer.StructureByteStride = sizeof(ShaderType::InstanceData);
+			desc.Buffer.NumElements = static_cast<UINT>(resource_desc.Width / sizeof(InstanceData));
+			desc.Buffer.StructureByteStride = sizeof(InstanceData);
 			desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
 			gDevice->CreateShaderResourceView(mTLAS->GetInstanceBuffer(), &desc, handle);
 
@@ -517,7 +517,7 @@ void Scene::CreateShaderResource()
 		{
 			D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
 			desc.BufferLocation = gPrecomputedAtmosphereScatteringResources.mConstantUploadBuffer->GetGPUVirtualAddress();
-			desc.SizeInBytes = gAlignUp(static_cast<UINT>(sizeof(ShaderType::Atmosphere)), static_cast<UINT>(D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
+			desc.SizeInBytes = gAlignUp(static_cast<UINT>(sizeof(AtmosphereConstants)), static_cast<UINT>(D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
 			gDevice->CreateConstantBufferView(&desc, handle);
 
 			handle.ptr += increment_size;
@@ -545,7 +545,7 @@ void Scene::CreateShaderResource()
 		{
 			D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
 			desc.BufferLocation = gCloudResources.mConstantUploadBuffer->GetGPUVirtualAddress();
-			desc.SizeInBytes = gAlignUp(static_cast<UINT>(sizeof(ShaderType::Cloud)), static_cast<UINT>(D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
+			desc.SizeInBytes = gAlignUp(static_cast<UINT>(sizeof(Cloud)), static_cast<UINT>(D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
 			gDevice->CreateConstantBufferView(&desc, handle);
 
 			handle.ptr += increment_size;

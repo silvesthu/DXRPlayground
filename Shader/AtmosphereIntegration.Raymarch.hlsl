@@ -1,4 +1,4 @@
-// Atmosphere scattering without precomputation
+// AtmosphereConstants scattering without precomputation
 // Based on https://www.shadertoy.com/view/lslXDr
 
 namespace AtmosphereIntegration { namespace Raymarch {

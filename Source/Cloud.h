@@ -19,7 +19,7 @@ struct CloudProfile
 			profile.mRaymarch.mLightSampleLength = 0.01f; // km
 		}
 	};
-	ShaderType::CloudRaymarch mRaymarch;
+	CloudConstants::CloudRaymarch mRaymarch;
 
 	struct GeometryReference
 	{
@@ -31,7 +31,7 @@ struct CloudProfile
 			profile.mGeometry.mCirro = 4.0; // km
 		}
 	};
-	ShaderType::CloudGeometry mGeometry;
+	CloudConstants::CloudGeometry mGeometry;
 
 	struct ShapeNoiseReference
 	{
@@ -42,7 +42,7 @@ struct CloudProfile
 			profile.mShapeNoise.mScale = 1.0f;
 		}
 	};
-	ShaderType::CloudShapeNoise mShapeNoise;
+	CloudConstants::CloudShapeNoise mShapeNoise;
 
 	CloudProfile()
 	{
@@ -91,5 +91,5 @@ struct CloudResources
 };
 
 extern CloudProfile gCloudProfile;
-extern Cloud gCloud;
 extern CloudResources gCloudResources;
+extern Cloud gCloud;

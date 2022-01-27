@@ -348,35 +348,7 @@ struct GlobalRootSignature : public StateSubobjectHolder<ID3D12RootSignature*, D
 	ComPtr<ID3D12RootSignature> mRootSignature;
 };
 
-template <typename T>
-static void sWriteEnum(std::ofstream& ioEnumFile, T* inCurrentValue = nullptr)
-{
-	ioEnumFile << "// enum " << nameof::nameof_enum_type<T>().data() << "\n";
-	ioEnumFile << "typedef uint " << nameof::nameof_enum_type<T>().data() << ";\n";
-
-	for (int i = 0; i < static_cast<int>(T::Count); i++)
-	{
-		const auto& name = nameof::nameof_enum((T)i);
-		if (name[0] == '_')
-			continue;
-
-		ioEnumFile << "const static uint " << nameof::nameof_enum_type<T>().data() << "_" << name.data() << " = " << i << ";\n";
-	}
-
-	ioEnumFile << "\n";
-
-	if (inCurrentValue != nullptr)
-	{
-		ioEnumFile
-			<< nameof::nameof_enum_type<T>().data()
-			<< " " << nameof::nameof_enum_type<T>().data() << "_Current = "
-			<< nameof::nameof_enum_type<T>().data() << "_" << nameof::nameof_enum(*inCurrentValue) << ";\n";
-
-		ioEnumFile << "\n";
-	}
-}
-
-bool sCreateVSPSPipelineState(const char* inShaderFileName, std::stringstream& inShaderStream, const wchar_t* inVSName, const wchar_t* inPSName, Shader& ioSystemShader)
+static bool sCreateVSPSPipelineState(const char* inShaderFileName, std::stringstream& inShaderStream, const wchar_t* inVSName, const wchar_t* inPSName, Shader& ioSystemShader)
 {
 	IDxcBlob* vs_blob = sCompileShader(inShaderFileName, inShaderStream.str().c_str(), (glm::uint32)inShaderStream.str().length(), inVSName, L"vs_6_6");
 	IDxcBlob* ps_blob = sCompileShader(inShaderFileName, inShaderStream.str().c_str(), (glm::uint32)inShaderStream.str().length(), inPSName, L"ps_6_6");
@@ -419,7 +391,7 @@ bool sCreateVSPSPipelineState(const char* inShaderFileName, std::stringstream& i
 	return true;
 }
 
-bool sCreateCSPipelineState(const char* inShaderFileName, const std::stringstream& inShaderStream, const wchar_t* inCSName, Shader& ioSystemShader)
+static bool sCreateCSPipelineState(const char* inShaderFileName, const std::stringstream& inShaderStream, const wchar_t* inCSName, Shader& ioSystemShader)
 {
 	IDxcBlob* cs_blob = sCompileShader(inShaderFileName, inShaderStream.str().c_str(), static_cast<glm::uint32>(inShaderStream.str().length()), inCSName, L"cs_6_6");
 	if (cs_blob == nullptr)
@@ -468,25 +440,7 @@ bool sCreatePipelineState(const char* inShaderFileName, std::stringstream& inSha
 
 void gCreatePipelineState()
 {
-	static bool startup = true;
-
-	// Generate enum
-	const char* enum_filename = "Shader/Generated/Enum.hlsl";
-	::CreateDirectoryA("Shader/Generated", nullptr);
-	std::ofstream enum_file(enum_filename);
-	{
-		enum_file << "// Auto-generated for enum\n";
-		enum_file << "\n";
-
-		sWriteEnum<RecursionMode>(enum_file);
-		sWriteEnum<DebugMode>(enum_file);
-		sWriteEnum<DebugInstanceMode>(enum_file);
-		sWriteEnum<ToneMappingMode>(enum_file);
-		sWriteEnum<AtmosphereMode>(enum_file);
-		sWriteEnum<AtmosphereMuSEncodingMode>(enum_file);
-		sWriteEnum<CloudMode>(enum_file);
-	}
-	enum_file.close();
+	static bool first_run = true;
 
 	// Load shader
 	const char* shader_filename = "Shader/Shader.hlsl";
@@ -499,7 +453,7 @@ void gCreatePipelineState()
 	IDxcBlob* blob = sCompileShader(shader_filename, shader_stream.str().c_str(), static_cast<glm::uint32>(shader_stream.str().length()), L"", L"lib_6_5");
 	if (blob == nullptr)
 	{
-		if (startup)
+		if (first_run)
 			assert(gDXRStateObject != nullptr);
 		return;
 	}
@@ -545,7 +499,7 @@ void gCreatePipelineState()
 	// Shader config
 	//  sizeof(BuiltInTriangleIntersectionAttributes) = sizeof(float) * 2, depends on interaction type
 	//  sizeof(Payload), fully customized
-	ShaderConfig shader_config(sizeof(float) * 2, (glm::uint32)std::max(sizeof(ShaderType::RayPayload), sizeof(ShaderType::ShadowPayload)));
+	ShaderConfig shader_config(sizeof(float) * 2, (glm::uint32)std::max(sizeof(RayPayload), sizeof(ShadowPayload)));
 	subobjects[index++] = shader_config.mStateSubobject;
 	SubobjectToExportsAssociation shader_config_association(entry_points, ARRAYSIZE(entry_points), &(subobjects[index - 1]));
 	subobjects[index++] = shader_config_association.mStateSubobject;
@@ -591,13 +545,13 @@ void gCreatePipelineState()
 
 		if (!succeed)
 		{
-			if (startup)
+			if (first_run)
 				assert(gDXRStateObject != nullptr);
 			return;
 		}
 	}
 
-	startup = false; // disable assert for unsuccessful shader reload
+	first_run = false; // disable assert for unsuccessful shader reload
 }
 
 void gCleanupPipelineState()

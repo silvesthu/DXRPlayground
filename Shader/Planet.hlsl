@@ -1,6 +1,6 @@
-cbuffer AtmosphereBuffer : register(b0, space2)
+cbuffer AtmosphereConstantsBuffer : register(b0, space2)
 {
-	Atmosphere mAtmosphere;
+	AtmosphereConstants mAtmosphere;
 }
 
 float3 PlanetRayOrigin()

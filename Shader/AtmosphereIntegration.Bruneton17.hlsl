@@ -215,42 +215,44 @@ float4 Decode4D(uint3 inTexCoords, RWTexture3D<float4> inTexture, out bool inter
 		// [NOTE] Formulas other than Bruneton17 are likely fitted curve with max_sun_zenith_angle = 102.0 degrees
 		switch (mAtmosphere.mMuSEncodingMode)
 		{
-		case AtmosphereMuSEncodingMode_Bruneton17:
-		{
-			bool use_half_precision = true;
-			float max_sun_zenith_angle = (use_half_precision ? 102.0 : 120.0) / 180.0 * MATH_PI;
-			float mu_s_min = cos(max_sun_zenith_angle);
+		case AtmosphereMuSEncodingMode::Bruneton17:
+			{
+				bool use_half_precision = true;
+				float max_sun_zenith_angle = (use_half_precision ? 102.0 : 120.0) / 180.0 * MATH_PI;
+				float mu_s_min = cos(max_sun_zenith_angle);
 
-			float d_min = R_t - R_g;
-			float d_max = H;
+				float d_min = R_t - R_g;
+				float d_max = H;
 
-			float D = DistanceToTopAtmosphereBoundary(R_g, mu_s_min);
+				float D = DistanceToTopAtmosphereBoundary(R_g, mu_s_min);
 
-			float A = (D - d_min) / (d_max - d_min);
-			float a = (A - u_mu_s * A) / (1.0 + u_mu_s * A);
+				float A = (D - d_min) / (d_max - d_min);
+				float a = (A - u_mu_s * A) / (1.0 + u_mu_s * A);
 
-			float d = d_min + min(a, A) * (d_max - d_min);
+				float d = d_min + min(a, A) * (d_max - d_min);
 
-			mu_s = d == 0.0 ? float(1.0) : ClampCosine((H * H - d * d) / (2.0 * R_g * d));
-		}
-		break;
-		case AtmosphereMuSEncodingMode_Bruneton08:
-		{
-			mu_s = (log(1.0 - (1 - exp(-3.6)) * u_mu_s) + 0.6) / -3.0;
-		}
-		break;
-		case AtmosphereMuSEncodingMode_Elek09:
-		{
-			mu_s = (log(1.0 - (1 - exp(-3.6)) * u_mu_s) + 0.8) / -2.8;
-		}
-		break;
-		case AtmosphereMuSEncodingMode_Yusov13:
-		{
-			mu_s = tan((2.0 * u_mu_s - 1.0 + 0.26) * 1.1) / tan(1.26 * 1.1);
-			mu_s = ClampCosine(mu_s); // [NOTE] without clamp, mu_s might be slightly larger than 1, which cause clamp on nu fail to work
-		}
-		break;
-		}
+				mu_s = d == 0.0 ? float(1.0) : ClampCosine((H * H - d * d) / (2.0 * R_g * d));
+			}
+			break;
+		case AtmosphereMuSEncodingMode::Bruneton08:
+			{
+				mu_s = (log(1.0 - (1 - exp(-3.6)) * u_mu_s) + 0.6) / -3.0;
+			}
+			break;
+		case AtmosphereMuSEncodingMode::Elek09:
+			{
+				mu_s = (log(1.0 - (1 - exp(-3.6)) * u_mu_s) + 0.8) / -2.8;
+			}
+			break;
+		case AtmosphereMuSEncodingMode::Yusov13:
+			{
+				mu_s = tan((2.0 * u_mu_s - 1.0 + 0.26) * 1.1) / tan(1.26 * 1.1);
+				mu_s = ClampCosine(mu_s); // [NOTE] without clamp, mu_s might be slightly larger than 1, which cause clamp on nu fail to work
+			}
+			break;
+		default:
+			break;
+        }
 	}
 
 	// nu - View Sun Angle
@@ -309,7 +311,8 @@ void Encode4D(float4 r_mu_mu_s_nu, bool intersects_ground, Texture3D<float4> inT
 	// [NOTE] Formulas other than Bruneton17 are likely fitted curve with max_sun_zenith_angle = 102.0 degrees
 	switch (mAtmosphere.mMuSEncodingMode)
 	{
-	case AtmosphereMuSEncodingMode_Bruneton17:
+	default: // fallthrough
+	case AtmosphereMuSEncodingMode::Bruneton17:
 	{
 		bool use_half_precision = true;
 		float max_sun_zenith_angle = (use_half_precision ? 102.0 : 120.0) / 180.0 * MATH_PI;
@@ -324,17 +327,17 @@ void Encode4D(float4 r_mu_mu_s_nu, bool intersects_ground, Texture3D<float4> inT
 		u_mu_s = max(1.0 - a / A, 0.0) / (1.0 + a);
 	}
 	break;
-	case AtmosphereMuSEncodingMode_Bruneton08:
+	case AtmosphereMuSEncodingMode::Bruneton08:
 	{
 		u_mu_s = max((1.0 - exp(-3.0 * mu_s - 0.6)) / (1.0 - exp(-3.6)), 0.0);
 	}
 	break;
-	case AtmosphereMuSEncodingMode_Elek09:
+	case AtmosphereMuSEncodingMode::Elek09:
 	{
 		u_mu_s = max((1.0 - exp(-2.8 * mu_s - 0.8)) / (1.0 - exp(-3.6)), 0.0);
 	}
 	break;
-	case AtmosphereMuSEncodingMode_Yusov13:
+	case AtmosphereMuSEncodingMode::Yusov13:
 	{
 		u_mu_s = 0.5 * (atan(max(mu_s, -0.1975) * tan(1.26 * 1.1)) / 1.1 + (1.0 - 0.26));
 	}

@@ -48,13 +48,13 @@ struct ScenePreset
 
 static ScenePreset kScenePresets[(int)ScenePresetType::COUNT] =
 {
-	{ "None",									nullptr,																			glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,		glm::mat4x4(1.0f),											0.0f, glm::pi<float>() / 4.0f,},
-	{ "CornellBox",							"Asset/raytracing-references/cornellbox/cornellbox.obj",							glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,		glm::mat4x4(1.0f),											0.0f, glm::pi<float>() / 4.0f,},
-	{ "VeachMIS",								"Asset/raytracing-references/veach-mis/veach-mis.obj",							glm::vec4(0.0f, 1.0f, 13.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,		glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
-	{ "Furnance",								"Asset/raytracing-references/furnace-light-sampling/furnace-light-sampling.obj",	glm::vec4(0.0f, 1.0f, 13.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,		glm::mat4x4(1.0f),											0.0f, glm::pi<float>() / 4.0f,},
-	{ "Bruneton17",							"Asset/primitives/sphere.obj",													glm::vec4(0.0f, 0.0f, 9.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,		glm::translate(glm::vec3(0.0f, 1.0f, 0.0f)),	0.0f, glm::pi<float>() / 4.0f,},
-	{ "Bruneton17_Artifact_Mu",				"Asset/primitives/sphere.obj",													glm::vec4(0.0f, 80.0f, 150.0f, 0.0f),		glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,		glm::scale(glm::vec3(100.0f, 100.0f, 100.0f)),	0.0f, glm::pi<float>() / 4.0f,},
-	{ "Hillaire20",							nullptr,																			glm::vec4(0.0f, 0.5, -1.0f, 0.0f),			glm::vec4(0.0f, 0.0f, 1.0f, 0.0f),		98.8514328f, glm::translate(glm::vec3(0.0f, 1.0f, 0.0f)),	0.0f, glm::pi<float>() / 2.0f - 0.45f,},
+	{ "None",								nullptr,																			glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
+	{ "CornellBox",							"Asset/raytracing-references/cornellbox/cornellbox.obj",							glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
+	{ "VeachMIS",							"Asset/raytracing-references/veach-mis/veach-mis.obj",								glm::vec4(0.0f, 1.0f, 13.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
+	{ "Furnance",							"Asset/raytracing-references/furnace-light-sampling/furnace-light-sampling.obj",	glm::vec4(0.0f, 1.0f, 13.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
+	{ "Bruneton17",							"Asset/primitives/sphere.obj",														glm::vec4(0.0f, 0.0f, 9.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::translate(glm::vec3(0.0f, 1.0f, 0.0f)),			0.0f, glm::pi<float>() / 4.0f,},
+	{ "Bruneton17_Artifact_Mu",				"Asset/primitives/sphere.obj",														glm::vec4(0.0f, 80.0f, 150.0f, 0.0f),		glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::scale(glm::vec3(100.0f, 100.0f, 100.0f)),			0.0f, glm::pi<float>() / 4.0f,},
+	{ "Hillaire20",							nullptr,																			glm::vec4(0.0f, 0.5, -1.0f, 0.0f),			glm::vec4(0.0f, 0.0f, 1.0f, 0.0f),		98.8514328f, 	glm::translate(glm::vec3(0.0f, 1.0f, 0.0f)),			0.0f, glm::pi<float>() / 2.0f - 0.45f,},
 };
 static ScenePresetType sCurrentScene = ScenePresetType::VeachMIS;
 static ScenePresetType sPreviousScene = ScenePresetType::VeachMIS;
@@ -558,7 +558,7 @@ void sRender()
 			gScene.Update(gCommandList);
 	}
 
-	// Upload - PerFrame
+	// Upload - PerFrameConstants
 	{
 		{
 			gPerFrameConstantBuffer.mSunDirection = 
@@ -567,14 +567,14 @@ void sRender()
 
 		// Accumulation reset check
 		{
-			static ShaderType::PerFrame sPerFrameCopy = gPerFrameConstantBuffer;
+			static PerFrameConstants sPerFrameCopy = gPerFrameConstantBuffer;
 
 			sPerFrameCopy.mDebugCoord = gPerFrameConstantBuffer.mDebugCoord = glm::uvec2(static_cast<glm::uint32>(ImGui::GetMousePos().x), (glm::uint32)ImGui::GetMousePos().y);
 			sPerFrameCopy.mAccumulationFrameCount = gPerFrameConstantBuffer.mAccumulationFrameCount;
 			sPerFrameCopy.mFrameIndex = gPerFrameConstantBuffer.mFrameIndex;
 			sPerFrameCopy.mTime = gPerFrameConstantBuffer.mTime;
 
-			if (gPerFrameConstantBuffer.mReset == 0 && memcmp(&sPerFrameCopy, &gPerFrameConstantBuffer, sizeof(ShaderType::PerFrame)) == 0)
+			if (gPerFrameConstantBuffer.mReset == 0 && memcmp(&sPerFrameCopy, &gPerFrameConstantBuffer, sizeof(PerFrameConstants)) == 0)
 				gPerFrameConstantBuffer.mAccumulationFrameCount++;
 			else
 				gPerFrameConstantBuffer.mAccumulationFrameCount = 1;
@@ -797,7 +797,7 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		}
 	}
 
-	// PerFrame
+	// PerFrameConstants
 	for (UINT i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
 	{
 		std::wstring name;
@@ -808,7 +808,7 @@ static bool sCreateDeviceD3D(HWND hWnd)
 
 		// Buffer
 		{
-			D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(gAlignUp(static_cast<UINT>(sizeof(ShaderType::PerFrame)), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
+			D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(gAlignUp(static_cast<UINT>(sizeof(PerFrameConstants)), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
 			D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
 
 			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gFrameContext[i].mConstantUploadBuffer)));
@@ -820,11 +820,11 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		}
 	}
 
-	// PerFrame (GPU)
+	// PerFrameConstants (GPU)
 	{
 		// Buffer
 		{
-			D3D12_RESOURCE_DESC resource_desc = gGetBufferResourceDesc(gAlignUp(static_cast<UINT>(sizeof(ShaderType::PerFrame)), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
+			D3D12_RESOURCE_DESC resource_desc = gGetBufferResourceDesc(gAlignUp(static_cast<UINT>(sizeof(PerFrameConstants)), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
 			D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
 
 			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, nullptr, IID_PPV_ARGS(&gConstantGPUBuffer)));

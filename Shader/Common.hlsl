@@ -1,5 +1,23 @@
 #define MATH_PI 3.1415926535897932384626433832795f
 
+struct HitInfo
+{
+    float3 mAlbedo;
+    float3 mEmission;
+
+    float3 mPosition;
+    float3 mReflectionDirection;
+
+    float mScatteringPDF;
+    float mPDF;
+
+	// Participating Media along the ray
+    float3 mTransmittance;
+    float3 mInScattering;
+
+    bool mDone;
+};
+
 float4 remap(float4 x, float4 a, float4 b, float4 c, float4 d)
 {
     return (((x - a) / (b - a)) * (d - c)) + c;

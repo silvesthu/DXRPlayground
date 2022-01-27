@@ -1,6 +1,6 @@
 cbuffer CloudBuffer : register(b0, space3)
 {
-	Cloud mCloud;
+	CloudConstants mCloudConstants;
 }
 
 Texture3D<float4> CloudShapeNoiseSRV : register(t0, space3);
@@ -55,10 +55,10 @@ float SampleCloudDensity(float3 p, bool sample_coarse)
 	// FBM noise
 	if (false)
 	{
-		float frequency = mCloud.mShapeNoise.mFrequency * 10.0;
-		float power = mCloud.mShapeNoise.mPower * 0.2;
-		float scale = mCloud.mShapeNoise.mScale;
-		float3 offset = mCloud.mShapeNoise.mOffset;
+		float frequency = mCloudConstants.mShapeNoise.mFrequency * 10.0;
+		float power = mCloudConstants.mShapeNoise.mPower * 0.2;
+		float scale = mCloudConstants.mShapeNoise.mScale;
+		float3 offset = mCloudConstants.mShapeNoise.mOffset;
 
 		float shape = fbm((p + offset) * frequency);
 		shape = pow(shape, power) * scale;
@@ -69,10 +69,10 @@ float SampleCloudDensity(float3 p, bool sample_coarse)
 	// Noise texture
 	// if (false)
 	{
-		float frequency = mCloud.mShapeNoise.mFrequency;
-		float power = mCloud.mShapeNoise.mPower;
-		float scale = mCloud.mShapeNoise.mScale;
-		float3 offset = mCloud.mShapeNoise.mOffset;
+		float frequency = mCloudConstants.mShapeNoise.mFrequency;
+		float power = mCloudConstants.mShapeNoise.mPower;
+		float scale = mCloudConstants.mShapeNoise.mScale;
+		float3 offset = mCloudConstants.mShapeNoise.mOffset;
 
 		// [TODO] Skew
 
@@ -95,10 +95,10 @@ float SampleCloudDensityAlongCone(float3 p, float3 ray_direction, out float3 ray
 {
 	float accumulated_density = 0.0;
 
-	float3 light_step = ray_direction * mCloud.mRaymarch.mLightSampleLength;
+	float3 light_step = ray_direction * mCloudConstants.mRaymarch.mLightSampleLength;
 
 	p += light_step * 0.5;
-	for (int i = 0; i < mCloud.mRaymarch.mLightSampleCount; i++)
+	for (int i = 0; i < mCloudConstants.mRaymarch.mLightSampleCount; i++)
 	{
 		// [TODO] line -> cone
 		p += light_step;
@@ -112,9 +112,13 @@ float SampleCloudDensityAlongCone(float3 p, float3 ray_direction, out float3 ray
 	return accumulated_density;
 }
 
-float3 RaymarchCloud(out float3 transmittance)
+void RaymarchCloud(out float3 outTransmittance, out float3 outLuminance)
 {
-	transmittance = 1.0;
+	outTransmittance = 1.0;
+	outLuminance = 0.0;
+
+	if (mCloudConstants.mMode == CloudMode::None)
+		return;
 
 	float3 accumulated_light = 0;
 	float accumulated_density = 0.0;
@@ -131,12 +135,12 @@ float3 RaymarchCloud(out float3 transmittance)
 		float2 distance_to_planet = 0;
 		bool hit_planet = IntersectRaySphere(PlanetRayOrigin(), PlanetRayDirection(), PlanetCenter(), PlanetRadius() + 0, distance_to_planet);
 		float2 distance_to_strato = 0;
-		bool hit_strato = IntersectRaySphere(PlanetRayOrigin(), PlanetRayDirection(), PlanetCenter(), PlanetRadius() + mCloud.mGeometry.mStrato, distance_to_strato);
+		bool hit_strato = IntersectRaySphere(PlanetRayOrigin(), PlanetRayDirection(), PlanetCenter(), PlanetRadius() + mCloudConstants.mGeometry.mStrato, distance_to_strato);
 		float2 distance_to_cirro = 0;
-		bool hit_cirro = IntersectRaySphere(PlanetRayOrigin(), PlanetRayDirection(), PlanetCenter(), PlanetRadius() + mCloud.mGeometry.mCirro, distance_to_cirro);
+		bool hit_cirro = IntersectRaySphere(PlanetRayOrigin(), PlanetRayDirection(), PlanetCenter(), PlanetRadius() + mCloudConstants.mGeometry.mCirro, distance_to_cirro);
 
 		if (!hit_cirro || distance_to_cirro.y < 0)
-			return 0; // Hit nothing
+			return; // Hit nothing
 
 		if (!hit_strato || distance_to_strato.y < 0)
 			distance_range = float2(0, distance_to_cirro.y); // Hit cirro only, inside cloud scape
@@ -146,20 +150,21 @@ float3 RaymarchCloud(out float3 transmittance)
 				distance_range = float2(0, distance_to_strato.x); // Hit strato, inside cloud scape
 			else
 				if (hit_planet && distance_to_planet.x > 0 && distance_to_planet.x < distance_to_strato.y)
-					return 1; // Hit ground
+					return; // Hit ground
 				else
 					distance_range = float2(distance_to_strato.y, distance_to_cirro.y); // Hit strato, below cloud scape
 		}
 
-		int sample_count = mCloud.mRaymarch.mSampleCount;
+		int sample_count = mCloudConstants.mRaymarch.mSampleCount;
 		float step_length = (distance_range.y - distance_range.x) / sample_count;
 		float3 step = PlanetRayDirection() * step_length;
 
 		// [Debug]
 		if (false)
 		{
-			transmittance = 0;
-			return distance_range.y - distance_range.x;
+			outTransmittance = 0;
+			outLuminance = distance_range.y - distance_range.x;
+			return;
 		}
 
 		int zero_density_count = 0;
@@ -235,6 +240,6 @@ float3 RaymarchCloud(out float3 transmittance)
 		// accumulated_light = accumulated_density;
 	}
 
-	transmittance = 1.0 - accumulated_density;
-	return accumulated_light;
+	outTransmittance = 1.0 - accumulated_density;
+	outLuminance = accumulated_light;
 }

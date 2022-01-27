@@ -1,39 +1,26 @@
 #include "Common.hlsl"
 
 #define CONSTANT_DEFAULT(x)
-#include "Generated/Enum.hlsl"
-#include "ShaderType.hlsl"
+#include "Shared.hlsl"
+#include "Util.hlsl"
 
 #ifndef SHADER_PROFILE_LIB
 #define ENABLE_INLINE_RAYTRACING
 #endif // SHADER_PROFILE_LIB
 
-const static float kPreExposure = 1.0e-4;
-const static float kEmissionScale = 1.0e4;
-
 //////////////////////////////////////////////////////////////////////////////////
 // Common
 
 RWTexture2D<float4> RaytracingOutput : register(u0, space0);
-cbuffer PerFrameBuffer : register(b0, space0)
+cbuffer PerFrameConstantsBuffer : register(b0, space0)
 {
-	PerFrame mPerFrame;
+	PerFrameConstants mPerFrameConstants;
 };
 
 SamplerState BilinearSampler : register(s0);
 SamplerState BilinearWrapSampler : register(s1);
 
-float3 RadianceToLuminance(float3 radiance)
-{
-	// https://en.wikipedia.org/wiki/Luminous_efficacy
-	// https://en.wikipedia.org/wiki/Sunlight#Measurement
-
-	float kW_to_W = 1000.0;
-	float3 luminance = radiance * kW_to_W * kSunLuminousEfficacy * kPreExposure;
-	return luminance;
-}
-
-float3 GetSunDirection() { return mPerFrame.mSunDirection.xyz; }
+float3 GetSunDirection() { return mPerFrameConstants.mSunDirection.xyz; }
 
 //////////////////////////////////////////////////////////////////////////////////
 // DXR Adapters
@@ -130,8 +117,8 @@ uint sGetInstanceID()
 }
 
 #include "Planet.hlsl"
-#include "Atmosphere.hlsl"
-#include "Cloud.hlsl"
+#include "AtmosphereIntegration.hlsl"
+#include "CloudIntegration.hlsl"
 
 //////////////////////////////////////////////////////////////////////////////////
 
@@ -166,7 +153,7 @@ float3 LuminanceToColor(float3 luminance)
 		float kVignettingAttenuation = 0.78f; // To cancel out saturation. Typically 0.65 for real lens, see https://www.unrealengine.com/en-US/tech-blog/how-epic-games-is-handling-auto-exposure-in-4-25
 		float kLensSaturation = kSaturationBasedSpeedConstant / kISO / kVignettingAttenuation;
 
-		float exposure_normalization_factor = 1.0 / (pow(2.0, mPerFrame.mEV100) * kLensSaturation); // = 1.0 / luminance_max
+		float exposure_normalization_factor = 1.0 / (pow(2.0, mPerFrameConstants.mEV100) * kLensSaturation); // = 1.0 / luminance_max
 		normalized_luminance = luminance * (exposure_normalization_factor / kPreExposure);
 
 		// [Reference]
@@ -179,11 +166,11 @@ float3 LuminanceToColor(float3 luminance)
 	float3 tone_mapped_color = 0;
 	// Tone Mapping
 	{
-		switch (mPerFrame.mToneMappingMode)
+		switch (mPerFrameConstants.mToneMappingMode)
 		{
-		default:
-		case ToneMappingMode_Passthrough: tone_mapped_color = normalized_luminance; break;
-		case ToneMappingMode_Knarkowicz: tone_mapped_color = ToneMapping_ACES_Knarkowicz(normalized_luminance); break;
+			case ToneMappingMode::Knarkowicz:	tone_mapped_color = ToneMapping_ACES_Knarkowicz(normalized_luminance); break;
+            case ToneMappingMode::Passthrough:	// fallthrough
+			default:							tone_mapped_color = normalized_luminance; break;
         }
 
 		// [Reference]
@@ -199,21 +186,14 @@ void DefaultMiss(inout RayPayload payload)
 {
 	payload.mDone = true;
 
-	float3 sky_radiance = GetSkyRadiance();
+    float3 sky_luminance = GetSkyLuminance();
 
-	float3 cloud = 0;
 	float3 cloud_transmittance = 1;
-	switch (mCloud.mMode)
-	{
-	default:
-	case CloudMode_None:		break;
-	case CloudMode_Noise:		cloud = RaymarchCloud(cloud_transmittance); break;
-	}
+    float3 cloud_luminance = 0;
+    RaymarchCloud(cloud_transmittance, cloud_luminance);
 
 	// [TODO] How to mix contributions to get best result?
-	float3 emission = 0;
-	emission = sky_radiance;
-	emission = lerp(emission, cloud, 1.0 - cloud_transmittance);
+    float3 emission = lerp(sky_luminance, cloud_luminance, 1.0 - cloud_transmittance);
 
 	payload.mEmission = payload.mEmission + payload.mThroughput * emission;
 }
@@ -258,24 +238,24 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	float3 raw_hit_position = sGetWorldRayOrigin() + sGetWorldRayDirection() * sGetRayTCurrent();
 	hit_info.mPosition = raw_hit_position + normal * 0.001;
 
-	float3 sky_radiance = 0;
+	float3 sky_luminance = 0;
 	float3 transmittance = 0;
-	GetSkyRadianceToPoint(sky_radiance, transmittance);
+    GetSkyLuminanceToPoint(sky_luminance, transmittance);
 
 	// Debug - Global
 	{
 		bool terminate = true;
-		switch (mPerFrame.mDebugMode)
+		switch (mPerFrameConstants.mDebugMode)
 		{
-			case DebugMode_Barycentrics: 			hit_info.mEmission = barycentrics; break;
-			case DebugMode_Vertex: 					hit_info.mEmission = vertex; break;
-			case DebugMode_Normal: 					hit_info.mEmission = normal * 0.5 + 0.5; break;
-			case DebugMode_Albedo: 					hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mAlbedo; break;
-			case DebugMode_Reflectance: 			hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mReflectance; break;
-			case DebugMode_Emission: 				hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mEmission; break;
-			case DebugMode_Roughness: 				hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mRoughness; break;
-			case DebugMode_Transmittance:			hit_info.mEmission = transmittance; break;
-			case DebugMode_InScattering:			hit_info.mEmission = sky_radiance; break;
+			case DebugMode::Barycentrics: 			hit_info.mEmission = barycentrics; break;
+			case DebugMode::Vertex: 				hit_info.mEmission = vertex; break;
+			case DebugMode::Normal: 				hit_info.mEmission = normal * 0.5 + 0.5; break;
+			case DebugMode::Albedo: 				hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mAlbedo; break;
+			case DebugMode::Reflectance: 			hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mReflectance; break;
+			case DebugMode::Emission: 				hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mEmission; break;
+			case DebugMode::Roughness: 				hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mRoughness; break;
+			case DebugMode::Transmittance:			hit_info.mEmission = transmittance; break;
+			case DebugMode::InScattering:			hit_info.mEmission = sky_luminance; break;
 			default:								terminate = false; break;
 		}
 
@@ -287,12 +267,12 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	}
 
 	// Debug - Per instance
-	if (mPerFrame.mDebugInstanceIndex == sGetInstanceID())
+	if (mPerFrameConstants.mDebugInstanceIndex == sGetInstanceID())
 	{
-		switch (mPerFrame.mDebugInstanceMode)
+		switch (mPerFrameConstants.mDebugInstanceMode)
 		{
-			case DebugInstanceMode_Barycentrics: 	hit_info.mEmission = barycentrics; hit_info.mDone = true; return hit_info;										// Barycentrics
-			case DebugInstanceMode_Mirror: 			hit_info.mAlbedo = 1; hit_info.mReflectionDirection = reflect(sGetWorldRayDirection(), normal); return hit_info;	// Mirror
+			case DebugInstanceMode::Barycentrics: 	hit_info.mEmission = barycentrics; hit_info.mDone = true; return hit_info;											// Barycentrics
+			case DebugInstanceMode::Mirror: 		hit_info.mAlbedo = 1; hit_info.mReflectionDirection = reflect(sGetWorldRayDirection(), normal); return hit_info;	// Mirror
 			default: break;
 		}
 	}
@@ -362,7 +342,7 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 
 	// Participating Media
 	{
-		hit_info.mInScattering = RadianceToLuminance(sky_radiance);
+        hit_info.mInScattering = sky_luminance;
 		hit_info.mTransmittance = transmittance;
 	}
 
@@ -410,14 +390,14 @@ void TraceRay()
 	d.y = -d.y;
 	
 	RayDesc ray;
-	ray.Origin = mPerFrame.mCameraPosition.xyz;
-	ray.Direction = normalize(mPerFrame.mCameraDirection.xyz + mPerFrame.mCameraRightExtend.xyz * d.x + mPerFrame.mCameraUpExtend.xyz * d.y);
+	ray.Origin = mPerFrameConstants.mCameraPosition.xyz;
+	ray.Direction = normalize(mPerFrameConstants.mCameraDirection.xyz + mPerFrameConstants.mCameraRightExtend.xyz * d.x + mPerFrameConstants.mCameraUpExtend.xyz * d.y);
 	ray.TMin = 0.001;				// Near
 	ray.TMax = 100000;				// Far
 
 	RayPayload payload = (RayPayload)0;
 	payload.mThroughput = 1; // Camera gather all the light
-	payload.mRandomState = uint(uint(sGetDispatchRaysIndex().x) * uint(1973) + uint(sGetDispatchRaysIndex().y) * uint(9277) + uint(mPerFrame.mAccumulationFrameCount) * uint(26699)) | uint(1); // From https://www.shadertoy.com/view/tsBBWW
+	payload.mRandomState = uint(uint(sGetDispatchRaysIndex().x) * uint(1973) + uint(sGetDispatchRaysIndex().y) * uint(9277) + uint(mPerFrameConstants.mAccumulationFrameCount) * uint(26699)) | uint(1); // From https://www.shadertoy.com/view/tsBBWW
 
 #ifdef ENABLE_INLINE_RAYTRACING
 	// Note that RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH will give first hit for "Any Hit". The result may not be the closest one
@@ -477,9 +457,9 @@ void TraceRay()
 		// Russian Roulette
 		// http://www.pbr-book.org/3ed-2018/Monte_Carlo_Integration/Russian_Roulette_and_Splitting.html
 		// https://computergraphics.stackexchange.com/questions/2316/is-russian-roulette-really-the-answer
-		if (recursion >= mPerFrame.mRecursionCountMax)
+		if (recursion >= mPerFrameConstants.mRecursionCountMax)
 		{
-			if (mPerFrame.mRecursionMode == RecursionMode_RussianRoulette && recursion <= 8)
+			if (mPerFrameConstants.mRecursionMode == RecursionMode::RussianRoulette && recursion <= 8)
 			{
 				// Probability can be chosen in almost any manner
 				// e.g. Fixed threshold
@@ -508,10 +488,10 @@ void TraceRay()
 	float3 scene_luminance = payload.mEmission;
 	float3 output = LuminanceToColor(scene_luminance);
 
-	if (mPerFrame.mOutputLuminance)
+	if (mPerFrameConstants.mOutputLuminance)
 		output = scene_luminance;
 
-	if (mPerFrame.mDebugMode != DebugMode_None)
+	if (mPerFrameConstants.mDebugMode != DebugMode::None)
 		output = scene_luminance;
 
 	// Accumulation
@@ -520,16 +500,16 @@ void TraceRay()
 
 		float3 previous_output = RaytracingOutput[sGetDispatchRaysIndex().xy].xyz;
 		previous_output = max(0, previous_output); // Eliminate nan
-		float3 mixed_output = lerp(previous_output, current_output, 1.0f / (float)(mPerFrame.mAccumulationFrameCount));
+		float3 mixed_output = lerp(previous_output, current_output, 1.0f / (float)(mPerFrameConstants.mAccumulationFrameCount));
 
 		if (recursion == 0)
 			mixed_output = current_output;
 
-		if (mPerFrame.mDebugMode == DebugMode_RecursionCount)
-			mixed_output = hsv2rgb(float3(recursion * 1.0 / (mPerFrame.mRecursionCountMax + 1), 1, 1));
+		if (mPerFrameConstants.mDebugMode == DebugMode::RecursionCount)
+			mixed_output = hsv2rgb(float3(recursion * 1.0 / (mPerFrameConstants.mRecursionCountMax + 1), 1, 1));
 
-		if (mPerFrame.mDebugMode == DebugMode_RussianRouletteCount)
-			mixed_output = hsv2rgb(float3(max(0.0, (recursion * 1.0 - mPerFrame.mRecursionCountMax * 1.0)) / 10.0 /* for visualization only */, 1, 1));
+		if (mPerFrameConstants.mDebugMode == DebugMode::RussianRouletteCount)
+			mixed_output = hsv2rgb(float3(max(0.0, (recursion * 1.0 - mPerFrameConstants.mRecursionCountMax * 1.0)) / 10.0 /* for visualization only */, 1, 1));
 
 		// [TODO] Ray visualization ?
 		// if (all(abs((int2)sGetDispatchRaysIndex().xy - (int2)mDebugCoord) < DEBUG_PIXEL_RADIUS))
@@ -627,7 +607,7 @@ float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 {
 	float3 color = InputTexture.Load(int3(position.xy, 0)).xyz;
 
-	if (mPerFrame.mOutputLuminance)
+	if (mPerFrameConstants.mOutputLuminance)
 		color = LuminanceToColor(color /* as luminance */);
 
 	float3 srgb_color = ApplySRGBCurve(color);

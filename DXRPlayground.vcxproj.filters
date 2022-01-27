@@ -232,25 +232,28 @@
     <CopyFileToFolders Include="Shader\Common.hlsl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\ShaderType.hlsl">
+    <CopyFileToFolders Include="Shader\Shared.hlsl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\RaymarchAtmosphere.hlsl">
+    <CopyFileToFolders Include="Shader\AtmosphereIntegration.Raymarch.hlsl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\Atmosphere.hlsl">
+    <CopyFileToFolders Include="Shader\AtmosphereIntegration.hlsl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\Generated\Enum.hlsl">
+    <CopyFileToFolders Include="Shader\AtmosphereIntegration.Hillaire20.hlsl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\Hillaire20.hlsl">
-      <Filter>Shader</Filter>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\Bruneton17.hlsl">
+    <CopyFileToFolders Include="Shader\AtmosphereIntegration.Bruneton17.hlsl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
     <CopyFileToFolders Include="Shader\Planet.hlsl">
+      <Filter>Shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Shader\Util.hlsl">
+      <Filter>Shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Shader\CloudIntegration.hlsl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
   </ItemGroup>

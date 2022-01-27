@@ -90,34 +90,29 @@
       <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)$(Platform)\$(Configuration)\Shader</DestinationFolders>
       <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)$(Platform)\$(Configuration)\Shader</DestinationFolders>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\ShaderType.hlsl">
+    <CopyFileToFolders Include="Shader\Shared.hlsl">
       <FileType>Document</FileType>
       <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)$(Platform)\$(Configuration)\Shader</DestinationFolders>
       <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)$(Platform)\$(Configuration)\Shader</DestinationFolders>
     </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="Shader\RaymarchAtmosphere.hlsl">
+    <CopyFileToFolders Include="Shader\AtmosphereIntegration.Raymarch.hlsl">
       <FileType>Document</FileType>
     </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="Shader\Generated\Enum.hlsl">
+    <CopyFileToFolders Include="Shader\AtmosphereIntegration.hlsl">
       <FileType>Document</FileType>
     </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="Shader\Atmosphere.hlsl">
+    <CopyFileToFolders Include="Shader\AtmosphereIntegration.Hillaire20.hlsl">
       <FileType>Document</FileType>
     </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="Shader\Hillaire20.hlsl">
-      <FileType>Document</FileType>
-    </CopyFileToFolders>
-  </ItemGroup>
-  <ItemGroup>
-    <CopyFileToFolders Include="Shader\Bruneton17.hlsl">
+    <CopyFileToFolders Include="Shader\AtmosphereIntegration.Bruneton17.hlsl">
       <FileType>Document</FileType>
     </CopyFileToFolders>
   </ItemGroup>
@@ -126,6 +121,16 @@
   </ItemGroup>
   <ItemGroup>
     <CopyFileToFolders Include="Shader\Planet.hlsl">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
+  </ItemGroup>
+  <ItemGroup>
+    <CopyFileToFolders Include="Shader\Util.hlsl">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
+  </ItemGroup>
+  <ItemGroup>
+    <CopyFileToFolders Include="Shader\CloudIntegration.hlsl">
       <FileType>Document</FileType>
     </CopyFileToFolders>
   </ItemGroup>

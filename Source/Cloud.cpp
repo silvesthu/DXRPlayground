@@ -11,7 +11,7 @@ void Cloud::Update()
 {
 	gCloudProfile.mShapeNoise.mOffset += gCloudProfile.mWind * ImGui::GetIO().DeltaTime;
 
-	ShaderType::Cloud* cloud = static_cast<ShaderType::Cloud*>(gCloudResources.mConstantUploadBufferPointer);
+	CloudConstants* cloud = static_cast<CloudConstants*>(gCloudResources.mConstantUploadBufferPointer);
 	cloud->mMode		= gCloudProfile.mMode;
 	cloud->mRaymarch	= gCloudProfile.mRaymarch;
 	cloud->mGeometry	= gCloudProfile.mGeometry;
@@ -22,7 +22,7 @@ void Cloud::Initialize()
 {
 	// Buffer
 	{
-		D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(gAlignUp((UINT)sizeof(ShaderType::Cloud), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
+		D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(gAlignUp((UINT)sizeof(Cloud), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
 		D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
 
 		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gCloudResources.mConstantUploadBuffer)));

@@ -67,13 +67,13 @@ public:
 	BLASRef GetBLAS() { return mBLAS; }
 	glm::mat4& Transform() { return mTransform; }
 	glm::uint32 GetHitGroupIndex() const { return mHitGroupIndex; }
-	ShaderType::InstanceData& Data() { return mInstanceData; }
+	InstanceData& Data() { return mInstanceData; }
 
 private:
 	glm::mat4 mTransform = glm::mat4(1);
 	BLASRef mBLAS;
 	glm::uint32 mHitGroupIndex = 0;
-	ShaderType::InstanceData mInstanceData;
+	InstanceData mInstanceData;
 
 	std::function<void(ObjectInstance*)> mUpdater;
 };
@@ -109,7 +109,7 @@ private:
 	D3D12_RAYTRACING_INSTANCE_DESC* mInstanceDescsPointer = nullptr;
 
 	ComPtr<ID3D12Resource> mInstanceBuffer = nullptr;
-	ShaderType::InstanceData* mInstanceBufferPointer = nullptr;
+	InstanceData* mInstanceBufferPointer = nullptr;
 
 	std::wstring mName;
 };

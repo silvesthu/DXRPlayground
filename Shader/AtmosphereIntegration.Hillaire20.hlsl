@@ -363,7 +363,7 @@ SingleScatteringResult IntegrateScatteredLuminance(
 			float4 DepthBufferWorldPos = mul(gSkyInvViewProjMat, float4(ClipSpace, 1.0));
 			DepthBufferWorldPos /= DepthBufferWorldPos.w;
 
-			float tDepth = length(DepthBufferWorldPos.xyz - (WorldPos + float3(0.0, 0.0, -Atmosphere.BottomRadius))); // apply earth offset to go back to origin as top of earth mode. 
+			float tDepth = length(DepthBufferWorldPos.xyz - (WorldPos + float3(0.0, 0.0, -AtmosphereConstants.BottomRadius))); // apply earth offset to go back to origin as top of earth mode. 
 			if (tDepth < tMax)
 			{
 				tMax = tDepth;
@@ -490,7 +490,7 @@ SingleScatteringResult IntegrateScatteredLuminance(
 		float shadow = 1.0f;
 #if SHADOWMAP_ENABLED
 		// First evaluate opaque shadow
-		shadow = getShadow(Atmosphere, P);
+		shadow = getShadow(AtmosphereConstants, P);
 #endif
 
 		float3 S = globalL * (earthShadow * shadow * TransmittanceToSun * PhaseTimesScattering + multiScatteredLuminance * medium.scattering);
@@ -613,7 +613,7 @@ void TransLUT(
 	uint TRANSMITTANCE_TEXTURE_HEIGHT = 64;
 	// TransmittanceTexUAV.GetDimensions(TRANSMITTANCE_TEXTURE_WIDTH, TRANSMITTANCE_TEXTURE_HEIGHT); // calculate in shader introduce extra error
 	float2 pixPos = inDispatchThreadID.xy + 0.5; // half pixel offset
-	float3 sun_direction = mPerFrame.mSunDirection.xyz;
+	float3 sun_direction = GetSunDirection();
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -814,12 +814,12 @@ void SkyViewLut(
 	AtmosphereParameters Atmosphere = GetAtmosphereParameters();
 
 	float2 dimensions = float2(192, 108.0);
-	float3 sun_direction = mPerFrame.mSunDirection.xyz;
+	float3 sun_direction = GetSunDirection();
 
 	float2 pixPos = inDispatchThreadID.xy + 0.5; 		// half pixel offset
 	float2 uv = pixPos / dimensions;
 
-	float3 camera_position = mPerFrame.mCameraPosition.xyz;
+	float3 camera_position = mPerFrameConstants.mCameraPosition.xyz;
 	camera_position.y = max(camera_position.y, 0);		// Keep observer position above ground
 	float3 WorldPos = camera_position + float3(0, Atmosphere.BottomRadius, 0);
 	float viewHeight = length(WorldPos);
@@ -894,20 +894,20 @@ void CameraVolumes(
 	float2 d = ((pixPos / dims) * 2.f - 1.f); // 0~1 => -1~1
 	d.y = -d.y;
 
-	float3 right = mPerFrame.mCameraRightExtend.xyz;
-	float3 up = mPerFrame.mCameraUpExtend.xyz;
+	float3 right = mPerFrameConstants.mCameraRightExtend.xyz;
+	float3 up = mPerFrameConstants.mCameraUpExtend.xyz;
 
 	// Debug
 	right = -right; // handness?
 
-	float3 WorldDir = normalize(mPerFrame.mCameraDirection.xyz + right * d.x + up * d.y);
+	float3 WorldDir = normalize(mPerFrameConstants.mCameraDirection.xyz + right * d.x + up * d.y);
 	WorldDir.xyz = WorldDir.xzy; // Y-up to Z-up
-	float3 SunDir = mPerFrame.mSunDirection.xzy; // Y-up to Z-up
+	float3 SunDir = mPerFrameConstants.mSunDirection.xzy; // Y-up to Z-up
 
 	// Debug
 	float3 WorldDir_Raw = WorldDir;
 
-	float3 camera = mPerFrame.mCameraPosition.xzy; // Y-up to Z-up
+	float3 camera = mPerFrameConstants.mCameraPosition.xzy; // Y-up to Z-up
 
 	// Debug
 	camera.xy = 0; // flat
@@ -918,11 +918,11 @@ void CameraVolumes(
 
 #if 0
 	float2 pixPos = Input.position.xy;
-	AtmosphereParameters Atmosphere = GetAtmosphereParameters();
+	AtmosphereParameters AtmosphereConstants = GetAtmosphereParameters();
 	float3 ClipSpace = float3((pixPos / float2(gResolution)) * float2(2.0, -2.0) - float2(1.0, -1.0), 0.5);
 	float4 HPos = mul(gSkyInvViewProjMat, float4(ClipSpace, 1.0));
 	float3 WorldDir = normalize(HPos.xyz / HPos.w - camera);
-	float earthR = Atmosphere.BottomRadius;
+	float earthR = AtmosphereConstants.BottomRadius;
 	float3 earthO = float3(0.0, 0.0, -earthR);
 	float3 camPos = camera + float3(0, 0, earthR);
 	float3 SunDir = sun_direction;
@@ -1001,7 +1001,7 @@ void CameraVolumes(
 	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(WorldPos, 1.0); // match
 	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(SunDir, 1.0); // match
 	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(SampleCountIni.xxx, 1.0); // match
-	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(mPerFrame.mCameraDirection.xzy, 1.0); // match
+	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(mPerFrameConstants.mCameraDirection.xzy, 1.0); // match
 	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(WorldDir_Raw, 1.0); // match	
 	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(newWorldPos, 1.0); // almost match
 	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(WorldDir, 1.0); // match
