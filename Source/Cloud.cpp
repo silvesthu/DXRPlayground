@@ -1,21 +1,15 @@
 #include "Cloud.h"
-
-#include "ImGui/imgui_impl_dx12.h"
 #include "ImGui/imgui_impl_helper.h"
-
-CloudProfile gCloudProfile;
-Cloud gCloud;
-CloudResources gCloudResources;
 
 void Cloud::Update()
 {
-	gCloudProfile.mShapeNoise.mOffset += gCloudProfile.mWind * ImGui::GetIO().DeltaTime;
+	gCloud.mProfile.mShapeNoise.mOffset += gCloud.mProfile.mWind * ImGui::GetIO().DeltaTime;
 
-	CloudConstants* cloud = static_cast<CloudConstants*>(gCloudResources.mConstantUploadBufferPointer);
-	cloud->mMode		= gCloudProfile.mMode;
-	cloud->mRaymarch	= gCloudProfile.mRaymarch;
-	cloud->mGeometry	= gCloudProfile.mGeometry;
-	cloud->mShapeNoise	= gCloudProfile.mShapeNoise;
+	CloudConstants* cloud = static_cast<CloudConstants*>(gCloud.mResource.mConstantUploadBufferPointer);
+	cloud->mMode		= gCloud.mProfile.mMode;
+	cloud->mRaymarch	= gCloud.mProfile.mRaymarch;
+	cloud->mGeometry	= gCloud.mProfile.mGeometry;
+	cloud->mShapeNoise	= gCloud.mProfile.mShapeNoise;
 }
 
 void Cloud::Initialize()
@@ -25,21 +19,21 @@ void Cloud::Initialize()
 		D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(gAlignUp((UINT)sizeof(Cloud), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
 		D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
 
-		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gCloudResources.mConstantUploadBuffer)));
-		gCloudResources.mConstantUploadBuffer->SetName(L"Cloud.Constant");
-		gCloudResources.mConstantUploadBuffer->Map(0, nullptr, (void**)&gCloudResources.mConstantUploadBufferPointer);
+		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gCloud.mResource.mConstantUploadBuffer)));
+		gCloud.mResource.mConstantUploadBuffer->SetName(L"Cloud.Constant");
+		gCloud.mResource.mConstantUploadBuffer->Map(0, nullptr, (void**)&gCloud.mResource.mConstantUploadBufferPointer);
 	}
 
 	// Texture
 	{
-		for (auto&& texture : gCloudResources.mTextures)
-			texture->Initialize();
+		for (auto&& texture : gCloud.mResource.mTextures)
+			texture.Initialize();
 	}
 
 	// Shader Binding
 	{
-		gCloudResources.mShapeNoiseShader.InitializeDescriptors({ gCloudResources.mShapeNoiseInputTexture.mResource.Get(), gCloudResources.mShapeNoiseTexture.mResource.Get() });
-		gCloudResources.mErosionNoiseShader.InitializeDescriptors({ gCloudResources.mErosionNoiseInputTexture.mResource.Get(), gCloudResources.mErosionNoiseTexture.mResource.Get() });
+		gCloud.mResource.mShapeNoiseShader.InitializeDescriptors({ gCloud.mResource.mShapeNoiseInputTexture.mResource.Get(), gCloud.mResource.mShapeNoiseTexture.mResource.Get() });
+		gCloud.mResource.mErosionNoiseShader.InitializeDescriptors({ gCloud.mResource.mErosionNoiseInputTexture.mResource.Get(), gCloud.mResource.mErosionNoiseTexture.mResource.Get() });
 	}
 }
 
@@ -52,84 +46,86 @@ void Cloud::Precompute()
 	// Load
 	{
 		{
-			gCloudResources.mShapeNoiseTexture.Load();
+			gCloud.mResource.mShapeNoiseTexture.Load();
 			
-			BarrierScope input_resource_scope(gCommandList, gCloudResources.mShapeNoiseInputTexture.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-			BarrierScope resource_scope(gCommandList, gCloudResources.mShapeNoiseTexture.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-			gCloudResources.mShapeNoiseShader.SetupCompute();
-			gCommandList->Dispatch(gCloudResources.mShapeNoiseTexture.mWidth / 8, gCloudResources.mShapeNoiseTexture.mHeight / 8, gCloudResources.mShapeNoiseTexture.mDepth);
+			BarrierScope input_resource_scope(gCommandList, gCloud.mResource.mShapeNoiseInputTexture.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+			BarrierScope resource_scope(gCommandList, gCloud.mResource.mShapeNoiseTexture.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+			gCloud.mResource.mShapeNoiseShader.SetupCompute();
+			gCommandList->Dispatch(gCloud.mResource.mShapeNoiseTexture.mWidth / 8, gCloud.mResource.mShapeNoiseTexture.mHeight / 8, gCloud.mResource.mShapeNoiseTexture.mDepth);
 		}
 
 		{
-			gCloudResources.mErosionNoiseTexture.Load();
+			gCloud.mResource.mErosionNoiseTexture.Load();
 
-			BarrierScope input_resource_scope(gCommandList, gCloudResources.mErosionNoiseInputTexture.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-			BarrierScope output_resource_scope(gCommandList, gCloudResources.mErosionNoiseTexture.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-			gCloudResources.mErosionNoiseShader.SetupCompute();
-			gCommandList->Dispatch(gCloudResources.mErosionNoiseTexture.mWidth / 8, gCloudResources.mErosionNoiseTexture.mHeight / 8, gCloudResources.mErosionNoiseTexture.mDepth);
+			BarrierScope input_resource_scope(gCommandList, gCloud.mResource.mErosionNoiseInputTexture.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+			BarrierScope output_resource_scope(gCommandList, gCloud.mResource.mErosionNoiseTexture.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+			gCloud.mResource.mErosionNoiseShader.SetupCompute();
+			gCommandList->Dispatch(gCloud.mResource.mErosionNoiseTexture.mWidth / 8, gCloud.mResource.mErosionNoiseTexture.mHeight / 8, gCloud.mResource.mErosionNoiseTexture.mDepth);
 		}
 	}
 }
 
 void Cloud::Finalize()
 {
-	gCloudResources = {};
+	gCloud.mResource.Reset();
 }
 
 void Cloud::UpdateImGui()
 {
-#define SMALL_BUTTON(func) if (ImGui::SmallButton(NAMEOF(func).c_str())) func(gCloudProfile);
+#define SMALL_BUTTON(func) if (ImGui::SmallButton(NAMEOF(func).c_str())) func(gCloud.mProfile);
 
 	if (ImGui::TreeNodeEx("Control", ImGuiTreeNodeFlags_DefaultOpen))
 	{
-		for (int i = 0; i < (int)CloudMode::Count; i++)
+		for (int i = 0; i < static_cast<int>(CloudMode::Count); i++)
 		{
-			const auto& name = nameof::nameof_enum((CloudMode)i);
+			const auto& name = nameof::nameof_enum(static_cast<CloudMode>(i));
 			if (i != 0)
 				ImGui::SameLine();
-			if (ImGui::RadioButton(name.data(), (int)gCloudProfile.mMode == i))
-				gCloudProfile.mMode = (CloudMode)i;
+			if (ImGui::RadioButton(name.data(), (int)gCloud.mProfile.mMode == i))
+				gCloud.mProfile.mMode = static_cast<CloudMode>(i);
 		}
 
-		ImGui::SliderFloat3("Wind", &gCloudProfile.mWind[0], 0.0f, 100.0f);
+		ImGui::SliderFloat3("Wind", &gCloud.mProfile.mWind[0], 0.0f, 100.0f);
 
 		ImGui::TreePop();
 	}
 
 	if (ImGui::TreeNodeEx("Raymarch", ImGuiTreeNodeFlags_DefaultOpen))
 	{
-		ImGui::SliderUint("Sample Count", &gCloudProfile.mRaymarch.mSampleCount, 8, 128);
-		ImGui::SliderUint("Light Sample Count", &gCloudProfile.mRaymarch.mLightSampleCount, 8, 128);
-		ImGui::SliderFloat("Light Sample Length (km)", &gCloudProfile.mRaymarch.mLightSampleLength, 0.0f, 1.0f);
+		ImGui::SliderUint("Sample Count", &gCloud.mProfile.mRaymarch.mSampleCount, 8, 128);
+		ImGui::SliderUint("Light Sample Count", &gCloud.mProfile.mRaymarch.mLightSampleCount, 8, 128);
+		ImGui::SliderFloat("Light Sample Length (km)", &gCloud.mProfile.mRaymarch.mLightSampleLength, 0.0f, 1.0f);
 
-		SMALL_BUTTON(CloudProfile::RaymarchReference::Default);
+		SMALL_BUTTON(Profile::RaymarchReference::Default);
 
 		ImGui::TreePop();
 	}
 
 	if (ImGui::TreeNodeEx("Geometry", ImGuiTreeNodeFlags_DefaultOpen))
 	{
-		ImGui::SliderFloat("Strato Bottom (km)", &gCloudProfile.mGeometry.mStrato, 0.0f, 8.0f);
-		ImGui::SliderFloat("Cirro Bottom (km)", &gCloudProfile.mGeometry.mCirro, 0.0f, 8.0f);
+		ImGui::SliderFloat("Strato Bottom (km)", &gCloud.mProfile.mGeometry.mStrato, 0.0f, 8.0f);
+		ImGui::SliderFloat("Cirro Bottom (km)", &gCloud.mProfile.mGeometry.mCirro, 0.0f, 8.0f);
 
-		SMALL_BUTTON(CloudProfile::GeometryReference::Schneider15);
+		SMALL_BUTTON(Profile::GeometryReference::Schneider15);
 
 		ImGui::TreePop();
 	}
 
 	if (ImGui::TreeNodeEx("Shape Noise", ImGuiTreeNodeFlags_DefaultOpen))
 	{
-		ImGui::SliderFloat3("Offset", &gCloudProfile.mShapeNoise.mOffset[0], 0.0f, 100.0f);
+		ImGui::SliderFloat3("Offset", &gCloud.mProfile.mShapeNoise.mOffset[0], 0.0f, 100.0f);
 		ImGui::NewLine();
 
-		ImGui::SliderFloat("Frequency", &gCloudProfile.mShapeNoise.mFrequency, 0.0f, 1.0f);
-		ImGui::SliderFloat("Power", &gCloudProfile.mShapeNoise.mPower, 0.0f, 100.0f);
-		ImGui::SliderFloat("Scale", &gCloudProfile.mShapeNoise.mScale, 0.0f, 5.0f);
+		ImGui::SliderFloat("Frequency", &gCloud.mProfile.mShapeNoise.mFrequency, 0.0f, 1.0f);
+		ImGui::SliderFloat("Power", &gCloud.mProfile.mShapeNoise.mPower, 0.0f, 100.0f);
+		ImGui::SliderFloat("Scale", &gCloud.mProfile.mShapeNoise.mScale, 0.0f, 5.0f);
 
-		SMALL_BUTTON(CloudProfile::ShapeNoiseReference::Default);
+		SMALL_BUTTON(Profile::ShapeNoiseReference::Default);
 
 		ImGui::TreePop();
 	}
 
-	ImGuiShowTextures(gCloudResources.mTextures);
+	ImGuiShowTextures(gCloud.mResource.mTextures);
 }
+
+Cloud gCloud;

@@ -1,11 +1,10 @@
-#include "Common.hlsl"
-
 #define CONSTANT_DEFAULT(x)
-#include "Shared.hlsl"
-#include "Util.hlsl"
+#include "Shared.inl"
+#include "Common.inl"
+#include "Util.inl"
 
 #ifndef SHADER_PROFILE_LIB
-#define ENABLE_INLINE_RAYTRACING
+#define ENABLE_RAY_QUERY
 #endif // SHADER_PROFILE_LIB
 
 //////////////////////////////////////////////////////////////////////////////////
@@ -22,103 +21,11 @@ SamplerState BilinearWrapSampler : register(s1);
 
 float3 GetSunDirection() { return mPerFrameConstants.mSunDirection.xyz; }
 
-//////////////////////////////////////////////////////////////////////////////////
-// DXR Adapters
+#include "RayQuery.inl"
 
-// Proxies
-static uint3 sDispatchRaysIndex;
-uint3 sGetDispatchRaysIndex() 
-{
-#ifdef ENABLE_INLINE_RAYTRACING
-	return sDispatchRaysIndex;
-#else
-	return DispatchRaysIndex();
-#endif // ENABLE_INLINE_RAYTRACING
-}
-
-static uint3 sDispatchRaysDimensions;
-uint3 sGetDispatchRaysDimensions() 
-{
-#ifdef ENABLE_INLINE_RAYTRACING
-	return sDispatchRaysDimensions;
-#else
-	return DispatchRaysDimensions();
-#endif // ENABLE_INLINE_RAYTRACING
-}
-
-static float3 sWorldRayOrigin;
-float3 sGetWorldRayOrigin()
-{
-#ifdef ENABLE_INLINE_RAYTRACING
-	return sWorldRayOrigin;
-#else
-	return WorldRayOrigin();
-#endif // ENABLE_INLINE_RAYTRACING
-}
-
-static float3 sWorldRayDirection;
-float3 sGetWorldRayDirection()
-{
-#ifdef ENABLE_INLINE_RAYTRACING
-	return sWorldRayDirection;
-#else
-	return WorldRayDirection();
-#endif // ENABLE_INLINE_RAYTRACING
-}
-
-static float sRayTCurrent;
-float sGetRayTCurrent()
-{
-#ifdef ENABLE_INLINE_RAYTRACING
-	return sRayTCurrent;
-#else
-	return RayTCurrent();
-#endif // ENABLE_INLINE_RAYTRACING
-}
-
-static uint sInstanceIndex;
-uint sGetInstanceIndex()
-{
-#ifdef ENABLE_INLINE_RAYTRACING
-	return sInstanceIndex;
-#else
-	return InstanceIndex();
-#endif // ENABLE_INLINE_RAYTRACING
-}
-
-static uint sPrimitiveIndex;
-uint sGetPrimitiveIndex()
-{
-#ifdef ENABLE_INLINE_RAYTRACING
-	return sPrimitiveIndex;
-#else
-	return PrimitiveIndex();
-#endif // ENABLE_INLINE_RAYTRACING
-}
-
-static uint sGeometryIndex;
-uint sGetGeometryIndex()
-{
-#ifdef ENABLE_INLINE_RAYTRACING
-	return sGeometryIndex;
-#else
-	return GeometryIndex();
-#endif // ENABLE_INLINE_RAYTRACING
-}
-
-static uint sInstanceID;
-uint sGetInstanceID()
-{
-#ifdef ENABLE_INLINE_RAYTRACING
-	return sInstanceID;
-#else
-	return InstanceID();
-#endif // ENABLE_INLINE_RAYTRACING
-}
-
-#include "Planet.hlsl"
-#include "AtmosphereIntegration.hlsl"
-#include "CloudIntegration.hlsl"
+#include "Planet.inl"
+#include "AtmosphereIntegration.inl"
+#include "CloudIntegration.inl"
 
 //////////////////////////////////////////////////////////////////////////////////
 
@@ -242,39 +149,10 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	float3 transmittance = 0;
     GetSkyLuminanceToPoint(sky_luminance, transmittance);
 
-	// Debug - Global
+	// Participating Media
 	{
-		bool terminate = true;
-		switch (mPerFrameConstants.mDebugMode)
-		{
-			case DebugMode::Barycentrics: 			hit_info.mEmission = barycentrics; break;
-			case DebugMode::Vertex: 				hit_info.mEmission = vertex; break;
-			case DebugMode::Normal: 				hit_info.mEmission = normal * 0.5 + 0.5; break;
-			case DebugMode::Albedo: 				hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mAlbedo; break;
-			case DebugMode::Reflectance: 			hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mReflectance; break;
-			case DebugMode::Emission: 				hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mEmission; break;
-			case DebugMode::Roughness: 				hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mRoughness; break;
-			case DebugMode::Transmittance:			hit_info.mEmission = transmittance; break;
-			case DebugMode::InScattering:			hit_info.mEmission = sky_luminance; break;
-			default:								terminate = false; break;
-		}
-
-		if (terminate)
-		{
-			hit_info.mDone = true;
-			return hit_info;
-		}
-	}
-
-	// Debug - Per instance
-	if (mPerFrameConstants.mDebugInstanceIndex == sGetInstanceID())
-	{
-		switch (mPerFrameConstants.mDebugInstanceMode)
-		{
-			case DebugInstanceMode::Barycentrics: 	hit_info.mEmission = barycentrics; hit_info.mDone = true; return hit_info;											// Barycentrics
-			case DebugInstanceMode::Mirror: 		hit_info.mAlbedo = 1; hit_info.mReflectionDirection = reflect(sGetWorldRayDirection(), normal); return hit_info;	// Mirror
-			default: break;
-		}
+		hit_info.mInScattering = sky_luminance;
+		hit_info.mTransmittance = transmittance;
 	}
 
 	// Material
@@ -340,10 +218,39 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 		}
 	}
 
-	// Participating Media
+	// Debug - Global
 	{
-        hit_info.mInScattering = sky_luminance;
-		hit_info.mTransmittance = transmittance;
+		bool terminate = true;
+		switch (mPerFrameConstants.mDebugMode)
+		{
+		case DebugMode::Barycentrics: 			hit_info.mEmission = barycentrics; break;
+		case DebugMode::Vertex: 				hit_info.mEmission = vertex; break;
+		case DebugMode::Normal: 				hit_info.mEmission = normal * 0.5 + 0.5; break;
+		case DebugMode::Albedo: 				hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mAlbedo; break;
+		case DebugMode::Reflectance: 			hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mReflectance; break;
+		case DebugMode::Emission: 				hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mEmission; break;
+		case DebugMode::Roughness: 				hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mRoughness; break;
+		case DebugMode::Transmittance:			hit_info.mEmission = transmittance; break;
+		case DebugMode::InScattering:			hit_info.mEmission = sky_luminance; break;
+		default:								terminate = false; break;
+		}
+
+		if (terminate)
+		{
+			hit_info.mDone = true;
+			return hit_info;
+		}
+	}
+
+	// Debug - Per instance
+	if (mPerFrameConstants.mDebugInstanceIndex == sGetInstanceID())
+	{
+		switch (mPerFrameConstants.mDebugInstanceMode)
+		{
+		case DebugInstanceMode::Barycentrics: 	hit_info.mEmission = barycentrics; hit_info.mDone = true; return hit_info;											// Barycentrics
+		case DebugInstanceMode::Mirror: 		hit_info.mAlbedo = 1; hit_info.mReflectionDirection = reflect(sGetWorldRayDirection(), normal); return hit_info;	// Mirror
+		default: break;
+		}
 	}
 
 	return hit_info;
@@ -399,18 +306,18 @@ void TraceRay()
 	payload.mThroughput = 1; // Camera gather all the light
 	payload.mRandomState = uint(uint(sGetDispatchRaysIndex().x) * uint(1973) + uint(sGetDispatchRaysIndex().y) * uint(9277) + uint(mPerFrameConstants.mAccumulationFrameCount) * uint(26699)) | uint(1); // From https://www.shadertoy.com/view/tsBBWW
 
-#ifdef ENABLE_INLINE_RAYTRACING
+#ifdef ENABLE_RAY_QUERY
 	// Note that RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH will give first hit for "Any Hit". The result may not be the closest one
 	// https://docs.microsoft.com/en-us/windows/win32/direct3d12/ray_flag
 	RayQuery<RAY_FLAG_CULL_NON_OPAQUE | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> query;
 	uint additional_ray_flags = 0;
 	uint ray_instance_mask = 0xffffffff;
-#endif // ENABLE_INLINE_RAYTRACING
+#endif // ENABLE_RAY_QUERY
 
 	uint recursion = 0;
 	for (;;)
 	{
-#ifdef ENABLE_INLINE_RAYTRACING
+#ifdef ENABLE_RAY_QUERY
 		sWorldRayOrigin 		= ray.Origin;
 		sWorldRayDirection		= ray.Direction;
 
@@ -446,7 +353,7 @@ void TraceRay()
 			ray,					// RayDesc
 			payload					// payload_t
 		);
-#endif // ENABLE_INLINE_RAYTRACING
+#endif // ENABLE_RAY_QUERY
 
 		if (payload.mDone)
 			break;
@@ -527,7 +434,7 @@ void DefaultRayGeneration()
 	TraceRay();
 }
 
-#ifdef ENABLE_INLINE_RAYTRACING
+#ifdef ENABLE_RAY_QUERY
 [numthreads(8, 8, 1)]
 void InlineRaytracingCS(	
 	uint3 inGroupThreadID : SV_GroupThreadID,
@@ -543,7 +450,7 @@ void InlineRaytracingCS(
 
 	TraceRay();
 }
-#endif // ENABLE_INLINE_RAYTRACING
+#endif // ENABLE_RAY_QUERY
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef SHADER_PROFILE_LIB

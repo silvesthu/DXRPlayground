@@ -1,5 +1,3 @@
-#define MATH_PI 3.1415926535897932384626433832795f
-
 struct HitInfo
 {
     float3 mAlbedo;

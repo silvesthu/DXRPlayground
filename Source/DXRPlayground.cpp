@@ -326,7 +326,7 @@ static void sUpdate()
 
 			if (ImGui::TreeNodeEx("Atmosphere", ImGuiTreeNodeFlags_DefaultOpen))
 			{
-				gPrecomputedAtmosphereScattering.UpdateImGui();
+				gAtmosphere.UpdateImGui();
 				ImGui::TreePop();
 			}
 
@@ -391,7 +391,7 @@ static void sUpdate()
 			gScene.RebuildShader();
 			gPerFrameConstantBuffer.mReset = 1;
 
-			gPrecomputedAtmosphereScattering.mRecomputeRequested = true;
+			gAtmosphere.mRecomputeRequested = true;
 			gCloud.mRecomputeRequested = true;
 			gDDGI.mRecomputeRequested = true;
 		}
@@ -444,7 +444,7 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 	gPerFrameConstantBuffer.mSunZenith = kScenePresets[current_scene_index].mSunZenith;
 
 	// Features (rely on ImGui, Scene)
-	gPrecomputedAtmosphereScattering.Initialize();
+	gAtmosphere.Initialize();
 	gCloud.Initialize();
 	gDDGI.Initialize();
 
@@ -452,7 +452,7 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 	filewatch::FileWatch<std::string> file_watch("Shader/", 
 		[] (const std::string& inPath, const filewatch::Event /*inChangeType*/) 
 		{
-			std::regex pattern(".*\\.hlsl");
+			std::regex pattern(".*\\.(hlsl|h|inl)");
 			if (std::regex_match(inPath, pattern) && inPath.find("Generated") == std::string::npos)
 			{
 				std::string msg = "Reload triggered by " + inPath + "\n";
@@ -498,7 +498,7 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 	{
 		sWaitForLastSubmittedFrame();
 
-		gPrecomputedAtmosphereScattering.Finalize();
+		gAtmosphere.Finalize();
 		gCloud.Finalize();
 		gDDGI.Finalize();
 
@@ -592,11 +592,11 @@ void sRender()
 
 	// Atmosphere
 	{
-		gPrecomputedAtmosphereScattering.Update();
-		gPrecomputedAtmosphereScattering.Load();
-		gPrecomputedAtmosphereScattering.Precompute();
-		gPrecomputedAtmosphereScattering.Compute();
-		gPrecomputedAtmosphereScattering.Validate();
+		gAtmosphere.Update();
+		gAtmosphere.Load();
+		gAtmosphere.Precompute();
+		gAtmosphere.Compute();
+		gAtmosphere.Validate();
 	}
 
 	// Cloud

@@ -165,6 +165,7 @@
     <ClInclude Include="Source\Thirdparty\tinygltf\tiny_gltf.h">
       <Filter>Source\Thirdparty\tinygltf</Filter>
     </ClInclude>
+    <ClInclude Include="Shader\RayQuery.inl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\DXRPlayground.cpp">
@@ -229,31 +230,31 @@
     <CopyFileToFolders Include="Shader\Shader.hlsl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\Common.hlsl">
+    <CopyFileToFolders Include="Shader\Common.inl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\Shared.hlsl">
+    <CopyFileToFolders Include="Shader\Shared.inl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\AtmosphereIntegration.Raymarch.hlsl">
+    <CopyFileToFolders Include="Shader\AtmosphereIntegration.Raymarch.inl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\AtmosphereIntegration.hlsl">
+    <CopyFileToFolders Include="Shader\AtmosphereIntegration.inl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\AtmosphereIntegration.Hillaire20.hlsl">
+    <CopyFileToFolders Include="Shader\AtmosphereIntegration.Hillaire20.inl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\AtmosphereIntegration.Bruneton17.hlsl">
+    <CopyFileToFolders Include="Shader\AtmosphereIntegration.Bruneton17.inl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\Planet.hlsl">
+    <CopyFileToFolders Include="Shader\Planet.inl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\Util.hlsl">
+    <CopyFileToFolders Include="Shader\Util.inl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\CloudIntegration.hlsl">
+    <CopyFileToFolders Include="Shader\CloudIntegration.inl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
   </ItemGroup>

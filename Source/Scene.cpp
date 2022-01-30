@@ -513,39 +513,39 @@ void Scene::CreateShaderResource()
 			handle.ptr += increment_size;
 		}
 
-		// b, space2 - PrecomputedAtmosphere
-		if (gPrecomputedAtmosphereScatteringResources.mConstantUploadBuffer != nullptr)
+		// b, space2 - Atmosphere
+		if (gAtmosphere.mResource.mConstantUploadBuffer != nullptr)
 		{
 			D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
-			desc.BufferLocation = gPrecomputedAtmosphereScatteringResources.mConstantUploadBuffer->GetGPUVirtualAddress();
+			desc.BufferLocation = gAtmosphere.mResource.mConstantUploadBuffer->GetGPUVirtualAddress();
 			desc.SizeInBytes = gAlignUp(static_cast<UINT>(sizeof(AtmosphereConstants)), static_cast<UINT>(D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
 			gDevice->CreateConstantBufferView(&desc, handle);
 
 			handle.ptr += increment_size;
 		}
 
-		// t, space2 - PrecomputedAtmosphere
-		for (auto&& texture : gPrecomputedAtmosphereScatteringResources.mTextures)
+		// t, space2 - Atmosphere
+		for (auto&& texture : gAtmosphere.mResource.mTextures)
 		{
-			if (texture->mResource == nullptr)
+			if (texture.mResource == nullptr)
 				continue;
 
 			D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
-			srv_desc.Format = texture->mFormat;
-			srv_desc.ViewDimension = texture->mDepth == 1 ? D3D12_SRV_DIMENSION_TEXTURE2D : D3D12_SRV_DIMENSION_TEXTURE3D;
+			srv_desc.Format = texture.mFormat;
+			srv_desc.ViewDimension = texture.mDepth == 1 ? D3D12_SRV_DIMENSION_TEXTURE2D : D3D12_SRV_DIMENSION_TEXTURE3D;
 			srv_desc.Texture2D.MipLevels = static_cast<UINT>(-1);
 			srv_desc.Texture2D.MostDetailedMip = 0;
 			srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			gDevice->CreateShaderResourceView(texture->mResource.Get(), &srv_desc, handle);
+			gDevice->CreateShaderResourceView(texture.mResource.Get(), &srv_desc, handle);
 
 			handle.ptr += increment_size;
 		}
 
 		// b, space3 - Cloud
-		if (gCloudResources.mConstantUploadBuffer != nullptr)
+		if (gCloud.mResource.mConstantUploadBuffer != nullptr)
 		{
 			D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
-			desc.BufferLocation = gCloudResources.mConstantUploadBuffer->GetGPUVirtualAddress();
+			desc.BufferLocation = gCloud.mResource.mConstantUploadBuffer->GetGPUVirtualAddress();
 			desc.SizeInBytes = gAlignUp(static_cast<UINT>(sizeof(Cloud)), static_cast<UINT>(D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
 			gDevice->CreateConstantBufferView(&desc, handle);
 
@@ -553,18 +553,18 @@ void Scene::CreateShaderResource()
 		}
 
 		// t, space3 - Cloud
-		for (auto&& texture : gCloudResources.mTextures)
+		for (auto&& texture : gCloud.mResource.mTextures)
 		{
-			if (texture->mResource == nullptr)
+			if (texture.mResource == nullptr)
 				continue;
 
 			D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
-			srv_desc.Format = texture->mFormat;
-			srv_desc.ViewDimension = texture->mDepth == 1 ? D3D12_SRV_DIMENSION_TEXTURE2D : D3D12_SRV_DIMENSION_TEXTURE3D;
+			srv_desc.Format = texture.mFormat;
+			srv_desc.ViewDimension = texture.mDepth == 1 ? D3D12_SRV_DIMENSION_TEXTURE2D : D3D12_SRV_DIMENSION_TEXTURE3D;
 			srv_desc.Texture2D.MipLevels = static_cast<UINT>(-1);
 			srv_desc.Texture2D.MostDetailedMip = 0;
 			srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			gDevice->CreateShaderResourceView(texture->mResource.Get(), &srv_desc, handle);
+			gDevice->CreateShaderResourceView(texture.mResource.Get(), &srv_desc, handle);
 
 			handle.ptr += increment_size;
 		}

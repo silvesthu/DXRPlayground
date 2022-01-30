@@ -156,9 +156,9 @@ float2 UV_to_XY(float2 uv, Texture2D<float4> texture) // GetUnitRangeFromTexture
 	return float2(U_to_X(uv.x, size.x), U_to_X(uv.y, size.y));
 }
 
-#include "AtmosphereIntegration.Bruneton17.hlsl"
-#include "AtmosphereIntegration.Hillaire20.hlsl"
-#include "AtmosphereIntegration.Raymarch.hlsl"
+#include "AtmosphereIntegration.Bruneton17.inl"
+#include "AtmosphereIntegration.Hillaire20.inl"
+#include "AtmosphereIntegration.Raymarch.inl"
 
 void GetSunAndSkyIrradiance(float3 inHitPosition, float3 inNormal, out float3 outSunIrradiance, out float3 outSkyIrradiance)
 {

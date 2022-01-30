@@ -19,6 +19,7 @@ using Microsoft::WRL::ComPtr;
 #include <locale>
 #include <codecvt>
 #include <filesystem>
+#include <span>
 
 #include "Thirdparty/glm/glm/gtx/transform.hpp"
 #include "Thirdparty/nameof/include/nameof.hpp"
@@ -117,8 +118,8 @@ struct Texture
 	ComPtr<ID3D12Resource> mResource;
 	ComPtr<ID3D12Resource> mUploadResource;
 
-	D3D12_CPU_DESCRIPTOR_HANDLE mCPUHandle = {};
-	D3D12_GPU_DESCRIPTOR_HANDLE mGPUHandle = {};
+	D3D12_CPU_DESCRIPTOR_HANDLE mGuiCPUHandle = {};
+	D3D12_GPU_DESCRIPTOR_HANDLE mGuiGPUHandle = {};
 
 	int mResourceHeapIndex = -1;
 };
@@ -172,8 +173,7 @@ using uint3 = glm::uvec3;
 using uint4 = glm::uvec4;
 
 #define CONSTANT_DEFAULT(x) = x
-static const float MATH_PI = glm::pi<float>();
-#include "../Shader/Shared.hlsl"
+#include "../Shader/Shared.inl"
 
 extern PerFrameConstants					gPerFrameConstantBuffer;
 
@@ -187,6 +187,27 @@ static const wchar_t*						kShadowClosestHitShader		= L"ShadowClosestHit";
 static const wchar_t*						kShadowHitGroup				= L"ShadowHitGroup";
 
 // Helper
+template <typename ResourceType>
+class ResourceBase
+{
+public:
+	ResourceBase() = default;
+	~ResourceBase() = default;
+
+	// Reconstruct this, release all managed resources
+	void Reset()
+	{
+		std::destroy_at<ResourceType>(static_cast<ResourceType*>(this));
+		std::construct_at<ResourceType>(static_cast<ResourceType*>(this));
+	}
+
+	// Make the class non-copyable as std::span is used to referencing members, otherwise those should be re-calculated after copy
+	ResourceBase(const ResourceBase&) = delete;
+	ResourceBase(const ResourceBase&&) = delete;
+	ResourceBase& operator=(const ResourceBase&) = delete;
+	ResourceBase& operator=(const ResourceBase&&) = delete;
+};
+
 template <typename T>
 inline T gAlignUp(T value, T alignment)
 {
@@ -364,11 +385,11 @@ inline D3D12_RESOURCE_DESC gGetTextureResourceDesc(UINT width, UINT height, UINT
 	return desc;
 }
 
-inline D3D12_RESOURCE_DESC gGetUAVResourceDesc(UINT64 width)
+inline D3D12_RESOURCE_DESC gGetUAVResourceDesc(UINT64 inWidth)
 {
-	D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(width);
+	D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(inWidth);
 	desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 	return desc;
 }
 
-void ImGuiShowTextures(std::vector<Texture*> textures, std::string name = "Texture", ImGuiTreeNodeFlags flags = 0);
+void ImGuiShowTextures(std::span<Texture> inTextures, const std::string& inName = "Texture", ImGuiTreeNodeFlags inFlags = 0);

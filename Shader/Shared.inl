@@ -1,5 +1,7 @@
 // Code shared between HLSL and C++
 
+#define MATH_PI 3.1415926535897932384626433832795f
+
 // TODO: How to calculate RGB luminance of sun ?
 // https://en.wikipedia.org/wiki/Luminous_efficacy
 // https://en.wikipedia.org/wiki/Sunlight#Measurement
@@ -242,25 +244,25 @@ struct CloudConstants
 	uint						mPad1;
 	uint						mPad2;
 
-	struct CloudRaymarch
+	struct RayMarch
 	{
 		uint					mSampleCount			CONSTANT_DEFAULT(0);
 		uint					mLightSampleCount		CONSTANT_DEFAULT(0);
 		float					mLightSampleLength		CONSTANT_DEFAULT(0);
 		float					mPad;
 	};
-	CloudRaymarch				mRaymarch;
+	RayMarch					mRaymarch;
 
-	struct CloudGeometry
+	struct Geometry
 	{
 		float					mStrato					CONSTANT_DEFAULT(0);
 		float					mAlto					CONSTANT_DEFAULT(0);
 		float					mCirro					CONSTANT_DEFAULT(0);
 		float					mPad;
 	};
-	CloudGeometry				mGeometry;
+	Geometry					mGeometry;
 
-	struct CloudShapeNoise
+	struct ShapeNoise
 	{
 		float3					mOffset					CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 		float					mPad3;
@@ -270,7 +272,7 @@ struct CloudConstants
 		float					mScale					CONSTANT_DEFAULT(0);
 		float					mPad4;
 	};
-	CloudShapeNoise				mShapeNoise;
+	ShapeNoise					mShapeNoise;
 };
 
 struct DDGIConstants

@@ -235,14 +235,14 @@ void Texture::Initialize()
 	
 	// SRV for ImGui
 	{
-		ImGui_ImplDX12_AllocateDescriptor(mCPUHandle, mGPUHandle);
+		ImGui_ImplDX12_AllocateDescriptor(mGuiCPUHandle, mGuiGPUHandle);
 		D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
 		srv_desc.Format = mFormat;
 		srv_desc.ViewDimension = mDepth == 1 ? D3D12_SRV_DIMENSION_TEXTURE2D : D3D12_SRV_DIMENSION_TEXTURE3D;
 		srv_desc.Texture2D.MipLevels = (UINT)-1;
 		srv_desc.Texture2D.MostDetailedMip = 0;
 		srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		gDevice->CreateShaderResourceView(mResource.Get(), &srv_desc, mCPUHandle);
+		gDevice->CreateShaderResourceView(mResource.Get(), &srv_desc, mGuiCPUHandle);
 	}
 
 	// UIScale
@@ -282,12 +282,12 @@ void Texture::Load()
 	UpdateSubresources(gCommandList, mResource.Get(), mUploadResource.Get(), 0, 0, (UINT)subresources.size(), subresources.data());
 }
 
-void ImGuiShowTextures(std::vector<Texture*> textures, std::string name, ImGuiTreeNodeFlags flags)
+void ImGuiShowTextures(std::span<Texture> inTextures, const std::string& inName, ImGuiTreeNodeFlags inFlags)
 {
 	static float ui_scale = 1.0f;
 	static bool flip_y = false;
 
-	if (ImGui::TreeNodeEx(name.c_str(), flags))
+	if (ImGui::TreeNodeEx(inName.c_str(), inFlags))
 	{
 		static Texture* sTexture = nullptr;
 		auto add_texture = [&](Texture& inTexture)
@@ -299,7 +299,7 @@ void ImGuiShowTextures(std::vector<Texture*> textures, std::string name, ImGuiTr
 				std::swap(uv0.y, uv1.y);
 
 			float item_ui_scale = inTexture.mUIScale * ui_scale;
-			ImGui::Image((ImTextureID)inTexture.mGPUHandle.ptr, ImVec2(inTexture.mWidth * item_ui_scale, inTexture.mHeight * item_ui_scale), uv0, uv1);
+			ImGui::Image(reinterpret_cast<ImTextureID>(inTexture.mGuiGPUHandle.ptr), ImVec2(inTexture.mWidth * item_ui_scale, inTexture.mHeight * item_ui_scale), uv0, uv1);
 			if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
 			{
 				sTexture = &inTexture;
@@ -344,8 +344,8 @@ void ImGuiShowTextures(std::vector<Texture*> textures, std::string name, ImGuiTr
 			ImGui::EndPopup();
 		}
 
-		for (auto&& texture : textures)
-			add_texture(*texture);
+		for (auto&& texture : inTextures)
+			add_texture(texture);
 
 		ImGui::TreePop();
 	}

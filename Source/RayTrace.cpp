@@ -1,6 +1,5 @@
 #include "Common.h"
 #include "Scene.h"
-#include "Atmosphere.h"
 
 void gRaytrace()
 {

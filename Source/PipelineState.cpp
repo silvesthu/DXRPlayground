@@ -135,7 +135,7 @@ void GenerateGlobalRootSignatureDescriptor(RootSignatureDescriptor& outDesc)
 		outDesc.mDescriptorRanges.push_back(descriptor_range);
 	}
 
-	// b0, space2 - PrecomputedAtmosphere
+	// b0, space2 - Atmosphere
 	descriptor_range = {};
 	descriptor_range.BaseShaderRegister = 0;
 	descriptor_range.NumDescriptors = 1;
@@ -144,13 +144,13 @@ void GenerateGlobalRootSignatureDescriptor(RootSignatureDescriptor& outDesc)
 	descriptor_range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 	outDesc.mDescriptorRanges.push_back(descriptor_range);
 
-	// t, space2 - PrecomputedAtmosphere
+	// t, space2 - Atmosphere
 	descriptor_range = {};
 	descriptor_range.NumDescriptors = 1;
 	descriptor_range.RegisterSpace = 2;
 	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 	descriptor_range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-	for (int i = 0; i < gPrecomputedAtmosphereScatteringResources.mTextures.size(); i++)
+	for (int i = 0; i < gAtmosphere.mResource.mTextures.size(); i++)
 	{
 		descriptor_range.BaseShaderRegister = i;
 		outDesc.mDescriptorRanges.push_back(descriptor_range);
@@ -171,7 +171,7 @@ void GenerateGlobalRootSignatureDescriptor(RootSignatureDescriptor& outDesc)
 	descriptor_range.RegisterSpace = 3;
 	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 	descriptor_range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-	for (int i = 0; i < gCloudResources.mTextures.size(); i++)
+	for (int i = 0; i < gCloud.mResource.mTextures.size(); i++)
 	{
 		descriptor_range.BaseShaderRegister = i;
 		outDesc.mDescriptorRanges.push_back(descriptor_range);
@@ -534,14 +534,14 @@ void gCreatePipelineState()
 		succeed &= sCreatePipelineState(shader_filename, shader_stream, gDiffTexture2DShader);
 		succeed &= sCreatePipelineState(shader_filename, shader_stream, gDiffTexture3DShader);
 
-		for (auto&& shader : gPrecomputedAtmosphereScatteringResources.mShaders)
-			succeed &= sCreatePipelineState(shader_filename, shader_stream, *shader);
+		for (auto&& shader : gAtmosphere.mResource.mShaders)
+			succeed &= sCreatePipelineState(shader_filename, shader_stream, shader);
 
-		for (auto&& shader : gCloudResources.mShaders)
-			succeed &= sCreatePipelineState(shader_filename, shader_stream, *shader);
+		for (auto&& shader : gCloud.mResource.mShaders)
+			succeed &= sCreatePipelineState(shader_filename, shader_stream, shader);
 
-		for (auto&& shader : gDDGIResources.mShaders)
-			succeed &= sCreatePipelineState(shader_filename, shader_stream, *shader);
+		for (auto&& shader : gDDGI.mResource.mShaders)
+			succeed &= sCreatePipelineState(shader_filename, shader_stream, shader);
 
 		if (!succeed)
 		{
