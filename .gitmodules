@@ -7,9 +7,6 @@
 [submodule "Source/Thirdparty/tinyobjloader"]
 	path = Source/Thirdparty/tinyobjloader
 	url = https://github.com/tinyobjloader/tinyobjloader.git
-[submodule "Asset/raytracing-references"]
-	path = Asset/raytracing-references
-	url = https://github.com/sergeyreznik/raytracing-references.git
 [submodule "Source/Thirdparty/nameof"]
 	path = Source/Thirdparty/nameof
 	url = https://github.com/Neargye/nameof.git
