@@ -584,9 +584,8 @@ void ComputeDirectIrradianceCS(
 		average_cosine_factor = (mu_s + alpha_s) * (mu_s + alpha_s) / (4.0 * alpha_s);
 
 	// Direct Irradiance
-	float3 solar_irradiance = mAtmosphere.mPrecomputeWithSolarIrradiance ? mAtmosphere.mSolarIrradiance : 1.0;
 	float3 transmittance = GetTransmittanceToTopAtmosphereBoundary(r, mu_s);
-	float3 direct_irradiance = transmittance * solar_irradiance * average_cosine_factor; // [Bruneton08] 2.2 (9) L_0
+	float3 direct_irradiance = transmittance * average_cosine_factor; // [Bruneton08] 2.2 (9) L_0
 
 	// Output
 	DeltaIrradianceUAV[inDispatchThreadID.xy] = float4(direct_irradiance, 1.0);
@@ -634,10 +633,8 @@ void IntegrateSingleScattering(float4 r_mu_mu_s_nu, bool intersects_ground, out 
 		mie_sum += mie_i * weight_i;
 	}
 
-	float3 solar_irradiance = mAtmosphere.mPrecomputeWithSolarIrradiance ? mAtmosphere.mSolarIrradiance : 1.0;
-
-	rayleigh = rayleigh_sum * dx * solar_irradiance * mAtmosphere.mRayleighScattering;
-	mie = mie_sum * dx * solar_irradiance * mAtmosphere.mMieScattering;
+	rayleigh = rayleigh_sum * dx * mAtmosphere.mRayleighScattering;
+	mie = mie_sum * dx * mAtmosphere.mMieScattering;
 }
 
 [RootSignature(AtmosphereRootSignature)]
@@ -1015,10 +1012,9 @@ float3 GetExtrapolatedSingleMieScattering(float4 scattering)
 void GetCombinedScattering(float r, float mu, float mu_s, float nu, bool ray_r_mu_intersects_ground, out float3 rayleigh_scattering, out float3 single_mie_scattering)
 {
 	float4 scattering = GetScattering(ScatteringSRV, r, mu, mu_s, nu, ray_r_mu_intersects_ground);
-	float3 solar_irradiance = mAtmosphere.mPrecomputeWithSolarIrradiance ? 1.0 : mAtmosphere.mSolarIrradiance;
 
-	single_mie_scattering = GetExtrapolatedSingleMieScattering(scattering) * solar_irradiance;
-	rayleigh_scattering = scattering.xyz * solar_irradiance;
+	single_mie_scattering = GetExtrapolatedSingleMieScattering(scattering);
+	rayleigh_scattering = scattering.xyz;
 }
 
 void GetSkyRadiance(out float3 outSkyRadiance, out float3 outTransmittanceToTop)
@@ -1175,11 +1171,10 @@ void GetSunAndSkyIrradiance(float3 inHitPosition, float3 inNormal, out float3 ou
 	float mu_s = dot(local_position, sun_direction) / r;
 
 	// Indirect irradiance from sky (approximated if the surface is not horizontal).
-	float3 solar_irradiance = mAtmosphere.mPrecomputeWithSolarIrradiance ? 1.0 : mAtmosphere.mSolarIrradiance;
-	outSkyIrradiance = solar_irradiance * GetIrradiance(r, mu_s) * (1.0 + dot(inNormal, local_position) / r) * 0.5;
+	outSkyIrradiance = GetIrradiance(r, mu_s) * (1.0 + dot(inNormal, local_position) / r) * 0.5;
 
 	// Direct irradiance from sun
-	outSunIrradiance = mAtmosphere.mSolarIrradiance * GetTransmittanceToSun(r, mu_s) * max(dot(inNormal, sun_direction), 0.0);
+	outSunIrradiance = GetTransmittanceToSun(r, mu_s) * max(dot(inNormal, sun_direction), 0.0);
 }
 
 }} // namespace AtmosphereIntegration { namespace Bruneton17 {

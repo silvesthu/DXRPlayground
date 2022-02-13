@@ -124,7 +124,7 @@ struct PerFrameConstants
 	float4						mCameraRightExtend		CONSTANT_DEFAULT(float4(1.0f, 0.0f, 0.0f, 0.0f));
 	float4						mCameraUpExtend			CONSTANT_DEFAULT(float4(0.0f, 1.0f, 0.0f, 0.0f));
 
-	uint						mOutputLuminance		CONSTANT_DEFAULT(0);
+	uint						mReserved				CONSTANT_DEFAULT(0);
 	float						mEV100					CONSTANT_DEFAULT(16.0f);
 	ToneMappingMode				mToneMappingMode		CONSTANT_DEFAULT(ToneMappingMode::Knarkowicz);
 	float						_0						CONSTANT_DEFAULT(0.0f);
@@ -245,8 +245,7 @@ struct AtmosphereConstants
 	float3						mSolarIrradiance		CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	float						mSunAngularRadius		CONSTANT_DEFAULT(0);
 
-	float3						mPad5;
-	uint						mPrecomputeWithSolarIrradiance	CONSTANT_DEFAULT(0);
+	float4						mPad5;
 
 	float3						mGroundAlbedo			CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	float						mAerialPerspective		CONSTANT_DEFAULT(0);

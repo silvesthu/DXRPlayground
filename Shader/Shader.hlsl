@@ -109,8 +109,7 @@ void DefaultMiss(inout RayPayload payload)
 HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attributes)
 {
 	HitInfo hit_info = (HitInfo)0;
-	hit_info.mPDF = 1.0;
-	hit_info.mScatteringPDF = 1.0;
+	hit_info.mDone = true;
 
 	// For more system value intrinsics, see https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html 
 	float3 barycentrics = float3(1.0 - attributes.barycentrics.x - attributes.barycentrics.y, attributes.barycentrics.x, attributes.barycentrics.y);
@@ -160,80 +159,85 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 
 	// Reflection
 	{
+		// TODO: Revisit. Support tangent ?
+		// onb - build_from_w
+		float3 axis[3];
+		axis[2] = normal;
+		float3 a = (abs(axis[2].x) > 0.9) ? float3(0, 1, 0) : float3(1, 0, 0);
+		axis[1] = normalize(cross(axis[2], a));
+		axis[0] = cross(axis[2], axis[1]);
+		
 		// Based on Mitsuba2
         switch (InstanceDataBuffer[sGetInstanceID()].mMaterialType)
         {
             case MaterialType::Diffuse:
 	            {
-		            hit_info.mAlbedo = InstanceDataBuffer[sGetInstanceID()].mAlbedo;
             		hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mEmission * (kEmissionScale * kPreExposure);
+
+            		// random
+            		float3 direction = RandomCosineDirection(payload.mRandomState);
+
+            		// onb - local
+            		hit_info.mReflectionDirection = normalize(direction.x * axis[0] + direction.y * axis[1] + direction.z * axis[2]);
+
+            		// pdf - exact distribution - should cancel out
+            		float cosine = dot(normal, hit_info.mReflectionDirection);
+            		hit_info.mScatteringPDF = cosine <= 0 ? 0 : cosine / MATH_PI;
+            		hit_info.mSamplingPDF = cosine <= 0 ? 0 : cosine / MATH_PI;
+            		hit_info.mAlbedo = InstanceDataBuffer[sGetInstanceID()].mAlbedo;
+            		hit_info.mDone = false;
 	            }
                 break;
             case MaterialType::RoughConductor:
 				{
-                    hit_info.mAlbedo = InstanceDataBuffer[sGetInstanceID()].mAlbedo;
                     hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mEmission * (kEmissionScale * kPreExposure);
 
-            		// TODO
+            		// TODO: Check visible normal
+
+            		float a = InstanceDataBuffer[sGetInstanceID()].mRoughnessAlpha;
+            		float a2 = a * a;
+
+            		// Microfacet
+            		float3 H; // Microfacet normal (Half-vector)
+            		{                    	
+						float e0 = RandomFloat01(payload.mRandomState);
+                    	float e1 = RandomFloat01(payload.mRandomState);
+                    	
+                    	// 2D Distribution -> GGX Distribution (Polar)
+                    	float cos_theta = sqrt((1.0 - e0) / ((a2 - 1) * e0 + 1.0));
+                    	float sin_theta = sqrt( 1 - cos_theta * cos_theta );
+                    	float phi = 2 * MATH_PI * e1;
+
+                    	// Polar -> Cartesian
+                    	H.x = sin_theta * cos(phi);
+                    	H.y = sin_theta * sin(phi);
+                    	H.z = cos_theta;
+
+                    	// Tangent -> World
+                    	H = normalize(H.x * axis[0] + H.y * axis[1] + H.z * axis[2]);
+            		}
+
+            		// Reflect with microfacet normal
+            		hit_info.mReflectionDirection = normalize(reflect(sGetWorldRayDirection(), H));
+            		
+            		float HoV = dot(H, sGetWorldRayDirection());
+            		float NoH = dot(normal, H);
+            		float NoV = dot(normal, sGetWorldRayDirection());
+            		float NoL = dot(normal, hit_info.mReflectionDirection);
+
+            		float Vis = Vis_SmithGGXCorrelated(NoV, NoL, a2);
+            		float3 F = F_Schlick(InstanceDataBuffer[sGetInstanceID()].mReflectance, HoV);
+
+            		hit_info.mAlbedo = Vis * F * NoL * (4.0f * HoV) / NoH;
+            		hit_info.mAlbedo = 1.0; // TODO: WIP
+            		hit_info.mScatteringPDF = 1.0;
+            		hit_info.mSamplingPDF = 1.0;
+            		hit_info.mDone = false;
                 }
                 break;
             case MaterialType::None:
 			default:
                 break;
-        }
-
-		// Lambertian
-		{
-            if (false)
-            {
-				// random direction
-
-                float3 random_vector = RandomUnitVector(payload.mRandomState);
-                if (dot(normal, random_vector) < 0)
-                    random_vector = -random_vector;
-                hit_info.mReflectionDirection = random_vector;
-
-				// pdf - simple distribution
-                float cosine = dot(normal, hit_info.mReflectionDirection);
-                hit_info.mScatteringPDF = cosine <= 0 ? 0 : cosine / MATH_PI;
-                hit_info.mPDF = 1 / (2 * MATH_PI); // hemisphere
-            }
-            else
-            {
-				// random cosine direction
-
-				// onb - build_from_w
-                float3 axis[3];
-                axis[2] = normal;
-                float3 a = (abs(axis[2].x) > 0.9) ? float3(0, 1, 0) : float3(1, 0, 0);
-                axis[1] = normalize(cross(axis[2], a));
-                axis[0] = cross(axis[2], axis[1]);
-
-				// random
-                float3 direction = RandomCosineDirection(payload.mRandomState);
-
-				// onb - local
-                hit_info.mReflectionDirection = normalize(direction.x * axis[0] + direction.y * axis[1] + direction.z * axis[2]);
-
-				// pdf - exact distribution - should cancel out
-                float cosine = dot(normal, hit_info.mReflectionDirection);
-                hit_info.mScatteringPDF = cosine <= 0 ? 0 : cosine / MATH_PI;
-                hit_info.mPDF = cosine <= 0 ? 0 : cosine / MATH_PI;
-            }
-        }
-
-		// Sun light
-        if (false)
-        {
-            float sun_light_pdf = 0.01; // sun size over sphere?
-            float sun_light_weight = 0.5;
-            if (RandomFloat01(payload.mRandomState) < sun_light_weight)
-            {
-                hit_info.mReflectionDirection = GetSunDirection(); // should be random on sun disk to get soft shadow
-                hit_info.mPDF = (1 - sun_light_weight) * hit_info.mPDF + sun_light_weight * sun_light_pdf;
-
-			// how to feedback if sun is not hit?
-            }
         }
     }
 
@@ -292,7 +296,7 @@ void DefaultClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionA
 
 	// Material
 	payload.mEmission = payload.mEmission + payload.mThroughput * hit_info.mTransmittance * hit_info.mEmission + hit_info.mInScattering;
-	payload.mThroughput = hit_info.mPDF <= 0 ? 0 : payload.mThroughput * hit_info.mAlbedo * hit_info.mTransmittance * hit_info.mScatteringPDF / hit_info.mPDF;
+	payload.mThroughput = hit_info.mSamplingPDF <= 0 ? 0 : payload.mThroughput * hit_info.mAlbedo * hit_info.mTransmittance * hit_info.mScatteringPDF / hit_info.mSamplingPDF;
 }
 
 [shader("closesthit")]
@@ -349,7 +353,6 @@ void TraceRay()
 		if (query.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
 		{
 			sRayTCurrent		= query.CommittedRayT();
-
 			sInstanceIndex 		= query.CommittedInstanceIndex();
 			sPrimitiveIndex 	= query.CommittedPrimitiveIndex();
 			sGeometryIndex 		= query.CommittedGeometryIndex();
@@ -370,7 +373,7 @@ void TraceRay()
 			0,						// RayFlags 
 			0xFF,					// InstanceInclusionMask
 			0,						// RayContributionToHitGroupIndex, 4bits
-			0,						// MultiplierForGeometryContributuionToHitGroupIndex, 16bits
+			0,						// MultiplierForGeometryContributionToHitGroupIndex, 16bits
 			0,						// MissShaderIndex
 			ray,					// RayDesc
 			payload					// payload_t
@@ -410,17 +413,9 @@ void TraceRay()
 		recursion++;
 	}
 
-	// [Debug]
-	// payload.mEmission = RemoveSRGBCurve(payload.mEmission);
-	// payload.mEmission = (uint3)(RemoveSRGBCurve(payload.mEmission) * 255.0) / 255.0;
-
-	float3 output = payload.mEmission;
-	if (!mPerFrameConstants.mOutputLuminance && mPerFrameConstants.mDebugMode == DebugMode::None)
-		output = LuminanceToColor(payload.mEmission);
-
 	// Accumulation
 	{
-		float3 current_output = output;
+		float3 current_output = payload.mEmission;
 
 		float3 previous_output = RaytracingOutput[sGetDispatchRaysIndex().xy].xyz;
 		previous_output = max(0, previous_output); // Eliminate nan
@@ -439,10 +434,8 @@ void TraceRay()
 		// if (all(abs((int2)sGetDispatchRaysIndex().xy - (int2)mDebugCoord) < DEBUG_PIXEL_RADIUS))
 		// 	mixed_output = 0;
 
-		output = mixed_output;
+		RaytracingOutput[sGetDispatchRaysIndex().xy] = float4(mixed_output, 1);
 	}
-
-	RaytracingOutput[sGetDispatchRaysIndex().xy] = float4(output, 1);
 }
 
 [shader("raygeneration")]
@@ -531,7 +524,7 @@ float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 {
 	float3 color = InputTexture.Load(int3(position.xy, 0)).xyz;
 
-	if (mPerFrameConstants.mOutputLuminance && mPerFrameConstants.mDebugMode == DebugMode::None)
+	if (mPerFrameConstants.mDebugMode == DebugMode::None)
 		color = LuminanceToColor(color /* as luminance */);
 
 	color = ApplySRGBCurve(color);

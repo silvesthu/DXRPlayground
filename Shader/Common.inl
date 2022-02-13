@@ -7,7 +7,7 @@ struct HitInfo
     float3 mReflectionDirection;
 
     float mScatteringPDF;
-    float mPDF;
+    float mSamplingPDF;
 
 	// Participating Media along the ray
     float3 mTransmittance;
@@ -136,4 +136,19 @@ float MIS_PowerHeuristic(int nf, float fPdf, int ng, float gPdf, float power)
 float MIS_BalanceHeuristic(int nf, float fPdf, int ng, float gPdf)
 {
     return MIS_PowerHeuristic(nf, fPdf, ng, gPdf, 1.0);
+}
+
+float3 F_Schlick(float3 inR0, float inNoV)
+{
+    return inR0 + (1.0 - inR0) * pow(1.0 - inNoV, 5.0);
+}
+
+// [2014][Heitz] Understanding the Masking-Shadowing Function in Microfacet-Based BRDFs
+// - https://jcgt.org/published/0003/02/03/
+// - https://google.github.io/filament/Filament.md.html#materialsystem/specularbrdf/geometricshadowing(specularg)
+float Vis_SmithGGXCorrelated(float inNoV, float inNoL, float inA2)
+{
+    float GGXV = inNoL * sqrt(inNoV * inNoV * (1.0 - inA2) + inA2);
+    float GGXL = inNoV * sqrt(inNoL * inNoL * (1.0 - inA2) + inA2);
+    return 0.5 / (GGXV + GGXL);
 }

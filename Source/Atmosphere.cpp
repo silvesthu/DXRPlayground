@@ -18,7 +18,6 @@ void Atmosphere::Update()
 	constants->mConstantColor					= gAtmosphere.mProfile.mConstantColor;
 
 	constants->mSolarIrradiance					= gAtmosphere.mProfile.mSolarIrradiance;
-	constants->mPrecomputeWithSolarIrradiance	= gAtmosphere.mProfile.mPrecomputeWithSolarIrradiance;
 	constants->mSunAngularRadius				= static_cast<float>(gAtmosphere.mProfile.kSunAngularRadius);
 
 	constants->mAerialPerspective				= (gAtmosphere.mProfile.mMode != AtmosphereMode::RaymarchAtmosphereOnly && gAtmosphere.mProfile.mAerialPerspective) ? 1.0f : 0.0f;
@@ -336,7 +335,6 @@ void Atmosphere::UpdateImGui()
 		ImGui::Checkbox("Use Luminance", &gAtmosphere.mProfile.mShowSolarIrradianceAsLuminance);
 		ImGui::SameLine();
 		ImGui::Text("(Luminous Efficacy = %.2f lm/W)", kSunLuminousEfficacy);
-		ImGui::Checkbox("Precompute With Solar Irradiance", &gAtmosphere.mProfile.mPrecomputeWithSolarIrradiance);
 
 		if (ImGui::SmallButton("Bruneton17")) Profile::SolarIrradianceReference::Bruneton17(gAtmosphere.mProfile);
 		ImGui::SameLine(); 

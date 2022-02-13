@@ -52,17 +52,17 @@ static ScenePresetType sCurrentScene = ScenePresetType::VeachMIS;
 static ScenePresetType sPreviousScene = sCurrentScene;
 static ScenePreset kScenePresets[(int)ScenePresetType::COUNT] =
 {
-	{ "None",								nullptr,																			glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
+	{ "None",						nullptr,								glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
 
-	{ "Rectangle",							"Asset/primitives/rectangle.obj",													glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
+	{ "Rectangle",					"Asset/primitives/rectangle.obj",		glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
 	
-	{ "CornellBox",							"Asset/raytracing-references/cornellbox/cornellbox.obj",							glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
+	{ "CornellBox",					"Asset/Comparison/cornellbox.obj",		glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
 
-	{ "Bruneton17",							"Asset/primitives/sphere.obj",														glm::vec4(0.0f, 0.0f, 9.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::translate(glm::vec3(0.0f, 1.0f, 0.0f)),			0.0f, glm::pi<float>() / 4.0f,},
-	{ "Bruneton17_Artifact_Mu",				"Asset/primitives/sphere.obj",														glm::vec4(0.0f, 80.0f, 150.0f, 0.0f),		glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::scale(glm::vec3(100.0f, 100.0f, 100.0f)),			0.0f, glm::pi<float>() / 4.0f,},
-	{ "Hillaire20",							nullptr,																			glm::vec4(0.0f, 0.5, -1.0f, 0.0f),			glm::vec4(0.0f, 0.0f, 1.0f, 0.0f),		98.8514328f, 	glm::translate(glm::vec3(0.0f, 1.0f, 0.0f)),			0.0f, glm::pi<float>() / 2.0f - 0.45f,},
+	{ "Bruneton17",					"Asset/primitives/sphere.obj",			glm::vec4(0.0f, 0.0f, 9.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::translate(glm::vec3(0.0f, 1.0f, 0.0f)),			0.0f, glm::pi<float>() / 4.0f,},
+	{ "Bruneton17_Artifact_Mu",		"Asset/primitives/sphere.obj",			glm::vec4(0.0f, 80.0f, 150.0f, 0.0f),		glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::scale(glm::vec3(100.0f, 100.0f, 100.0f)),			0.0f, glm::pi<float>() / 4.0f,},
+	{ "Hillaire20",					nullptr,								glm::vec4(0.0f, 0.5, -1.0f, 0.0f),			glm::vec4(0.0f, 0.0f, 1.0f, 0.0f),		98.8514328f, 	glm::translate(glm::vec3(0.0f, 1.0f, 0.0f)),			0.0f, glm::pi<float>() / 2.0f - 0.45f,},
 
-	{ "VeachMIS",							"Asset/raytracing-references/veach-mis/veach-mis.obj",										glm::vec4(0.0f, 1.0f, 13.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
+	{ "VeachMIS",					"Asset/Comparison/veach-mis.obj",		glm::vec4(0.0f, 2.0f, 15.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
 };
 
 static bool sReloadRequested = false;
@@ -201,19 +201,15 @@ static void sUpdate()
 				if (ImGui::Button("Reload Shader") || ImGui::IsKeyPressed(VK_F5))
 					sReloadRequested = true;
 
-				if (ImGui::Button("Dump Output") || ImGui::IsKeyPressed(VK_F9))
+				if (ImGui::Button("Dump Luminance") || ImGui::IsKeyPressed(VK_F9))
 				{
 					gDumpTextureProxy.mResource = gScene.GetOutputResource();
-					gDumpTextureProxy.mName = "Output";
+					gDumpTextureProxy.mName = "Luminance";
 					gDumpTexture = &gDumpTextureProxy;
 				}
 
 				ImGui::SameLine();
-
-				ImGui::CheckboxFlags("Output Luminance", &gPerFrameConstantBuffer.mOutputLuminance, 0x1);
-
-				ImGui::SameLine();
-
+				
 				ImGui::Checkbox("Inline Raytracing", &gUseDXRInlineShader);
 			}
 

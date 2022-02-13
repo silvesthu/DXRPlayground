@@ -217,6 +217,7 @@ float3 GetSkyLuminance()
 	float3 radiance = 0;
 	float3 transmittance_to_top = 0;
 	GetSkyRadiance(radiance, transmittance_to_top);
+	radiance *= mAtmosphere.mSolarIrradiance;
 
 	// Debug
 	switch (mPerFrameConstants.mDebugMode)

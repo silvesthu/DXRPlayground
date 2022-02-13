@@ -20,7 +20,7 @@ public:
 	struct Profile
 	{
 		// Config
-		AtmosphereMode mMode								= AtmosphereMode::Hillaire20;
+		AtmosphereMode mMode								= AtmosphereMode::ConstantColor;
 
 		// Constant Color
 		glm::vec4 mConstantColor							= glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
@@ -263,9 +263,8 @@ public:
 				profile.mSolarIrradiance = glm::vec3(1.0f, 1.0f, 1.0f);
 			}
 		};
-		glm::vec3 mSolarIrradiance							= {}; // kW/m^2. why is this W/m^2 in [Bruneton17]
+		glm::vec3 mSolarIrradiance							= {}; // kW/m^2
 		bool mShowSolarIrradianceAsLuminance				= false;
-		bool mPrecomputeWithSolarIrradiance					= true;
 
 		// [Note] Calculated based on Sun seen from Earth
 		// https://sciencing.com/calculate-angular-diameter-sun-8592633.html

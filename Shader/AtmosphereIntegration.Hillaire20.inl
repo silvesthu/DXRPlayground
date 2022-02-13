@@ -321,7 +321,7 @@ SingleScatteringResult IntegrateScatteredLuminance(
 	in bool MieRayPhase, in float tMaxMax = 9000000.0f)
 {
 	// Adapter
-	float3 gSunIlluminance = mAtmosphere.mSolarIrradiance;
+	float3 gSunIlluminance = 1.0;
 
 	SingleScatteringResult result = (SingleScatteringResult)0;
 
