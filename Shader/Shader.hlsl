@@ -34,6 +34,7 @@ StructuredBuffer<InstanceData> InstanceDataBuffer : register(t1, space0);
 StructuredBuffer<uint> Indices : register(t2, space0);
 StructuredBuffer<float3> Vertices : register(t3, space0);
 StructuredBuffer<float3> Normals : register(t4, space0);
+StructuredBuffer<float2> UVs : register(t5, space0);
 
 #define DEBUG_PIXEL_RADIUS (3)
 
@@ -110,8 +111,6 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	HitInfo hit_info = (HitInfo)0;
 	hit_info.mPDF = 1.0;
 	hit_info.mScatteringPDF = 1.0;
-	hit_info.mTransmittance = 1.0;
-	hit_info.mInScattering = 0.0;
 
 	// For more system value intrinsics, see https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html 
 	float3 barycentrics = float3(1.0 - attributes.barycentrics.x - attributes.barycentrics.y, attributes.barycentrics.x, attributes.barycentrics.y);
@@ -122,11 +121,14 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	uint3 indices = uint3(Indices[base_index], Indices[base_index + 1], Indices[base_index + 2]);
 
 	// Attributes
+	float3 vertices[3] = { Vertices[indices[0]], Vertices[indices[1]], Vertices[indices[2]] };
+	float3 vertex = vertices[0] * barycentrics.x + vertices[1] * barycentrics.y + vertices[2] * barycentrics.z;
+
 	float3 normals[3] = { Normals[indices[0]], Normals[indices[1]], Normals[indices[2]] };
 	float3 normal = normalize(normals[0] * barycentrics.x + normals[1] * barycentrics.y + normals[2] * barycentrics.z);
 
-	float3 vertices[3] = { Vertices[indices[0]], Vertices[indices[1]], Vertices[indices[2]] };
-	float3 vertex = vertices[0] * barycentrics.x + vertices[1] * barycentrics.y + vertices[2] * barycentrics.z;
+	float2 uvs[3] = { UVs[indices[0]], UVs[indices[1]], UVs[indices[2]] };
+	float2 uv = uvs[0] * barycentrics.x + uvs[1] * barycentrics.y + uvs[2] * barycentrics.z;
 
 	// Handle front face only
 	if (dot(normal, -sGetWorldRayDirection()) < 0)
@@ -142,81 +144,98 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	}
 
 	// Hit position
-	float3 raw_hit_position = sGetWorldRayOrigin() + sGetWorldRayDirection() * sGetRayTCurrent();
-	hit_info.mPosition = raw_hit_position + normal * 0.001;
-
-	float3 sky_luminance = 0;
-	float3 transmittance = 0;
-    GetSkyLuminanceToPoint(sky_luminance, transmittance);
+	{
+        float3 raw_hit_position = sGetWorldRayOrigin() + sGetWorldRayDirection() * sGetRayTCurrent();
+        hit_info.mPosition = raw_hit_position + normal * 0.001;
+    }
 
 	// Participating Media
+    float3 in_scattering = 0;
+    float3 transmittance = 0;
+    GetSkyLuminanceToPoint(in_scattering, transmittance);
 	{
-		hit_info.mInScattering = sky_luminance;
+        hit_info.mInScattering = in_scattering;
 		hit_info.mTransmittance = transmittance;
 	}
 
-	// Material
+	// Reflection
 	{
-		hit_info.mAlbedo = InstanceDataBuffer[sGetInstanceID()].mAlbedo;
-		hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mEmission * (kEmissionScale * kPreExposure);
+		// Based on Mitsuba2
+        switch (InstanceDataBuffer[sGetInstanceID()].mMaterialType)
+        {
+            case MaterialType::Diffuse:
+	            {
+		            hit_info.mAlbedo = InstanceDataBuffer[sGetInstanceID()].mAlbedo;
+            		hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mEmission * (kEmissionScale * kPreExposure);
+	            }
+                break;
+            case MaterialType::RoughConductor:
+				{
+                    hit_info.mAlbedo = InstanceDataBuffer[sGetInstanceID()].mAlbedo;
+                    hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mEmission * (kEmissionScale * kPreExposure);
 
-		if (dot(hit_info.mEmission, 1) > 0) // no reflection from surface with emission
-			hit_info.mDone = true;
-	}
+            		// TODO
+                }
+                break;
+            case MaterialType::None:
+			default:
+                break;
+        }
 
-	// Lambertian
-	{
-		if (false)
+		// Lambertian
 		{
-			// random direction
+            if (false)
+            {
+				// random direction
 
-			float3 random_vector = RandomUnitVector(payload.mRandomState);
-			if (dot(normal, random_vector) < 0)
-				random_vector = -random_vector;
-			hit_info.mReflectionDirection = random_vector;
+                float3 random_vector = RandomUnitVector(payload.mRandomState);
+                if (dot(normal, random_vector) < 0)
+                    random_vector = -random_vector;
+                hit_info.mReflectionDirection = random_vector;
 
-			// pdf - simple distribution
-			float cosine = dot(normal, hit_info.mReflectionDirection);
-			hit_info.mScatteringPDF = cosine <= 0 ? 0 : cosine / MATH_PI;
-			hit_info.mPDF = 1 / (2 * MATH_PI); // hemisphere
-		}
-		else
-		{
-			// random cosine direction
+				// pdf - simple distribution
+                float cosine = dot(normal, hit_info.mReflectionDirection);
+                hit_info.mScatteringPDF = cosine <= 0 ? 0 : cosine / MATH_PI;
+                hit_info.mPDF = 1 / (2 * MATH_PI); // hemisphere
+            }
+            else
+            {
+				// random cosine direction
 
-			// onb - build_from_w
-			float3 axis[3];
-			axis[2] = normal;
-			float3 a = (abs(axis[2].x) > 0.9) ? float3(0, 1, 0) : float3(1, 0, 0);
-			axis[1] = normalize(cross(axis[2], a));
-			axis[0] = cross(axis[2], axis[1]);
+				// onb - build_from_w
+                float3 axis[3];
+                axis[2] = normal;
+                float3 a = (abs(axis[2].x) > 0.9) ? float3(0, 1, 0) : float3(1, 0, 0);
+                axis[1] = normalize(cross(axis[2], a));
+                axis[0] = cross(axis[2], axis[1]);
 
-			// random
-			float3 direction = RandomCosineDirection(payload.mRandomState);
+				// random
+                float3 direction = RandomCosineDirection(payload.mRandomState);
 
-			// onb - local
-			hit_info.mReflectionDirection = normalize(direction.x * axis[0] + direction.y * axis[1] + direction.z * axis[2]);
+				// onb - local
+                hit_info.mReflectionDirection = normalize(direction.x * axis[0] + direction.y * axis[1] + direction.z * axis[2]);
 
-			// pdf - exact distribution - should cancel out
-			float cosine = dot(normal, hit_info.mReflectionDirection);
-			hit_info.mScatteringPDF = cosine <= 0 ? 0 : cosine / MATH_PI;
-			hit_info.mPDF = cosine <= 0 ? 0 : cosine / MATH_PI;
-		}
-	}
+				// pdf - exact distribution - should cancel out
+                float cosine = dot(normal, hit_info.mReflectionDirection);
+                hit_info.mScatteringPDF = cosine <= 0 ? 0 : cosine / MATH_PI;
+                hit_info.mPDF = cosine <= 0 ? 0 : cosine / MATH_PI;
+            }
+        }
 
-	// Sun light
-	if (false)
-	{
-		float sun_light_pdf = 0.01; // sun size over sphere?
-		float sun_light_weight = 0.5;
-		if (RandomFloat01(payload.mRandomState) < sun_light_weight)
-		{
-			hit_info.mReflectionDirection = GetSunDirection(); // should be random on sun disk to get soft shadow
-			hit_info.mPDF = (1 - sun_light_weight) * hit_info.mPDF + sun_light_weight * sun_light_pdf;
+		// Sun light
+        if (false)
+        {
+            float sun_light_pdf = 0.01; // sun size over sphere?
+            float sun_light_weight = 0.5;
+            if (RandomFloat01(payload.mRandomState) < sun_light_weight)
+            {
+                hit_info.mReflectionDirection = GetSunDirection(); // should be random on sun disk to get soft shadow
+                hit_info.mPDF = (1 - sun_light_weight) * hit_info.mPDF + sun_light_weight * sun_light_pdf;
 
 			// how to feedback if sun is not hit?
-		}
-	}
+            }
+        }
+    }
 
 	// Debug - Global
 	{
@@ -226,12 +245,15 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 		case DebugMode::Barycentrics: 			hit_info.mEmission = barycentrics; break;
 		case DebugMode::Vertex: 				hit_info.mEmission = vertex; break;
 		case DebugMode::Normal: 				hit_info.mEmission = normal * 0.5 + 0.5; break;
+		case DebugMode::UV:						hit_info.mEmission = float3(uv, 0.0); break;
 		case DebugMode::Albedo: 				hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mAlbedo; break;
 		case DebugMode::Reflectance: 			hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mReflectance; break;
 		case DebugMode::Emission: 				hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mEmission; break;
-		case DebugMode::Roughness: 				hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mRoughness; break;
+		case DebugMode::RoughnessAlpha: 		hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mRoughnessAlpha; break;
 		case DebugMode::Transmittance:			hit_info.mEmission = transmittance; break;
-		case DebugMode::InScattering:			hit_info.mEmission = sky_luminance; break;
+		case DebugMode::InScattering:			hit_info.mEmission = in_scattering; break;
+		case DebugMode::RecursionCount:			terminate = false; break;
+		case DebugMode::RussianRouletteCount:	terminate = false; break;
 		default:								terminate = false; break;
 		}
 
@@ -247,9 +269,9 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	{
 		switch (mPerFrameConstants.mDebugInstanceMode)
 		{
-		case DebugInstanceMode::Barycentrics: 	hit_info.mEmission = barycentrics; hit_info.mDone = true; return hit_info;											// Barycentrics
-		case DebugInstanceMode::Mirror: 		hit_info.mAlbedo = 1; hit_info.mReflectionDirection = reflect(sGetWorldRayDirection(), normal); return hit_info;	// Mirror
-		default: break;
+		case DebugInstanceMode::Barycentrics: 	hit_info.mEmission = barycentrics; hit_info.mDone = true; return hit_info;
+		case DebugInstanceMode::Mirror: 		hit_info.mAlbedo = 1; hit_info.mReflectionDirection = reflect(sGetWorldRayDirection(), normal); return hit_info;
+		default:								break;
 		}
 	}
 
@@ -392,14 +414,9 @@ void TraceRay()
 	// payload.mEmission = RemoveSRGBCurve(payload.mEmission);
 	// payload.mEmission = (uint3)(RemoveSRGBCurve(payload.mEmission) * 255.0) / 255.0;
 
-	float3 scene_luminance = payload.mEmission;
-	float3 output = LuminanceToColor(scene_luminance);
-
-	if (mPerFrameConstants.mOutputLuminance)
-		output = scene_luminance;
-
-	if (mPerFrameConstants.mDebugMode != DebugMode::None)
-		output = scene_luminance;
+	float3 output = payload.mEmission;
+	if (!mPerFrameConstants.mOutputLuminance && mPerFrameConstants.mDebugMode == DebugMode::None)
+		output = LuminanceToColor(payload.mEmission);
 
 	// Accumulation
 	{
@@ -514,11 +531,11 @@ float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 {
 	float3 color = InputTexture.Load(int3(position.xy, 0)).xyz;
 
-	if (mPerFrameConstants.mOutputLuminance)
+	if (mPerFrameConstants.mOutputLuminance && mPerFrameConstants.mDebugMode == DebugMode::None)
 		color = LuminanceToColor(color /* as luminance */);
 
-	float3 srgb_color = ApplySRGBCurve(color);
-	return float4(srgb_color, 1);
+	color = ApplySRGBCurve(color);
+	return float4(color, 1);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

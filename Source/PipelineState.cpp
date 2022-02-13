@@ -129,7 +129,7 @@ void GenerateGlobalRootSignatureDescriptor(RootSignatureDescriptor& outDesc)
 	descriptor_range.RegisterSpace = 0;
 	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 	descriptor_range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-	for (int i = 0; i < 5; i++)
+	for (int i = 0; i < 6; i++)
 	{
 		descriptor_range.BaseShaderRegister = i;
 		outDesc.mDescriptorRanges.push_back(descriptor_range);

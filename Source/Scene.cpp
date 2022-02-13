@@ -170,173 +170,203 @@ void TLAS::UpdateObjectInstances()
 	}
 }
 
-void Scene::Load(const char* inFilename, const glm::mat4x4& inTransform)
+bool Scene::LoadDummy(LoadContext& ioContext)
 {
-	std::vector<ObjectInstanceRef> object_instances;
-	std::vector<IndexType> indices;
-	std::vector<VertexType> vertices;
-	std::vector<NormalType> normals;
-	std::vector<UVType> uvs;
+	ioContext.mIndices.push_back(0);
+	ioContext.mIndices.push_back(0);
+	ioContext.mIndices.push_back(0);
 
-	if (inFilename == nullptr || !std::filesystem::exists(inFilename))
+	ioContext.mVertices.push_back(VertexType(0, 0, 0));
+	ioContext.mNormals.push_back(NormalType(0, 0, 0));
+	ioContext.mUVs.push_back(UVType(0, 0));
+
+	BLASRef blas = std::make_shared<BLAS>(std::make_shared<Primitive>(0, 1, 0, 3), L"Dummy");
+	ObjectInstanceRef object_instance = std::make_shared<ObjectInstance>(blas, glm::mat4(1), kDefaultHitGroupIndex);
+	ioContext.mObjectInstances.push_back(object_instance);
+
+	return true; 
+}
+
+bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransform, Scene::LoadContext& ioContext)
+{	
+	tinyobj::ObjReader reader;
+	if (!reader.ParseFromFile(inFilename))
+		return false;
+
+	if (!reader.Warning().empty())
+		gDebugPrint(reader.Warning().c_str());
+
+	if (!reader.Error().empty())
+		gDebugPrint(reader.Error().c_str());
+
+	// Fetch indices, attributes
+	glm::uint32 index = 0;
+	for (auto&& shape : reader.GetShapes())
 	{
-		// Dummy scene
-		indices.push_back(0);
-		indices.push_back(0);
-		indices.push_back(0);
+		glm::uint32 index_offset = static_cast<glm::uint32>(ioContext.mIndices.size());
 
-		vertices.push_back(VertexType(0, 0, 0));
-		normals.push_back(NormalType(0, 0, 0));
-		uvs.push_back(UVType(0, 0));
-
-		BLASRef blas = std::make_shared<BLAS>(std::make_shared<Primitive>(0, 1, 0, 3), L"Dummy");
-		ObjectInstanceRef object_instance = std::make_shared<ObjectInstance>(blas, glm::mat4(1), kDefaultHitGroupIndex);
-		object_instances.push_back(object_instance);
-	}
-	else
-	{
-		// Load from file
-		tinyobj::ObjReader reader;
-		reader.ParseFromFile(inFilename);
-
-		if (!reader.Warning().empty())
-			gDebugPrint(reader.Warning().c_str());
-
-		if (!reader.Error().empty())
-			gDebugPrint(reader.Error().c_str());
-
-		// Fetch indices, attributes
-		glm::uint32 index = 0;
-		for (auto&& shape : reader.GetShapes())
+		const int kNumFaceVerticesTriangle = 3;
+		glm::uint32 index_count = static_cast<glm::uint32>(shape.mesh.num_face_vertices.size()) * kNumFaceVerticesTriangle;
+		for (size_t face_index = 0; face_index < shape.mesh.num_face_vertices.size(); face_index++)
 		{
-			glm::uint32 index_offset = static_cast<glm::uint32>(indices.size());
-
-			const int kNumFaceVerticesTriangle = 3;
-			glm::uint32 index_count = static_cast<glm::uint32>(shape.mesh.num_face_vertices.size()) * kNumFaceVerticesTriangle;
-			for (size_t face_index = 0; face_index < shape.mesh.num_face_vertices.size(); face_index++)
+			assert(shape.mesh.num_face_vertices[face_index] == kNumFaceVerticesTriangle);
+			for (size_t vertex_index = 0; vertex_index < kNumFaceVerticesTriangle; vertex_index++)
 			{
-				assert(shape.mesh.num_face_vertices[face_index] == kNumFaceVerticesTriangle);
-				for (size_t vertex_index = 0; vertex_index < kNumFaceVerticesTriangle; vertex_index++)
+				tinyobj::index_t idx = shape.mesh.indices[face_index * kNumFaceVerticesTriangle + vertex_index];
+				ioContext.mIndices.push_back(static_cast<IndexType>(index++));
+
+				ioContext.mVertices.push_back(VertexType(
+					reader.GetAttrib().vertices[3 * idx.vertex_index + 0],
+					reader.GetAttrib().vertices[3 * idx.vertex_index + 1],
+					reader.GetAttrib().vertices[3 * idx.vertex_index + 2]
+				));
+
+				ioContext.mNormals.push_back(NormalType(
+					reader.GetAttrib().normals[3 * idx.normal_index + 0],
+					reader.GetAttrib().normals[3 * idx.normal_index + 1],
+					reader.GetAttrib().normals[3 * idx.normal_index + 2]
+				));
+
+				if (idx.texcoord_index == -1)
 				{
-					tinyobj::index_t idx = shape.mesh.indices[face_index * kNumFaceVerticesTriangle + vertex_index];
-					indices.push_back(static_cast<IndexType>(index++));
-
-					vertices.push_back(VertexType(
-						reader.GetAttrib().vertices[3 * idx.vertex_index + 0],
-						reader.GetAttrib().vertices[3 * idx.vertex_index + 1],
-						reader.GetAttrib().vertices[3 * idx.vertex_index + 2]
-					));
-
-					normals.push_back(NormalType(
-						reader.GetAttrib().normals[3 * idx.normal_index + 0],
-						reader.GetAttrib().normals[3 * idx.normal_index + 1],
-						reader.GetAttrib().normals[3 * idx.normal_index + 2]
-					));
-
-					if (idx.texcoord_index == -1)
-					{
-						// Dummy uv if not available
-						uvs.push_back(UVType(0, 0));
-					}
-					else
-					{
-						uvs.push_back(UVType(
-							reader.GetAttrib().texcoords[2 * idx.texcoord_index + 0],
-							reader.GetAttrib().texcoords[2 * idx.texcoord_index + 1]
-						));
-					}
-				}
-			}
-
-			// trivial - index count == vertex count
-			glm::uint32 vertex_offset = 0;
-			glm::uint32 vertex_count = index_count;
-
-			std::wstring name(shape.name.begin(), shape.name.end());
-			BLASRef blas = std::make_shared<BLAS>(std::make_shared<Primitive>(vertex_offset, vertex_count, index_offset, index_count), name);
-			ObjectInstanceRef object_instance = std::make_shared<ObjectInstance>(blas, inTransform, kDefaultHitGroupIndex);
-			object_instances.push_back(object_instance);
-
-			if (shape.mesh.material_ids.size() > 0)
-			{
-				if (shape.mesh.material_ids[0] == -1)
-				{
-					// Dummy material
-					object_instance->Data().mAlbedo = glm::vec3(0.1f, 0.1f, 0.1f);
-					object_instance->Data().mEmission = glm::vec3(0.0f, 0.0f, 0.0f);
-					object_instance->Data().mReflectance = glm::vec3(0.0f, 0.0f, 0.0f);
-					object_instance->Data().mRoughness = 1.0f;
+					// Dummy uv if not available
+					ioContext.mUVs.push_back(UVType(0, 0));
 				}
 				else
 				{
-					const tinyobj::material_t& material = reader.GetMaterials()[shape.mesh.material_ids[0]];
-					object_instance->Data().mAlbedo = glm::vec3(material.diffuse[0], material.diffuse[1], material.diffuse[2]);
-					object_instance->Data().mEmission = glm::vec3(material.emission[0], material.emission[1], material.emission[2]);
-					object_instance->Data().mReflectance = glm::vec3(material.specular[0], material.specular[1], material.specular[2]);
-					object_instance->Data().mRoughness = material.roughness;
+					ioContext.mUVs.push_back(UVType(
+						reader.GetAttrib().texcoords[2 * idx.texcoord_index + 0],
+						reader.GetAttrib().texcoords[2 * idx.texcoord_index + 1]
+					));
 				}
-
-				object_instance->Data().mIndexOffset = index_offset;
-				object_instance->Data().mVertexOffset = vertex_offset;
 			}
 		}
+
+		glm::uint32 vertex_offset = 0;
+		glm::uint32 vertex_count = index_count;
+
+		std::wstring name(shape.name.begin(), shape.name.end());
+		BLASRef blas = std::make_shared<BLAS>(std::make_shared<Primitive>(vertex_offset, vertex_count, index_offset, index_count), name);
+		ObjectInstanceRef object_instance = std::make_shared<ObjectInstance>(blas, inTransform, kDefaultHitGroupIndex);
+		ioContext.mObjectInstances.push_back(object_instance);
+
+		if (shape.mesh.material_ids.size() == 0 || shape.mesh.material_ids[0] == -1)
+		{
+			// Dummy material
+			object_instance->Data().mMaterialType = MaterialType::None;
+			object_instance->Data().mAlbedo = glm::vec3(0.1f, 0.1f, 0.1f);
+			object_instance->Data().mOpacity = 1.0f;
+			object_instance->Data().mEmission = glm::vec3(0.0f, 0.0f, 0.0f);
+			object_instance->Data().mReflectance = glm::vec3(0.0f, 0.0f, 0.0f);
+			object_instance->Data().mRoughnessAlpha = 1.0f;
+			object_instance->Data().mTransmittance = glm::vec3(1.0f, 1.0f, 1.0f);
+			object_instance->Data().mIOR = glm::vec3(1.0f, 1.0f, 1.0f);
+		}
+		else
+		{
+			const tinyobj::material_t& material = reader.GetMaterials()[shape.mesh.material_ids[0]];
+
+			MaterialType type = MaterialType::None;
+			switch (material.illum)
+			{
+			case 0: [[fallthrough]];
+			case 1: type = MaterialType::Diffuse; break;
+			case 2: type = MaterialType::RoughConductor; break; // TODO: support RoughPlastic
+			default: break;
+			}
+			object_instance->Data().mMaterialType = type;
+			object_instance->Data().mAlbedo = glm::vec3(material.diffuse[0], material.diffuse[1], material.diffuse[2]);
+			object_instance->Data().mOpacity = 1.0f;
+			object_instance->Data().mEmission = glm::vec3(material.emission[0], material.emission[1], material.emission[2]);
+			object_instance->Data().mReflectance = glm::vec3(material.specular[0], material.specular[1], material.specular[2]);
+			object_instance->Data().mRoughnessAlpha = material.roughness; // To match Mitsuba2 and PBRT (remaproughness = false)
+			object_instance->Data().mTransmittance = glm::vec3(material.transmittance[0], material.transmittance[1], material.transmittance[2]);
+			object_instance->Data().mIOR = glm::vec3(material.ior);
+		}
+
+		object_instance->Data().mIndexOffset = index_offset;
+		object_instance->Data().mVertexOffset = vertex_offset;
 	}
 
-	// Construct acceleration structure
+	return true;
+}
+
+void Scene::InitializeAS(Scene::LoadContext& inContext)
+{
+	D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(0);
+	D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
+
 	{
-		D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(0);
-		D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
+		desc.Width = sizeof(IndexType) * inContext.mIndices.size();
+		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mIndexBuffer)));
+		gSetName(mIndexBuffer, L"Scene", L".IndexBuffer");
 
-		{
-			desc.Width = sizeof(IndexType) * indices.size();
-			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mIndexBuffer)));
-			gSetName(mIndexBuffer, L"Scene", L".IndexBuffer");
-
-			uint8_t* pData = nullptr;
-			mIndexBuffer->Map(0, nullptr, reinterpret_cast<void**>(&pData));
-			memcpy(pData, indices.data(), desc.Width);
-			mIndexBuffer->Unmap(0, nullptr);
-		}
-
-		{
-			desc.Width =  sizeof(VertexType) * vertices.size();
-			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mVertexBuffer)));
-			gSetName(mVertexBuffer, L"Scene", L".VertexBuffer");
-
-			uint8_t* pData = nullptr;
-			mVertexBuffer->Map(0, nullptr, reinterpret_cast<void**>(&pData));
-			memcpy(pData, vertices.data(), desc.Width);
-			mVertexBuffer->Unmap(0, nullptr);
-		}
-
-		{
-			desc.Width = sizeof(NormalType) * normals.size();
-			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mNormalBuffer)));
-			gSetName(mNormalBuffer, L"Scene", L".NormalBuffer");
-
-			uint8_t* pData = nullptr;
-			mNormalBuffer->Map(0, nullptr, reinterpret_cast<void**>(&pData));
-			memcpy(pData, normals.data(), desc.Width);
-			mNormalBuffer->Unmap(0, nullptr);
-		}
-
-		{
-			desc.Width = sizeof(UVType) * uvs.size();
-			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mUVBuffer)));
-			gSetName(mUVBuffer, L"Scene", L".UVBuffer");
-
-			uint8_t* pData = nullptr;
-			mUVBuffer->Map(0, nullptr, reinterpret_cast<void**>(&pData));
-			memcpy(pData, uvs.data(), desc.Width);
-			mUVBuffer->Unmap(0, nullptr);
-		}
-
-		for (auto&& object_instance : object_instances)
-			object_instance->GetBLAS()->Initialize(mVertexBuffer->GetGPUVirtualAddress(), mIndexBuffer->GetGPUVirtualAddress());
-
-		mTLAS = std::make_shared<TLAS>(L"Scene");
-		mTLAS->Initialize(std::move(object_instances));
+		uint8_t* pData = nullptr;
+		mIndexBuffer->Map(0, nullptr, reinterpret_cast<void**>(&pData));
+		memcpy(pData, inContext.mIndices.data(), desc.Width);
+		mIndexBuffer->Unmap(0, nullptr);
 	}
+
+	{
+		desc.Width =  sizeof(VertexType) * inContext.mVertices.size();
+		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mVertexBuffer)));
+		gSetName(mVertexBuffer, L"Scene", L".VertexBuffer");
+
+		uint8_t* pData = nullptr;
+		mVertexBuffer->Map(0, nullptr, reinterpret_cast<void**>(&pData));
+		memcpy(pData, inContext.mVertices.data(), desc.Width);
+		mVertexBuffer->Unmap(0, nullptr);
+	}
+
+	{
+		desc.Width = sizeof(NormalType) * inContext.mNormals.size();
+		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mNormalBuffer)));
+		gSetName(mNormalBuffer, L"Scene", L".NormalBuffer");
+
+		uint8_t* pData = nullptr;
+		mNormalBuffer->Map(0, nullptr, reinterpret_cast<void**>(&pData));
+		memcpy(pData, inContext.mNormals.data(), desc.Width);
+		mNormalBuffer->Unmap(0, nullptr);
+	}
+
+	{
+		desc.Width = sizeof(UVType) * inContext.mUVs.size();
+		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mUVBuffer)));
+		gSetName(mUVBuffer, L"Scene", L".UVBuffer");
+
+		uint8_t* pData = nullptr;
+		mUVBuffer->Map(0, nullptr, reinterpret_cast<void**>(&pData));
+		memcpy(pData, inContext.mUVs.data(), desc.Width);
+		mUVBuffer->Unmap(0, nullptr);
+	}
+
+	for (auto&& object_instance : inContext.mObjectInstances)
+		object_instance->GetBLAS()->Initialize(mVertexBuffer->GetGPUVirtualAddress(), mIndexBuffer->GetGPUVirtualAddress());
+
+	mTLAS = std::make_shared<TLAS>(L"Scene");
+	mTLAS->Initialize(std::move(inContext.mObjectInstances));
+}
+
+void Scene::Load(const char* inFilename, const glm::mat4x4& inTransform)
+{
+	LoadContext context;
+
+	std::string filename_lower;
+	if (inFilename != nullptr)
+		filename_lower = inFilename;
+	filename_lower = gToLower(filename_lower);
+	
+	bool loaded = false;
+	bool try_load = std::filesystem::exists(filename_lower); 
+	
+	if (!loaded && try_load && filename_lower.ends_with(".obj"))
+		loaded |= LoadObj(filename_lower, inTransform, context);
+	
+	if (!loaded)
+		loaded |= LoadDummy(context);
+
+	assert(loaded);	
+	InitializeAS(context);
 
 	gCreatePipelineState();
 	CreateShaderResource();
@@ -509,6 +539,19 @@ void Scene::CreateShaderResource()
 			desc.Buffer.NumElements = static_cast<UINT>(resource_desc.Width / sizeof(Scene::NormalType));
 			desc.Buffer.StructureByteStride = sizeof(Scene::NormalType);
 			gDevice->CreateShaderResourceView(mNormalBuffer.Get(), &desc, handle);
+
+			handle.ptr += increment_size;
+		}
+
+		// t5
+		{
+			D3D12_RESOURCE_DESC resource_desc = mUVBuffer->GetDesc();
+			D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
+			desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+			desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+			desc.Buffer.NumElements = static_cast<UINT>(resource_desc.Width / sizeof(Scene::UVType));
+			desc.Buffer.StructureByteStride = sizeof(Scene::UVType);
+			gDevice->CreateShaderResourceView(mUVBuffer.Get(), &desc, handle);
 
 			handle.ptr += increment_size;
 		}

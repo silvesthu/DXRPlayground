@@ -19,21 +19,6 @@ extern "C" { __declspec(dllexport) extern const char8_t* D3D12SDKPath = u8".\\D3
 
 static const wchar_t*					kApplicationTitleW = L"DXR Playground";
 
-enum class ScenePresetType
-{
-	None,
-
-	CornellBox,
-	VeachMIS,
-	Furnance,
-	Bruneton17,
-	Bruneton17_Artifact_Mu,
-
-	Hillaire20,
-
-	COUNT,
-};
-
 struct ScenePreset
 {
 	const char* mName;
@@ -46,18 +31,39 @@ struct ScenePreset
 	float mSunZenith;
 };
 
+enum class ScenePresetType
+{
+	None,
+
+	Rectangle,
+
+	CornellBox,
+
+	Bruneton17,
+	Bruneton17_Artifact_Mu,
+	Hillaire20,
+
+	VeachMIS,
+
+	COUNT,
+};
+
+static ScenePresetType sCurrentScene = ScenePresetType::VeachMIS;
+static ScenePresetType sPreviousScene = sCurrentScene;
 static ScenePreset kScenePresets[(int)ScenePresetType::COUNT] =
 {
 	{ "None",								nullptr,																			glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
+
+	{ "Rectangle",							"Asset/primitives/rectangle.obj",													glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
+	
 	{ "CornellBox",							"Asset/raytracing-references/cornellbox/cornellbox.obj",							glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
-	{ "VeachMIS",							"Asset/raytracing-references/veach-mis/veach-mis.obj",								glm::vec4(0.0f, 1.0f, 13.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
-	{ "Furnance",							"Asset/raytracing-references/furnace-light-sampling/furnace-light-sampling.obj",	glm::vec4(0.0f, 1.0f, 13.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
+
 	{ "Bruneton17",							"Asset/primitives/sphere.obj",														glm::vec4(0.0f, 0.0f, 9.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::translate(glm::vec3(0.0f, 1.0f, 0.0f)),			0.0f, glm::pi<float>() / 4.0f,},
 	{ "Bruneton17_Artifact_Mu",				"Asset/primitives/sphere.obj",														glm::vec4(0.0f, 80.0f, 150.0f, 0.0f),		glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::scale(glm::vec3(100.0f, 100.0f, 100.0f)),			0.0f, glm::pi<float>() / 4.0f,},
 	{ "Hillaire20",							nullptr,																			glm::vec4(0.0f, 0.5, -1.0f, 0.0f),			glm::vec4(0.0f, 0.0f, 1.0f, 0.0f),		98.8514328f, 	glm::translate(glm::vec3(0.0f, 1.0f, 0.0f)),			0.0f, glm::pi<float>() / 2.0f - 0.45f,},
+
+	{ "VeachMIS",							"Asset/raytracing-references/veach-mis/veach-mis.obj",										glm::vec4(0.0f, 1.0f, 13.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
 };
-static ScenePresetType sCurrentScene = ScenePresetType::VeachMIS;
-static ScenePresetType sPreviousScene = ScenePresetType::VeachMIS;
 
 static bool sReloadRequested = false;
 
@@ -183,7 +189,7 @@ static void sUpdate()
 				gDisplaySettings.mRenderResolution.y);
 
 			{
-				if (ImGui::Button("Reset Camera Transform"))
+				if (ImGui::Button("Reset Camera Transform") || ImGui::IsKeyPressed(VK_F6))
 				{
 					gPerFrameConstantBuffer.mCameraPosition = kScenePresets[(int)sCurrentScene].mCameraPosition;
 					gPerFrameConstantBuffer.mCameraDirection = glm::normalize(kScenePresets[(int)sCurrentScene].mCameraDirection);

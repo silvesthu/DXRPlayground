@@ -137,20 +137,33 @@ public:
 
 	ID3D12DescriptorHeap* GetDXRDescriptorHeap() { return mDXRDescriptorHeap.Get(); }
 
-private:
+private:	
+	struct LoadContext
+	{		
+		std::vector<ObjectInstanceRef>		mObjectInstances;
+		std::vector<IndexType>				mIndices;
+		std::vector<VertexType>				mVertices;
+		std::vector<NormalType>				mNormals;
+		std::vector<UVType>					mUVs;
+	};
+	bool LoadDummy(LoadContext& ioContext);
+	bool LoadObj(const std::string& inFilename, const glm::mat4x4& inTransform, LoadContext& ioContext);
+	
+	void InitializeAS(LoadContext& inContext);
+
 	void CreateShaderResource();
 	void CleanupShaderResource();
 
-	TLASRef							mTLAS;
+	TLASRef									mTLAS;
 
-	ComPtr<ID3D12Resource>			mIndexBuffer = nullptr;
-	ComPtr<ID3D12Resource>			mVertexBuffer = nullptr;	
-	ComPtr<ID3D12Resource>			mNormalBuffer = nullptr;
-	ComPtr<ID3D12Resource>			mUVBuffer = nullptr;
+	ComPtr<ID3D12Resource>					mIndexBuffer = nullptr;
+	ComPtr<ID3D12Resource>					mVertexBuffer = nullptr;	
+	ComPtr<ID3D12Resource>					mNormalBuffer = nullptr;
+	ComPtr<ID3D12Resource>					mUVBuffer = nullptr;
 
-	ComPtr<ID3D12Resource>			mOutputResource = nullptr;
+	ComPtr<ID3D12Resource>					mOutputResource = nullptr;
 
-	ComPtr<ID3D12DescriptorHeap>	mDXRDescriptorHeap = nullptr;
+	ComPtr<ID3D12DescriptorHeap>			mDXRDescriptorHeap = nullptr;
 };
 
 extern Scene gScene;

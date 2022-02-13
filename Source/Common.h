@@ -226,6 +226,13 @@ inline T gMax(T lhs, T rhs)
 	return lhs > rhs ? lhs : rhs;
 }
 
+inline std::string gToLower(const std::string& inString)
+{
+	std::string result = inString;
+	std::transform(result.begin(), result.end(), result.begin(), [](unsigned char c){ return static_cast<char>(std::tolower(c)); });
+	return result;
+}
+
 inline void gDebugPrint(const char* string)
 {
 	OutputDebugStringA(string);
@@ -246,6 +253,37 @@ inline std::wstring gToWString(const std::string string)
 	std::wstring wide_string(wide_size, 0);
 	MultiByteToWideChar(CP_UTF8, 0, string.c_str(), (int)string.size(), &wide_string[0], wide_size);
 	return wide_string;
+}
+
+template <typename T>
+inline T gFromString(const char* inString);
+
+template<>
+inline float gFromString(const char* inString)
+{
+	float v;
+	std::sscanf(inString, "%f", &v);
+	return v;
+}
+
+template<>
+inline glm::vec2 gFromString(const char* inString)
+{
+	glm::vec2 v;
+	int received = std::sscanf(inString, "%f,%f", &v.x, &v.y);
+	if (received != 2)
+		received = std::sscanf(inString, "%f %f", &v.x, &v.y);
+	return v;
+}
+
+template<>
+inline glm::vec3 gFromString(const char* inString)
+{
+	glm::vec3 v;
+	int received = std::sscanf(inString, "%f,%f,%f", &v.x, &v.y, &v.z);
+	if (received != 3)
+		received = std::sscanf(inString, "%f %f %f", &v.x, &v.y, &v.z);
+	return v;
 }
 
 namespace nameof

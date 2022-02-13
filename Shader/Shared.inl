@@ -18,6 +18,16 @@ inline float3 RadianceToLuminance(float3 inRadiance)
 	return luminance;
 }
 
+enum class MaterialType : uint
+{
+	None = 0,
+
+	Diffuse,
+	RoughConductor,
+
+	Count
+};
+
 enum class DebugMode : uint
 {
 	None = 0,
@@ -27,13 +37,14 @@ enum class DebugMode : uint
 	Barycentrics,
 	Vertex,
 	Normal,
+	UV,
 
 	_Newline1,
 
 	Albedo,
 	Reflectance,
+	RoughnessAlpha,
 	Emission,
-	Roughness,
 
 	_Newline2,
 
@@ -142,13 +153,28 @@ struct PerFrameConstants
 
 struct InstanceData
 {
+	MaterialType				mMaterialType			CONSTANT_DEFAULT(MaterialType::None);
+	float3						_0						CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+
     float3						mAlbedo					CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	float						mOpacity				CONSTANT_DEFAULT(1.0f);
+
     float3						mReflectance			CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	float						mRoughnessAlpha			CONSTANT_DEFAULT(0.0f);
+
     float3						mEmission				CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
-    float						mRoughness				CONSTANT_DEFAULT(0.0f);
+	float						_1						CONSTANT_DEFAULT(0);
+
+	float3						mTransmittance			CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	float						_2						CONSTANT_DEFAULT(0);
+	
+	float3						mIOR					CONSTANT_DEFAULT(float3(1.0f, 1.0f, 1.0f));
+	float						_3						CONSTANT_DEFAULT(0);
 
     uint						mIndexOffset			CONSTANT_DEFAULT(0);
     uint						mVertexOffset			CONSTANT_DEFAULT(0);
+	float						_4						CONSTANT_DEFAULT(0);
+	float						_5						CONSTANT_DEFAULT(0);
 };
 
 struct RayPayload

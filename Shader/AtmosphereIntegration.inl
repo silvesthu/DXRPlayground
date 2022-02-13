@@ -227,7 +227,7 @@ float3 GetSkyLuminance()
 	case DebugMode::Albedo: 				return 0;
 	case DebugMode::Reflectance: 			return 0;
 	case DebugMode::Emission: 				return 0;
-	case DebugMode::Roughness: 				return 1;
+	case DebugMode::RoughnessAlpha:			return 0;
 	case DebugMode::Transmittance:			return transmittance_to_top;
 	case DebugMode::InScattering:			return radiance;
 	default:								break;
