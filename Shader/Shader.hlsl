@@ -217,21 +217,22 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
                     	H = normalize(H.x * axis[0] + H.y * axis[1] + H.z * axis[2]);
             		}
 
-            		// Reflect with microfacet normal
-            		hit_info.mReflectionDirection = normalize(reflect(sGetWorldRayDirection(), H));
-            		
-            		float HoV = dot(H, sGetWorldRayDirection());
+            		// TODO: Better to calculate in tangent space?
+            		float3 V = -sGetWorldRayDirection();
+            		float HoV = dot(H, V);
+            		float3 L = 2.0 * HoV * H - V;
             		float NoH = dot(normal, H);
-            		float NoV = dot(normal, sGetWorldRayDirection());
-            		float NoL = dot(normal, hit_info.mReflectionDirection);
+            		float NoV = dot(normal, V);
+            		float HoL = dot(H, L);
+            		float NoL = dot(normal, L);
 
-            		float Vis = Vis_SmithGGXCorrelated(NoV, NoL, a2);
+            		float G = G_SmithGGX(NoL, NoV, a2);
             		float3 F = F_Schlick(InstanceDataBuffer[sGetInstanceID()].mReflectance, HoV);
 
-            		hit_info.mAlbedo = Vis * F * NoL * (4.0f * HoV) / NoH;
-            		hit_info.mAlbedo = 1.0; // TODO: WIP
+            		hit_info.mReflectionDirection = L;
+            		hit_info.mAlbedo = G * F / (4.0f * NoV);
             		hit_info.mScatteringPDF = 1.0;
-            		hit_info.mSamplingPDF = 1.0;
+            		hit_info.mSamplingPDF = NoH / (4.0f * abs(HoL));
             		hit_info.mDone = false;
                 }
                 break;

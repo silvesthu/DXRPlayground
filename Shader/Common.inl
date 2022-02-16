@@ -138,9 +138,17 @@ float MIS_BalanceHeuristic(int nf, float fPdf, int ng, float gPdf)
     return MIS_PowerHeuristic(nf, fPdf, ng, gPdf, 1.0);
 }
 
-float3 F_Schlick(float3 inR0, float inNoV)
+float G_SmithGGX(float inNoL, float inNoV, float inA2)
 {
-    return inR0 + (1.0 - inR0) * pow(1.0 - inNoV, 5.0);
+    float denomA = inNoV * sqrt(inA2 + (1.0 - inA2) * inNoL * inNoL);
+    float denomB = inNoL * sqrt(inA2 + (1.0 - inA2) * inNoV * inNoV);
+
+    return 2.0 * inNoL * inNoV / (denomA + denomB);
+}
+
+float3 F_Schlick(float3 inR0, float inHoV)
+{
+    return inR0 + (1.0 - inR0) * pow(1.0 - inHoV, 5.0);
 }
 
 // [2014][Heitz] Understanding the Masking-Shadowing Function in Microfacet-Based BRDFs
