@@ -34,6 +34,9 @@
     <Filter Include="Source\Thirdparty\tinygltf">
       <UniqueIdentifier>{5d26f50b-fa5b-4b3e-857a-3c345a269b88}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\Thirdparty\ArPragueSkyModelGround">
+      <UniqueIdentifier>{a5eca7a6-a35c-4256-a2d2-7e48086555ad}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\ShaderTable.h">
@@ -166,6 +169,9 @@
       <Filter>Source\Thirdparty\tinygltf</Filter>
     </ClInclude>
     <ClInclude Include="Shader\RayQuery.inl" />
+    <ClInclude Include="Source\Thirdparty\ArPragueSkyModelGround\ArPragueSkyModelGround.h">
+      <Filter>Source\Thirdparty\ArPragueSkyModelGround</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\DXRPlayground.cpp">
@@ -224,6 +230,9 @@
     </ClCompile>
     <ClCompile Include="Source\Thirdparty\tinygltf\tiny_gltf.cc">
       <Filter>Source\Thirdparty\tinygltf</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Thirdparty\ArPragueSkyModelGround\ArPragueSkyModelGround.cpp">
+      <Filter>Source\Thirdparty\ArPragueSkyModelGround</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

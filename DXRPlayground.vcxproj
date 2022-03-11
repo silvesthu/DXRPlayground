@@ -24,6 +24,7 @@
     <ClInclude Include="Source\RayTrace.h" />
     <ClInclude Include="Source\Scene.h" />
     <ClInclude Include="Source\ShaderTable.h" />
+    <ClInclude Include="Source\Thirdparty\ArPragueSkyModelGround\ArPragueSkyModelGround.h" />
     <ClInclude Include="Source\Thirdparty\glm\glm\common.hpp" />
     <ClInclude Include="Source\Thirdparty\glm\glm\exponential.hpp" />
     <ClInclude Include="Source\Thirdparty\glm\glm\ext.hpp" />
@@ -70,6 +71,7 @@
     <ClCompile Include="Source\RayTrace.cpp" />
     <ClCompile Include="Source\Scene.cpp" />
     <ClCompile Include="Source\ShaderTable.cpp" />
+    <ClCompile Include="Source\Thirdparty\ArPragueSkyModelGround\ArPragueSkyModelGround.cpp" />
     <ClCompile Include="Source\Thirdparty\imgui\imgui.cpp" />
     <ClCompile Include="Source\Thirdparty\imgui\imgui_demo.cpp" />
     <ClCompile Include="Source\Thirdparty\imgui\imgui_draw.cpp" />
