@@ -85,7 +85,7 @@ struct ExampleAppLog
 		Filter.Draw("Filter", -100.0f);
 
 		ImGui::Separator();
-		ImGui::BeginChild("scrolling", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar);
+		ImGui::BeginChild("scrolling", ImVec2(0, 100), false, ImGuiWindowFlags_HorizontalScrollbar);
 
 		if (clear)
 			Clear();
