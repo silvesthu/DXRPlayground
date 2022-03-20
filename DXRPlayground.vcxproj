@@ -15,6 +15,7 @@
     <ClInclude Include="Shader\RayQuery.inl" />
     <ClInclude Include="Source\Atmosphere.h" />
     <ClInclude Include="Source\Cloud.h" />
+    <ClInclude Include="Source\Color.h" />
     <ClInclude Include="Source\Common.h" />
     <ClInclude Include="Source\DDGI.h" />
     <ClInclude Include="Source\ImGui\imgui_impl_dx12.h" />
@@ -24,6 +25,10 @@
     <ClInclude Include="Source\RayTrace.h" />
     <ClInclude Include="Source\Scene.h" />
     <ClInclude Include="Source\ShaderTable.h" />
+    <ClInclude Include="Source\Thirdparty\ArHosekSkyModel\ArHosekSkyModel.h" />
+    <ClInclude Include="Source\Thirdparty\ArHosekSkyModel\ArHosekSkyModelData_CIEXYZ.h" />
+    <ClInclude Include="Source\Thirdparty\ArHosekSkyModel\ArHosekSkyModelData_RGB.h" />
+    <ClInclude Include="Source\Thirdparty\ArHosekSkyModel\ArHosekSkyModelData_Spectral.h" />
     <ClInclude Include="Source\Thirdparty\ArPragueSkyModelGround\ArPragueSkyModelGround.h" />
     <ClInclude Include="Source\Thirdparty\glm\glm\common.hpp" />
     <ClInclude Include="Source\Thirdparty\glm\glm\exponential.hpp" />
@@ -61,6 +66,7 @@
   <ItemGroup>
     <ClCompile Include="Source\Atmosphere.cpp" />
     <ClCompile Include="Source\Cloud.cpp" />
+    <ClCompile Include="Source\Color.cpp" />
     <ClCompile Include="Source\Common.cpp" />
     <ClCompile Include="Source\DDGI.cpp" />
     <ClCompile Include="Source\DXRPlayground.cpp" />
@@ -71,6 +77,7 @@
     <ClCompile Include="Source\RayTrace.cpp" />
     <ClCompile Include="Source\Scene.cpp" />
     <ClCompile Include="Source\ShaderTable.cpp" />
+    <ClCompile Include="Source\Thirdparty\ArHosekSkyModel\ArHosekSkyModel.cpp" />
     <ClCompile Include="Source\Thirdparty\ArPragueSkyModelGround\ArPragueSkyModelGround.cpp" />
     <ClCompile Include="Source\Thirdparty\imgui\imgui.cpp" />
     <ClCompile Include="Source\Thirdparty\imgui\imgui_demo.cpp" />

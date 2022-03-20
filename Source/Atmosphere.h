@@ -302,6 +302,24 @@ public:
 		// Unit
 		bool mSceneInKilometer								= true; // Meter otherwise
 
+		struct Fitting
+		{
+			double mTurbidity								= 1.37;
+			double mVisibility								= 0.0;
+			double mAlbedo									= 0.0;
+
+			bool mUpdateRequested							= false;
+			bool mUseRawValues								= false;
+			
+			glm::dvec3 mHosekZenithSpectrum					= glm::dvec3(0.0);
+			glm::dvec3 mHosekSolarSpectrum					= glm::dvec3(0.0);
+			glm::dvec3 mHosekZenithXYZ						= glm::dvec3(0.0);
+			glm::dvec3 mHosekZenithRGB						= glm::dvec3(0.0);
+			glm::dvec3 mPragueZenithSpectrum				= glm::dvec3(0.0);
+			glm::dvec3 mPragueSolarSpectrum					= glm::dvec3(0.0);
+		};
+		Fitting mFitting;
+
 		struct Preset
 		{
 			static void Bruneton17(Profile& profile)
@@ -420,6 +438,13 @@ public:
 		};
 		Validation mValidation;
 
+		struct Wilkie21
+		{
+			// [Wilkie21]
+			Texture mSkyRadianceLutTex							= Texture().Width(192).Height(108).Format(DXGI_FORMAT_R11G11B10_FLOAT).Name("Atmosphere.Wilkie21.SkyRadiance");
+		};
+		Wilkie21 mWilkie21;
+
 		Resource()
 		{
 			Bruneton17(*this);
@@ -451,6 +476,8 @@ public:
 	void NewMultiScatCS();
 	void SkyViewLut();
 	void CameraVolumes();
+	
+	void FillSkyRadiance();
 };
 
 extern Atmosphere gAtmosphere;

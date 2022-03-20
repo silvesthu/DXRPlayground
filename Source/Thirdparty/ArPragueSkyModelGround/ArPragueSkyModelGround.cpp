@@ -1152,6 +1152,8 @@ double arpragueskymodelground_transmittance(
 	return trans;
 }
 
+#ifdef DXR_PLAYGROUND_CUSTOMIZE
 #pragma warning(default: 4267)
 #pragma warning(default: 4244)
 #pragma warning(default: 4189)
+#endif // DXR_PLAYGROUND_CUSTOMIZE

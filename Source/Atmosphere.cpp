@@ -1,4 +1,5 @@
 #include "Atmosphere.h"
+#include "Color.h"
 #include "ImGui/imgui_impl_helper.h"
 
 void Atmosphere::Update()
@@ -62,6 +63,8 @@ void Atmosphere::Update()
 			constants->mOzoneDensity				= gAtmosphere.mProfile.mOzoneDensityProfile;
 		}
 	}
+
+	FillSkyRadiance();
 }
 
 void Atmosphere::Load()
@@ -311,6 +314,35 @@ void Atmosphere::UpdateImGui()
 		{
 			ImGui::ColorEdit3("Color", reinterpret_cast<float*>(&gAtmosphere.mProfile.mConstantColor), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
 		}
+		
+		if (gAtmosphere.mProfile.mMode == AtmosphereMode::Fitting)
+		{
+			ImGui::SliderDouble("Turbidity", &gAtmosphere.mProfile.mFitting.mTurbidity, 1.37, 3.7);
+			ImGui::InputDouble("Visibility", &gAtmosphere.mProfile.mFitting.mVisibility, 0.0, 0.0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+			ImGui::SliderDouble("Albedo", &gAtmosphere.mProfile.mFitting.mAlbedo, 0.0, 1.0);
+
+			if (ImGui::TreeNodeEx("Hosek", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				ImGui::InputDouble3("Zenith Spectrum (as XYZ)", &gAtmosphere.mProfile.mFitting.mHosekZenithSpectrum.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+				ImGui::InputDouble3("Zenith XYZ", &gAtmosphere.mProfile.mFitting.mHosekZenithXYZ.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+				ImGui::InputDouble3("Zenith RGB", &gAtmosphere.mProfile.mFitting.mHosekZenithRGB.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+				ImGui::InputDouble3("Solar Spectrum (as XYZ)", &gAtmosphere.mProfile.mFitting.mHosekSolarSpectrum.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+				
+				ImGui::TreePop();
+			}
+
+			if (ImGui::TreeNodeEx("Prague", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				ImGui::InputDouble3("Zenith Spectrum (as XYZ)", &gAtmosphere.mProfile.mFitting.mPragueZenithSpectrum.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+				ImGui::InputDouble3("Solar Spectrum (as XYZ)", &gAtmosphere.mProfile.mFitting.mPragueSolarSpectrum.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+
+				ImGui::TreePop();
+			}
+
+			ImGui::Checkbox("Show Raw Values", &gAtmosphere.mProfile.mFitting.mUseRawValues);
+			if (ImGui::Button("Update"))
+				gAtmosphere.mProfile.mFitting.mUpdateRequested = true;
+		}
 
 		if (gAtmosphere.mProfile.mMode == AtmosphereMode::Bruneton17)
 		{
@@ -484,7 +516,7 @@ void Atmosphere::UpdateImGui()
 			ImGui::Checkbox("Enable", &gAtmosphere.mProfile.mEnableOzone);
 
 			ImGui::SliderDouble3("Absorption (/km)", &gAtmosphere.mProfile.mOZoneAbsorptionCoefficient[0], 1.0e-5, 1.0e-1, "%.3e");
-			
+		
 			DensityPlot plot;
 			plot.mMin = 0.0f;
 			plot.mMax = static_cast<float>(gAtmosphere.mProfile.mAtmosphereThickness);
@@ -549,3 +581,148 @@ void Atmosphere::UpdateImGui()
 }
 
 Atmosphere gAtmosphere;
+
+#include "Thirdparty/ArHosekSkyModel/ArHosekSkyModel.h"
+#include "Thirdparty/ArPragueSkyModelGround/ArPragueSkyModelGround.h"
+
+struct SkyModel
+{
+	struct Parameters
+	{
+		double mSunElevation = 0.0;
+		double mTurbidity = 0.0;
+		double mAlbedo = 0.0;
+	};
+	Parameters mParameters;
+	
+	void Reset(const SkyModel::Parameters& parameters)
+	{
+		mParameters = parameters;
+		Free();
+
+		mHosek = arhosekskymodelstate_alloc_init(
+			mParameters.mSunElevation,
+			mParameters.mTurbidity,
+			mParameters.mAlbedo);
+
+		mHosekXYZ = arhosek_xyz_skymodelstate_alloc_init(
+			mParameters.mTurbidity,
+			mParameters.mAlbedo,
+			mParameters.mSunElevation);
+
+		mHosekRGB = arhosek_rgb_skymodelstate_alloc_init(
+			mParameters.mTurbidity,
+			mParameters.mAlbedo,
+			mParameters.mSunElevation);
+
+		gAtmosphere.mProfile.mFitting.mVisibility = 7487.f * exp(-3.41f * mParameters.mTurbidity) + 117.1f * exp(-0.4768f * mParameters.mTurbidity);		
+		mPrague = arpragueskymodelground_state_alloc_init(
+			"Asset/ArPragueSkyModelGround/SkyModelDataset.dat",
+			mParameters.mSunElevation,
+			gAtmosphere.mProfile.mFitting.mVisibility,
+			mParameters.mAlbedo);
+	}
+
+	void Free()
+	{
+		if (mHosek != nullptr)
+			arhosekskymodelstate_free(mHosek);
+
+		if (mHosekXYZ != nullptr)
+			arhosekskymodelstate_free(mHosekXYZ);
+
+		if (mHosekRGB != nullptr)
+			arhosekskymodelstate_free(mHosekRGB);
+		
+		if (mPrague != nullptr)
+			arpragueskymodelground_state_free(mPrague);
+	}
+	
+	~SkyModel()
+	{
+		Free();
+	}
+	
+	ArHosekSkyModelState* mHosek = nullptr;
+	ArHosekSkyModelState* mHosekXYZ = nullptr;
+	ArHosekSkyModelState* mHosekRGB = nullptr;
+	ArPragueSkyModelGroundState* mPrague = nullptr;
+};
+SkyModel gArPragueSkyModelGround;
+
+void Atmosphere::FillSkyRadiance()
+{
+	if (!gAtmosphere.mProfile.mFitting.mUpdateRequested)
+		return;
+	
+	double sun_elevation			= glm::pi<double>() / 2.0 - gPerFrameConstantBuffer.mSunZenith;
+	double sun_azimuth				= gPerFrameConstantBuffer.mSunAzimuth;
+	glm::dvec3 view_direction		= glm::dvec3(0, 0, 1);
+	glm::dvec3 up_direction			= glm::dvec3(0, 0, 1);	
+	double theta					= 0.0;
+	double gamma					= 0.0;
+	double shadow					= 0.0;
+	arpragueskymodelground_compute_angles(sun_elevation, sun_azimuth, &view_direction[0], &up_direction[0], &theta, &gamma, &shadow);
+
+	SkyModel::Parameters parameters = { sun_elevation, gAtmosphere.mProfile.mFitting.mTurbidity, gAtmosphere.mProfile.mFitting.mAlbedo };
+	gArPragueSkyModelGround.Reset(parameters);
+
+	Color::Spectrum hosek_sky_radiance;
+	Color::Spectrum hosek_solar_radiance;
+	Color::Spectrum prague_sky_radiance;
+	Color::Spectrum prague_solar_radiance;
+	for (int i = 0; i < Color::LambdaCount; i++)
+	{
+		if (Color::LambdaMin + i <= 720)
+		{
+			hosek_sky_radiance.mEnergy[i] = arhosekskymodel_radiance(gArPragueSkyModelGround.mHosek, theta, gamma, Color::LambdaMin + i);
+			hosek_solar_radiance.mEnergy[i] = arhosekskymodel_solar_radiance(gArPragueSkyModelGround.mHosek, theta, gamma, Color::LambdaMin + i);	
+		}
+		prague_sky_radiance.mEnergy[i] = arpragueskymodelground_sky_radiance(gArPragueSkyModelGround.mPrague, theta, gamma, shadow, Color::LambdaMin + i);
+		prague_solar_radiance.mEnergy[i] = arpragueskymodelground_solar_radiance(gArPragueSkyModelGround.mPrague, theta, Color::LambdaMin + i);
+	}
+
+	// Still working on the units
+	//
+	// ArHosekSkyModel.h says
+	// > Also, the output of the XYZ model is now no longer scaled to the range [0...1]. Instead, it is
+	// > the result of a simple conversion from spectral data via the CIE 2 degree
+	// > standard observer matching functions. Therefore, after multiplication
+	// > with 683 lm / W, the Y channel now corresponds to luminance in lm.
+	// So at least mHosekZenithXYZ should give the luminance value as cd/m^2
+	//
+	// Then mHosekZenithSpectrum is likely to require no normalization? But why?
+	// > The coefficients of the spectral model are now scaled so that the output
+	// > is given in physical units: W / (m^-2 * sr * nm)
+	//
+	// Assume mPragueZenithSpectrum is given in same unit as mHosekZenithSpectrum. At least the magnitude looks right.
+	// Also mPragueSolarSpectrum will match 1.6x10^9 cd/m^2 from internet.
+	// But how to explain mHosekSolarSpectrum? It seems more of sun+sky, while mPragueSolarSpectrum is more like sun. Just ignore it for now...
+	//
+	// Other reference:
+	// - Mitsuba divides radiance by 106.856980 for both Spectrum and XYZ of Hosek model.
+	//   - https://github.com/mitsuba-renderer/mitsuba/blob/cfeb7766e7a1513492451f35dc65b86409655a7b/src/emitters/sky.cpp#L434
+	// - clear-sky-models
+	//   - https://github.com/ebruneton/clear-sky-models
+
+	double multiplier = gAtmosphere.mProfile.mFitting.mUseRawValues ? 1.0 : Color::MaxLuminousEfficacy;
+	
+	gAtmosphere.mProfile.mFitting.mHosekZenithSpectrum = Color::SpectrumToXYZ(hosek_sky_radiance, false).mData * multiplier;
+	gAtmosphere.mProfile.mFitting.mHosekSolarSpectrum = Color::SpectrumToXYZ(hosek_solar_radiance, false).mData * multiplier;
+	gAtmosphere.mProfile.mFitting.mHosekZenithXYZ =
+	{
+		arhosek_tristim_skymodel_radiance(gArPragueSkyModelGround.mHosekXYZ, theta, gamma, 0) * multiplier,
+		arhosek_tristim_skymodel_radiance(gArPragueSkyModelGround.mHosekXYZ, theta, gamma, 1) * multiplier,
+		arhosek_tristim_skymodel_radiance(gArPragueSkyModelGround.mHosekXYZ, theta, gamma, 2) * multiplier,
+	};
+	gAtmosphere.mProfile.mFitting.mHosekZenithRGB =
+	{
+		arhosek_tristim_skymodel_radiance(gArPragueSkyModelGround.mHosekRGB, theta, gamma, 0) * multiplier,
+		arhosek_tristim_skymodel_radiance(gArPragueSkyModelGround.mHosekRGB, theta, gamma, 1) * multiplier,
+		arhosek_tristim_skymodel_radiance(gArPragueSkyModelGround.mHosekRGB, theta, gamma, 2) * multiplier,
+	};
+	gAtmosphere.mProfile.mFitting.mPragueZenithSpectrum = Color::SpectrumToXYZ(prague_sky_radiance, false).mData * multiplier;
+	gAtmosphere.mProfile.mFitting.mPragueSolarSpectrum = Color::SpectrumToXYZ(prague_solar_radiance, false).mData * multiplier;
+
+	gAtmosphere.mProfile.mFitting.mUpdateRequested = false;
+}

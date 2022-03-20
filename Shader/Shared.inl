@@ -88,10 +88,11 @@ enum class ToneMappingMode : uint
 enum class AtmosphereMode : uint
 {
 	ConstantColor = 0,
-	RaymarchAtmosphereOnly,
+	Fitting,
 
 	_Newline0,
-
+	
+	RaymarchAtmosphereOnly,
 	Bruneton17,
 	Hillaire20,
 
