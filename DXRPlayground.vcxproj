@@ -12,6 +12,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Shader\Constant.h" />
     <ClInclude Include="Shader\RayQuery.inl" />
     <ClInclude Include="Source\Atmosphere.h" />
     <ClInclude Include="Source\Cloud.h" />

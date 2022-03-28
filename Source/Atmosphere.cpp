@@ -355,18 +355,18 @@ void Atmosphere::UpdateImGui()
 
 	if (ImGui::TreeNodeEx("Sun"))
 	{
-		ImGui::SliderFloat("Luminance Scale", &gPerFrameConstantBuffer.mSunLuminanceScale, 0.0f, 1.0f);
+		ImGui::SliderFloat("Luminance Scale", &gPerFrameConstantBuffer.mSolarLuminanceScale, 0.0f, 1.0f);
 		ImGui::SliderAngle("Azimuth Angle", &gPerFrameConstantBuffer.mSunAzimuth, 0.0f, 360.0f);
 		ImGui::SliderAngle("Zenith Angle", &gPerFrameConstantBuffer.mSunZenith, 0.0f, 180.0f);
 
 		ImGui::Text(gAtmosphere.mProfile.mShowSolarIrradianceAsLuminance ? "Solar Irradiance (klm)" : "Solar Irradiance (kW)");
-		float scale = gAtmosphere.mProfile.mShowSolarIrradianceAsLuminance ? kSunLuminousEfficacy : 1.0f;
+		float scale = gAtmosphere.mProfile.mShowSolarIrradianceAsLuminance ? kSolarLuminousEfficacy : 1.0f;
 		glm::vec3 solar_value = gAtmosphere.mProfile.mSolarIrradiance * scale;
 		if (ImGui::ColorEdit3("", &solar_value[0], ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR))
 			gAtmosphere.mProfile.mSolarIrradiance = solar_value / scale;
 		ImGui::Checkbox("Use Luminance", &gAtmosphere.mProfile.mShowSolarIrradianceAsLuminance);
 		ImGui::SameLine();
-		ImGui::Text("(Luminous Efficacy = %.2f lm/W)", kSunLuminousEfficacy);
+		ImGui::Text("(Luminous Efficacy = %.2f lm/W)", kSolarLuminousEfficacy);
 
 		if (ImGui::SmallButton("Bruneton17")) Profile::SolarIrradianceReference::Bruneton17(gAtmosphere.mProfile);
 		ImGui::SameLine(); 
@@ -466,13 +466,13 @@ void Atmosphere::UpdateImGui()
 			}
 			popup_density_profile();
 
-			SMALL_BUTTON(Profile::RayleighReference::Bruneton17);
-			ImGui::SameLine();
 			SMALL_BUTTON(Profile::RayleighReference::Bruneton08);
 			ImGui::SameLine();
 			SMALL_BUTTON(Profile::RayleighReference::Preetham99);
 			ImGui::SameLine();
 			SMALL_BUTTON(Profile::RayleighReference::Yusov13);
+			ImGui::SameLine();
+			SMALL_BUTTON(Profile::RayleighReference::Bruneton17);
 			ImGui::SameLine();
 			SMALL_BUTTON(Profile::RayleighReference::Hillaire20);
 
@@ -500,11 +500,11 @@ void Atmosphere::UpdateImGui()
 			}
 			popup_density_profile();
 
-			SMALL_BUTTON(Profile::MieReference::Bruneton17);
-			ImGui::SameLine();
 			SMALL_BUTTON(Profile::MieReference::Bruneton08);
 			ImGui::SameLine();
 			SMALL_BUTTON(Profile::MieReference::Yusov13);
+			ImGui::SameLine();
+			SMALL_BUTTON(Profile::MieReference::Bruneton17);
 			ImGui::SameLine();
 			SMALL_BUTTON(Profile::MieReference::Hillaire20);
 

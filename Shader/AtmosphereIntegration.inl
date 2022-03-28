@@ -1,3 +1,5 @@
+#include "Shared.inl"
+
 cbuffer AtmosphereConstantsPerDrawBuffer : register(b1, space2)
 {
 	AtmosphereConstantsPerDraw mAtmospherePerDraw;
@@ -190,6 +192,16 @@ void GetSkyRadiance(out float3 outSkyRadiance, out float3 outTransmittanceToTop)
 	}
 }
 
+float3 SolarRadianceToLuminance(float3 inRadiance)
+{
+	// https://en.wikipedia.org/wiki/Luminous_efficacy
+	// https://en.wikipedia.org/wiki/Sunlight#Measurement
+
+	float kW_to_W = 1000.0;
+	float3 luminance = inRadiance * kW_to_W * kSolarLuminousEfficacy * kPreExposure;
+	return luminance;
+}
+
 void GetSkyLuminanceToPoint(out float3 outSkyLuminance, out float3 outTransmittance)
 {
 	outSkyLuminance = 0;
@@ -208,7 +220,7 @@ void GetSkyLuminanceToPoint(out float3 outSkyLuminance, out float3 outTransmitta
     default: break;
     }
 
-	outSkyLuminance = RadianceToLuminance(radiance) * mPerFrameConstants.mSunLuminanceScale;
+	outSkyLuminance = SolarRadianceToLuminance(radiance) * mPerFrameConstants.mSolarLuminanceScale;
 }
 
 float3 GetSkyLuminance()
@@ -235,10 +247,14 @@ float3 GetSkyLuminance()
 	}
 
 	// Sun
-	if (dot(PlanetRayDirection(), GetSunDirection()) > cos(mAtmosphere.mSunAngularRadius))
+	if (mAtmosphere.mMode != AtmosphereMode::ConstantColor &&
+		dot(PlanetRayDirection(), GetSunDirection()) > cos(mAtmosphere.mSunAngularRadius))
 	{
-		radiance = radiance + transmittance_to_top * mAtmosphere.mSolarIrradiance;
+		// static const float kSunSolidAngle = 6.8E-5;
+		static const float kSunSolidAngle = 6.8; // Limit radiance to prevent fireflies...
+		float3 solar_radiance = mAtmosphere.mSolarIrradiance / kSunSolidAngle;
+		radiance = radiance + transmittance_to_top * solar_radiance;
 	}
 
-	return RadianceToLuminance(radiance) * mPerFrameConstants.mSunLuminanceScale;
+	return SolarRadianceToLuminance(radiance) * mPerFrameConstants.mSolarLuminanceScale;
 }

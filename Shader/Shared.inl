@@ -1,22 +1,12 @@
 // Code shared between HLSL and C++
+#ifndef __INCLUDE_SHARED_INL__
+#define __INCLUDE_SHARED_INL__
 
 #define MATH_PI 3.1415926535897932384626433832795f
 
-// TODO: How to calculate RGB luminance of sun ?
 // https://en.wikipedia.org/wiki/Luminous_efficacy
 // https://en.wikipedia.org/wiki/Sunlight#Measurement
-static const float kSunLuminousEfficacy = 93.0f; // lm/W
-static const float kPreExposure = 1.0e-4f;
-static const float kEmissionScale = 1.0e4f;
-inline float3 RadianceToLuminance(float3 inRadiance)
-{
-	// https://en.wikipedia.org/wiki/Luminous_efficacy
-	// https://en.wikipedia.org/wiki/Sunlight#Measurement
-
-	float kW_to_W = 1000.0;
-	float3 luminance = inRadiance * kW_to_W * kSunLuminousEfficacy * kPreExposure;
-	return luminance;
-}
+static const float kSolarLuminousEfficacy = 93.0f; // lm/W
 
 enum class MaterialType : uint
 {
@@ -130,7 +120,7 @@ struct PerFrameConstants
 	ToneMappingMode				mToneMappingMode		CONSTANT_DEFAULT(ToneMappingMode::Knarkowicz);
 	float						_0						CONSTANT_DEFAULT(0.0f);
 	
-	float						mSunLuminanceScale		CONSTANT_DEFAULT(1.0f);
+	float						mSolarLuminanceScale	CONSTANT_DEFAULT(1.0f);
 	float						mSunAzimuth				CONSTANT_DEFAULT(0);
 	float						mSunZenith				CONSTANT_DEFAULT(MATH_PI / 4.0f);
 	float						mTime					CONSTANT_DEFAULT(0);
@@ -305,3 +295,5 @@ struct DDGIConstants
 {
 	float4						mData;
 };
+
+#endif // __INCLUDE_SHARED_INL__

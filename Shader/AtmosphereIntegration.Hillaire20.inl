@@ -926,7 +926,7 @@ void CameraVolumes(
 	float3 earthO = float3(0.0, 0.0, -earthR);
 	float3 camPos = camera + float3(0, 0, earthR);
 	float3 SunDir = sun_direction;
-	float3 SunLuminance = 0.0;
+	float3 SolarLuminance = 0.0;
 #endif
 
 #if 0

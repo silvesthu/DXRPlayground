@@ -1,3 +1,4 @@
+#include "Constant.h"
 #define CONSTANT_DEFAULT(x)
 #include "Shared.inl"
 #include "Common.inl"
@@ -99,8 +100,7 @@ void DefaultMiss(inout RayPayload payload)
 	float3 cloud_transmittance = 1;
     float3 cloud_luminance = 0;
     RaymarchCloud(cloud_transmittance, cloud_luminance);
-
-	// [TODO] How to mix contributions to get best result?
+	
     float3 emission = lerp(sky_luminance, cloud_luminance, 1.0 - cloud_transmittance);
 
 	payload.mEmission = payload.mEmission + payload.mThroughput * emission;
@@ -172,7 +172,7 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
         {
             case MaterialType::Diffuse:
 	            {
-            		hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mEmission * (kEmissionScale * kPreExposure);
+            		hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mEmission * (kEmissionBoostScale * kPreExposure);
 
             		// random
             		float3 direction = RandomCosineDirection(payload.mRandomState);
@@ -190,7 +190,7 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
                 break;
             case MaterialType::RoughConductor:
 				{
-                    hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mEmission * (kEmissionScale * kPreExposure);
+                    hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mEmission * (kEmissionBoostScale * kPreExposure);
 
             		// TODO: Check visible normal
 
