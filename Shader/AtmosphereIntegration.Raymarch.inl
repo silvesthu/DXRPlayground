@@ -162,6 +162,7 @@ void GetSkyRadiance(out float3 sky_radiance, out float3 transmittance_to_top)
 	}
 
 	sky_radiance = in_scatter(camera, view_ray, from_to, GetSunDirection());
+	sky_radiance *= mAtmosphere.mSolarIrradiance;
 }
 
 }} // namespace AtmosphereIntegration { namespace Raymarch {

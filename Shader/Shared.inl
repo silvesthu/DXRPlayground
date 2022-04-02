@@ -2,11 +2,15 @@
 #ifndef __INCLUDE_SHARED_INL__
 #define __INCLUDE_SHARED_INL__
 
-#define MATH_PI 3.1415926535897932384626433832795f
+static const float MATH_PI						= 3.1415926535897932384626433832795f;
+static const float kPreExposure					= 1.0e-4f;	// Pre-exposure to improve float point precision
 
 // https://en.wikipedia.org/wiki/Luminous_efficacy
 // https://en.wikipedia.org/wiki/Sunlight#Measurement
-static const float kSolarLuminousEfficacy = 93.0f; // lm/W
+static const float kSolarLuminousEfficacy		= 93.0f; // lm/W
+static const float kKW2W						= 1000.0f;
+static const float kSolarKW2LM					= kKW2W * kSolarLuminousEfficacy;
+static const float kSolarLM2KW					= 1.0f / kSolarKW2LM;
 
 enum class MaterialType : uint
 {
@@ -78,7 +82,7 @@ enum class ToneMappingMode : uint
 enum class AtmosphereMode : uint
 {
 	ConstantColor = 0,
-	Fitting,
+	Wilkie21,
 
 	_Newline0,
 	
@@ -236,10 +240,12 @@ struct AtmosphereConstants
 	float3						mSolarIrradiance		CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	float						mSunAngularRadius		CONSTANT_DEFAULT(0);
 
-	float4						mPad5;
+	uint						mHillaire20SkyViewInLuminance		CONSTANT_DEFAULT(0);
+	uint						mWilkie21SkyViewSplitScreen		CONSTANT_DEFAULT(0);
+	float2						mPad5;
 
 	float3						mGroundAlbedo			CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
-	float						mAerialPerspective		CONSTANT_DEFAULT(0);
+	uint						mAerialPerspective		CONSTANT_DEFAULT(0);
 
 	float3						mRuntimeGroundAlbedo	CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	float						mPad6;

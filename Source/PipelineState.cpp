@@ -55,10 +55,10 @@ static IDxcBlob* sCompileShader(const char* inFilename, const char* inSource, gl
 	defines.push_back(dxc_define_entry_point);
 
 	std::vector<LPCWSTR> arguments;
-	arguments.push_back(DXC_ARG_DEBUG);						// -Zi
-	arguments.push_back(DXC_ARG_WARNINGS_ARE_ERRORS);		// -WX
-	arguments.push_back(DXC_ARG_ALL_RESOURCES_BOUND);		// -all_resources_bound
-	arguments.push_back(L"-Qembed_debug");					// -Qembed_debug
+	arguments.push_back(DXC_ARG_DEBUG);							// -Zi
+	arguments.push_back(DXC_ARG_WARNINGS_ARE_ERRORS);			// -WX
+	arguments.push_back(DXC_ARG_ALL_RESOURCES_BOUND);			// -all_resources_bound
+	arguments.push_back(L"-Qembed_debug");						// -Qembed_debug
 
 	IDxcOperationResult* operation_result;
 	if (FAILED(compiler->Compile(

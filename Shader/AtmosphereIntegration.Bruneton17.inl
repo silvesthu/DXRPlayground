@@ -1069,6 +1069,7 @@ void GetSkyRadiance(out float3 outSkyRadiance, out float3 outTransmittanceToTop)
 	// [TODO] light shafts
 
 	outSkyRadiance = rayleigh_scattering * RayleighPhaseFunction(nu) + single_mie_scattering * MiePhaseFunction(mAtmosphere.mMiePhaseFunctionG, nu);
+	outSkyRadiance *= mAtmosphere.mSolarIrradiance;
 
 	// override
 	{
@@ -1160,6 +1161,7 @@ void GetSkyRadianceToPoint(out float3 outSkyRadiance, out float3 outTransmittanc
 	single_mie_scattering = single_mie_scattering * smoothstep(float(0.0), float(0.01), mu_s);
 
 	outSkyRadiance = rayleigh_scattering* RayleighPhaseFunction(nu) + single_mie_scattering * MiePhaseFunction(mAtmosphere.mMiePhaseFunctionG, nu);
+	outSkyRadiance *= mAtmosphere.mSolarIrradiance;
 }
 
 void GetSunAndSkyIrradiance(float3 inHitPosition, float3 inNormal, out float3 outSunIrradiance, out float3 outSkyIrradiance)
@@ -1172,9 +1174,11 @@ void GetSunAndSkyIrradiance(float3 inHitPosition, float3 inNormal, out float3 ou
 
 	// Indirect irradiance from sky (approximated if the surface is not horizontal).
 	outSkyIrradiance = GetIrradiance(r, mu_s) * (1.0 + dot(inNormal, local_position) / r) * 0.5;
+	outSkyIrradiance *= mAtmosphere.mSolarIrradiance;
 
 	// Direct irradiance from sun
 	outSunIrradiance = GetTransmittanceToSun(r, mu_s) * max(dot(inNormal, sun_direction), 0.0);
+	outSunIrradiance *= mAtmosphere.mSolarIrradiance;
 }
 
 }} // namespace AtmosphereIntegration { namespace Bruneton17 {

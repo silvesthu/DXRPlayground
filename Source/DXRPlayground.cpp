@@ -49,7 +49,7 @@ enum class ScenePresetType
 	COUNT,
 };
 
-static ScenePresetType sCurrentScene = ScenePresetType::VeachMIS;
+static ScenePresetType sCurrentScene = ScenePresetType::Hillaire20;
 static ScenePresetType sPreviousScene = sCurrentScene;
 static ScenePreset kScenePresets[(int)ScenePresetType::COUNT] =
 {
@@ -596,7 +596,6 @@ void sRender()
 	// Atmosphere
 	{
 		gAtmosphere.Update();
-		gAtmosphere.Load();
 		gAtmosphere.Precompute();
 		gAtmosphere.Compute();
 		gAtmosphere.Validate();
@@ -622,7 +621,7 @@ void sRender()
 	// Copy
 	{
 		// Output: UAV -> Copy
-		gBarrierTransition(gCommandList, gScene.GetOutputResource(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE);
+		gBarrierTransition(gCommandList, gScene.GetOutputResource(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON);
 
 		// Draw
 		D3D12_RESOURCE_DESC desc = frame_render_target_resource->GetDesc();
@@ -647,7 +646,7 @@ void sRender()
 		gCommandList->DrawInstanced(3, 1, 0, 0);
 
 		// Output - Copy -> UAV
-		gBarrierTransition(gCommandList, gScene.GetOutputResource(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		gBarrierTransition(gCommandList, gScene.GetOutputResource(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 	}
 
 	// Draw ImGui
@@ -673,7 +672,7 @@ void sRender()
 	{
 		if (gDumpTexture != nullptr && gDumpTexture->mResource != nullptr)
 		{
-			D3D12_RESOURCE_STATES resource_state = D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
+			D3D12_RESOURCE_STATES resource_state = D3D12_RESOURCE_STATE_COMMON;
 			if (gScene.GetOutputResource() == gDumpTexture->mResource.Get())
 				resource_state = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 
@@ -696,10 +695,10 @@ void sRender()
  		else
 			gSwapChain->Present(0, DXGI_PRESENT_ALLOW_TEARING);
 
-		UINT64 fenceValue = gFenceLastSignaledValue + 1;
-		gCommandQueue->Signal(gIncrementalFence, fenceValue);
-		gFenceLastSignaledValue = fenceValue;
-		frame_context->mFenceValue = fenceValue;
+		UINT64 fence_value = gFenceLastSignaledValue + 1;
+		gCommandQueue->Signal(gIncrementalFence, fence_value);
+		gFenceLastSignaledValue = fence_value;
+		frame_context->mFenceValue = fence_value;
 	}
 }
 

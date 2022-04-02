@@ -21,7 +21,9 @@ void Atmosphere::Update()
 	constants->mSolarIrradiance					= gAtmosphere.mProfile.mSolarIrradiance;
 	constants->mSunAngularRadius				= static_cast<float>(gAtmosphere.mProfile.kSunAngularRadius);
 
-	constants->mAerialPerspective				= (gAtmosphere.mProfile.mMode != AtmosphereMode::RaymarchAtmosphereOnly && gAtmosphere.mProfile.mAerialPerspective) ? 1.0f : 0.0f;
+	constants->mHillaire20SkyViewInLuminance	= gAtmosphere.mProfile.mHillaire20SkyViewInLuminance;
+	constants->mWilkie21SkyViewSplitScreen		= gAtmosphere.mProfile.mWilkie21SkyViewSplitScreen;
+	constants->mAerialPerspective				= (gAtmosphere.mProfile.mMode != AtmosphereMode::RaymarchAtmosphereOnly && gAtmosphere.mProfile.mAerialPerspective) ? 1 : 0;
 	constants->mGroundAlbedo					= gAtmosphere.mProfile.mGroundAlbedo;
 	constants->mRuntimeGroundAlbedo				= gAtmosphere.mProfile.mRuntimeGroundAlbedo;
 
@@ -64,16 +66,13 @@ void Atmosphere::Update()
 		}
 	}
 
-	FillSkyRadiance();
-}
-
-void Atmosphere::Load()
-{
 	for (auto&& texture : gAtmosphere.mResource.mTextures)
-		texture.Load();
+		texture.Update();
 
 	for (auto&& texture : gAtmosphere.mResource.mValidation.mTextures)
-		texture.Load();
+		texture.Update();
+
+	ComputeWilkie21();
 }
 
 void Atmosphere::ComputeTransmittance()
@@ -135,21 +134,25 @@ void Atmosphere::Precompute()
 	if (memcmp(&sAtmosphereProfileCache, &gAtmosphere.mProfile, sizeof(Profile)) != 0)
 	{
 		sAtmosphereProfileCache = gAtmosphere.mProfile;
+
+		// Reset accumulation
+		gPerFrameConstantBuffer.mReset = true;
+
 		mRecomputeRequested = true;
 	}
 
-	if (!mRecomputeRequested && !mRecomputeEveryFrame)
-		return;
+	if (gAtmosphere.mProfile.mMode == AtmosphereMode::Bruneton17)
+	{
+		if (mRecomputeRequested || mRecomputeEveryFrame)
+		{
+			ComputeTransmittance();
+			ComputeDirectIrradiance();
+			ComputeSingleScattering();
 
-	ComputeTransmittance();
-	ComputeDirectIrradiance();
-	ComputeSingleScattering();
-
-	for (glm::uint scattering_order = 2; scattering_order <= gAtmosphere.mProfile.mScatteringOrder; scattering_order++)
-		ComputeMultipleScattering(scattering_order);
-
-	// Reset accumulation
-	gPerFrameConstantBuffer.mReset = true;
+			for (glm::uint scattering_order = 2; scattering_order <= gAtmosphere.mProfile.mScatteringOrder; scattering_order++)
+				ComputeMultipleScattering(scattering_order);
+		}
+	}
 
 	mRecomputeRequested = false;
 }
@@ -307,47 +310,55 @@ void Atmosphere::UpdateImGui()
 			ImGui::PopID();
 		}
 
-		ImGui::Checkbox("Scene Unit is Kilometer, otherwise Meter", &gAtmosphere.mProfile.mSceneInKilometer);
-		ImGui::Checkbox("Aerial Perspective", &gAtmosphere.mProfile.mAerialPerspective);
-
 		if (gAtmosphere.mProfile.mMode == AtmosphereMode::ConstantColor)
 		{
 			ImGui::ColorEdit3("Color", reinterpret_cast<float*>(&gAtmosphere.mProfile.mConstantColor), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
 		}
 		
-		if (gAtmosphere.mProfile.mMode == AtmosphereMode::Fitting)
-		{
-			ImGui::SliderDouble("Turbidity", &gAtmosphere.mProfile.mFitting.mTurbidity, 1.37, 3.7);
-			ImGui::InputDouble("Visibility", &gAtmosphere.mProfile.mFitting.mVisibility, 0.0, 0.0, "%.3f", ImGuiInputTextFlags_ReadOnly);
-			ImGui::SliderDouble("Albedo", &gAtmosphere.mProfile.mFitting.mAlbedo, 0.0, 1.0);
-
-			if (ImGui::TreeNodeEx("Hosek", ImGuiTreeNodeFlags_DefaultOpen))
-			{
-				ImGui::InputDouble3("Zenith Spectrum (as XYZ)", &gAtmosphere.mProfile.mFitting.mHosekZenithSpectrum.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
-				ImGui::InputDouble3("Zenith XYZ", &gAtmosphere.mProfile.mFitting.mHosekZenithXYZ.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
-				ImGui::InputDouble3("Zenith RGB", &gAtmosphere.mProfile.mFitting.mHosekZenithRGB.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
-				ImGui::InputDouble3("Solar Spectrum (as XYZ)", &gAtmosphere.mProfile.mFitting.mHosekSolarSpectrum.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
-				
-				ImGui::TreePop();
-			}
-
-			if (ImGui::TreeNodeEx("Prague", ImGuiTreeNodeFlags_DefaultOpen))
-			{
-				ImGui::InputDouble3("Zenith Spectrum (as XYZ)", &gAtmosphere.mProfile.mFitting.mPragueZenithSpectrum.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
-				ImGui::InputDouble3("Solar Spectrum (as XYZ)", &gAtmosphere.mProfile.mFitting.mPragueSolarSpectrum.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
-
-				ImGui::TreePop();
-			}
-
-			ImGui::Checkbox("Show Raw Values", &gAtmosphere.mProfile.mFitting.mUseRawValues);
-			if (ImGui::Button("Update"))
-				gAtmosphere.mProfile.mFitting.mUpdateRequested = true;
-		}
-
 		if (gAtmosphere.mProfile.mMode == AtmosphereMode::Bruneton17)
 		{
 			ImGui::SliderInt("Scattering Order", reinterpret_cast<int*>(&gAtmosphere.mProfile.mScatteringOrder), 1, 8);
 			ImGui::Checkbox("Recompute Every Frame", &mRecomputeEveryFrame);
+		}
+
+		ImGui::Checkbox("Scene Unit is Kilometer, otherwise Meter", &gAtmosphere.mProfile.mSceneInKilometer);
+		ImGui::Checkbox("Aerial Perspective", &gAtmosphere.mProfile.mAerialPerspective);
+		ImGui::Checkbox("[Hillaire20] SkyView in Luminance", &gAtmosphere.mProfile.mHillaire20SkyViewInLuminance);
+		if (ImGui::Button("[Wilkie21] Bake -> Split Screen")) gAtmosphere.mWilkie21.mBakeRequested = true;
+		ImGui::SameLine();
+		if (ImGui::RadioButton("Off", gAtmosphere.mProfile.mWilkie21SkyViewSplitScreen == 0)) gAtmosphere.mProfile.mWilkie21SkyViewSplitScreen = 0;
+		ImGui::SameLine();
+		if (ImGui::RadioButton("Left", gAtmosphere.mProfile.mWilkie21SkyViewSplitScreen == 1)) gAtmosphere.mProfile.mWilkie21SkyViewSplitScreen = 1;
+		ImGui::SameLine();
+		if (ImGui::RadioButton("Right", gAtmosphere.mProfile.mWilkie21SkyViewSplitScreen == 2)) gAtmosphere.mProfile.mWilkie21SkyViewSplitScreen = 2;		
+
+		ImGui::TreePop();
+	}
+
+	if (ImGui::TreeNodeEx("Wilkie21"))
+	{
+		ImGui::SliderDouble("Turbidity", &gAtmosphere.mProfile.mWilkie21.mTurbidity, 1.37, 3.7);
+		ImGui::InputDouble("Visibility", &gAtmosphere.mProfile.mWilkie21.mVisibility, 0.0, 0.0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+		ImGui::SliderDouble("Albedo", &gAtmosphere.mProfile.mWilkie21.mAlbedo, 0.0, 1.0);
+
+		if (ImGui::TreeNodeEx("Hosek", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			ImGui::InputDouble3("Zenith Spectrum (as XYZ)", &gAtmosphere.mProfile.mWilkie21.mHosekZenithSpectrum.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+			ImGui::InputDouble3("Zenith XYZ", &gAtmosphere.mProfile.mWilkie21.mHosekZenithXYZ.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+			ImGui::InputDouble3("Zenith RGB", &gAtmosphere.mProfile.mWilkie21.mHosekZenithRGB.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+			ImGui::InputDouble3("Solar Spectrum (as XYZ)", &gAtmosphere.mProfile.mWilkie21.mHosekSolarSpectrum.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+				
+			ImGui::TreePop();
+		}
+
+		if (ImGui::TreeNodeEx("Prague", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			ImGui::InputDouble3("Zenith Spectrum (as XYZ)", &gAtmosphere.mProfile.mWilkie21.mPragueZenithSpectrum.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+			ImGui::InputDouble3("Zenith Spectrum (as RGB)", &gAtmosphere.mProfile.mWilkie21.mPragueZenithRGB.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+			ImGui::InputDouble3("Solar Spectrum (as XYZ)", &gAtmosphere.mProfile.mWilkie21.mPragueSolarSpectrum.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+			ImGui::InputDouble3("Transmittance (as XYZ)", &gAtmosphere.mProfile.mWilkie21.mPragueTransmittance.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+
+			ImGui::TreePop();
 		}
 
 		ImGui::TreePop();
@@ -576,8 +587,8 @@ void Atmosphere::UpdateImGui()
 		ImGui::TreePop();
 	}
 
-	ImGuiShowTextures(gAtmosphere.mResource.mTextures, "Texture", ImGuiTreeNodeFlags_DefaultOpen);
-	ImGuiShowTextures(gAtmosphere.mResource.mValidation.mTextures, "Validation", ImGuiTreeNodeFlags_None);
+	ImGuiShowTextures(gAtmosphere.mResource.mTextures, "Atmosphere", ImGuiTreeNodeFlags_None);
+	ImGuiShowTextures(gAtmosphere.mResource.mValidation.mTextures, "Atmosphere.Validation", ImGuiTreeNodeFlags_None);
 }
 
 Atmosphere gAtmosphere;
@@ -615,11 +626,11 @@ struct SkyModel
 			mParameters.mAlbedo,
 			mParameters.mSunElevation);
 
-		gAtmosphere.mProfile.mFitting.mVisibility = 7487.f * exp(-3.41f * mParameters.mTurbidity) + 117.1f * exp(-0.4768f * mParameters.mTurbidity);		
+		gAtmosphere.mProfile.mWilkie21.mVisibility = 7487.f * exp(-3.41f * mParameters.mTurbidity) + 117.1f * exp(-0.4768f * mParameters.mTurbidity);		
 		mPrague = arpragueskymodelground_state_alloc_init(
 			"Asset/ArPragueSkyModelGround/SkyModelDataset.dat",
 			mParameters.mSunElevation,
-			gAtmosphere.mProfile.mFitting.mVisibility,
+			gAtmosphere.mProfile.mWilkie21.mVisibility,
 			mParameters.mAlbedo);
 	}
 
@@ -650,9 +661,9 @@ struct SkyModel
 };
 SkyModel gArPragueSkyModelGround;
 
-void Atmosphere::FillSkyRadiance()
+void Atmosphere::ComputeWilkie21()
 {
-	if (!gAtmosphere.mProfile.mFitting.mUpdateRequested)
+	if (!gAtmosphere.mWilkie21.mBakeRequested)
 		return;
 	
 	double sun_elevation			= glm::pi<double>() / 2.0 - gPerFrameConstantBuffer.mSunZenith;
@@ -664,13 +675,14 @@ void Atmosphere::FillSkyRadiance()
 	double shadow					= 0.0;
 	arpragueskymodelground_compute_angles(sun_elevation, sun_azimuth, &view_direction[0], &up_direction[0], &theta, &gamma, &shadow);
 
-	SkyModel::Parameters parameters = { sun_elevation, gAtmosphere.mProfile.mFitting.mTurbidity, gAtmosphere.mProfile.mFitting.mAlbedo };
+	SkyModel::Parameters parameters = { sun_elevation, gAtmosphere.mProfile.mWilkie21.mTurbidity, gAtmosphere.mProfile.mWilkie21.mAlbedo };
 	gArPragueSkyModelGround.Reset(parameters);
 
 	Color::Spectrum hosek_sky_radiance;
 	Color::Spectrum hosek_solar_radiance;
 	Color::Spectrum prague_sky_radiance;
 	Color::Spectrum prague_solar_radiance;
+	Color::Spectrum prague_transmittance;
 	for (int i = 0; i < Color::LambdaCount; i++)
 	{
 		if (Color::LambdaMin + i <= 720)
@@ -680,6 +692,7 @@ void Atmosphere::FillSkyRadiance()
 		}
 		prague_sky_radiance.mEnergy[i] = arpragueskymodelground_sky_radiance(gArPragueSkyModelGround.mPrague, theta, gamma, shadow, Color::LambdaMin + i);
 		prague_solar_radiance.mEnergy[i] = arpragueskymodelground_solar_radiance(gArPragueSkyModelGround.mPrague, theta, Color::LambdaMin + i);
+		prague_transmittance.mEnergy[i] = arpragueskymodelground_transmittance(gArPragueSkyModelGround.mPrague, theta, Color::LambdaMin + i, PSMG_ATMO_WIDTH);
 	}
 
 	// Still working on the units
@@ -704,25 +717,102 @@ void Atmosphere::FillSkyRadiance()
 	//   - https://github.com/mitsuba-renderer/mitsuba/blob/cfeb7766e7a1513492451f35dc65b86409655a7b/src/emitters/sky.cpp#L434
 	// - clear-sky-models
 	//   - https://github.com/ebruneton/clear-sky-models
-
-	double multiplier = gAtmosphere.mProfile.mFitting.mUseRawValues ? 1.0 : Color::MaxLuminousEfficacy;
 	
-	gAtmosphere.mProfile.mFitting.mHosekZenithSpectrum = Color::SpectrumToXYZ(hosek_sky_radiance, false).mData * multiplier;
-	gAtmosphere.mProfile.mFitting.mHosekSolarSpectrum = Color::SpectrumToXYZ(hosek_solar_radiance, false).mData * multiplier;
-	gAtmosphere.mProfile.mFitting.mHosekZenithXYZ =
+	gAtmosphere.mProfile.mWilkie21.mHosekZenithSpectrum = Color::SpectrumToXYZ(hosek_sky_radiance, false).mData * Color::MaxLuminousEfficacy;
+	gAtmosphere.mProfile.mWilkie21.mHosekSolarSpectrum = Color::SpectrumToXYZ(hosek_solar_radiance, false).mData * Color::MaxLuminousEfficacy;
+	gAtmosphere.mProfile.mWilkie21.mHosekZenithXYZ =
 	{
-		arhosek_tristim_skymodel_radiance(gArPragueSkyModelGround.mHosekXYZ, theta, gamma, 0) * multiplier,
-		arhosek_tristim_skymodel_radiance(gArPragueSkyModelGround.mHosekXYZ, theta, gamma, 1) * multiplier,
-		arhosek_tristim_skymodel_radiance(gArPragueSkyModelGround.mHosekXYZ, theta, gamma, 2) * multiplier,
+		arhosek_tristim_skymodel_radiance(gArPragueSkyModelGround.mHosekXYZ, theta, gamma, 0) * Color::MaxLuminousEfficacy,
+		arhosek_tristim_skymodel_radiance(gArPragueSkyModelGround.mHosekXYZ, theta, gamma, 1) * Color::MaxLuminousEfficacy,
+		arhosek_tristim_skymodel_radiance(gArPragueSkyModelGround.mHosekXYZ, theta, gamma, 2) * Color::MaxLuminousEfficacy,
 	};
-	gAtmosphere.mProfile.mFitting.mHosekZenithRGB =
+	gAtmosphere.mProfile.mWilkie21.mHosekZenithRGB =
 	{
-		arhosek_tristim_skymodel_radiance(gArPragueSkyModelGround.mHosekRGB, theta, gamma, 0) * multiplier,
-		arhosek_tristim_skymodel_radiance(gArPragueSkyModelGround.mHosekRGB, theta, gamma, 1) * multiplier,
-		arhosek_tristim_skymodel_radiance(gArPragueSkyModelGround.mHosekRGB, theta, gamma, 2) * multiplier,
+		arhosek_tristim_skymodel_radiance(gArPragueSkyModelGround.mHosekRGB, theta, gamma, 0) * Color::MaxLuminousEfficacy,
+		arhosek_tristim_skymodel_radiance(gArPragueSkyModelGround.mHosekRGB, theta, gamma, 1) * Color::MaxLuminousEfficacy,
+		arhosek_tristim_skymodel_radiance(gArPragueSkyModelGround.mHosekRGB, theta, gamma, 2) * Color::MaxLuminousEfficacy,
 	};
-	gAtmosphere.mProfile.mFitting.mPragueZenithSpectrum = Color::SpectrumToXYZ(prague_sky_radiance, false).mData * multiplier;
-	gAtmosphere.mProfile.mFitting.mPragueSolarSpectrum = Color::SpectrumToXYZ(prague_solar_radiance, false).mData * multiplier;
+	gAtmosphere.mProfile.mWilkie21.mPragueZenithSpectrum = Color::SpectrumToXYZ(prague_sky_radiance, false).mData * Color::MaxLuminousEfficacy;
+	gAtmosphere.mProfile.mWilkie21.mPragueZenithRGB = Color::XYZToRGB({ gAtmosphere.mProfile.mWilkie21.mPragueZenithSpectrum }, Color::RGBColorSpace::Rec709).mData;
+	gAtmosphere.mProfile.mWilkie21.mPragueSolarSpectrum = Color::SpectrumToXYZ(prague_solar_radiance, false).mData * Color::MaxLuminousEfficacy;
+	gAtmosphere.mProfile.mWilkie21.mPragueTransmittance = Color::SpectrumToXYZ(prague_transmittance, true).mData;
 
-	gAtmosphere.mProfile.mFitting.mUpdateRequested = false;
+	// Bake SkyView
+	{
+		// Use same uv mapping of Hillaire20
+		auto UvToSkyViewLutParams = [](glm::vec2 uv)
+		{
+#define NONLINEARSKYVIEWLUT 1
+			{
+				float viewZenithCosAngle = 0.0f;
+				float lightViewCosAngle = 0.0f;
+			
+				float CosBeta = 0.0f;				// GroundToHorizonCos
+				float Beta = acos(CosBeta);
+				float ZenithHorizonAngle = glm::pi<float>() - Beta;
+
+				if (uv.y < 0.5f)
+				{
+					float coord = 2.0f * uv.y;
+					coord = 1.0f - coord;
+#if NONLINEARSKYVIEWLUT
+					coord *= coord;
+#endif
+					coord = 1.0f - coord;
+					viewZenithCosAngle = cos(ZenithHorizonAngle * coord);
+				}
+				else
+				{
+					float coord = uv.y * 2.0f - 1.0f;
+#if NONLINEARSKYVIEWLUT
+					coord *= coord;
+#endif
+					viewZenithCosAngle = cos(ZenithHorizonAngle + Beta * coord);
+				}
+
+				float coord = uv.x;
+				coord *= coord;
+				lightViewCosAngle = -(coord * 2.0f - 1.0f);
+
+				return glm::vec2(viewZenithCosAngle, lightViewCosAngle);
+			}
+		};
+
+		gAtmosphere.mResource.mWilkie21SkyViewLutTex.mUploadData.resize(gAtmosphere.mResource.mWilkie21SkyViewLutTex.GetSubresourceSize());
+		glm::uint64* pixels = reinterpret_cast<glm::uint64*>(gAtmosphere.mResource.mWilkie21SkyViewLutTex.mUploadData.data());
+	
+		int width = static_cast<int>(gAtmosphere.mResource.mWilkie21SkyViewLutTex.mWidth);
+		int height = static_cast<int>(gAtmosphere.mResource.mWilkie21SkyViewLutTex.mHeight);
+	
+#pragma omp parallel for
+		for (int h = 0; h < height; h++)
+		{
+			for (int w = 0; w < width; w++)
+			{
+				glm::vec2 uv = {w * 1.0f / (width - 1) , h * 1.0f / (height - 1)};
+				glm::vec2 params = UvToSkyViewLutParams(uv);
+
+				float viewZenithCosAngle = params.x;
+				float lightViewCosAngle = params.y;
+				float viewZenithSinAngle = sqrt(1 - viewZenithCosAngle * viewZenithCosAngle);
+				view_direction = float3(
+					viewZenithSinAngle * lightViewCosAngle,
+					viewZenithSinAngle * sqrt(1.0 - lightViewCosAngle * lightViewCosAngle),
+					viewZenithCosAngle);
+				arpragueskymodelground_compute_angles(sun_elevation, sun_azimuth, &view_direction[0], &up_direction[0], &theta, &gamma, &shadow);
+			
+				for (int i = 0; i < Color::LambdaCount; i++)
+					prague_sky_radiance.mEnergy[i] = arpragueskymodelground_sky_radiance(gArPragueSkyModelGround.mPrague, theta, gamma, shadow, Color::LambdaMin + i);
+				Color::RGB luminance = Color::XYZToRGB({ Color::SpectrumToXYZ(prague_sky_radiance, false).mData * Color::MaxLuminousEfficacy }, Color::RGBColorSpace::Rec709);
+				luminance.mData *= kPreExposure;
+			
+				glm::uint64 pixel = glm::packHalf2x16({luminance.mData.b, 1.0});
+				pixel = pixel << 32;
+				pixel |= glm::packHalf2x16({luminance.mData.r, luminance.mData.g});
+				pixels[(h * width + w)] = pixel;
+			}
+		};
+	}
+
+	gAtmosphere.mWilkie21.mBakeRequested = false;
 }

@@ -813,7 +813,7 @@ void SkyViewLut(
 {
 	AtmosphereParameters Atmosphere = GetAtmosphereParameters();
 
-	float2 dimensions = float2(192, 108.0);
+	float2 dimensions = float2(192, 108);
 	float3 sun_direction = GetSunDirection();
 
 	float2 pixPos = inDispatchThreadID.xy + 0.5; 		// half pixel offset
@@ -862,6 +862,8 @@ void SkyViewLut(
 	SingleScatteringResult ss = IntegrateScatteredLuminance(pixPos, WorldPos, WorldDir, SunDir, Atmosphere, ground, SampleCountIni, DepthBufferValue, VariableSampleCount, MieRayPhase);
 
 	float3 L = ss.L;
+	if (mAtmosphere.mHillaire20SkyViewInLuminance)
+		L *= kSolarKW2LM * kPreExposure * mAtmosphere.mSolarIrradiance;
 	SkyViewLutTexUAV[inDispatchThreadID.xy] = float4(L, 1); // match
 
 	// Debug
@@ -1058,6 +1060,11 @@ void GetSkyRadiance(out float3 outSkyRadiance, out float3 outTransmittanceToTop)
 	float2 uv;
 	SkyViewLutParamsToUv(Atmosphere, ray_r_mu_intersects_ground, mu, lightViewCosAngle, r, uv);
 	outSkyRadiance = SkyViewLutTexSRV.SampleLevel(samplerLinearClamp, uv, 0).rgb;
+
+	if (mAtmosphere.mHillaire20SkyViewInLuminance)
+		outSkyRadiance = outSkyRadiance / kPreExposure * kSolarLM2KW; // PreExposed lm/m^2 -> kW/m^2
+	else
+		outSkyRadiance *= mAtmosphere.mSolarIrradiance;
 
 	// Debug
 	// outSkyRadiance = 0.1234;

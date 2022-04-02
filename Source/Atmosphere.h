@@ -2,17 +2,21 @@
 #include "Common.h"
 
 // [Nishita93][NSTN93]	Display of The Earth Taking into Account Atmospheric Scattering							https://www.researchgate.net/publication/2933032_Display_of_The_Earth_Taking_into_Account_Atmospheric_Scattering
+// [Nishita96][NDKY96]	Display of Clouds Taking into Account Multiple Anisotropic Scattering and Sky Light		https://www.researchgate.net/publication/220720838_Display_of_Clouds_Taking_into_Account_Multiple_Anisotropic_Scattering_and_Sky_Light
 // [Preetham99][PSS99]	A Practical Analytic Model for Daylight													https://www2.cs.duke.edu/courses/cps124/spring08/assign/07_papers/p91-preetham.pdf
 // [Riley04][REK*04]	Efficient Rendering of Atmospheric Phenomena											https://people.cs.clemson.edu/~jtessen/reports/papers_files/Atmos_EGSR_Elec.pdf
 // [Zotti07][ZWP07]		A Critical Review of the Preetham Skylight Model										https://www.cg.tuwien.ac.at/research/publications/2007/zotti-2007-wscg/zotti-2007-wscg-paper.pdf
 // [Bruneton08]			Precomputed Atmospheric Scattering														https://hal.inria.fr/inria-00288758/document https://ebruneton.github.io/precomputed_atmospheric_scattering/atmosphere/functions.glsl.html
 // [Elek09]				Rendering Parametrizable Planetary Atmospheres with Multiple Scattering in Real-Time	http://www.klayge.org/material/4_0/Atmospheric/Rendering%20Parametrizable%20Planetary%20Atmospheres%20with%20Multiple%20Scattering%20in%20Real-Time.pdf
+// [Hosek12]			An Analytic Model for Full Spectral Sky-Dome Radiance									https://cgg.mff.cuni.cz/publications/an-analytic-model-for-full-spectral-sky-dome-radiance/
+// [Hosek13]			Adding a Solar Radiance Function to the Hosek Skylight Model							https://cgg.mff.cuni.cz/publications/adding-a-solar-radiance-function-to-the-hosek-wilkie-skylight-model/
 // [Yusov13]			Outdoor Light Scattering Sample Update													https://software.intel.com/content/www/us/en/develop/blogs/otdoor-light-scattering-sample-update.html
 // [Hillaire16]			Physically Based Sky, Atmosphere and Cloud Rendering in Frostbite						https://media.contentapi.ea.com/content/dam/eacom/frostbite/files/s2016-pbs-frostbite-sky-clouds-new.pdf
 // [Bruneton17]			Precomputed Atmospheric Scattering														https://github.com/ebruneton/precomputed_atmospheric_scattering
 // [Carpentier17]		Decima Engine : Advances in Lighting and AA												https://www.guerrilla-games.com/read/decima-engine-advances-in-lighting-and-aa
 // [Hillaire20]			A Scalable and Production Ready Sky and Atmosphere Rendering Technique					https://sebh.github.io/publications/egsr2020.pdf
 // [Epic20]				SkyAtmosphere.usf SkyAtmosphereComponent.cpp											https://docs.unrealengine.com/en-US/BuildingWorlds/FogEffects/SkyAtmosphere/index.html
+// [Wilkie21]			A Fitted Radiance and Attenuation Model for Realistic Atmospheres						https://cgg.mff.cuni.cz/publications/skymodel-2021/
 
 class Atmosphere
 {
@@ -20,7 +24,7 @@ public:
 	struct Profile
 	{
 		// Config
-		AtmosphereMode mMode								= AtmosphereMode::ConstantColor;
+		AtmosphereMode mMode								= AtmosphereMode::Hillaire20;
 
 		// Constant Color
 		glm::vec4 mConstantColor							= glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
@@ -92,9 +96,9 @@ public:
 				Bruneton17(profile);
 
 				constexpr double pi = glm::pi<double>();
-				double n = 1.0003; // index of refraction of air
-				double N = 2.545e25; // number of molecules per unit volume
-				double p_n = 0.035; // depolarization factor
+				double n = 1.0003;		// index of refraction of air
+				double N = 2.545e25;	// number of molecules per unit volume
+				double p_n = 0.035;		// depolarization factor
 				double kRayleigh =
 					((8.0 * glm::pow(pi, 3.0) * glm::pow((n * n - 1.0), 2.0)) * (6.0 + 3.0 * p_n)) // Why [Bruneton08] 2.1 (1) omit the right half?
 					/ // -----------------------------------------------------------------------------------------
@@ -295,30 +299,33 @@ public:
 				profile.mGroundAlbedo						= glm::vec3(0.401977777f);
 			}
 		};
-		bool mAerialPerspective								= true;
 		glm::vec3 mGroundAlbedo								= glm::vec3(0.0f);
 		glm::vec3 mRuntimeGroundAlbedo						= glm::vec3(0.0f);
+
+		// Control
+		bool mHillaire20SkyViewInLuminance					= false;
+		int mWilkie21SkyViewSplitScreen						= 0;
+		bool mAerialPerspective								= true;
 
 		// Unit
 		bool mSceneInKilometer								= true; // Meter otherwise
 
-		struct Fitting
+		struct Wilkie21
 		{
 			double mTurbidity								= 1.37;
 			double mVisibility								= 0.0;
 			double mAlbedo									= 0.0;
-
-			bool mUpdateRequested							= false;
-			bool mUseRawValues								= false;
 			
 			glm::dvec3 mHosekZenithSpectrum					= glm::dvec3(0.0);
 			glm::dvec3 mHosekSolarSpectrum					= glm::dvec3(0.0);
 			glm::dvec3 mHosekZenithXYZ						= glm::dvec3(0.0);
 			glm::dvec3 mHosekZenithRGB						= glm::dvec3(0.0);
 			glm::dvec3 mPragueZenithSpectrum				= glm::dvec3(0.0);
+			glm::dvec3 mPragueZenithRGB						= glm::dvec3(0.0);
 			glm::dvec3 mPragueSolarSpectrum					= glm::dvec3(0.0);
+			glm::dvec3 mPragueTransmittance					= glm::dvec3(0.0);
 		};
-		Fitting mFitting;
+		Wilkie21 mWilkie21;
 
 		struct Preset
 		{
@@ -350,7 +357,9 @@ public:
 			{
 			case AtmosphereMode::Hillaire20:	Preset::Hillaire20(*this); break;
 			default:							Preset::Bruneton17(*this); break;
-			}		
+			}
+
+			// GroundReference::UE4(*this);
 		}
 	};
 	Profile mProfile;
@@ -391,6 +400,8 @@ public:
 		Texture mMultiScattTex						= Texture().Width(32).Height(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Atmosphere.Hillaire20.MultiScattTex");
 		Texture mSkyViewLutTex						= Texture().Width(192).Height(108).Format(DXGI_FORMAT_R11G11B10_FLOAT).Name("Atmosphere.Hillaire20.SkyViewLutTex");
 		Texture mAtmosphereCameraScatteringVolume	= Texture().Width(32).Height(32).Depth(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Atmosphere.Hillaire20.AtmosphereCameraScatteringVolume");
+		// [Wilkie21]
+		Texture mWilkie21SkyViewLutTex				= Texture().Width(192).Height(108).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).Name("Atmosphere.Wilkie21.SkyViewLutTex");
 		// Gather textures
 		Texture mSentinelTexture					= Texture();
 		std::span<Texture> mTextures				= std::span<Texture>(&mTransmittanceTexture, &mSentinelTexture);
@@ -438,13 +449,6 @@ public:
 		};
 		Validation mValidation;
 
-		struct Wilkie21
-		{
-			// [Wilkie21]
-			Texture mSkyRadianceLutTex							= Texture().Width(192).Height(108).Format(DXGI_FORMAT_R11G11B10_FLOAT).Name("Atmosphere.Wilkie21.SkyRadiance");
-		};
-		Wilkie21 mWilkie21;
-
 		Resource()
 		{
 			Bruneton17(*this);
@@ -457,7 +461,6 @@ public:
 	void Finalize();
 	void UpdateImGui();
 	void Update();
-	void Load();
 	void Precompute();
 	void Compute();
 	void Validate();
@@ -469,15 +472,20 @@ public:
 	void ComputeIndirectIrradiance(glm::uint scattering_order);
 	void AccumulateMultipleScattering();
 	void ComputeMultipleScattering(glm::uint scattering_order);
-	bool mRecomputeRequested = true;
-	bool mRecomputeEveryFrame = false;
+	bool mRecomputeRequested						= true;
+	bool mRecomputeEveryFrame						= false;
 
 	void TransLUT();
 	void NewMultiScatCS();
 	void SkyViewLut();
 	void CameraVolumes();
 	
-	void FillSkyRadiance();
+	void ComputeWilkie21();
+	struct Wilkie21
+	{
+		bool mBakeRequested						= false;
+	};
+	Wilkie21 mWilkie21;
 };
 
 extern Atmosphere gAtmosphere;

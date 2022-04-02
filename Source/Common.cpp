@@ -197,6 +197,16 @@ void Shader::SetupCompute(ID3D12DescriptorHeap* inHeap, bool inUseTable)
 	gCommandList->SetPipelineState(mData.mPipelineState.Get());
 }
 
+int Texture::GetPixelSize() const
+{
+	return static_cast<int>(DirectX::BitsPerPixel(mFormat) / 8);
+}
+
+glm::uint64 Texture::GetSubresourceSize() const
+{
+	return GetRequiredIntermediateSize(mResource.Get(), 0, mSubresourceCount);
+}
+
 void Texture::Initialize()
 {
 	auto create_uav = [](ID3D12Resource* inResource, int& outHeapIndex)
@@ -229,7 +239,7 @@ void Texture::Initialize()
 	D3D12_RESOURCE_DESC resource_desc = gGetTextureResourceDesc(mWidth, mHeight, mDepth, mFormat);
 	D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
 
-	gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&mResource)));
+	gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mResource)));
 	mResource->SetName(name.c_str());
 	create_uav(mResource.Get(), mResourceHeapIndex);
 	
@@ -247,43 +257,63 @@ void Texture::Initialize()
 
 	// UIScale
 	if (mUIScale == 0.0f)
-		mUIScale = 256.0f / mWidth;
+		mUIScale = 256.0f / static_cast<float>(mWidth);
 }
 
-void Texture::Load()
+void Texture::Update()
 {
-	if (mPath == nullptr)
+	if (!mLoaded && mPath != nullptr)
+	{
+		// Load file
+		DirectX::ScratchImage scratch_image;
+		HRESULT hr = E_FAIL;
+		if (FAILED(hr))
+			hr = DirectX::LoadFromTGAFile(mPath, nullptr, scratch_image);
+		if (FAILED(hr))
+			hr = DirectX::LoadFromDDSFile(mPath, DirectX::DDS_FLAGS_NONE, nullptr, scratch_image);
+		assert(!FAILED(hr));
+
+		// Upload
+		std::vector<D3D12_SUBRESOURCE_DATA> subresources;
+		PrepareUpload(gDevice, scratch_image.GetImages(), scratch_image.GetImageCount(), scratch_image.GetMetadata(), subresources);
+		InitializeUpload();
+		BarrierScope expected_scope(gCommandList, mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
+		UpdateSubresources(gCommandList, mResource.Get(), mUploadResource.Get(), 0, 0, mSubresourceCount, subresources.data());
+
+		mLoaded = true;
+	}
+
+	if (!mUploadData.empty())
+	{
+		D3D12_SUBRESOURCE_DATA subresource = {};
+		subresource.pData = mUploadData.data();
+		subresource.RowPitch = mWidth * GetPixelSize();
+		subresource.SlicePitch = mWidth * mHeight * GetPixelSize();
+		InitializeUpload();
+		BarrierScope expected_scope(gCommandList, mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
+		UpdateSubresources(gCommandList, mResource.Get(), mUploadResource.Get(), 0, 0, mSubresourceCount, &subresource);
+
+		mUploadData.clear();
+	}
+}
+
+void Texture::InitializeUpload()
+{
+	if (mUploadResource != nullptr)
 		return;
-
-	if (mUploadResource != nullptr) // Only support upload once
-		return;
-
-	// Load file
-	DirectX::ScratchImage scratch_image;
-	HRESULT hr = E_FAIL;
-	if (FAILED(hr))
-		hr = DirectX::LoadFromTGAFile(mPath, nullptr, scratch_image);
-	if (FAILED(hr))
-		hr = DirectX::LoadFromDDSFile(mPath, DirectX::DDS_FLAGS_NONE, nullptr, scratch_image);
-	assert(!FAILED(hr));
-
-	// Prepare upload resource
-	std::vector<D3D12_SUBRESOURCE_DATA> subresources;
-	PrepareUpload(gDevice, scratch_image.GetImages(), scratch_image.GetImageCount(), scratch_image.GetMetadata(), subresources);
-	UINT64 byte_count = GetRequiredIntermediateSize(mResource.Get(), 0, UINT(subresources.size()));
+	
+	UINT64 byte_count = GetSubresourceSize();
 	D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(byte_count);
 	D3D12_HEAP_PROPERTIES upload_properties = gGetUploadHeapProperties();
 	gValidate(gDevice->CreateCommittedResource(&upload_properties, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mUploadResource)));
 	std::wstring name = gToWString(mName);
 	mUploadResource->SetName(name.c_str());
-
-	// Upload
-	BarrierScope expected_scope(gCommandList, mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
-	UpdateSubresources(gCommandList, mResource.Get(), mUploadResource.Get(), 0, 0, (UINT)subresources.size(), subresources.data());
 }
 
 void ImGuiShowTextures(std::span<Texture> inTextures, const std::string& inName, ImGuiTreeNodeFlags inFlags)
 {
+	ImGui::Begin("Textures");
+	
 	static float ui_scale = 1.0f;
 	static bool flip_y = false;
 
@@ -349,4 +379,6 @@ void ImGuiShowTextures(std::span<Texture> inTextures, const std::string& inName,
 
 		ImGui::TreePop();
 	}
+
+	ImGui::End();
 }

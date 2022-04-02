@@ -16,6 +16,7 @@ RWTexture2D<float4> TransmittanceTexUAV								: register(u7, space2);
 RWTexture2D<float4> MultiScattTexUAV								: register(u8, space2);
 RWTexture2D<float4> SkyViewLutTexUAV								: register(u9, space2);
 RWTexture3D<float4> AtmosphereCameraScatteringVolumeUAV				: register(u10, space2);
+RWTexture2D<float4> Wilkie21SkyViewLutTexUAV						: register(u11, space2);
 
 Texture2D<float4> TransmittanceSRV									: register(t0, space2);
 Texture2D<float4> DeltaIrradianceSRV								: register(t1, space2);
@@ -28,13 +29,14 @@ Texture2D<float4> TransmittanceTexSRV								: register(t7, space2);
 Texture2D<float4> MultiScattTexSRV									: register(t8, space2);
 Texture2D<float4> SkyViewLutTexSRV									: register(t9, space2);
 Texture3D<float4> AtmosphereCameraScatteringVolumeSRV				: register(t10, space2);
+Texture2D<float4> Wilkie21SkyViewLutTexSRV							: register(t11, space2);
 
 #define AtmosphereRootSignature							\
 "DescriptorTable("										\
 	"  CBV(b0, space = 0)"								\
 	", CBV(b0, space = 2)"								\
-	", UAV(u0, space = 2, numDescriptors = 11)"			\
-	", SRV(t0, space = 2, numDescriptors = 11)"			\
+	", UAV(u0, space = 2, numDescriptors = 12)"			\
+	", SRV(t0, space = 2, numDescriptors = 12)"			\
 ")"														\
 ", RootConstants(num32BitConstants=4, b1, space = 2)"	\
 ", StaticSampler(s0, filter = FILTER_MIN_MAG_MIP_LINEAR, addressU = TEXTURE_ADDRESS_CLAMP, addressV = TEXTURE_ADDRESS_CLAMP, addressW = TEXTURE_ADDRESS_CLAMP)"	\
@@ -160,6 +162,7 @@ float2 UV_to_XY(float2 uv, Texture2D<float4> texture) // GetUnitRangeFromTexture
 
 #include "AtmosphereIntegration.Bruneton17.inl"
 #include "AtmosphereIntegration.Hillaire20.inl"
+#include "AtmosphereIntegration.Wilkie21.inl"
 #include "AtmosphereIntegration.Raymarch.inl"
 
 void GetSunAndSkyIrradiance(float3 inHitPosition, float3 inNormal, out float3 outSunIrradiance, out float3 outSkyIrradiance)
@@ -182,24 +185,22 @@ void GetSkyRadiance(out float3 outSkyRadiance, out float3 outTransmittanceToTop)
 	outSkyRadiance = 0;
 	outTransmittanceToTop = 1;
 
-	switch (mAtmosphere.mMode)
+	AtmosphereMode mode = mAtmosphere.mMode;
+	bool left_screen = sGetDispatchRaysIndex().x * 1.0 / sGetDispatchRaysDimensions().x < 0.5;
+	if (mAtmosphere.mWilkie21SkyViewSplitScreen == 1 && left_screen)
+		mode = AtmosphereMode::Wilkie21;
+	if (mAtmosphere.mWilkie21SkyViewSplitScreen == 2 && !left_screen)
+		mode = AtmosphereMode::Wilkie21;
+
+	switch (mode)
 	{
 	case AtmosphereMode::ConstantColor:				outSkyRadiance = mAtmosphere.mConstantColor.xyz; break;
+	case AtmosphereMode::Wilkie21:					AtmosphereIntegration::Wilkie21::GetSkyRadiance(outSkyRadiance, outTransmittanceToTop); break;
 	case AtmosphereMode::RaymarchAtmosphereOnly:	AtmosphereIntegration::Raymarch::GetSkyRadiance(outSkyRadiance, outTransmittanceToTop); break;
 	case AtmosphereMode::Bruneton17: 				AtmosphereIntegration::Bruneton17::GetSkyRadiance(outSkyRadiance, outTransmittanceToTop); break;
 	case AtmosphereMode::Hillaire20: 				AtmosphereIntegration::Hillaire20::GetSkyRadiance(outSkyRadiance, outTransmittanceToTop); break;
 	default: break;
 	}
-}
-
-float3 SolarRadianceToLuminance(float3 inRadiance)
-{
-	// https://en.wikipedia.org/wiki/Luminous_efficacy
-	// https://en.wikipedia.org/wiki/Sunlight#Measurement
-
-	float kW_to_W = 1000.0;
-	float3 luminance = inRadiance * kW_to_W * kSolarLuminousEfficacy * kPreExposure;
-	return luminance;
 }
 
 void GetSkyLuminanceToPoint(out float3 outSkyLuminance, out float3 outTransmittance)
@@ -220,7 +221,7 @@ void GetSkyLuminanceToPoint(out float3 outSkyLuminance, out float3 outTransmitta
     default: break;
     }
 
-	outSkyLuminance = SolarRadianceToLuminance(radiance) * mPerFrameConstants.mSolarLuminanceScale;
+	outSkyLuminance = radiance * kSolarKW2LM * kPreExposure * mPerFrameConstants.mSolarLuminanceScale;
 }
 
 float3 GetSkyLuminance()
@@ -229,7 +230,6 @@ float3 GetSkyLuminance()
 	float3 radiance = 0;
 	float3 transmittance_to_top = 0;
 	GetSkyRadiance(radiance, transmittance_to_top);
-	radiance *= mAtmosphere.mSolarIrradiance;
 
 	// Debug
 	switch (mPerFrameConstants.mDebugMode)
@@ -250,11 +250,14 @@ float3 GetSkyLuminance()
 	if (mAtmosphere.mMode != AtmosphereMode::ConstantColor &&
 		dot(PlanetRayDirection(), GetSunDirection()) > cos(mAtmosphere.mSunAngularRadius))
 	{
+		// https://en.wikipedia.org/wiki/Solid_angle#Celestial_objects
+		// https://pages.mtu.edu/~scarn/teaching/GE4250/radiation_lecture_slides.pdf
 		// static const float kSunSolidAngle = 6.8E-5;
-		static const float kSunSolidAngle = 6.8; // Limit radiance to prevent fireflies...
-		float3 solar_radiance = mAtmosphere.mSolarIrradiance / kSunSolidAngle;
+		static const float kSunSolidAngle = 6.8E-5;
+		static const float kSolarRadianceScale = 1E-5; // Limit radiance to prevent fireflies...		
+		float3 solar_radiance = mAtmosphere.mSolarIrradiance / kSunSolidAngle * kSolarRadianceScale;
 		radiance = radiance + transmittance_to_top * solar_radiance;
 	}
 
-	return SolarRadianceToLuminance(radiance) * mPerFrameConstants.mSolarLuminanceScale;
+	return radiance * kSolarKW2LM * kPreExposure * mPerFrameConstants.mSolarLuminanceScale;
 }

@@ -6,10 +6,6 @@
 #undef RGB // for windows...
 #endif
 
-// References
-// https://github.com/mmp/pbrt-v4
-// https://github.com/colour-science/colour
-// http://cvrl.ioo.ucl.ac.uk/cmfs.htm
 namespace Color
 {
     constexpr double MaxLuminousEfficacy = 683.0; // lm/W
@@ -17,10 +13,13 @@ namespace Color
     constexpr int LambdaMin = 360;
     constexpr int LambdaMax = 830;
     constexpr int LambdaCount = (LambdaMax - LambdaMin + 1); 
-    
-    namespace CIE1931 // CIE 1931 2 Degree Standard Observer
+
+    // CIE 1931 2 Degree Standard Observer
+    // https://github.com/mmp/pbrt-v4
+    // https://github.com/colour-science/colour
+    // http://cvrl.ioo.ucl.ac.uk/cmfs.htm
+    namespace CIE1931
     {
-        // From https://github.com/mmp/pbrt-v4
         constexpr int SampleCount = 471;
         constexpr double X[SampleCount] = {
             // CIE X function values

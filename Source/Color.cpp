@@ -38,7 +38,7 @@ namespace Color
     {
         if (inxyY.mData.y == 0)
             return { glm::vec3(0,0,0) };
-        return CIEXYZ(glm::vec3(inxyY.mData.x * inY / inxyY.mData.y, inY, (1 - inxyY.mData.x - inxyY.mData.y) * inY / inxyY.mData.y));
+        return { glm::dvec3(inxyY.mData.x * inY / inxyY.mData.y, inY, (1 - inxyY.mData.x - inxyY.mData.y) * inY / inxyY.mData.y) };
     }
 
     CIEXYZ SpectrumToXYZ(const Spectrum& inSpectrum, bool inNormalize)

@@ -20,6 +20,7 @@ using Microsoft::WRL::ComPtr;
 #include <codecvt>
 #include <filesystem>
 #include <span>
+#include <execution>
 
 #include "Thirdparty/glm/glm/gtx/transform.hpp"
 #include "Thirdparty/nameof/include/nameof.hpp"
@@ -112,8 +113,11 @@ struct Texture
 		return *this;
 	}
 
+	int GetPixelSize() const;
+	glm::uint64 GetSubresourceSize() const;
 	void Initialize();
-	void Load();
+	void Update();
+	void InitializeUpload();
 
 	ComPtr<ID3D12Resource> mResource;
 	ComPtr<ID3D12Resource> mUploadResource;
@@ -121,7 +125,10 @@ struct Texture
 	D3D12_CPU_DESCRIPTOR_HANDLE mGuiCPUHandle = {};
 	D3D12_GPU_DESCRIPTOR_HANDLE mGuiGPUHandle = {};
 
+	int mSubresourceCount = 1; // TODO: Support multiple subresources
 	int mResourceHeapIndex = -1;
+	bool mLoaded = false;
+	std::vector<glm::uint8> mUploadData;
 };
 
 extern ComPtr<ID3D12Resource>				gConstantGPUBuffer;
