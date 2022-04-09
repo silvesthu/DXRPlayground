@@ -361,6 +361,8 @@ void Atmosphere::UpdateImGui()
 			ImGui::TreePop();
 		}
 
+		ImGui::Checkbox("Bake Hosek", &gAtmosphere.mWilkie21.mBakeHosek);
+
 		ImGui::TreePop();
 	}
 
@@ -800,10 +802,23 @@ void Atmosphere::ComputeWilkie21()
 					viewZenithSinAngle * sqrt(1.0 - lightViewCosAngle * lightViewCosAngle),
 					viewZenithCosAngle);
 				arpragueskymodelground_compute_angles(sun_elevation, sun_azimuth, &view_direction[0], &up_direction[0], &theta, &gamma, &shadow);
-			
-				for (int i = 0; i < Color::LambdaCount; i++)
-					prague_sky_radiance.mEnergy[i] = arpragueskymodelground_sky_radiance(gArPragueSkyModelGround.mPrague, theta, gamma, shadow, Color::LambdaMin + i);
-				Color::RGB luminance = Color::XYZToRGB({ Color::SpectrumToXYZ(prague_sky_radiance, false).mData * Color::MaxLuminousEfficacy }, Color::RGBColorSpace::Rec709);
+
+				Color::RGB luminance;
+				if (gAtmosphere.mWilkie21.mBakeHosek)
+				{
+					luminance =
+						{ glm::vec3(
+							arhosek_tristim_skymodel_radiance(gArPragueSkyModelGround.mHosekRGB, theta, gamma, 0) * Color::MaxLuminousEfficacy,
+							arhosek_tristim_skymodel_radiance(gArPragueSkyModelGround.mHosekRGB, theta, gamma, 1) * Color::MaxLuminousEfficacy,
+							arhosek_tristim_skymodel_radiance(gArPragueSkyModelGround.mHosekRGB, theta, gamma, 2) * Color::MaxLuminousEfficacy)
+						};
+				}
+				else
+				{
+					for (int i = 0; i < Color::LambdaCount; i++)
+						prague_sky_radiance.mEnergy[i] = arpragueskymodelground_sky_radiance(gArPragueSkyModelGround.mPrague, theta, gamma, shadow, Color::LambdaMin + i);
+					luminance = Color::XYZToRGB({ Color::SpectrumToXYZ(prague_sky_radiance, false).mData * Color::MaxLuminousEfficacy }, Color::RGBColorSpace::Rec709);
+				}
 				luminance.mData *= kPreExposure;
 			
 				glm::uint64 pixel = glm::packHalf2x16({luminance.mData.b, 1.0});

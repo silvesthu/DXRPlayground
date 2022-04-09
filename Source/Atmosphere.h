@@ -484,6 +484,7 @@ public:
 	struct Wilkie21
 	{
 		bool mBakeRequested						= false;
+		bool mBakeHosek							= false;
 	};
 	Wilkie21 mWilkie21;
 };
