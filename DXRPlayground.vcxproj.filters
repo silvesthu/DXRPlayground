@@ -172,6 +172,13 @@
     <ClInclude Include="Source\Thirdparty\ArPragueSkyModelGround\ArPragueSkyModelGround.h">
       <Filter>Source\Thirdparty\ArPragueSkyModelGround</Filter>
     </ClInclude>
+    <ClInclude Include="Shader\AtmosphereIntegration.Wilkie21.inl" />
+    <ClInclude Include="Shader\Constant.h" />
+    <ClInclude Include="Source\Color.h" />
+    <ClInclude Include="Source\Thirdparty\ArHosekSkyModel\ArHosekSkyModel.h" />
+    <ClInclude Include="Source\Thirdparty\ArHosekSkyModel\ArHosekSkyModelData_CIEXYZ.h" />
+    <ClInclude Include="Source\Thirdparty\ArHosekSkyModel\ArHosekSkyModelData_RGB.h" />
+    <ClInclude Include="Source\Thirdparty\ArHosekSkyModel\ArHosekSkyModelData_Spectral.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\DXRPlayground.cpp">
@@ -234,6 +241,8 @@
     <ClCompile Include="Source\Thirdparty\ArPragueSkyModelGround\ArPragueSkyModelGround.cpp">
       <Filter>Source\Thirdparty\ArPragueSkyModelGround</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Color.cpp" />
+    <ClCompile Include="Source\Thirdparty\ArHosekSkyModel\ArHosekSkyModel.cpp" />
   </ItemGroup>
   <ItemGroup>
     <CopyFileToFolders Include="Shader\Shader.hlsl">
