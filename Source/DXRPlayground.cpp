@@ -620,8 +620,7 @@ void sRender()
 
 	// Copy
 	{
-		// Output: UAV -> Copy
-		gBarrierTransition(gCommandList, gScene.GetOutputResource(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON);
+		BarrierScope output_resource_scope(gCommandList, gScene.GetOutputResource(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE);
 
 		// Draw
 		D3D12_RESOURCE_DESC desc = frame_render_target_resource->GetDesc();
@@ -644,9 +643,6 @@ void sRender()
 
 		gCompositeShader.SetupGraphics();
 		gCommandList->DrawInstanced(3, 1, 0, 0);
-
-		// Output - Copy -> UAV
-		gBarrierTransition(gCommandList, gScene.GetOutputResource(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 	}
 
 	// Draw ImGui
