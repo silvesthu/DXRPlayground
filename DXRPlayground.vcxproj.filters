@@ -37,6 +37,9 @@
     <Filter Include="Source\Thirdparty\ArPragueSkyModelGround">
       <UniqueIdentifier>{a5eca7a6-a35c-4256-a2d2-7e48086555ad}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\Thirdparty\ArHosekSkyModel">
+      <UniqueIdentifier>{c9e18a15-292f-471e-afa4-1fe816659385}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\ShaderTable.h">
@@ -168,17 +171,33 @@
     <ClInclude Include="Source\Thirdparty\tinygltf\tiny_gltf.h">
       <Filter>Source\Thirdparty\tinygltf</Filter>
     </ClInclude>
-    <ClInclude Include="Shader\RayQuery.inl" />
     <ClInclude Include="Source\Thirdparty\ArPragueSkyModelGround\ArPragueSkyModelGround.h">
       <Filter>Source\Thirdparty\ArPragueSkyModelGround</Filter>
     </ClInclude>
-    <ClInclude Include="Shader\AtmosphereIntegration.Wilkie21.inl" />
-    <ClInclude Include="Shader\Constant.h" />
-    <ClInclude Include="Source\Color.h" />
-    <ClInclude Include="Source\Thirdparty\ArHosekSkyModel\ArHosekSkyModel.h" />
-    <ClInclude Include="Source\Thirdparty\ArHosekSkyModel\ArHosekSkyModelData_CIEXYZ.h" />
-    <ClInclude Include="Source\Thirdparty\ArHosekSkyModel\ArHosekSkyModelData_RGB.h" />
-    <ClInclude Include="Source\Thirdparty\ArHosekSkyModel\ArHosekSkyModelData_Spectral.h" />
+    <ClInclude Include="Source\Thirdparty\ArHosekSkyModel\ArHosekSkyModel.h">
+      <Filter>Source\Thirdparty\ArHosekSkyModel</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Thirdparty\ArHosekSkyModel\ArHosekSkyModelData_CIEXYZ.h">
+      <Filter>Source\Thirdparty\ArHosekSkyModel</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Thirdparty\ArHosekSkyModel\ArHosekSkyModelData_RGB.h">
+      <Filter>Source\Thirdparty\ArHosekSkyModel</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Thirdparty\ArHosekSkyModel\ArHosekSkyModelData_Spectral.h">
+      <Filter>Source\Thirdparty\ArHosekSkyModel</Filter>
+    </ClInclude>
+    <ClInclude Include="Shader\AtmosphereIntegration.Wilkie21.inl">
+      <Filter>Shader</Filter>
+    </ClInclude>
+    <ClInclude Include="Shader\Constant.h">
+      <Filter>Shader</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Color.h">
+      <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="Shader\RayQuery.inl">
+      <Filter>Shader</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\DXRPlayground.cpp">
@@ -241,8 +260,12 @@
     <ClCompile Include="Source\Thirdparty\ArPragueSkyModelGround\ArPragueSkyModelGround.cpp">
       <Filter>Source\Thirdparty\ArPragueSkyModelGround</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Color.cpp" />
-    <ClCompile Include="Source\Thirdparty\ArHosekSkyModel\ArHosekSkyModel.cpp" />
+    <ClCompile Include="Source\Thirdparty\ArHosekSkyModel\ArHosekSkyModel.cpp">
+      <Filter>Source\Thirdparty\ArHosekSkyModel</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Color.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <CopyFileToFolders Include="Shader\Shader.hlsl">
