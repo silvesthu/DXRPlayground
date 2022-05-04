@@ -61,9 +61,6 @@ void gCreateShaderTable()
 			memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kDefaultMissShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 			shader_table_entry_index++;
 
-			memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kShadowMissShader), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-			shader_table_entry_index++;
-
 			gDXRShaderTable.mMissCount = shader_table_entry_index - gDXRShaderTable.mMissOffset;
 		}
 
@@ -72,9 +69,6 @@ void gCreateShaderTable()
 			gDXRShaderTable.mHitGroupOffset = shader_table_entry_index;
 
 			memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kDefaultHitGroup), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-			shader_table_entry_index++;
-
-			memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kShadowHitGroup), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 			shader_table_entry_index++;
 
 			gDXRShaderTable.mHitGroupCount = shader_table_entry_index - gDXRShaderTable.mHitGroupOffset;

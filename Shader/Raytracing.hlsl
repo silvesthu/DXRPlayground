@@ -13,17 +13,6 @@
 #include "AtmosphereIntegration.inl"
 #include "CloudIntegration.inl"
 
-//////////////////////////////////////////////////////////////////////////////////
-
-RaytracingAccelerationStructure RaytracingScene : register(t0, space0);
-StructuredBuffer<InstanceData> InstanceDataBuffer : register(t1, space0);
-StructuredBuffer<uint> Indices : register(t2, space0);
-StructuredBuffer<float3> Vertices : register(t3, space0);
-StructuredBuffer<float3> Normals : register(t4, space0);
-StructuredBuffer<float2> UVs : register(t5, space0);
-
-#define DEBUG_PIXEL_RADIUS (3)
-
 [shader("miss")]
 void DefaultMiss(inout RayPayload payload)
 {
@@ -234,18 +223,6 @@ void DefaultClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionA
 	payload.mThroughput = hit_info.mSamplingPDF <= 0 ? 0 : payload.mThroughput * hit_info.mAlbedo * hit_info.mTransmittance * hit_info.mScatteringPDF / hit_info.mSamplingPDF;
 }
 
-[shader("closesthit")]
-void ShadowClosestHit(inout ShadowPayload payload, in BuiltInTriangleIntersectionAttributes attributes)
-{
-	payload.mHit = true;
-}
-
-[shader("miss")]
-void ShadowMiss(inout ShadowPayload payload)
-{
-	payload.mHit = false;
-}
-
 void TraceRay()
 {
 	uint3 launchIndex = sGetDispatchRaysIndex();
@@ -365,10 +342,6 @@ void TraceRay()
 		if (mPerFrameConstants.mDebugMode == DebugMode::RussianRouletteCount)
 			mixed_output = hsv2rgb(float3(max(0.0, (recursion * 1.0 - mPerFrameConstants.mRecursionCountMax * 1.0)) / 10.0 /* for visualization only */, 1, 1));
 
-		// [TODO] Ray visualization ?
-		// if (all(abs((int2)sGetDispatchRaysIndex().xy - (int2)mDebugCoord) < DEBUG_PIXEL_RADIUS))
-		// 	mixed_output = 0;
-
 		RaytracingOutput[sGetDispatchRaysIndex().xy] = float4(mixed_output, 1);
 	}
 }
@@ -396,98 +369,3 @@ void InlineRaytracingCS(
 	TraceRay();
 }
 #endif // ENABLE_RAY_QUERY
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#ifndef SHADER_PROFILE_LIB
-
-cbuffer DiffTextureConstants : register(b0, space11)
-{
-	uint mComputedIndex;
-	uint mExpectedIndex;
-	uint mOutputIndex;
-};
-
-[RootSignature("RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), RootConstants(num32BitConstants=3, b0, space = 11)")]
-[numthreads(8, 8, 1)]
-void DiffTexture2DShader(
-	uint3 inGroupThreadID : SV_GroupThreadID,
-	uint3 inGroupID : SV_GroupID,
-	uint3 inDispatchThreadID : SV_DispatchThreadID,
-	uint inGroupIndex : SV_GroupIndex)
-{
-	RWTexture2D<float4> computed = ResourceDescriptorHeap[mComputedIndex];
-	RWTexture2D<float4> expected = ResourceDescriptorHeap[mExpectedIndex];
-	RWTexture2D<float4> output = ResourceDescriptorHeap[mOutputIndex];
-
-	bool equal = all(computed[inDispatchThreadID.xy] == expected[inDispatchThreadID.xy]);
-	output[inDispatchThreadID.xy] = equal ? float4(0, 1, 0, 1) : float4(1, 0, 0, 1);
-}
-
-[RootSignature("RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), RootConstants(num32BitConstants=3, b0, space = 11)")]
-[numthreads(8, 8, 1)]
-void DiffTexture3DShader(
-	uint3 inGroupThreadID : SV_GroupThreadID,
-	uint3 inGroupID : SV_GroupID,
-	uint3 inDispatchThreadID : SV_DispatchThreadID,
-	uint inGroupIndex : SV_GroupIndex)
-{
-	RWTexture3D<float4> computed = ResourceDescriptorHeap[mComputedIndex];
-	RWTexture3D<float4> expected = ResourceDescriptorHeap[mExpectedIndex];
-	RWTexture3D<float4> output = ResourceDescriptorHeap[mOutputIndex];
-
-	bool equal = all(computed[inDispatchThreadID.xyz] == expected[inDispatchThreadID.xyz]);
-	output[inDispatchThreadID.xyz] = equal ? float4(0, 1, 0, 1) : float4(1, 0, 0, 1);
-}
-
-#endif // SHADER_PROFILE_LIB
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-RWTexture2D<float4> InputUAV : register(u0, space1);
-RWTexture3D<float4> OutputUAV : register(u1, space1);
-[RootSignature("DescriptorTable(UAV(u0, space = 1, numDescriptors = 2))")]
-[numthreads(8, 8, 1)]
-void CloudShapeNoiseCS(
-	uint3 inGroupThreadID : SV_GroupThreadID,
-	uint3 inGroupID : SV_GroupID,
-	uint3 inDispatchThreadID : SV_DispatchThreadID,
-	uint inGroupIndex : SV_GroupIndex)
-{
-	float3 xyz = DispatchThreadID_to_XYZ(inDispatchThreadID.xyz, OutputUAV);
-
-	uint2 coords = inDispatchThreadID.xy;
-	coords.x += inDispatchThreadID.z * 128;
-
-	float4 input = InputUAV[coords.xy];
-	OutputUAV[inDispatchThreadID.xyz] = pow(input, 1);
-}
-
-[RootSignature("DescriptorTable(UAV(u0, space = 1, numDescriptors = 2))")]
-[numthreads(8, 8, 1)]
-void CloudErosionNoiseCS(
-	uint3 inGroupThreadID : SV_GroupThreadID,
-	uint3 inGroupID : SV_GroupID,
-	uint3 inDispatchThreadID : SV_DispatchThreadID,
-	uint inGroupIndex : SV_GroupIndex)
-{
-	float3 xyz = DispatchThreadID_to_XYZ(inDispatchThreadID.xyz, OutputUAV);
-
-	uint2 coords = inDispatchThreadID.xy;
-	coords.x += inDispatchThreadID.z * 32;
-
-	float4 input = InputUAV[coords.xy];
-	OutputUAV[inDispatchThreadID.xyz] = pow(input, 1);
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-[RootSignature("DescriptorTable(UAV(u0, space = 1, numDescriptors = 2))")] 
-[numthreads(8, 8, 1)]
-void DDGIPrecompute(
-	uint3 inGroupThreadID : SV_GroupThreadID,
-	uint3 inGroupID : SV_GroupID,
-	uint3 inDispatchThreadID : SV_DispatchThreadID,
-	uint inGroupIndex : SV_GroupIndex)
-{
-	// float3 xyz = DispatchThreadID_to_XYZ(inDispatchThreadID.xyz, OutputUAV);
-}

@@ -189,9 +189,6 @@ static const wchar_t*						kDefaultRayGenerationShader	= L"DefaultRayGeneration"
 static const wchar_t*						kDefaultMissShader			= L"DefaultMiss";
 static const wchar_t*						kDefaultClosestHitShader	= L"DefaultClosestHit";
 static const wchar_t*						kDefaultHitGroup			= L"DefaultHitGroup";
-static const wchar_t*						kShadowMissShader			= L"ShadowMiss";
-static const wchar_t*						kShadowClosestHitShader		= L"ShadowClosestHit";
-static const wchar_t*						kShadowHitGroup				= L"ShadowHitGroup";
 
 // Helper
 template <typename ResourceType>

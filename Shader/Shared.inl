@@ -174,20 +174,17 @@ struct InstanceData
 
 struct RayPayload
 {
-	uint						mRandomState;
-
-	float3						mThroughput;     // [0, 1]		Accumulated throughput
-	float3						mEmission;       // [0, +inf]	Accumulated emission
+	float3						mThroughput;			// [0, 1]		Accumulated throughput
+	float3						mEmission;				// [0, +inf]	Accumulated emission
 
 	float3						mPosition;
 	float3						mReflectionDirection;
 
+	uint						mRandomState;
 	bool						mDone;
-};
 
-struct ShadowPayload
-{
-	bool						mHit;
+	// Certain layout might cause driver crash on PSO generation
+	// See https://github.com/silvesthu/DirectX-Graphics-Samples/commit/9822cb8142629515f3768d2c36ff6695dba04838
 };
 
 struct DensityProfileLayer

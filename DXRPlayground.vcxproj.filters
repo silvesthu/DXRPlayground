@@ -297,9 +297,6 @@
     </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
-    <None Include="packages.config" />
-  </ItemGroup>
-  <ItemGroup>
     <FxCompile Include="Shader\Composite.hlsl">
       <Filter>Shader</Filter>
     </FxCompile>
@@ -309,5 +306,8 @@
     <FxCompile Include="Shader\Cloud.hlsl">
       <Filter>Shader</Filter>
     </FxCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
   </ItemGroup>
 </Project>

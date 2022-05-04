@@ -11,10 +11,6 @@
 #include "Atmosphere.h"
 #include "Cloud.h"
 
-// Use Agility SDK
-extern "C" { __declspec(dllexport) extern const UINT D3D12SDKVersion = 600; }
-extern "C" { __declspec(dllexport) extern const char8_t* D3D12SDKPath = u8".\\D3D12\\"; }
-
 #define DX12_ENABLE_DEBUG_LAYER			(1)
 
 static const wchar_t*					kApplicationTitleW = L"DXR Playground";
