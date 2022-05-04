@@ -12,14 +12,18 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Shader\AtmosphereIntegration.Wilkie21.inl" />
-    <ClInclude Include="Shader\Constant.h" />
-    <ClInclude Include="Shader\RayQuery.inl" />
+    <CopyFileToFolders Include="Shader\AtmosphereIntegration.Wilkie21.inl">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Shader\Constant.h" />
+    <CopyFileToFolders Include="Shader\RayQuery.inl">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Shader\Binding.h" />
     <ClInclude Include="Source\Atmosphere.h" />
     <ClInclude Include="Source\Cloud.h" />
     <ClInclude Include="Source\Color.h" />
     <ClInclude Include="Source\Common.h" />
-    <ClInclude Include="Source\DDGI.h" />
     <ClInclude Include="Source\ImGui\imgui_impl_dx12.h" />
     <ClInclude Include="Source\ImGui\imgui_impl_helper.h" />
     <ClInclude Include="Source\ImGui\imgui_impl_win32.h" />
@@ -70,7 +74,6 @@
     <ClCompile Include="Source\Cloud.cpp" />
     <ClCompile Include="Source\Color.cpp" />
     <ClCompile Include="Source\Common.cpp" />
-    <ClCompile Include="Source\DDGI.cpp" />
     <ClCompile Include="Source\DXRPlayground.cpp" />
     <ClCompile Include="Source\ImGui\imgui_impl_dx12.cpp" />
     <ClCompile Include="Source\ImGui\imgui_impl_helper.cpp" />
@@ -90,7 +93,7 @@
     <ClCompile Include="Source\Thirdparty\tinyobjloader\tiny_obj_loader.cc" />
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="Shader\Shader.hlsl">
+    <CopyFileToFolders Include="Shader\Raytracing.hlsl">
       <FileType>Document</FileType>
       <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)$(Platform)\$(Configuration)\Shader</DestinationFolders>
       <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)$(Platform)\$(Configuration)\Shader</DestinationFolders>
@@ -134,17 +137,28 @@
     </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="Shader\Util.inl">
-      <FileType>Document</FileType>
-    </CopyFileToFolders>
-  </ItemGroup>
-  <ItemGroup>
     <CopyFileToFolders Include="Shader\CloudIntegration.inl">
       <FileType>Document</FileType>
     </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <CopyFileToFolders Include="Shader\Composite.hlsl">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Shader\DiffTexture.hlsl">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
+  </ItemGroup>
+  <ItemGroup>
+    <CopyFileToFolders Include="Shader\Atmosphere.hlsl">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Shader\Cloud.hlsl">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

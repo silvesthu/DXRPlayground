@@ -42,6 +42,22 @@ Texture2D<float4> Wilkie21SkyViewLutTexSRV							: register(t11, space2);
 ", StaticSampler(s0, filter = FILTER_MIN_MAG_MIP_LINEAR, addressU = TEXTURE_ADDRESS_CLAMP, addressV = TEXTURE_ADDRESS_CLAMP, addressW = TEXTURE_ADDRESS_CLAMP)"	\
 ", StaticSampler(s1, filter = FILTER_MIN_MAG_MIP_LINEAR, addressU = TEXTURE_ADDRESS_WRAP, addressV = TEXTURE_ADDRESS_WRAP, addressW = TEXTURE_ADDRESS_WRAP)"
 
+// Altitude -> Density
+float GetLayerDensity(DensityProfileLayer layer, float altitude)
+{
+	float density = layer.mExpTerm * exp(layer.mExpScale * altitude) + layer.mLinearTerm * altitude + layer.mConstantTerm;
+	return clamp(density, 0.0, 1.0);
+}
+
+// Altitude -> Density
+float GetProfileDensity(DensityProfile profile, float altitude)
+{
+	if (altitude < profile.mLayer0.mWidth)
+		return GetLayerDensity(profile.mLayer0, altitude);
+	else
+		return GetLayerDensity(profile.mLayer1, altitude);
+}
+
 float invlerp(float a, float b, float x)
 {
 	return (x - a) / (b - a);

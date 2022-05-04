@@ -1,13 +1,18 @@
 #include "Common.h"
 #include "Atmosphere.h"
 #include "Cloud.h"
-#include "DDGI.h"
 
 #include <fstream>
 #include <sstream>
 
-static IDxcBlob* sCompileShader(const char* inFilename, const char* inSource, glm::uint32 inSize, const wchar_t* inEntryPoint, const wchar_t* inProfile)
+static IDxcBlob* sCompileShader(const char* inFilename, const wchar_t* inEntryPoint, const wchar_t* inProfile)
 {
+	// Load shader
+	std::ifstream shader_file(inFilename);
+	std::stringstream shader_stream;
+	shader_stream << shader_file.rdbuf();
+	std::string shader_string = shader_stream.str();
+
 	// GetProcAddress to eliminate dependency on .lib. Make updating .dll easier.
 	DxcCreateInstanceProc DxcCreateInstance = nullptr;
 	if (DxcCreateInstance == nullptr)
@@ -22,7 +27,7 @@ static IDxcBlob* sCompileShader(const char* inFilename, const char* inSource, gl
 	DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(utils.GetAddressOf()));
 
 	IDxcBlobEncoding* blob_encoding;
-	gValidate(utils->CreateBlobFromPinned(inSource, inSize, CP_UTF8, &blob_encoding));
+	gValidate(utils->CreateBlobFromPinned(shader_string.c_str(), static_cast<glm::uint32>(shader_string.length()), CP_UTF8, &blob_encoding));
 
 	ComPtr<IDxcCompiler> compiler;
 	DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(compiler.GetAddressOf()));
@@ -348,10 +353,10 @@ struct GlobalRootSignature : public StateSubobjectHolder<ID3D12RootSignature*, D
 	ComPtr<ID3D12RootSignature> mRootSignature;
 };
 
-static bool sCreateVSPSPipelineState(const char* inShaderFileName, std::stringstream& inShaderStream, const wchar_t* inVSName, const wchar_t* inPSName, Shader& ioSystemShader)
+static bool sCreateVSPSPipelineState(const char* inShaderFileName, const wchar_t* inVSName, const wchar_t* inPSName, Shader& ioSystemShader)
 {
-	IDxcBlob* vs_blob = sCompileShader(inShaderFileName, inShaderStream.str().c_str(), (glm::uint32)inShaderStream.str().length(), inVSName, L"vs_6_6");
-	IDxcBlob* ps_blob = sCompileShader(inShaderFileName, inShaderStream.str().c_str(), (glm::uint32)inShaderStream.str().length(), inPSName, L"ps_6_6");
+	IDxcBlob* vs_blob = sCompileShader(inShaderFileName, inVSName, L"vs_6_6");
+	IDxcBlob* ps_blob = sCompileShader(inShaderFileName, inPSName, L"ps_6_6");
 	if (vs_blob == nullptr || ps_blob == nullptr)
 		return false;
 
@@ -391,9 +396,9 @@ static bool sCreateVSPSPipelineState(const char* inShaderFileName, std::stringst
 	return true;
 }
 
-static bool sCreateCSPipelineState(const char* inShaderFileName, const std::stringstream& inShaderStream, const wchar_t* inCSName, Shader& ioSystemShader)
+static bool sCreateCSPipelineState(const char* inShaderFileName, const wchar_t* inCSName, Shader& ioSystemShader)
 {
-	IDxcBlob* cs_blob = sCompileShader(inShaderFileName, inShaderStream.str().c_str(), static_cast<glm::uint32>(inShaderStream.str().length()), inCSName, L"cs_6_6");
+	IDxcBlob* cs_blob = sCompileShader(inShaderFileName, inCSName, L"cs_6_6");
 	if (cs_blob == nullptr)
 		return false;
 
@@ -430,27 +435,21 @@ static bool sCreateCSPipelineState(const char* inShaderFileName, const std::stri
 	return true;
 }
 
-bool sCreatePipelineState(const char* inShaderFileName, std::stringstream& inShaderStream, Shader& ioSystemShader)
+bool sCreatePipelineState(const char* inShaderFileName, Shader& ioSystemShader)
 {
 	if (ioSystemShader.mCSName != nullptr)
-		return sCreateCSPipelineState(inShaderFileName, inShaderStream, ioSystemShader.mCSName, ioSystemShader);
+		return sCreateCSPipelineState(inShaderFileName, ioSystemShader.mCSName, ioSystemShader);
 	else
-		return sCreateVSPSPipelineState(inShaderFileName, inShaderStream, ioSystemShader.mVSName, ioSystemShader.mPSName, ioSystemShader);
+		return sCreateVSPSPipelineState(inShaderFileName, ioSystemShader.mVSName, ioSystemShader.mPSName, ioSystemShader);
 }
 
 void gCreatePipelineState()
 {
 	static bool first_run = true;
 
-	// Load shader
-	const char* shader_filename = "Shader/Shader.hlsl";
-	std::ifstream shader_file(shader_filename);
-	std::stringstream shader_stream;
-	shader_stream << shader_file.rdbuf();
-	
 	// Create lib shaders
 	const wchar_t* entry_points[] = { kDefaultRayGenerationShader, kDefaultMissShader, kDefaultClosestHitShader, kShadowMissShader, kShadowClosestHitShader };
-	IDxcBlob* blob = sCompileShader(shader_filename, shader_stream.str().c_str(), static_cast<glm::uint32>(shader_stream.str().length()), L"", L"lib_6_5");
+	IDxcBlob* blob = sCompileShader("Shader/Raytracing.hlsl", L"", L"lib_6_5");
 	if (blob == nullptr)
 	{
 		if (first_run)
@@ -527,21 +526,18 @@ void gCreatePipelineState()
 	{
 		bool succeed = true;
 
-		succeed &= sCreatePipelineState(shader_filename, shader_stream, gCompositeShader);
+		succeed &= sCreatePipelineState("Shader/Composite.hlsl", gCompositeShader);
 
-		succeed &= sCreatePipelineState(shader_filename, shader_stream, gDXRInlineShader);
+		succeed &= sCreatePipelineState("Shader/Raytracing.hlsl", gDXRInlineShader);
 
-		succeed &= sCreatePipelineState(shader_filename, shader_stream, gDiffTexture2DShader);
-		succeed &= sCreatePipelineState(shader_filename, shader_stream, gDiffTexture3DShader);
+		succeed &= sCreatePipelineState("Shader/DiffTexture.hlsl", gDiffTexture2DShader);
+		succeed &= sCreatePipelineState("Shader/DiffTexture.hlsl", gDiffTexture3DShader);
 
 		for (auto&& shader : gAtmosphere.mResource.mShaders)
-			succeed &= sCreatePipelineState(shader_filename, shader_stream, shader);
+			succeed &= sCreatePipelineState("Shader/Atmosphere.hlsl", shader);
 
 		for (auto&& shader : gCloud.mResource.mShaders)
-			succeed &= sCreatePipelineState(shader_filename, shader_stream, shader);
-
-		for (auto&& shader : gDDGI.mResource.mShaders)
-			succeed &= sCreatePipelineState(shader_filename, shader_stream, shader);
+			succeed &= sCreatePipelineState("Shader/Cloud.hlsl", shader);
 
 		if (!succeed)
 		{

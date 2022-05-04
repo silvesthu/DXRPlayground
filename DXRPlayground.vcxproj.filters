@@ -147,9 +147,6 @@
     <ClInclude Include="Source\Cloud.h">
       <Filter>Source</Filter>
     </ClInclude>
-    <ClInclude Include="Source\DDGI.h">
-      <Filter>Source</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Thirdparty\imgui\imgui_internal.h">
       <Filter>Source\Thirdparty\imgui</Filter>
     </ClInclude>
@@ -186,9 +183,6 @@
     <ClInclude Include="Source\Thirdparty\ArHosekSkyModel\ArHosekSkyModelData_Spectral.h">
       <Filter>Source\Thirdparty\ArHosekSkyModel</Filter>
     </ClInclude>
-    <ClInclude Include="Shader\AtmosphereIntegration.Wilkie21.inl">
-      <Filter>Shader</Filter>
-    </ClInclude>
     <ClInclude Include="Shader\Constant.h">
       <Filter>Shader</Filter>
     </ClInclude>
@@ -196,6 +190,9 @@
       <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="Shader\RayQuery.inl">
+      <Filter>Shader</Filter>
+    </ClInclude>
+    <ClInclude Include="Shader\Binding.h">
       <Filter>Shader</Filter>
     </ClInclude>
   </ItemGroup>
@@ -236,9 +233,6 @@
     <ClCompile Include="Source\Cloud.cpp">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="Source\DDGI.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Thirdparty\imgui\imgui_tables.cpp">
       <Filter>Source\Thirdparty\imgui</Filter>
     </ClCompile>
@@ -268,7 +262,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="Shader\Shader.hlsl">
+    <CopyFileToFolders Include="Shader\Raytracing.hlsl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
     <CopyFileToFolders Include="Shader\Common.inl">
@@ -292,14 +286,28 @@
     <CopyFileToFolders Include="Shader\Planet.inl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\Util.inl">
+    <CopyFileToFolders Include="Shader\CloudIntegration.inl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\CloudIntegration.inl">
+    <CopyFileToFolders Include="Shader\AtmosphereIntegration.Wilkie21.inl">
+      <Filter>Shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Shader\Atmosphere.hlsl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="Shader\Composite.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Shader\DiffTexture.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Shader\Cloud.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

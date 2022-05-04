@@ -10,7 +10,6 @@
 
 #include "Atmosphere.h"
 #include "Cloud.h"
-#include "DDGI.h"
 
 // Use Agility SDK
 extern "C" { __declspec(dllexport) extern const UINT D3D12SDKVersion = 600; }
@@ -339,12 +338,6 @@ static void sUpdate()
 				ImGui::TreePop();
 			}
 
-			if (ImGui::TreeNodeEx("DDGI"))
-			{
-				gDDGI.UpdateImGui();
-				ImGui::TreePop();
-			}
-
 			if (ImGui::TreeNodeEx("Display"))
 			{
 				ImGui::Checkbox("Vsync", &gDisplaySettings.mVsync);
@@ -396,7 +389,6 @@ static void sUpdate()
 
 			gAtmosphere.mRecomputeRequested = true;
 			gCloud.mRecomputeRequested = true;
-			gDDGI.mRecomputeRequested = true;
 		}
 	}
 }
@@ -449,7 +441,6 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 	// Features (rely on ImGui, Scene)
 	gAtmosphere.Initialize();
 	gCloud.Initialize();
-	gDDGI.Initialize();
 
 	// File watch
 	filewatch::FileWatch<std::string> file_watch("Shader/", 
@@ -503,7 +494,6 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 
 		gAtmosphere.Finalize();
 		gCloud.Finalize();
-		gDDGI.Finalize();
 
 		ImGui_ImplDX12_Shutdown();
 		ImGui_ImplWin32_Shutdown();
@@ -605,12 +595,6 @@ void sRender()
 	{
 		gCloud.Update();
 		gCloud.Precompute();
-	}
-
-	// DDGI
-	{
-		gDDGI.Update();
-		gDDGI.Precompute();
 	}
 
 	// Raytrace
