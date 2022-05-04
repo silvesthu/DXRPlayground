@@ -89,7 +89,7 @@ static IDxcBlob* sCompileShader(const char* inFilename, const wchar_t* inEntryPo
 		gValidate(utils->GetBlobAsUtf8(blob, &blob_8));
 		std::string str(static_cast<LPCSTR>(blob_8->GetBufferPointer()), blob_8->GetBufferSize());
 		str += '\n';
-		gDebugPrint(str.c_str());
+		gLog(str.c_str());
 		blob->Release();
 		blob_8->Release();
 		return nullptr;
@@ -229,7 +229,7 @@ ComPtr<ID3D12RootSignature> CreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC 
 	if (FAILED(hr))
 	{
 		std::string str((char*)error_blob->GetBufferPointer(), error_blob->GetBufferSize());
-		gDebugPrint(str.c_str());
+		gLog(str.c_str());
 		assert(false);
 		return nullptr;
 	}
@@ -477,7 +477,7 @@ void gCreatePipelineState()
 	std::array<D3D12_STATE_SUBOBJECT, 64> subobjects;
 	glm::uint32 index = 0;
 
-	gDebugPrint("Shader compiled.\n");
+	gLog("Shader compiled.\n");
 	DXILLibrary dxilLibrary(blob, entry_points, ARRAYSIZE(entry_points));
 	subobjects[index++] = dxilLibrary.mStateSubobject;
 

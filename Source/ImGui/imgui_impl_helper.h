@@ -146,4 +146,4 @@ struct ExampleAppLog
 	}
 };
 
-extern ExampleAppLog gLog;
+extern ExampleAppLog gLogGui;

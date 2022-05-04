@@ -240,18 +240,18 @@ inline std::string gToLower(const std::string& inString)
 	return result;
 }
 
-inline void gDebugPrint(const char* string)
+inline void gLog(const char* string)
 {
 	OutputDebugStringA(string);
-	gLog.AddLog(string);
+	gLogGui.AddLog(string);
 }
 
 template <typename T>
-inline void gDebugPrint(const T& data)
+inline void gLog(const T& data)
 {
 	std::string str = std::to_string(data) + "\n";
 	OutputDebugStringA(str.c_str());
-	gLog.AddLog(str.c_str());
+	gLogGui.AddLog(str.c_str());
 }
 
 inline std::wstring gToWString(const std::string string)

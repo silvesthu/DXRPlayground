@@ -194,10 +194,10 @@ bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransfor
 		return false;
 
 	if (!reader.Warning().empty())
-		gDebugPrint(reader.Warning().c_str());
+		gLog(reader.Warning().c_str());
 
 	if (!reader.Error().empty())
-		gDebugPrint(reader.Error().c_str());
+		gLog(reader.Error().c_str());
 
 	// Fetch indices, attributes
 	glm::uint32 index = 0;
