@@ -31,8 +31,6 @@ enum class ScenePresetType
 {
 	None,
 
-	Rectangle,
-
 	CornellBox,
 
 	Bruneton17,
@@ -50,8 +48,6 @@ static ScenePreset kScenePresets[(int)ScenePresetType::COUNT] =
 {
 	{ "None",						nullptr,								glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
 
-	{ "Rectangle",					"Asset/primitives/rectangle.obj",		glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
-	
 	{ "CornellBox",					"Asset/Comparison/cornellbox.obj",		glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
 
 	{ "Bruneton17",					"Asset/primitives/sphere.obj",			glm::vec4(0.0f, 0.0f, 9.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::translate(glm::vec3(0.0f, 1.0f, 0.0f)),			0.0f, glm::pi<float>() / 4.0f,},
