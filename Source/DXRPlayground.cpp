@@ -358,13 +358,6 @@ static void sUpdate()
 
 				ImGui::TreePop();
 			}
-
-			if (ImGui::TreeNodeEx("Log", ImGuiTreeNodeFlags_DefaultOpen))
-			{
-				gLogGui.Draw();
-
-				ImGui::TreePop();
-			}
 		}
 		ImGui::End();
 	}
@@ -442,7 +435,7 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 			if (std::regex_match(inPath, pattern) && inPath.find("Generated") == std::string::npos)
 			{
 				std::string msg = "Reload triggered by " + inPath + "\n";
-				gLogGui.AddLog(msg.c_str());
+				gLog(msg.c_str());
 
 				sReloadRequested = true;
 			}

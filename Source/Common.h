@@ -240,7 +240,6 @@ inline std::string gToLower(const std::string& inString)
 inline void gLog(const char* string)
 {
 	OutputDebugStringA(string);
-	gLogGui.AddLog(string);
 }
 
 template <typename T>
@@ -248,7 +247,6 @@ inline void gLog(const T& data)
 {
 	std::string str = std::to_string(data) + "\n";
 	OutputDebugStringA(str.c_str());
-	gLogGui.AddLog(str.c_str());
 }
 
 inline std::wstring gToWString(const std::string string)
