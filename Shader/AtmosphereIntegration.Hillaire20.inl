@@ -460,7 +460,7 @@ SingleScatteringResult IntegrateScatteredLuminance(
 		OpticalDepth += SampleOpticalDepth;
 
 		float pHeight = length(P);
-		const float3 UpVector = P / pHeight;
+		float3 UpVector = P / pHeight;
 		float SunZenithCosAngle = dot(SunDir, UpVector);
 		float2 uv;
 		LutTransmittanceParamsToUv(Atmosphere, pHeight, SunZenithCosAngle, uv);
@@ -542,7 +542,7 @@ SingleScatteringResult IntegrateScatteredLuminance(
 		float3 P = WorldPos + tBottom * WorldDir;
 		float pHeight = length(P);
 
-		const float3 UpVector = P / pHeight;
+		float3 UpVector = P / pHeight;
 		float SunZenithCosAngle = dot(SunDir, UpVector);
 		float2 uv;
 		LutTransmittanceParamsToUv(Atmosphere, pHeight, SunZenithCosAngle, uv);
@@ -1058,6 +1058,9 @@ void GetSkyRadiance(out float3 outSkyRadiance, out float3 outTransmittanceToTop)
 	float lightViewCosAngle = lightOnPlane.x;
 
 	float2 uv;
+	LutTransmittanceParamsToUv(Atmosphere, r, dot(WorldDir, UpVector), uv);
+	outTransmittanceToTop = TransmittanceLutTexture.SampleLevel(samplerLinearClamp, uv, 0).rgb;
+
 	SkyViewLutParamsToUv(Atmosphere, ray_r_mu_intersects_ground, mu, lightViewCosAngle, r, uv);
 	outSkyRadiance = SkyViewLutTexSRV.SampleLevel(samplerLinearClamp, uv, 0).rgb;
 

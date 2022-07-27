@@ -1050,16 +1050,7 @@ void GetSkyRadiance(out float3 outSkyRadiance, out float3 outTransmittanceToTop)
 	float nu = dot(view_ray, sun_direction);
 	bool ray_r_mu_intersects_ground = RayIntersectsGround(r, mu);
 
-	// override
-	{
-		//r = 6360;
-		//mu = 0.0;
-		//mu_s = 0.0;
-		//nu = 0.0;
-		//ray_r_mu_intersects_ground = false;
-	}
-
-	outTransmittanceToTop = ray_r_mu_intersects_ground ? 0 : GetTransmittanceToTopAtmosphereBoundary(r, mu);
+	outTransmittanceToTop = GetTransmittanceToTopAtmosphereBoundary(r, mu);
 
 	// [TODO] shadow
 	float3 rayleigh_scattering;
