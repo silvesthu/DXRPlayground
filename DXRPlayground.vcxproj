@@ -12,6 +12,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Source\Thirdparty\tinyxml2\tinyxml2.h" />
     <CopyFileToFolders Include="Shader\AtmosphereIntegration.Wilkie21.inl">
       <FileType>Document</FileType>
     </CopyFileToFolders>
@@ -91,6 +92,7 @@
     <ClCompile Include="Source\Thirdparty\imgui\imgui_widgets.cpp" />
     <ClCompile Include="Source\Thirdparty\tinygltf\tiny_gltf.cc" />
     <ClCompile Include="Source\Thirdparty\tinyobjloader\tiny_obj_loader.cc" />
+    <ClCompile Include="Source\Thirdparty\tinyxml2\tinyxml2.cpp" />
   </ItemGroup>
   <ItemGroup>
     <CopyFileToFolders Include="Shader\Raytracing.hlsl">

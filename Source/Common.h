@@ -1,5 +1,7 @@
 #pragma once
 
+#define WIN32_LEAN_AND_MEAN
+
 #include <d3d12.h>
 #include <dxgi1_4.h>
 #include <dxcapi.h>
@@ -179,6 +181,16 @@ using uint2 = glm::uvec2;
 using uint3 = glm::uvec3;
 using uint4 = glm::uvec4;
 
+using float2x2 = glm::mat2x2;
+using float2x3 = glm::mat2x3;
+using float2x4 = glm::mat2x4;
+using float3x2 = glm::mat3x2;
+using float3x3 = glm::mat3x3;
+using float3x4 = glm::mat3x4;
+using float4x2 = glm::mat4x2;
+using float4x3 = glm::mat4x3;
+using float4x4 = glm::mat4x4;
+
 #define CONSTANT_DEFAULT(x) = x
 #include "../Shader/Shared.inl"
 
@@ -237,23 +249,31 @@ inline std::string gToLower(const std::string& inString)
 	return result;
 }
 
-inline void gLog(const char* string)
+inline void gTrace(const char* string)
 {
 	OutputDebugStringA(string);
 }
 
 template <typename T>
-inline void gLog(const T& data)
+inline void gTrace(const T& data)
 {
 	std::string str = std::to_string(data) + "\n";
 	OutputDebugStringA(str.c_str());
 }
 
-inline std::wstring gToWString(const std::string string)
+#define gAssert assert
+
+inline void gVerify(bool inExpr)
 {
-	int wide_size = MultiByteToWideChar(CP_UTF8, 0, string.c_str(), (int)string.size(), NULL, 0);
+	if (!inExpr)
+		__debugbreak();
+}
+
+inline std::wstring gToWString(const std::string_view string)
+{
+	int wide_size = MultiByteToWideChar(CP_UTF8, 0, string.data(), (int)string.size(), NULL, 0);
 	std::wstring wide_string(wide_size, 0);
-	MultiByteToWideChar(CP_UTF8, 0, string.c_str(), (int)string.size(), &wide_string[0], wide_size);
+	MultiByteToWideChar(CP_UTF8, 0, string.data(), (int)string.size(), &wide_string[0], wide_size);
 	return wide_string;
 }
 
@@ -329,10 +349,16 @@ inline void gValidate(HRESULT hr)
 }
 
 template <typename T>
-inline void gSetName(ComPtr<T>& object, std::wstring base_name, std::wstring name)
+inline void gSetName(ComPtr<T>& inObject, std::wstring inBaseName, std::wstring inName)
 {
-	std::wstring new_name = base_name + name;
-	object->SetName(new_name.c_str());
+	std::wstring new_name = inBaseName + inName;
+	inObject->SetName(new_name.c_str());
+}
+
+template <typename T>
+inline void gSetName(ComPtr<T>& inObject, std::string_view inBaseName, std::string_view inName)
+{
+	gSetName(inObject, gToWString(inBaseName), gToWString(inName));
 }
 
 inline void gBarrierTransition(ID3D12GraphicsCommandList4* command_list, ID3D12Resource* resource, D3D12_RESOURCE_STATES state_before, D3D12_RESOURCE_STATES state_after)

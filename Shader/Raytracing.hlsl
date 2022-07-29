@@ -48,6 +48,7 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 
 	float3 normals[3] = { Normals[indices[0]], Normals[indices[1]], Normals[indices[2]] };
 	float3 normal = normalize(normals[0] * barycentrics.x + normals[1] * barycentrics.y + normals[2] * barycentrics.z);
+    normal = normalize(mul((float3x3) InstanceDataBuffer[sGetInstanceID()].mInverseTranspose, normal)); // Allow non-uniform scale
 
 	float2 uvs[3] = { UVs[indices[0]], UVs[indices[1]], UVs[indices[2]] };
 	float2 uv = uvs[0] * barycentrics.x + uvs[1] * barycentrics.y + uvs[2] * barycentrics.z;
@@ -159,7 +160,6 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
             		hit_info.mDone = false;
                 }
                 break;
-            case MaterialType::None:
 			default:
                 break;
         }
@@ -193,13 +193,23 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	}
 
 	// Debug - Per instance
-	if (mPerFrameConstants.mDebugInstanceIndex == sGetInstanceID())
+    if (mPerFrameConstants.mDebugInstanceIndex == -1 || mPerFrameConstants.mDebugInstanceIndex == sGetInstanceID())
 	{
 		switch (mPerFrameConstants.mDebugInstanceMode)
 		{
-		case DebugInstanceMode::Barycentrics: 	hit_info.mEmission = barycentrics; hit_info.mDone = true; return hit_info;
-		case DebugInstanceMode::Mirror: 		hit_info.mAlbedo = 1; hit_info.mReflectionDirection = reflect(sGetWorldRayDirection(), normal); return hit_info;
-		default:								break;
+		case DebugInstanceMode::Barycentrics:
+			hit_info.mEmission = barycentrics; 
+			hit_info.mDone = true; 
+			return hit_info;
+		case DebugInstanceMode::Mirror:
+			hit_info.mAlbedo = 1; 
+            hit_info.mSamplingPDF = 1;
+            hit_info.mScatteringPDF = 1;
+			hit_info.mReflectionDirection = reflect(sGetWorldRayDirection(), normal); 
+			hit_info.mDone = false; 
+			return hit_info;
+		default:
+			break;
 		}
 	}
 

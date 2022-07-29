@@ -14,9 +14,7 @@ static const float kSolarLM2KW					= 1.0f / kSolarKW2LM;
 
 enum class MaterialType : uint
 {
-	None = 0,
-
-	Diffuse,
+	Diffuse = 0,
 	RoughConductor,
 
 	Count
@@ -133,7 +131,7 @@ struct PerFrameConstants
 
 	DebugMode					mDebugMode				CONSTANT_DEFAULT(DebugMode::None);
 	DebugInstanceMode			mDebugInstanceMode		CONSTANT_DEFAULT(DebugInstanceMode::None);
-	uint						mDebugInstanceIndex		CONSTANT_DEFAULT(0);
+	int							mDebugInstanceIndex		CONSTANT_DEFAULT(-1);
 	uint						_1						CONSTANT_DEFAULT(0);
 
 	RecursionMode				mRecursionMode			CONSTANT_DEFAULT(RecursionMode::RussianRoulette);
@@ -148,7 +146,7 @@ struct PerFrameConstants
 
 struct InstanceData
 {
-	MaterialType				mMaterialType			CONSTANT_DEFAULT(MaterialType::None);
+	MaterialType				mMaterialType			CONSTANT_DEFAULT(MaterialType::Diffuse);
 	float3						_0						CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 
     float3						mAlbedo					CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
@@ -165,6 +163,9 @@ struct InstanceData
 	
 	float3						mIOR					CONSTANT_DEFAULT(float3(1.0f, 1.0f, 1.0f));
 	float						_3						CONSTANT_DEFAULT(0);
+
+	float4x4					mTransform				CONSTANT_DEFAULT(float4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1));
+	float4x4					mInverseTranspose		CONSTANT_DEFAULT(float4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1));
 
     uint						mIndexOffset			CONSTANT_DEFAULT(0);
     uint						mVertexOffset			CONSTANT_DEFAULT(0);

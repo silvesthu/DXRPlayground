@@ -29,12 +29,13 @@ using PrimitiveRef = std::shared_ptr<Primitive>;
 class BLAS final
 {
 public:
-	BLAS(PrimitiveRef inPrimitive, const std::wstring& inName) : mPrimitive(inPrimitive), mName(inName) {}
+	BLAS(PrimitiveRef inPrimitive, std::string_view inName) : mPrimitive(inPrimitive), mName(inName) {}
 
 	void Initialize(D3D12_GPU_VIRTUAL_ADDRESS inVertexBaseAddress, D3D12_GPU_VIRTUAL_ADDRESS inIndexBaseAddress);
 	void Build(ID3D12GraphicsCommandList4* inCommandList);
 
 	D3D12_GPU_VIRTUAL_ADDRESS GetGPUVirtualAddress() const { return mDest->GetGPUVirtualAddress(); }
+	const std::string& GetName() { return mName; }
 
 private:
 	PrimitiveRef mPrimitive;
@@ -45,7 +46,7 @@ private:
 	ComPtr<ID3D12Resource> mScratch = nullptr;
 	ComPtr<ID3D12Resource> mDest = nullptr;
 
-	std::wstring mName;
+	std::string mName;
 
 	bool mBuilt = false;
 };
@@ -64,9 +65,11 @@ public:
 	void Update() { if (mUpdater) mUpdater(this); }
 	void SetUpdater(std::function<void(ObjectInstance*)> inUpdater) { mUpdater = inUpdater; }
 
-	BLASRef GetBLAS() { return mBLAS; }
+	const BLASRef GetBLAS() const { return mBLAS; }
+	const glm::mat4& GetTransform() const { return mTransform; }
 	glm::mat4& Transform() { return mTransform; }
 	glm::uint32 GetHitGroupIndex() const { return mHitGroupIndex; }
+	const InstanceData& GetData() const { return mInstanceData; }
 	InstanceData& Data() { return mInstanceData; }
 
 private:
@@ -82,14 +85,15 @@ using ObjectInstanceRef = std::shared_ptr<ObjectInstance>;
 class TLAS final
 {
 public:
-	explicit TLAS(const std::wstring& inName) : mName(inName) {}
+	explicit TLAS(const std::string& inName) : mName(inName) {}
 
 	void Initialize(std::vector<ObjectInstanceRef>&& inObjectInstances);
 
 	void Update(ID3D12GraphicsCommandList4* inCommandList);
 	void Build(ID3D12GraphicsCommandList4* inCommandList);
 
-	glm::uint32 GetInstanceCount() const					{ return static_cast<glm::uint32>(mObjectInstances.size()); }
+	int GetInstanceCount() const							{ return static_cast<int>(mObjectInstances.size()); }
+	const ObjectInstance& GetInstance(int inIndex)			{ return *mObjectInstances[inIndex]; }
 
 	ID3D12Resource* GetResource() const						{ return mDest.Get(); }
 	D3D12_GPU_VIRTUAL_ADDRESS GetGPUVirtualAddress() const	{ return mDest->GetGPUVirtualAddress(); }
@@ -111,7 +115,7 @@ private:
 	ComPtr<ID3D12Resource> mInstanceBuffer = nullptr;
 	InstanceData* mInstanceBufferPointer = nullptr;
 
-	std::wstring mName;
+	std::string mName;
 };
 using TLASRef = std::shared_ptr<TLAS>;
 
@@ -131,14 +135,15 @@ public:
 	void RebuildBinding(std::function<void()> inCallback);
 	void RebuildShader();
 
-	glm::uint32 GetInstanceCount() const { return mTLAS->GetInstanceCount(); }
+	int GetInstanceCount() const					{ return mTLAS->GetInstanceCount(); }
+	const ObjectInstance& GetInstance(int inIndex)	{ return mTLAS->GetInstance(inIndex); }
 
-	ID3D12Resource* GetOutputResource() { return mOutputResource.Get(); }
+	ID3D12Resource* GetOutputResource()				{ return mOutputResource.Get(); }
 
-	ID3D12DescriptorHeap* GetDXRDescriptorHeap() { return mDXRDescriptorHeap.Get(); }
+	ID3D12DescriptorHeap* GetDXRDescriptorHeap()	{ return mDXRDescriptorHeap.Get(); }
 
 private:	
-	struct LoadContext
+	struct ObjectCollection
 	{		
 		std::vector<ObjectInstanceRef>		mObjectInstances;
 		std::vector<IndexType>				mIndices;
@@ -146,13 +151,24 @@ private:
 		std::vector<NormalType>				mNormals;
 		std::vector<UVType>					mUVs;
 	};
-	bool LoadDummy(LoadContext& ioContext);
-	bool LoadObj(const std::string& inFilename, const glm::mat4x4& inTransform, LoadContext& ioContext);
+	bool LoadDummy(ObjectCollection& ioContext);
+	bool LoadObj(const std::string& inFilename, const glm::mat4x4& inTransform, ObjectCollection& ioContext);
+	bool LoadMitsuba(const std::string& inFilename, ObjectCollection& ioContext);
+
+	void FillDummyMaterial(InstanceData& ioInstanceData);
 	
-	void InitializeAS(LoadContext& inContext);
+	void InitializeAS(ObjectCollection& inContext);
 
 	void CreateShaderResource();
 	void CleanupShaderResource();
+
+	struct PrimitiveObjectCollection
+	{
+		ObjectCollection					mCube;
+		ObjectCollection					mRectangle;
+		ObjectCollection					mSphere;
+	};
+	PrimitiveObjectCollection				mPrimitiveObjectCollection;
 
 	TLASRef									mTLAS;
 

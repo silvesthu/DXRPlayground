@@ -8,6 +8,7 @@
 #include "Cloud.h"
 
 #include "Thirdparty/tinyobjloader/tiny_obj_loader.h"
+#include "Thirdparty/tinyxml2/tinyxml2.h"
 #include "Thirdparty/tinygltf/tiny_gltf.h"
 
 Scene gScene;
@@ -29,7 +30,7 @@ void BLAS::Initialize(D3D12_GPU_VIRTUAL_ADDRESS inVertexBaseAddress, D3D12_GPU_V
 	mDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
 
 	mInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-	mInputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_NONE;
+	mInputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
 	mInputs.NumDescs = 1;
 	mInputs.pGeometryDescs = &mDesc;
 	mInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
@@ -41,11 +42,11 @@ void BLAS::Initialize(D3D12_GPU_VIRTUAL_ADDRESS inVertexBaseAddress, D3D12_GPU_V
 	D3D12_RESOURCE_DESC desc = gGetUAVResourceDesc(info.ScratchDataSizeInBytes);
 
 	gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mScratch)));
-	gSetName(mScratch, mName, L".BLAS.Scratch");
+	gSetName(mScratch, mName, ".BLAS.Scratch");
 
 	desc = gGetUAVResourceDesc(info.ResultDataMaxSizeInBytes);
 	gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, nullptr, IID_PPV_ARGS(&mDest)));
-	gSetName(mDest, mName, L".BLAS.Dest");
+	gSetName(mDest, mName, ".BLAS.Dest");
 }
 
 void BLAS::Build(ID3D12GraphicsCommandList4* inCommandList)
@@ -117,21 +118,21 @@ void TLAS::Initialize(std::vector<ObjectInstanceRef>&& inObjectInstances)
 		D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
 		D3D12_RESOURCE_DESC desc = gGetUAVResourceDesc(info.ScratchDataSizeInBytes);
 		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mScratch)));
-		gSetName(mScratch, mName, L".TLAS.Scratch");
+		gSetName(mScratch, mName, ".TLAS.Scratch");
 	}
 
 	{
 		D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
 		D3D12_RESOURCE_DESC desc = gGetUAVResourceDesc(info.ResultDataMaxSizeInBytes);
 		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, nullptr, IID_PPV_ARGS(&mDest)));
-		gSetName(mDest, mName, L".TLAS.Dest");
+		gSetName(mDest, mName, ".TLAS.Dest");
 	}
 
 	{
 		D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
 		D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * mObjectInstances.size());
 		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mInstanceDescs)));
-		gSetName(mInstanceDescs, mName, L".TLAS.InstanceDescs");
+		gSetName(mInstanceDescs, mName, ".TLAS.InstanceDescs");
 
 		// Map once
 		mInstanceDescs->Map(0, nullptr, reinterpret_cast<void**>(&mInstanceDescsPointer));
@@ -141,7 +142,7 @@ void TLAS::Initialize(std::vector<ObjectInstanceRef>&& inObjectInstances)
 		D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
 		D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(sizeof(InstanceData) * mObjectInstances.size());
 		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mInstanceBuffer)));
-		gSetName(mInstanceBuffer, mName, L".TLAS.InstanceBuffer");
+		gSetName(mInstanceBuffer, mName, ".TLAS.InstanceBuffer");
 
 		// Map once
 		mInstanceBuffer->Map(0, nullptr, reinterpret_cast<void**>(&mInstanceBufferPointer));
@@ -170,40 +171,42 @@ void TLAS::UpdateObjectInstances()
 	}
 }
 
-bool Scene::LoadDummy(LoadContext& ioContext)
+bool Scene::LoadDummy(ObjectCollection& ioCollection)
 {
-	ioContext.mIndices.push_back(0);
-	ioContext.mIndices.push_back(0);
-	ioContext.mIndices.push_back(0);
+	ioCollection = ObjectCollection();
 
-	ioContext.mVertices.push_back(VertexType(0, 0, 0));
-	ioContext.mNormals.push_back(NormalType(0, 0, 0));
-	ioContext.mUVs.push_back(UVType(0, 0));
+	ioCollection.mIndices.push_back(0);
+	ioCollection.mIndices.push_back(0);
+	ioCollection.mIndices.push_back(0);
 
-	BLASRef blas = std::make_shared<BLAS>(std::make_shared<Primitive>(0, 1, 0, 3), L"Dummy");
+	ioCollection.mVertices.push_back(VertexType(0, 0, 0));
+	ioCollection.mNormals.push_back(NormalType(0, 0, 0));
+	ioCollection.mUVs.push_back(UVType(0, 0));
+
+	BLASRef blas = std::make_shared<BLAS>(std::make_shared<Primitive>(0, 1, 0, 3), "Dummy");
 	ObjectInstanceRef object_instance = std::make_shared<ObjectInstance>(blas, glm::mat4(1), kDefaultHitGroupIndex);
-	ioContext.mObjectInstances.push_back(object_instance);
+	ioCollection.mObjectInstances.push_back(object_instance);
 
 	return true; 
 }
 
-bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransform, Scene::LoadContext& ioContext)
+bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransform, Scene::ObjectCollection& ioCollection)
 {	
 	tinyobj::ObjReader reader;
 	if (!reader.ParseFromFile(inFilename))
 		return false;
 
 	if (!reader.Warning().empty())
-		gLog(reader.Warning().c_str());
+		gTrace(reader.Warning().c_str());
 
 	if (!reader.Error().empty())
-		gLog(reader.Error().c_str());
+		gTrace(reader.Error().c_str());
 
 	// Fetch indices, attributes
 	glm::uint32 index = 0;
 	for (auto&& shape : reader.GetShapes())
 	{
-		glm::uint32 index_offset = static_cast<glm::uint32>(ioContext.mIndices.size());
+		glm::uint32 index_offset = static_cast<glm::uint32>(ioCollection.mIndices.size());
 
 		const int kNumFaceVerticesTriangle = 3;
 		glm::uint32 index_count = static_cast<glm::uint32>(shape.mesh.num_face_vertices.size()) * kNumFaceVerticesTriangle;
@@ -212,16 +215,18 @@ bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransfor
 			assert(shape.mesh.num_face_vertices[face_index] == kNumFaceVerticesTriangle);
 			for (size_t vertex_index = 0; vertex_index < kNumFaceVerticesTriangle; vertex_index++)
 			{
-				tinyobj::index_t idx = shape.mesh.indices[face_index * kNumFaceVerticesTriangle + vertex_index];
-				ioContext.mIndices.push_back(static_cast<IndexType>(index++));
+				// [TODO] This makes index trivial...
 
-				ioContext.mVertices.push_back(VertexType(
+				tinyobj::index_t idx = shape.mesh.indices[face_index * kNumFaceVerticesTriangle + vertex_index];
+				ioCollection.mIndices.push_back(static_cast<IndexType>(index++));
+
+				ioCollection.mVertices.push_back(VertexType(
 					reader.GetAttrib().vertices[3 * idx.vertex_index + 0],
 					reader.GetAttrib().vertices[3 * idx.vertex_index + 1],
 					reader.GetAttrib().vertices[3 * idx.vertex_index + 2]
 				));
 
-				ioContext.mNormals.push_back(NormalType(
+				ioCollection.mNormals.push_back(NormalType(
 					reader.GetAttrib().normals[3 * idx.normal_index + 0],
 					reader.GetAttrib().normals[3 * idx.normal_index + 1],
 					reader.GetAttrib().normals[3 * idx.normal_index + 2]
@@ -230,11 +235,11 @@ bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransfor
 				if (idx.texcoord_index == -1)
 				{
 					// Dummy uv if not available
-					ioContext.mUVs.push_back(UVType(0, 0));
+					ioCollection.mUVs.push_back(UVType(0, 0));
 				}
 				else
 				{
-					ioContext.mUVs.push_back(UVType(
+					ioCollection.mUVs.push_back(UVType(
 						reader.GetAttrib().texcoords[2 * idx.texcoord_index + 0],
 						reader.GetAttrib().texcoords[2 * idx.texcoord_index + 1]
 					));
@@ -242,31 +247,22 @@ bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransfor
 			}
 		}
 
-		glm::uint32 vertex_offset = 0;
+		glm::uint32 vertex_offset = 0; // All vertices share same buffer. Only works indices fit in IndexType
 		glm::uint32 vertex_count = index_count;
 
-		std::wstring name(shape.name.begin(), shape.name.end());
-		BLASRef blas = std::make_shared<BLAS>(std::make_shared<Primitive>(vertex_offset, vertex_count, index_offset, index_count), name);
+		BLASRef blas = std::make_shared<BLAS>(std::make_shared<Primitive>(vertex_offset, vertex_count, index_offset, index_count), shape.name);
 		ObjectInstanceRef object_instance = std::make_shared<ObjectInstance>(blas, inTransform, kDefaultHitGroupIndex);
-		ioContext.mObjectInstances.push_back(object_instance);
+		ioCollection.mObjectInstances.push_back(object_instance);
 
 		if (shape.mesh.material_ids.size() == 0 || shape.mesh.material_ids[0] == -1)
 		{
-			// Dummy material
-			object_instance->Data().mMaterialType = MaterialType::None;
-			object_instance->Data().mAlbedo = glm::vec3(0.1f, 0.1f, 0.1f);
-			object_instance->Data().mOpacity = 1.0f;
-			object_instance->Data().mEmission = glm::vec3(0.0f, 0.0f, 0.0f);
-			object_instance->Data().mReflectance = glm::vec3(0.0f, 0.0f, 0.0f);
-			object_instance->Data().mRoughnessAlpha = 1.0f;
-			object_instance->Data().mTransmittance = glm::vec3(1.0f, 1.0f, 1.0f);
-			object_instance->Data().mIOR = glm::vec3(1.0f, 1.0f, 1.0f);
+			FillDummyMaterial(object_instance->Data());
 		}
 		else
 		{
 			const tinyobj::material_t& material = reader.GetMaterials()[shape.mesh.material_ids[0]];
 
-			MaterialType type = MaterialType::None;
+			MaterialType type = MaterialType::Diffuse;
 			switch (material.illum)
 			{
 			case 0: [[fallthrough]];
@@ -284,6 +280,8 @@ bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransfor
 			object_instance->Data().mIOR = glm::vec3(material.ior);
 		}
 
+		object_instance->Data().mTransform = inTransform;
+		object_instance->Data().mInverseTranspose = glm::transpose(glm::inverse(inTransform));
 		object_instance->Data().mIndexOffset = index_offset;
 		object_instance->Data().mVertexOffset = vertex_offset;
 	}
@@ -291,15 +289,116 @@ bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransfor
 	return true;
 }
 
-void Scene::InitializeAS(Scene::LoadContext& inContext)
+bool Scene::LoadMitsuba(const std::string& inFilename, ObjectCollection& ioCollection)
+{
+	tinyxml2::XMLDocument doc;
+	doc.LoadFile(inFilename.c_str());
+
+	tinyxml2::XMLElement* scene = doc.FirstChildElement("scene");
+
+	tinyxml2::XMLElement* bsdf = scene->FirstChildElement("bsdf");
+	while (bsdf != nullptr)
+	{
+		bsdf = scene->NextSiblingElement("bsdf");
+	}
+
+	tinyxml2::XMLElement* shape = scene->FirstChildElement("shape");
+	while (shape != nullptr)
+	{
+		std::string_view type = shape->Attribute("type");
+		std::string_view id = shape->Attribute("id");
+
+		ObjectCollection* primitive = nullptr;
+		if (type == "cube")
+			primitive = &mPrimitiveObjectCollection.mCube;
+		else if (type == "rectangle")
+			primitive = &mPrimitiveObjectCollection.mRectangle;
+		else if (type == "sphere")
+			primitive = &mPrimitiveObjectCollection.mSphere;
+
+		if (primitive != nullptr)
+		{
+			glm::uint32 index_count = static_cast<glm::uint32>(primitive->mIndices.size());
+
+			glm::uint32 vertex_offset = static_cast<glm::uint32>(ioCollection.mVertices.size());
+			glm::uint32 index_offset = static_cast<glm::uint32>(ioCollection.mIndices.size());
+			for (glm::uint32 i = 0; i < index_count; i++)
+				ioCollection.mIndices.push_back(primitive->mIndices[i] + vertex_offset);
+
+			std::copy(primitive->mVertices.begin(), primitive->mVertices.end(), std::back_inserter(ioCollection.mVertices));
+			std::copy(primitive->mNormals.begin(), primitive->mNormals.end(), std::back_inserter(ioCollection.mNormals));
+			std::copy(primitive->mUVs.begin(), primitive->mUVs.end(), std::back_inserter(ioCollection.mUVs));
+
+			vertex_offset = 0; // All vertices share same buffer. Only works indices fit in IndexType
+			glm::uint32 vertex_count = index_count;
+			BLASRef blas = std::make_shared<BLAS>(std::make_shared<Primitive>(vertex_offset, vertex_count, index_offset, index_count), id.data());
+
+			glm::mat4x4 matrix = glm::mat4x4(1.0f);
+			if (tinyxml2::XMLElement* transform = shape->FirstChildElement("transform"))
+			{
+				std::string_view transform_name = transform->Attribute("name");
+				gAssert(transform_name == "to_world");
+
+				std::string_view matrix_value = transform->FirstChildElement("matrix")->Attribute("value");
+				gVerify(std::sscanf(matrix_value.data(), "%f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f", &matrix[0][0], &matrix[1][0], &matrix[2][0], &matrix[3][0], &matrix[0][1], &matrix[1][1], &matrix[2][1], &matrix[3][1], &matrix[0][2], &matrix[1][2], &matrix[2][2], &matrix[3][2], &matrix[0][3], &matrix[1][3], &matrix[2][3], &matrix[3][3]) == 16);
+			}
+			else if (tinyxml2::XMLElement* center_element = shape->FirstChildElement("point"))
+			{
+				tinyxml2::XMLElement* radius_element = shape->FirstChildElement("float");
+				gAssert(std::string_view(radius_element->Attribute("name")) == "radius");
+				float radius = 0.0f;
+				gVerify(std::sscanf(radius_element->Attribute("value"), "%f", &radius) == 1);
+
+				gAssert(std::string_view(center_element->Attribute("name")) == "center");
+				glm::vec3 center = glm::vec3(0.0f);				
+				gVerify(std::sscanf(center_element->Attribute("x"), "%f", &center[0]) == 1);
+				gVerify(std::sscanf(center_element->Attribute("y"), "%f", &center[1]) == 1);
+				gVerify(std::sscanf(center_element->Attribute("z"), "%f", &center[2]) == 1);
+
+				matrix = glm::translate(matrix, center);
+				matrix = glm::scale(matrix, glm::vec3(radius));
+			}
+
+			ObjectInstanceRef object_instance = std::make_shared<ObjectInstance>(blas, matrix, kDefaultHitGroupIndex);
+			ioCollection.mObjectInstances.push_back(object_instance);
+
+			FillDummyMaterial(object_instance->Data());
+
+			object_instance->Data().mTransform = matrix;
+			object_instance->Data().mInverseTranspose = glm::transpose(glm::inverse(matrix));
+			object_instance->Data().mIndexOffset = index_offset;
+			object_instance->Data().mVertexOffset = vertex_offset;
+		}
+
+		shape = shape->NextSiblingElement("shape");
+	}
+
+	return true;
+}
+
+void Scene::FillDummyMaterial(InstanceData& ioInstanceData)
+{
+	ioInstanceData.mMaterialType = MaterialType::Diffuse;
+	ioInstanceData.mAlbedo = glm::vec3(0.18f, 0.18f, 0.18f);
+	ioInstanceData.mOpacity = 1.0f;
+	ioInstanceData.mEmission = glm::vec3(0.0f, 0.0f, 0.0f);
+	ioInstanceData.mReflectance = glm::vec3(0.0f, 0.0f, 0.0f);
+	ioInstanceData.mRoughnessAlpha = 1.0f;
+	ioInstanceData.mTransmittance = glm::vec3(1.0f, 1.0f, 1.0f);
+	ioInstanceData.mIOR = glm::vec3(1.0f, 1.0f, 1.0f);
+}
+
+void Scene::InitializeAS(Scene::ObjectCollection& inContext)
 {
 	D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(0);
 	D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
 
+	gAssert(inContext.mIndices.size() <= size_t(1) + std::numeric_limits<IndexType>::max());
+
 	{
 		desc.Width = sizeof(IndexType) * inContext.mIndices.size();
 		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mIndexBuffer)));
-		gSetName(mIndexBuffer, L"Scene", L".IndexBuffer");
+		gSetName(mIndexBuffer, "Scene", ".IndexBuffer");
 
 		uint8_t* pData = nullptr;
 		mIndexBuffer->Map(0, nullptr, reinterpret_cast<void**>(&pData));
@@ -310,7 +409,7 @@ void Scene::InitializeAS(Scene::LoadContext& inContext)
 	{
 		desc.Width =  sizeof(VertexType) * inContext.mVertices.size();
 		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mVertexBuffer)));
-		gSetName(mVertexBuffer, L"Scene", L".VertexBuffer");
+		gSetName(mVertexBuffer, "Scene", ".VertexBuffer");
 
 		uint8_t* pData = nullptr;
 		mVertexBuffer->Map(0, nullptr, reinterpret_cast<void**>(&pData));
@@ -321,7 +420,7 @@ void Scene::InitializeAS(Scene::LoadContext& inContext)
 	{
 		desc.Width = sizeof(NormalType) * inContext.mNormals.size();
 		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mNormalBuffer)));
-		gSetName(mNormalBuffer, L"Scene", L".NormalBuffer");
+		gSetName(mNormalBuffer, "Scene", ".NormalBuffer");
 
 		uint8_t* pData = nullptr;
 		mNormalBuffer->Map(0, nullptr, reinterpret_cast<void**>(&pData));
@@ -332,7 +431,7 @@ void Scene::InitializeAS(Scene::LoadContext& inContext)
 	{
 		desc.Width = sizeof(UVType) * inContext.mUVs.size();
 		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mUVBuffer)));
-		gSetName(mUVBuffer, L"Scene", L".UVBuffer");
+		gSetName(mUVBuffer, "Scene", ".UVBuffer");
 
 		uint8_t* pData = nullptr;
 		mUVBuffer->Map(0, nullptr, reinterpret_cast<void**>(&pData));
@@ -343,13 +442,17 @@ void Scene::InitializeAS(Scene::LoadContext& inContext)
 	for (auto&& object_instance : inContext.mObjectInstances)
 		object_instance->GetBLAS()->Initialize(mVertexBuffer->GetGPUVirtualAddress(), mIndexBuffer->GetGPUVirtualAddress());
 
-	mTLAS = std::make_shared<TLAS>(L"Scene");
+	mTLAS = std::make_shared<TLAS>("Scene");
 	mTLAS->Initialize(std::move(inContext.mObjectInstances));
 }
 
 void Scene::Load(const char* inFilename, const glm::mat4x4& inTransform)
 {
-	LoadContext context;
+	LoadObj("Asset/primitives/cube.obj", glm::mat4x4(1.0f), mPrimitiveObjectCollection.mCube);
+	LoadObj("Asset/primitives/rectangle.obj", glm::mat4x4(1.0f), mPrimitiveObjectCollection.mRectangle);
+	LoadObj("Asset/primitives/sphere.obj", glm::mat4x4(1.0f), mPrimitiveObjectCollection.mSphere);
+
+	ObjectCollection object_collection;
 
 	std::string filename_lower;
 	if (inFilename != nullptr)
@@ -360,13 +463,16 @@ void Scene::Load(const char* inFilename, const glm::mat4x4& inTransform)
 	bool try_load = std::filesystem::exists(filename_lower); 
 	
 	if (!loaded && try_load && filename_lower.ends_with(".obj"))
-		loaded |= LoadObj(filename_lower, inTransform, context);
-	
-	if (!loaded)
-		loaded |= LoadDummy(context);
+		loaded |= LoadObj(filename_lower, inTransform, object_collection);
 
-	assert(loaded);	
-	InitializeAS(context);
+	if (!loaded && try_load && filename_lower.ends_with(".xml"))
+		loaded |= LoadMitsuba(filename_lower, object_collection);
+	
+	if (object_collection.mObjectInstances.empty())
+		loaded |= LoadDummy(object_collection);
+
+	assert(loaded);
+	InitializeAS(object_collection);
 
 	gCreatePipelineState();
 	CreateShaderResource();
@@ -385,6 +491,8 @@ void Scene::Unload()
 	mIndexBuffer = nullptr;
 	mVertexBuffer = nullptr;
 	mUVBuffer = nullptr;
+
+	mPrimitiveObjectCollection = PrimitiveObjectCollection();
 }
 
 void Scene::Build(ID3D12GraphicsCommandList4* inCommandList)

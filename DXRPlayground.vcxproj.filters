@@ -40,6 +40,9 @@
     <Filter Include="Source\Thirdparty\ArHosekSkyModel">
       <UniqueIdentifier>{c9e18a15-292f-471e-afa4-1fe816659385}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\Thirdparty\tinyxml2">
+      <UniqueIdentifier>{97014e42-3f8e-4326-a174-1d2b0fb2d3dd}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\ShaderTable.h">
@@ -183,17 +186,11 @@
     <ClInclude Include="Source\Thirdparty\ArHosekSkyModel\ArHosekSkyModelData_Spectral.h">
       <Filter>Source\Thirdparty\ArHosekSkyModel</Filter>
     </ClInclude>
-    <ClInclude Include="Shader\Constant.h">
-      <Filter>Shader</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Color.h">
       <Filter>Source</Filter>
     </ClInclude>
-    <ClInclude Include="Shader\RayQuery.inl">
-      <Filter>Shader</Filter>
-    </ClInclude>
-    <ClInclude Include="Shader\Binding.h">
-      <Filter>Shader</Filter>
+    <ClInclude Include="Source\Thirdparty\tinyxml2\tinyxml2.h">
+      <Filter>Source\Thirdparty\tinyxml2</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -260,6 +257,9 @@
     <ClCompile Include="Source\Color.cpp">
       <Filter>Source</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Thirdparty\tinyxml2\tinyxml2.cpp">
+      <Filter>Source\Thirdparty\tinyxml2</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <CopyFileToFolders Include="Shader\Raytracing.hlsl">
@@ -295,17 +295,12 @@
     <CopyFileToFolders Include="Shader\Atmosphere.hlsl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
-  </ItemGroup>
-  <ItemGroup>
-    <FxCompile Include="Shader\Composite.hlsl">
-      <Filter>Shader</Filter>
-    </FxCompile>
-    <FxCompile Include="Shader\DiffTexture.hlsl">
-      <Filter>Shader</Filter>
-    </FxCompile>
-    <FxCompile Include="Shader\Cloud.hlsl">
-      <Filter>Shader</Filter>
-    </FxCompile>
+    <CopyFileToFolders Include="Shader\Constant.h" />
+    <CopyFileToFolders Include="Shader\RayQuery.inl" />
+    <CopyFileToFolders Include="Shader\Binding.h" />
+    <CopyFileToFolders Include="Shader\Composite.hlsl" />
+    <CopyFileToFolders Include="Shader\DiffTexture.hlsl" />
+    <CopyFileToFolders Include="Shader\Cloud.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

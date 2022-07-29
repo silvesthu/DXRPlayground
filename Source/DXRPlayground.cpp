@@ -38,23 +38,25 @@ enum class ScenePresetType
 	Hillaire20,
 
 	VeachMIS,
+	VeachMISMitsuba,
 
 	COUNT,
 };
 
-static ScenePresetType sCurrentScene = ScenePresetType::Hillaire20;
+static ScenePresetType sCurrentScene = ScenePresetType::VeachMISMitsuba;
 static ScenePresetType sPreviousScene = sCurrentScene;
 static ScenePreset kScenePresets[(int)ScenePresetType::COUNT] =
 {
-	{ "None",						nullptr,								glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
+	{ "None",						nullptr,															glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
 
-	{ "CornellBox",					"Asset/Comparison/cornellbox.obj",		glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
+	{ "CornellBox",					"Asset/Comparison/cornellbox.obj",									glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
 
-	{ "Bruneton17",					"Asset/primitives/sphere.obj",			glm::vec4(0.0f, 0.0f, 9.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::translate(glm::vec3(0.0f, 1.0f, 0.0f)),			0.0f, glm::pi<float>() / 4.0f,},
-	{ "Bruneton17_Artifact_Mu",		"Asset/primitives/sphere.obj",			glm::vec4(0.0f, 80.0f, 150.0f, 0.0f),		glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::scale(glm::vec3(100.0f, 100.0f, 100.0f)),			0.0f, glm::pi<float>() / 4.0f,},
-	{ "Hillaire20",					nullptr,								glm::vec4(0.0f, 0.5, -1.0f, 0.0f),			glm::vec4(0.0f, 0.0f, 1.0f, 0.0f),		98.8514328f, 	glm::translate(glm::vec3(0.0f, 1.0f, 0.0f)),			0.0f, glm::pi<float>() / 2.0f - 0.45f,},
+	{ "Bruneton17",					"Asset/primitives/sphere.obj",										glm::vec4(0.0f, 0.0f, 9.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::translate(glm::vec3(0.0f, 1.0f, 0.0f)),			0.0f, glm::pi<float>() / 4.0f,},
+	{ "Bruneton17_Artifact_Mu",		"Asset/primitives/sphere.obj",										glm::vec4(0.0f, 80.0f, 150.0f, 0.0f),		glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::scale(glm::vec3(100.0f, 100.0f, 100.0f)),			0.0f, glm::pi<float>() / 4.0f,},
+	{ "Hillaire20",					nullptr,															glm::vec4(0.0f, 0.5, -1.0f, 0.0f),			glm::vec4(0.0f, 0.0f, 1.0f, 0.0f),		98.8514328f, 	glm::translate(glm::vec3(0.0f, 1.0f, 0.0f)),			0.0f, glm::pi<float>() / 2.0f - 0.45f,},
 
-	{ "VeachMIS",					"Asset/Comparison/veach-mis.obj",		glm::vec4(0.0f, 2.0f, 15.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
+	{ "VeachMIS",					"Asset/Comparison/veach-mis.obj",									glm::vec4(0.0f, 2.0f, 15.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
+	{ "VeachMISMitsuba",			"Asset/Comparison/benedikt-bitterli/veach-mis/scene_v3.xml",		glm::vec4(0.0f, 2.0f, 15.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
 };
 
 static bool sReloadRequested = false;
@@ -301,8 +303,8 @@ static void sUpdate()
 					ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gPerFrameConstantBuffer.mDebugInstanceMode), i);
 				}
 
-				ImGui::SliderInt("DebugInstanceIndex", reinterpret_cast<int*>(&gPerFrameConstantBuffer.mDebugInstanceIndex), 0u, gScene.GetInstanceCount() - 1);
-				gPerFrameConstantBuffer.mDebugInstanceIndex = glm::clamp(gPerFrameConstantBuffer.mDebugInstanceIndex, 0u, gScene.GetInstanceCount() - 1);
+				ImGui::SliderInt("DebugInstanceIndex", reinterpret_cast<int*>(&gPerFrameConstantBuffer.mDebugInstanceIndex), -1, gScene.GetInstanceCount() - 1);
+				gPerFrameConstantBuffer.mDebugInstanceIndex = glm::clamp(static_cast<int>(gPerFrameConstantBuffer.mDebugInstanceIndex), -1, gScene.GetInstanceCount() - 1);
 
 				ImGui::TreePop();
 			}
@@ -313,6 +315,33 @@ static void sUpdate()
 				{
 					if (kScenePresets[i].mPath == nullptr || std::filesystem::exists(kScenePresets[i].mPath))
 						ImGui::RadioButton(kScenePresets[i].mName, reinterpret_cast<int*>(&sCurrentScene), i);
+				}
+
+				if (ImGui::TreeNodeEx("Instances", ImGuiTreeNodeFlags_DefaultOpen))
+				{
+					int column_count = 3;
+					if (ImGui::BeginTable("InstancesTable", column_count, ImGuiTableFlags_ScrollX | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
+					{
+						ImGui::TableNextRow();
+						ImGui::TableSetColumnIndex(0); ImGui::Text("Name");
+						ImGui::TableSetColumnIndex(1); ImGui::Text("Position");
+
+						for (int row = 0; row < gScene.GetInstanceCount(); row++)
+						{
+							ImGui::TableNextRow();
+
+							const ObjectInstance& instance = gScene.GetInstance(row);
+
+							ImGui::TableSetColumnIndex(0);
+							ImGui::Text(instance.GetBLAS()->GetName().c_str());
+
+							ImGui::TableSetColumnIndex(1);
+							ImGui::Text("%f %f %f", instance.GetTransform()[3][0], instance.GetTransform()[3][1], instance.GetTransform()[3][2]);
+						}
+						ImGui::EndTable();
+					}
+
+					ImGui::TreePop();
 				}
 
 				ImGui::TreePop();
@@ -435,7 +464,7 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 			if (std::regex_match(inPath, pattern) && inPath.find("Generated") == std::string::npos)
 			{
 				std::string msg = "Reload triggered by " + inPath + "\n";
-				gLog(msg.c_str());
+				gTrace(msg.c_str());
 
 				sReloadRequested = true;
 			}

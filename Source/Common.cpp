@@ -62,8 +62,8 @@ void Shader::InitializeDescriptors(const std::vector<Shader::DescriptorInfo>& in
 	{
 		// Check if root signature is supported
 		const D3D12_ROOT_SIGNATURE_DESC* root_signature_desc = mData.mRootSignatureDeserializer->GetRootSignatureDesc();
-		assert(root_signature_desc->NumParameters >= 1);
-		assert(root_signature_desc->pParameters[0].ParameterType == D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE);
+		gAssert(root_signature_desc->NumParameters >= 1);
+		gAssert(root_signature_desc->pParameters[0].ParameterType == D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE);
 
 		const D3D12_ROOT_DESCRIPTOR_TABLE& table = root_signature_desc->pParameters[0].DescriptorTable;
 
@@ -109,7 +109,7 @@ void Shader::InitializeDescriptors(const std::vector<Shader::DescriptorInfo>& in
 						{
 							desc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
 							desc.RaytracingAccelerationStructure.Location = resource->GetGPUVirtualAddress();
-							assert(desc.RaytracingAccelerationStructure.Location != NULL);
+							gAssert(desc.RaytracingAccelerationStructure.Location != NULL);
 							resource = nullptr;
 						}
 						else
@@ -122,7 +122,7 @@ void Shader::InitializeDescriptors(const std::vector<Shader::DescriptorInfo>& in
 						break;
 					}
 					default:
-						assert(false);
+						gAssert(false);
 						break;
 					}
 					gDevice->CreateShaderResourceView(resource, &desc, handle);
@@ -164,7 +164,7 @@ void Shader::InitializeDescriptors(const std::vector<Shader::DescriptorInfo>& in
 					D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
 					desc.SizeInBytes = gAlignUp((UINT)inEntries[entry_index].mResource->GetDesc().Width, (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
 					desc.BufferLocation = inEntries[entry_index].mResource->GetGPUVirtualAddress();
-					assert(desc.BufferLocation != NULL);
+					gAssert(desc.BufferLocation != NULL);
 					gDevice->CreateConstantBufferView(&desc, handle);
 
 					entry_index++;
@@ -172,7 +172,7 @@ void Shader::InitializeDescriptors(const std::vector<Shader::DescriptorInfo>& in
 				}
 			}
 			break;
-			default: assert(false); break;
+			default: gAssert(false); break;
 			}
 		}
 	}
@@ -271,7 +271,7 @@ void Texture::Update()
 			hr = DirectX::LoadFromTGAFile(mPath, nullptr, scratch_image);
 		if (FAILED(hr))
 			hr = DirectX::LoadFromDDSFile(mPath, DirectX::DDS_FLAGS_NONE, nullptr, scratch_image);
-		assert(!FAILED(hr));
+		gAssert(!FAILED(hr));
 
 		// Upload
 		std::vector<D3D12_SUBRESOURCE_DATA> subresources;

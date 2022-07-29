@@ -20,3 +20,6 @@
 [submodule "Source/Thirdparty/tinygltf"]
 	path = Source/Thirdparty/tinygltf
 	url = https://github.com/syoyo/tinygltf.git
+[submodule "Source/Thirdparty/tinyxml2"]
+	path = Source/Thirdparty/tinyxml2
+	url = https://github.com/leethomason/tinyxml2.git
