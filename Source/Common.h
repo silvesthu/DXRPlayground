@@ -254,6 +254,11 @@ inline void gTrace(const char* string)
 	OutputDebugStringA(string);
 }
 
+inline void gTrace(const std::string_view& data)
+{
+	OutputDebugStringA(data.data());
+}
+
 template <typename T>
 inline void gTrace(const T& data)
 {

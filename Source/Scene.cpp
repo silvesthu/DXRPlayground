@@ -154,8 +154,6 @@ void TLAS::UpdateObjectInstances()
 	int instance_index = 0;
 	for (auto&& object_instance : mObjectInstances)
 	{
-		object_instance->Update();
-
 		glm::mat4x4 transform = glm::transpose(object_instance->Transform());
 		memcpy(mInstanceDescsPointer[instance_index].Transform, &transform, sizeof(mInstanceDescsPointer[instance_index].Transform));
 
@@ -165,7 +163,7 @@ void TLAS::UpdateObjectInstances()
 		mInstanceDescsPointer[instance_index].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
 		mInstanceDescsPointer[instance_index].AccelerationStructure = object_instance->GetBLAS()->GetGPUVirtualAddress();
 
-		mInstanceBufferPointer[instance_index] = object_instance->Data();
+		mInstanceBufferPointer[instance_index] = object_instance->mInstanceData;
 
 		instance_index++;
 	}
@@ -252,38 +250,40 @@ bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransfor
 
 		BLASRef blas = std::make_shared<BLAS>(std::make_shared<Primitive>(vertex_offset, vertex_count, index_offset, index_count), shape.name);
 		ObjectInstanceRef object_instance = std::make_shared<ObjectInstance>(blas, inTransform, kDefaultHitGroupIndex);
+		object_instance->mName = shape.name;
 		ioCollection.mObjectInstances.push_back(object_instance);
 
 		if (shape.mesh.material_ids.size() == 0 || shape.mesh.material_ids[0] == -1)
 		{
-			FillDummyMaterial(object_instance->Data());
+			FillDummyMaterial(object_instance->mInstanceData);
 		}
 		else
 		{
 			const tinyobj::material_t& material = reader.GetMaterials()[shape.mesh.material_ids[0]];
+			object_instance->mMaterialName = material.name;
 
 			MaterialType type = MaterialType::Diffuse;
 			switch (material.illum)
 			{
 			case 0: [[fallthrough]];
 			case 1: type = MaterialType::Diffuse; break;
-			case 2: type = MaterialType::RoughConductor; break; // TODO: support RoughPlastic
+			case 2: type = MaterialType::RoughConductor; break;
 			default: break;
 			}
-			object_instance->Data().mMaterialType = type;
-			object_instance->Data().mAlbedo = glm::vec3(material.diffuse[0], material.diffuse[1], material.diffuse[2]);
-			object_instance->Data().mOpacity = 1.0f;
-			object_instance->Data().mEmission = glm::vec3(material.emission[0], material.emission[1], material.emission[2]);
-			object_instance->Data().mReflectance = glm::vec3(material.specular[0], material.specular[1], material.specular[2]);
-			object_instance->Data().mRoughnessAlpha = material.roughness; // To match Mitsuba2 and PBRT (remaproughness = false)
-			object_instance->Data().mTransmittance = glm::vec3(material.transmittance[0], material.transmittance[1], material.transmittance[2]);
-			object_instance->Data().mIOR = glm::vec3(material.ior);
+			object_instance->mInstanceData.mMaterialType = type;
+			object_instance->mInstanceData.mAlbedo = glm::vec3(material.diffuse[0], material.diffuse[1], material.diffuse[2]);
+			object_instance->mInstanceData.mOpacity = 1.0f;
+			object_instance->mInstanceData.mEmission = glm::vec3(material.emission[0], material.emission[1], material.emission[2]);
+			object_instance->mInstanceData.mReflectance = glm::vec3(material.specular[0], material.specular[1], material.specular[2]);
+			object_instance->mInstanceData.mRoughnessAlpha = material.roughness; // To match Mitsuba2 and PBRT (remaproughness = false)
+			object_instance->mInstanceData.mTransmittance = glm::vec3(material.transmittance[0], material.transmittance[1], material.transmittance[2]);
+			object_instance->mInstanceData.mIOR = glm::vec3(material.ior);
 		}
 
-		object_instance->Data().mTransform = inTransform;
-		object_instance->Data().mInverseTranspose = glm::transpose(glm::inverse(inTransform));
-		object_instance->Data().mIndexOffset = index_offset;
-		object_instance->Data().mVertexOffset = vertex_offset;
+		object_instance->mInstanceData.mTransform = inTransform;
+		object_instance->mInstanceData.mInverseTranspose = glm::transpose(glm::inverse(inTransform));
+		object_instance->mInstanceData.mIndexOffset = index_offset;
+		object_instance->mInstanceData.mVertexOffset = vertex_offset;
 	}
 
 	return true;
@@ -291,15 +291,77 @@ bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransfor
 
 bool Scene::LoadMitsuba(const std::string& inFilename, ObjectCollection& ioCollection)
 {
+	static auto first_child_element_by_name_attribute = [](tinyxml2::XMLElement* inElement, const char* inName)
+	{
+		tinyxml2::XMLElement* child = inElement->FirstChildElement();
+		while (child != nullptr)
+		{
+			std::string_view name = child->Attribute("name");
+			if (name == inName)
+				return child;
+
+			child = child->NextSiblingElement();
+		}
+
+		return (tinyxml2::XMLElement*)nullptr;
+	};
+
+	static auto get_child_value = [](tinyxml2::XMLElement* inElement, const char* inName)
+	{
+		tinyxml2::XMLElement* child = first_child_element_by_name_attribute(inElement, inName);
+		if (child == nullptr)
+			return ""; // Treat no found the same as attribute with empty string to simplify parsing
+
+		return child->Attribute("value");
+	};
+
 	tinyxml2::XMLDocument doc;
 	doc.LoadFile(inFilename.c_str());
 
 	tinyxml2::XMLElement* scene = doc.FirstChildElement("scene");
 
+	std::unordered_map<std::string_view, InstanceData> materials_by_id;
 	tinyxml2::XMLElement* bsdf = scene->FirstChildElement("bsdf");
 	while (bsdf != nullptr)
 	{
-		bsdf = scene->NextSiblingElement("bsdf");
+		std::string_view id = bsdf->Attribute("id");
+
+		tinyxml2::XMLElement* local_bsdf = bsdf;
+		std::string_view local_type = bsdf->Attribute("type");
+		if (local_type == "twosided")
+		{
+			local_bsdf = local_bsdf->FirstChildElement("bsdf");
+			local_type = local_bsdf->Attribute("type");
+		}
+
+		InstanceData material;
+		if (local_type == "diffuse")
+		{
+			material.mMaterialType = MaterialType::Diffuse;
+			
+			gVerify(std::sscanf(get_child_value(local_bsdf, "reflectance"), "%f, %f, %f", &material.mAlbedo.x, &material.mAlbedo.y, &material.mAlbedo.z) == 3);
+		}
+		else if (local_type == "roughconductor")
+		{
+			material.mMaterialType = MaterialType::RoughConductor;
+
+			gVerify(std::sscanf(get_child_value(local_bsdf, "alpha"), "%f", &material.mRoughnessAlpha) == 1);
+
+			// [TODO] beckmann vs. GGX
+			// gTrace(get_child_value(local_bsdf, "distribution")); 
+
+			glm::vec3 specular_reflectance;
+			gVerify(std::sscanf(get_child_value(local_bsdf, "specular_reflectance"), "%f, %f, %f", &specular_reflectance.x, &specular_reflectance.y, &specular_reflectance.z) == 3);
+			glm::vec3 eta;
+			gVerify(std::sscanf(get_child_value(local_bsdf, "eta"), "%f, %f, %f", &eta.x, &eta.y, &eta.z) == 3);
+			glm::vec3 k;
+			gVerify(std::sscanf(get_child_value(local_bsdf, "k"), "%f, %f, %f", &k.x, &k.y, &k.z) == 3);
+			material.mReflectance = specular_reflectance;
+		}
+
+		materials_by_id[id] = material;
+
+		bsdf = bsdf->NextSiblingElement("bsdf");
 	}
 
 	tinyxml2::XMLElement* shape = scene->FirstChildElement("shape");
@@ -360,14 +422,50 @@ bool Scene::LoadMitsuba(const std::string& inFilename, ObjectCollection& ioColle
 			}
 
 			ObjectInstanceRef object_instance = std::make_shared<ObjectInstance>(blas, matrix, kDefaultHitGroupIndex);
+			object_instance->mName = id;
 			ioCollection.mObjectInstances.push_back(object_instance);
 
-			FillDummyMaterial(object_instance->Data());
+			bool found_material = false;
+			tinyxml2::XMLElement* ref = shape->FirstChildElement("ref");
+			if (ref != nullptr)
+			{
+				std::string_view material_id = ref->Attribute("id");
+				auto iter = materials_by_id.find(material_id);
+				if (iter != materials_by_id.end())
+				{
+					object_instance->mMaterialName = material_id;
 
-			object_instance->Data().mTransform = matrix;
-			object_instance->Data().mInverseTranspose = glm::transpose(glm::inverse(matrix));
-			object_instance->Data().mIndexOffset = index_offset;
-			object_instance->Data().mVertexOffset = vertex_offset;
+					InstanceData& material = iter->second;
+					object_instance->mInstanceData.mMaterialType = material.mMaterialType;
+					object_instance->mInstanceData.mAlbedo = material.mAlbedo;
+					object_instance->mInstanceData.mOpacity = material.mOpacity;
+					object_instance->mInstanceData.mEmission = material.mEmission;
+					object_instance->mInstanceData.mReflectance = material.mReflectance;
+					object_instance->mInstanceData.mRoughnessAlpha = material.mRoughnessAlpha;
+					object_instance->mInstanceData.mTransmittance = material.mTransmittance;
+					object_instance->mInstanceData.mIOR = material.mIOR;
+
+					found_material = true;
+				}
+			}
+			
+			if (!found_material)
+				FillDummyMaterial(object_instance->mInstanceData);
+
+			tinyxml2::XMLElement* emitter = shape->FirstChildElement("emitter");
+			if (emitter != nullptr)
+			{
+				std::string_view emitter_type = emitter->Attribute("type");
+				gAssert(emitter_type == "area");
+
+				InstanceData& material = object_instance->mInstanceData;
+				gVerify(std::sscanf(get_child_value(emitter, "radiance"), "%f, %f, %f", &material.mEmission.x, &material.mEmission.y, &material.mEmission.z) == 3);
+			}
+
+			object_instance->mInstanceData.mTransform = matrix;
+			object_instance->mInstanceData.mInverseTranspose = glm::transpose(glm::inverse(matrix));
+			object_instance->mInstanceData.mIndexOffset = index_offset;
+			object_instance->mInstanceData.mVertexOffset = vertex_offset;
 		}
 
 		shape = shape->NextSiblingElement("shape");

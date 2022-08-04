@@ -17,6 +17,8 @@ enum class MaterialType : uint
 	Diffuse = 0,
 	RoughConductor,
 
+	// [TODO] Support more/unified materials. e.g. RoughPlastic
+
 	Count
 };
 
@@ -146,6 +148,8 @@ struct PerFrameConstants
 
 struct InstanceData
 {
+	// [TODO] Split material
+
 	MaterialType				mMaterialType			CONSTANT_DEFAULT(MaterialType::Diffuse);
 	float3						_0						CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 

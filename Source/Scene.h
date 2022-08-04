@@ -62,23 +62,20 @@ public:
 	{
 	}
 
-	void Update() { if (mUpdater) mUpdater(this); }
-	void SetUpdater(std::function<void(ObjectInstance*)> inUpdater) { mUpdater = inUpdater; }
-
 	const BLASRef GetBLAS() const { return mBLAS; }
 	const glm::mat4& GetTransform() const { return mTransform; }
 	glm::mat4& Transform() { return mTransform; }
 	glm::uint32 GetHitGroupIndex() const { return mHitGroupIndex; }
-	const InstanceData& GetData() const { return mInstanceData; }
-	InstanceData& Data() { return mInstanceData; }
+
+	InstanceData mInstanceData;
+
+	std::string mName;
+	std::string mMaterialName;
 
 private:
 	glm::mat4 mTransform = glm::mat4(1);
 	BLASRef mBLAS;
 	glm::uint32 mHitGroupIndex = 0;
-	InstanceData mInstanceData;
-
-	std::function<void(ObjectInstance*)> mUpdater;
 };
 using ObjectInstanceRef = std::shared_ptr<ObjectInstance>;
 
