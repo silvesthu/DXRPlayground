@@ -345,10 +345,39 @@ bool Scene::LoadMitsuba(const std::string& inFilename, ObjectCollection& ioColle
 		{
 			material.mMaterialType = MaterialType::RoughConductor;
 
+			gAssert(std::string_view(get_child_value(local_bsdf, "distribution")) == "ggx"); // [TODO] Support beckmann?
+
 			gVerify(std::sscanf(get_child_value(local_bsdf, "alpha"), "%f", &material.mRoughnessAlpha) == 1);
 
-			// [TODO] beckmann vs. GGX
-			// gTrace(get_child_value(local_bsdf, "distribution")); 
+			// [Mitsuba3] From fresnel_conductor in fresnel.h
+			// See also https://seblagarde.wordpress.com/2013/04/29/memo-on-fresnel-equations/
+			// See also "Optics" book
+			auto fresnel_conductor = [](glm::vec3 inEta, glm::vec3 inK, float inCosTheta)
+			{
+				// Modified from "Optics" by K.D. Moeller, University Science Books, 1988
+				float cos_theta_i_2 = inCosTheta * inCosTheta,
+					sin_theta_i_2 = 1.f - cos_theta_i_2,
+					sin_theta_i_4 = sin_theta_i_2 * sin_theta_i_2;
+
+				auto eta_r = inEta,
+					eta_i = inK;
+
+				glm::vec3 temp_1 = eta_r * eta_r - eta_i * eta_i - sin_theta_i_2,
+					a_2_pb_2 = glm::sqrt(temp_1 * temp_1 + 4.f * eta_i * eta_i * eta_r * eta_r),
+					a = glm::sqrt(.5f * (a_2_pb_2 + temp_1));
+
+				glm::vec3 term_1 = a_2_pb_2 + cos_theta_i_2,
+					term_2 = 2.f * inCosTheta * a;
+
+				glm::vec3 r_s = (term_1 - term_2) / (term_1 + term_2);
+
+				glm::vec3 term_3 = a_2_pb_2 * cos_theta_i_2 + sin_theta_i_4,
+					term_4 = term_2 * sin_theta_i_2;
+
+				glm::vec3 r_p = r_s * (term_3 - term_4) / (term_3 + term_4);
+
+				return 0.5f * (r_s + r_p);
+			};
 
 			glm::vec3 specular_reflectance;
 			gVerify(std::sscanf(get_child_value(local_bsdf, "specular_reflectance"), "%f, %f, %f", &specular_reflectance.x, &specular_reflectance.y, &specular_reflectance.z) == 3);
@@ -356,7 +385,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, ObjectCollection& ioColle
 			gVerify(std::sscanf(get_child_value(local_bsdf, "eta"), "%f, %f, %f", &eta.x, &eta.y, &eta.z) == 3);
 			glm::vec3 k;
 			gVerify(std::sscanf(get_child_value(local_bsdf, "k"), "%f, %f, %f", &k.x, &k.y, &k.z) == 3);
-			material.mReflectance = specular_reflectance;
+			material.mReflectance = specular_reflectance * fresnel_conductor(eta, k, 1); // Use F0 for now
 		}
 
 		materials_by_id[id] = material;

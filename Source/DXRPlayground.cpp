@@ -56,7 +56,7 @@ static ScenePreset kScenePresets[(int)ScenePresetType::COUNT] =
 	{ "Hillaire20",					nullptr,															glm::vec4(0.0f, 0.5, -1.0f, 0.0f),			glm::vec4(0.0f, 0.0f, 1.0f, 0.0f),		98.8514328f, 	glm::translate(glm::vec3(0.0f, 1.0f, 0.0f)),			0.0f, glm::pi<float>() / 2.0f - 0.45f,},
 
 	{ "VeachMIS",					"Asset/Comparison/veach-mis.obj",									glm::vec4(0.0f, 2.0f, 15.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
-	{ "VeachMISMitsuba",			"Asset/Comparison/benedikt-bitterli/veach-mis/scene_v3.xml",		glm::vec4(0.0f, 2.0f, 15.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
+	{ "VeachMISMitsuba",			"Asset/Comparison/benedikt-bitterli/veach-mis/scene_ggx_v3.xml",	glm::vec4(0.0f, 2.0f, 15.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
 };
 
 static bool sReloadRequested = false;
