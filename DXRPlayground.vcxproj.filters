@@ -305,4 +305,9 @@
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="Source\Thirdparty\glm\util\glm.natvis">
+      <Filter>Source\Thirdparty\glm</Filter>
+    </Natvis>
+  </ItemGroup>
 </Project>
