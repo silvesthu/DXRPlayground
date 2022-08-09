@@ -23,6 +23,7 @@ using Microsoft::WRL::ComPtr;
 #include <filesystem>
 #include <span>
 #include <execution>
+#include <optional>
 
 #include "Thirdparty/glm/glm/gtx/transform.hpp"
 #include "Thirdparty/nameof/include/nameof.hpp"

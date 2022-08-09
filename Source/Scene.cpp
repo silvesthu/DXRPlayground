@@ -169,9 +169,9 @@ void TLAS::UpdateObjectInstances()
 	}
 }
 
-bool Scene::LoadDummy(ObjectCollection& ioCollection)
+bool Scene::LoadDummy(SceneContent& ioCollection)
 {
-	ioCollection = ObjectCollection();
+	ioCollection = SceneContent();
 
 	ioCollection.mIndices.push_back(0);
 	ioCollection.mIndices.push_back(0);
@@ -188,7 +188,7 @@ bool Scene::LoadDummy(ObjectCollection& ioCollection)
 	return true; 
 }
 
-bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransform, Scene::ObjectCollection& ioCollection)
+bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransform, Scene::SceneContent& ioCollection)
 {	
 	tinyobj::ObjReader reader;
 	if (!reader.ParseFromFile(inFilename))
@@ -289,7 +289,7 @@ bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransfor
 	return true;
 }
 
-bool Scene::LoadMitsuba(const std::string& inFilename, ObjectCollection& ioCollection)
+bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioCollection)
 {
 	static auto first_child_element_by_name_attribute = [](tinyxml2::XMLElement* inElement, const char* inName)
 	{
@@ -380,11 +380,17 @@ bool Scene::LoadMitsuba(const std::string& inFilename, ObjectCollection& ioColle
 			};
 
 			glm::vec3 specular_reflectance;
-			gVerify(std::sscanf(get_child_value(local_bsdf, "specular_reflectance"), "%f, %f, %f", &specular_reflectance.x, &specular_reflectance.y, &specular_reflectance.z) == 3);
+			gVerify(std::sscanf(get_child_value(local_bsdf, "specular_reflectance"), 
+				"%f, %f, %f", 
+				&specular_reflectance.x, &specular_reflectance.y, &specular_reflectance.z) == 3);
 			glm::vec3 eta;
-			gVerify(std::sscanf(get_child_value(local_bsdf, "eta"), "%f, %f, %f", &eta.x, &eta.y, &eta.z) == 3);
+			gVerify(std::sscanf(get_child_value(local_bsdf, "eta"), 
+				"%f, %f, %f", 
+				&eta.x, &eta.y, &eta.z) == 3);
 			glm::vec3 k;
-			gVerify(std::sscanf(get_child_value(local_bsdf, "k"), "%f, %f, %f", &k.x, &k.y, &k.z) == 3);
+			gVerify(std::sscanf(get_child_value(local_bsdf, "k"), 
+				"%f, %f, %f", 
+				&k.x, &k.y, &k.z) == 3);
 			material.mReflectance = specular_reflectance * fresnel_conductor(eta, k, 1); // Use F0 for now
 		}
 
@@ -399,7 +405,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, ObjectCollection& ioColle
 		std::string_view type = shape->Attribute("type");
 		std::string_view id = shape->Attribute("id");
 
-		ObjectCollection* primitive = nullptr;
+		SceneContent* primitive = nullptr;
 		if (type == "cube")
 			primitive = &mPrimitiveObjectCollection.mCube;
 		else if (type == "rectangle")
@@ -420,7 +426,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, ObjectCollection& ioColle
 			std::copy(primitive->mNormals.begin(), primitive->mNormals.end(), std::back_inserter(ioCollection.mNormals));
 			std::copy(primitive->mUVs.begin(), primitive->mUVs.end(), std::back_inserter(ioCollection.mUVs));
 
-			vertex_offset = 0; // All vertices share same buffer. Only works indices fit in IndexType
+			vertex_offset = 0; // All vertices share same buffer. Only works when indices fit in IndexType
 			glm::uint32 vertex_count = index_count;
 			BLASRef blas = std::make_shared<BLAS>(std::make_shared<Primitive>(vertex_offset, vertex_count, index_offset, index_count), id.data());
 
@@ -431,7 +437,12 @@ bool Scene::LoadMitsuba(const std::string& inFilename, ObjectCollection& ioColle
 				gAssert(transform_name == "to_world");
 
 				std::string_view matrix_value = transform->FirstChildElement("matrix")->Attribute("value");
-				gVerify(std::sscanf(matrix_value.data(), "%f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f", &matrix[0][0], &matrix[1][0], &matrix[2][0], &matrix[3][0], &matrix[0][1], &matrix[1][1], &matrix[2][1], &matrix[3][1], &matrix[0][2], &matrix[1][2], &matrix[2][2], &matrix[3][2], &matrix[0][3], &matrix[1][3], &matrix[2][3], &matrix[3][3]) == 16);
+				gVerify(std::sscanf(matrix_value.data(), 
+					"%f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f", 
+					&matrix[0][0], &matrix[1][0], &matrix[2][0], &matrix[3][0], 
+					&matrix[0][1], &matrix[1][1], &matrix[2][1], &matrix[3][1], 
+					&matrix[0][2], &matrix[1][2], &matrix[2][2], &matrix[3][2], 
+					&matrix[0][3], &matrix[1][3], &matrix[2][3], &matrix[3][3]) == 16);
 			}
 			else if (tinyxml2::XMLElement* center_element = shape->FirstChildElement("point"))
 			{
@@ -488,7 +499,9 @@ bool Scene::LoadMitsuba(const std::string& inFilename, ObjectCollection& ioColle
 				gAssert(emitter_type == "area");
 
 				InstanceData& material = object_instance->mInstanceData;
-				gVerify(std::sscanf(get_child_value(emitter, "radiance"), "%f, %f, %f", &material.mEmission.x, &material.mEmission.y, &material.mEmission.z) == 3);
+				gVerify(std::sscanf(get_child_value(emitter, "radiance"), 
+					"%f, %f, %f", 
+					&material.mEmission.x, &material.mEmission.y, &material.mEmission.z) == 3);
 			}
 
 			object_instance->mInstanceData.mTransform = matrix;
@@ -499,6 +512,26 @@ bool Scene::LoadMitsuba(const std::string& inFilename, ObjectCollection& ioColle
 
 		shape = shape->NextSiblingElement("shape");
 	}
+
+	tinyxml2::XMLElement* sensor = scene->FirstChildElement("sensor");
+	if (sensor != nullptr)
+	{
+		tinyxml2::XMLElement* transform = first_child_element_by_name_attribute(sensor, "to_world");
+		glm::mat4x4 matrix = glm::mat4x4(1.0f);
+		gVerify(std::sscanf(transform->FirstChildElement("matrix")->Attribute("value"),
+			"%f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f",
+			&matrix[0][0], &matrix[1][0], &matrix[2][0], &matrix[3][0],
+			&matrix[0][1], &matrix[1][1], &matrix[2][1], &matrix[3][1],
+			&matrix[0][2], &matrix[1][2], &matrix[2][2], &matrix[3][2],
+			&matrix[0][3], &matrix[1][3], &matrix[2][3], &matrix[3][3]) == 16);		
+		ioCollection.mCameraTransform = matrix;
+
+		float fov = 90.0f;
+		gVerify(std::sscanf(get_child_value(sensor, "fov"), "%f", &fov) == 1);
+		ioCollection.mFov = fov;
+	}
+
+	ioCollection.mAtmosphereMode = AtmosphereMode::ConstantColor;
 
 	return true;
 }
@@ -515,7 +548,7 @@ void Scene::FillDummyMaterial(InstanceData& ioInstanceData)
 	ioInstanceData.mIOR = glm::vec3(1.0f, 1.0f, 1.0f);
 }
 
-void Scene::InitializeAS(Scene::ObjectCollection& inContext)
+void Scene::InitializeAS(Scene::SceneContent& inContext)
 {
 	D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(0);
 	D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
@@ -579,7 +612,7 @@ void Scene::Load(const char* inFilename, const glm::mat4x4& inTransform)
 	LoadObj("Asset/primitives/rectangle.obj", glm::mat4x4(1.0f), mPrimitiveObjectCollection.mRectangle);
 	LoadObj("Asset/primitives/sphere.obj", glm::mat4x4(1.0f), mPrimitiveObjectCollection.mSphere);
 
-	ObjectCollection object_collection;
+	mSceneContent = {}; // Reset
 
 	std::string filename_lower;
 	if (inFilename != nullptr)
@@ -590,16 +623,16 @@ void Scene::Load(const char* inFilename, const glm::mat4x4& inTransform)
 	bool try_load = std::filesystem::exists(filename_lower); 
 	
 	if (!loaded && try_load && filename_lower.ends_with(".obj"))
-		loaded |= LoadObj(filename_lower, inTransform, object_collection);
+		loaded |= LoadObj(filename_lower, inTransform, mSceneContent);
 
 	if (!loaded && try_load && filename_lower.ends_with(".xml"))
-		loaded |= LoadMitsuba(filename_lower, object_collection);
+		loaded |= LoadMitsuba(filename_lower, mSceneContent);
 	
-	if (object_collection.mObjectInstances.empty())
-		loaded |= LoadDummy(object_collection);
+	if (mSceneContent.mObjectInstances.empty())
+		loaded |= LoadDummy(mSceneContent);
 
 	assert(loaded);
-	InitializeAS(object_collection);
+	InitializeAS(mSceneContent);
 
 	gCreatePipelineState();
 	CreateShaderResource();

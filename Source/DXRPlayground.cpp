@@ -94,6 +94,8 @@ static void sWaitForIdle();
 static void sWaitForLastSubmittedFrame();
 static FrameContext* sWaitForNextFrameResources();
 static void sUpdate();
+static void sLoadCamera();
+static void sLoadScene();
 static void sRender();
 static LRESULT WINAPI sWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -184,11 +186,7 @@ static void sUpdate()
 
 			{
 				if (ImGui::Button("Reset Camera Transform") || ImGui::IsKeyPressed(VK_F6))
-				{
-					gPerFrameConstantBuffer.mCameraPosition = kScenePresets[(int)sCurrentScene].mCameraPosition;
-					gPerFrameConstantBuffer.mCameraDirection = glm::normalize(kScenePresets[(int)sCurrentScene].mCameraDirection);
-					gCameraSettings.mHorizontalFovDegree = kScenePresets[(int)sCurrentScene].mHorizontalFovDegree;
-				}
+					sLoadCamera();
 
 				ImGui::SameLine();
 
@@ -442,15 +440,8 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 	ImGui_ImplDX12_Init(gDevice, NUM_FRAMES_IN_FLIGHT, DXGI_FORMAT_R8G8B8A8_UNORM);
 	ImGui_ImplDX12_CreateDeviceObjects();
 	
-	// Create Scene
-	int current_scene_index = static_cast<int>(sCurrentScene);
-	gScene.Load(kScenePresets[current_scene_index].mPath, kScenePresets[current_scene_index].mTransform);
-	gScene.Build(gCommandList);
-	gPerFrameConstantBuffer.mCameraPosition = kScenePresets[current_scene_index].mCameraPosition;
-	gPerFrameConstantBuffer.mCameraDirection = glm::normalize(kScenePresets[current_scene_index].mCameraDirection);
-	gCameraSettings.mHorizontalFovDegree = kScenePresets[current_scene_index].mHorizontalFovDegree;
-	gPerFrameConstantBuffer.mSunAzimuth = kScenePresets[current_scene_index].mSunAzimuth;
-	gPerFrameConstantBuffer.mSunZenith = kScenePresets[current_scene_index].mSunZenith;
+	// Load Scene
+	sLoadScene();
 
 	// Features (rely on ImGui, Scene)
 	gAtmosphere.Initialize();
@@ -525,6 +516,45 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 	return 0;
 }
 
+void sLoadCamera()
+{
+	int current_scene_index = static_cast<int>(sCurrentScene);
+
+	gPerFrameConstantBuffer.mCameraPosition = kScenePresets[current_scene_index].mCameraPosition;
+	gPerFrameConstantBuffer.mCameraDirection = glm::normalize(kScenePresets[current_scene_index].mCameraDirection);
+	gCameraSettings.mHorizontalFovDegree = kScenePresets[current_scene_index].mHorizontalFovDegree;
+
+	if (gScene.GetSceneContent().mCameraTransform.has_value())
+	{
+		gPerFrameConstantBuffer.mCameraPosition = gScene.GetSceneContent().mCameraTransform.value()[3];
+		gPerFrameConstantBuffer.mCameraDirection = gScene.GetSceneContent().mCameraTransform.value()[2];
+	}
+
+	if (gScene.GetSceneContent().mFov.has_value())
+		gCameraSettings.mHorizontalFovDegree = gScene.GetSceneContent().mFov.value();
+}
+
+void sLoadScene()
+{
+	int current_scene_index = static_cast<int>(sCurrentScene);
+
+	gScene.Unload();
+	gScene.Load(kScenePresets[current_scene_index].mPath, kScenePresets[current_scene_index].mTransform);
+	gScene.Build(gCommandList);
+
+	gPerFrameConstantBuffer.mSunAzimuth = kScenePresets[current_scene_index].mSunAzimuth;
+	gPerFrameConstantBuffer.mSunZenith = kScenePresets[current_scene_index].mSunZenith;
+
+	gAtmosphere.mProfile.mMode = AtmosphereMode::Hillaire20;
+	if (gScene.GetSceneContent().mAtmosphereMode.has_value())
+	{
+		gAtmosphere.mProfile.mMode = gScene.GetSceneContent().mAtmosphereMode.value();
+		gAtmosphere.mProfile.mConstantColor = gScene.GetSceneContent().mBackgroundColor;
+	}
+
+	sLoadCamera();
+}
+
 void sRender()
 {
 	// Frame Context
@@ -548,18 +578,7 @@ void sRender()
 			sPreviousScene = sCurrentScene;
 
 			sWaitForIdle();
-
-			int current_scene_index = static_cast<int>(sCurrentScene);
-
-			gScene.Unload();
-			gScene.Load(kScenePresets[current_scene_index].mPath, kScenePresets[current_scene_index].mTransform);
-			gScene.Build(gCommandList);
-
-			gPerFrameConstantBuffer.mCameraPosition = kScenePresets[current_scene_index].mCameraPosition;
-			gPerFrameConstantBuffer.mCameraDirection = glm::normalize(kScenePresets[current_scene_index].mCameraDirection);
-			gCameraSettings.mHorizontalFovDegree = kScenePresets[current_scene_index].mHorizontalFovDegree;
-			gPerFrameConstantBuffer.mSunAzimuth = kScenePresets[current_scene_index].mSunAzimuth;
-			gPerFrameConstantBuffer.mSunZenith = kScenePresets[current_scene_index].mSunZenith;
+			sLoadScene();
 		}
 		else
 			gScene.Update(gCommandList);

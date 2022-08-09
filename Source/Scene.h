@@ -123,6 +123,20 @@ public:
 	using VertexType = glm::vec3;
 	using NormalType = glm::vec3;
 	using UVType = glm::vec2;
+	struct SceneContent
+	{
+		std::vector<ObjectInstanceRef>		mObjectInstances;
+		std::vector<IndexType>				mIndices;
+		std::vector<VertexType>				mVertices;
+		std::vector<NormalType>				mNormals;
+		std::vector<UVType>					mUVs;
+
+		std::optional<glm::mat4x4>			mCameraTransform;
+		std::optional<float>				mFov;
+
+		std::optional<AtmosphereMode>		mAtmosphereMode;
+		glm::vec4							mBackgroundColor = glm::vec4(0.0f);
+	};
 
 	void Load(const char* inFilename, const glm::mat4x4& inTransform);
 	void Unload();
@@ -132,50 +146,39 @@ public:
 	void RebuildBinding(std::function<void()> inCallback);
 	void RebuildShader();
 
+	const SceneContent& GetSceneContent()			{ return mSceneContent; }
 	int GetInstanceCount() const					{ return mTLAS->GetInstanceCount(); }
 	const ObjectInstance& GetInstance(int inIndex)	{ return mTLAS->GetInstance(inIndex); }
-
 	ID3D12Resource* GetOutputResource()				{ return mOutputResource.Get(); }
-
 	ID3D12DescriptorHeap* GetDXRDescriptorHeap()	{ return mDXRDescriptorHeap.Get(); }
 
-private:	
-	struct ObjectCollection
-	{		
-		std::vector<ObjectInstanceRef>		mObjectInstances;
-		std::vector<IndexType>				mIndices;
-		std::vector<VertexType>				mVertices;
-		std::vector<NormalType>				mNormals;
-		std::vector<UVType>					mUVs;
-	};
-	bool LoadDummy(ObjectCollection& ioContext);
-	bool LoadObj(const std::string& inFilename, const glm::mat4x4& inTransform, ObjectCollection& ioContext);
-	bool LoadMitsuba(const std::string& inFilename, ObjectCollection& ioContext);
+private:
+	bool LoadDummy(SceneContent& ioContext);
+	bool LoadObj(const std::string& inFilename, const glm::mat4x4& inTransform, SceneContent& ioContext);
+	bool LoadMitsuba(const std::string& inFilename, SceneContent& ioContext);
 
 	void FillDummyMaterial(InstanceData& ioInstanceData);
 	
-	void InitializeAS(ObjectCollection& inContext);
+	void InitializeAS(SceneContent& inContext);
 
 	void CreateShaderResource();
 	void CleanupShaderResource();
 
 	struct PrimitiveObjectCollection
 	{
-		ObjectCollection					mCube;
-		ObjectCollection					mRectangle;
-		ObjectCollection					mSphere;
+		SceneContent						mCube;
+		SceneContent						mRectangle;
+		SceneContent						mSphere;
 	};
 	PrimitiveObjectCollection				mPrimitiveObjectCollection;
-
+	SceneContent							mSceneContent;
 	TLASRef									mTLAS;
 
 	ComPtr<ID3D12Resource>					mIndexBuffer = nullptr;
 	ComPtr<ID3D12Resource>					mVertexBuffer = nullptr;	
 	ComPtr<ID3D12Resource>					mNormalBuffer = nullptr;
 	ComPtr<ID3D12Resource>					mUVBuffer = nullptr;
-
 	ComPtr<ID3D12Resource>					mOutputResource = nullptr;
-
 	ComPtr<ID3D12DescriptorHeap>			mDXRDescriptorHeap = nullptr;
 };
 
