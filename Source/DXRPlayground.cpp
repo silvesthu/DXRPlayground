@@ -301,8 +301,8 @@ static void sUpdate()
 					ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gPerFrameConstantBuffer.mDebugInstanceMode), i);
 				}
 
-				ImGui::SliderInt("DebugInstanceIndex", reinterpret_cast<int*>(&gPerFrameConstantBuffer.mDebugInstanceIndex), -1, gScene.GetInstanceCount() - 1);
-				gPerFrameConstantBuffer.mDebugInstanceIndex = glm::clamp(static_cast<int>(gPerFrameConstantBuffer.mDebugInstanceIndex), -1, gScene.GetInstanceCount() - 1);
+				ImGui::SliderInt("DebugInstanceIndex", &gPerFrameConstantBuffer.mDebugInstanceIndex, -1, gScene.GetInstanceCount() - 1);
+				gPerFrameConstantBuffer.mDebugInstanceIndex = glm::clamp(gPerFrameConstantBuffer.mDebugInstanceIndex, -1, gScene.GetInstanceCount() - 1);
 
 				ImGui::TreePop();
 			}
@@ -328,13 +328,14 @@ static void sUpdate()
 						{
 							ImGui::TableNextRow();
 
-							const ObjectInstance& instance = gScene.GetInstance(row);
+							const InstanceInfo& instance_info = gScene.GetInstanceInfo(row);
+							const InstanceData& instance_data = gScene.GetInstanceData(row);
 
 							ImGui::TableSetColumnIndex(0);
-							ImGui::Text(instance.GetBLAS()->GetName().c_str());
+							ImGui::Text(instance_info.mName.c_str());
 
 							ImGui::TableSetColumnIndex(1);
-							ImGui::Text("%f %f %f", instance.GetTransform()[3][0], instance.GetTransform()[3][1], instance.GetTransform()[3][2]);
+							ImGui::Text("%f %f %f", instance_data.mTransform[3][0], instance_data.mTransform[3][1], instance_data.mTransform[3][2]);
 						}
 						ImGui::EndTable();
 					}
@@ -571,7 +572,7 @@ void sRender()
 		gBarrierTransition(gCommandList, frame_render_target_resource, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 	}
 
-	// Update and Upload
+	// Update
 	{
 		if (sPreviousScene != sCurrentScene)
 		{
@@ -580,8 +581,6 @@ void sRender()
 			sWaitForIdle();
 			sLoadScene();
 		}
-		else
-			gScene.Update(gCommandList);
 	}
 
 	// Upload - PerFrameConstants

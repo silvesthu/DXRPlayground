@@ -1,5 +1,4 @@
 #include "Constant.h"
-#define CONSTANT_DEFAULT(x)
 #include "Shared.inl"
 #include "Binding.h"
 
@@ -39,7 +38,7 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 
 	// Only support 32bit index, see https://github.com/microsoft/DirectX-Graphics-Samples/blob/master/Samples/Desktop/D3D12Raytracing/src/D3D12RaytracingSimpleLighting/Raytracing.hlsl for reference
 	uint index_count_per_triangle = 3;
-	uint base_index = sGetPrimitiveIndex() * index_count_per_triangle + InstanceDataBuffer[sGetInstanceID()].mIndexOffset;
+    uint base_index = sGetPrimitiveIndex() * index_count_per_triangle + InstanceDatas[sGetInstanceID()].mIndexOffset;
 	uint3 indices = uint3(Indices[base_index], Indices[base_index + 1], Indices[base_index + 2]);
 
 	// Attributes
@@ -48,7 +47,7 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 
 	float3 normals[3] = { Normals[indices[0]], Normals[indices[1]], Normals[indices[2]] };
 	float3 normal = normalize(normals[0] * barycentrics.x + normals[1] * barycentrics.y + normals[2] * barycentrics.z);
-    normal = normalize(mul((float3x3) InstanceDataBuffer[sGetInstanceID()].mInverseTranspose, normal)); // Allow non-uniform scale
+    normal = normalize(mul((float3x3) InstanceDatas[sGetInstanceID()].mInverseTranspose, normal)); // Allow non-uniform scale
 
 	float2 uvs[3] = { UVs[indices[0]], UVs[indices[1]], UVs[indices[2]] };
 	float2 uv = uvs[0] * barycentrics.x + uvs[1] * barycentrics.y + uvs[2] * barycentrics.z;
@@ -92,11 +91,11 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 		axis[0] = cross(axis[2], axis[1]);
 		
 		// Based on Mitsuba2
-        switch (InstanceDataBuffer[sGetInstanceID()].mMaterialType)
+        switch (InstanceDatas[sGetInstanceID()].mMaterialType)
         {
             case MaterialType::Diffuse:
 	            {
-            		hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mEmission * (kEmissionBoostScale * kPreExposure);
+                    hit_info.mEmission = InstanceDatas[sGetInstanceID()].mEmission * (kEmissionBoostScale * kPreExposure);
 
             		// random
             		float3 direction = RandomCosineDirection(payload.mRandomState);
@@ -108,17 +107,17 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
             		float cosine = dot(normal, hit_info.mReflectionDirection);
             		hit_info.mScatteringPDF = cosine <= 0 ? 0 : cosine / MATH_PI;
             		hit_info.mSamplingPDF = cosine <= 0 ? 0 : cosine / MATH_PI;
-            		hit_info.mAlbedo = InstanceDataBuffer[sGetInstanceID()].mAlbedo;
+                    hit_info.mAlbedo = InstanceDatas[sGetInstanceID()].mAlbedo;
             		hit_info.mDone = false;
 	            }
                 break;
             case MaterialType::RoughConductor:
 				{
-                    hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mEmission * (kEmissionBoostScale * kPreExposure);
+                    hit_info.mEmission = InstanceDatas[sGetInstanceID()].mEmission * (kEmissionBoostScale * kPreExposure);
 
             		// TODO: Check visible normal
 
-            		float a = InstanceDataBuffer[sGetInstanceID()].mRoughnessAlpha;
+                    float a = InstanceDatas[sGetInstanceID()].mRoughnessAlpha;
             		float a2 = a * a;
 
             		// Microfacet
@@ -151,7 +150,7 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
             		float NoL = dot(normal, L);
 
             		float G = G_SmithGGX(NoL, NoV, a2);
-            		float3 F = F_Schlick(InstanceDataBuffer[sGetInstanceID()].mReflectance, HoV);
+                    float3 F = F_Schlick(InstanceDatas[sGetInstanceID()].mReflectance, HoV);
 
             		hit_info.mReflectionDirection = L;
             		hit_info.mAlbedo = G * F / (4.0f * NoV);
@@ -174,10 +173,10 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 		case DebugMode::Vertex: 				hit_info.mEmission = vertex; break;
 		case DebugMode::Normal: 				hit_info.mEmission = normal * 0.5 + 0.5; break;
 		case DebugMode::UV:						hit_info.mEmission = float3(uv, 0.0); break;
-		case DebugMode::Albedo: 				hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mAlbedo; break;
-		case DebugMode::Reflectance: 			hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mReflectance; break;
-		case DebugMode::Emission: 				hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mEmission; break;
-		case DebugMode::RoughnessAlpha: 		hit_info.mEmission = InstanceDataBuffer[sGetInstanceID()].mRoughnessAlpha; break;
+		case DebugMode::Albedo: 				hit_info.mEmission = InstanceDatas[sGetInstanceID()].mAlbedo; break;
+		case DebugMode::Reflectance: 			hit_info.mEmission = InstanceDatas[sGetInstanceID()].mReflectance; break;
+		case DebugMode::Emission: 				hit_info.mEmission = InstanceDatas[sGetInstanceID()].mEmission; break;
+		case DebugMode::RoughnessAlpha: 		hit_info.mEmission = InstanceDatas[sGetInstanceID()].mRoughnessAlpha; break;
 		case DebugMode::Transmittance:			hit_info.mEmission = transmittance; break;
 		case DebugMode::InScattering:			hit_info.mEmission = in_scattering; break;
 		case DebugMode::RecursionCount:			terminate = false; break;

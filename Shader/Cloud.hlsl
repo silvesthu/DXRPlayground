@@ -1,5 +1,4 @@
 #include "Constant.h"
-#define CONSTANT_DEFAULT(x)
 #include "Shared.inl"
 #include "Binding.h"
 
