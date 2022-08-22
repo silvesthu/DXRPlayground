@@ -295,12 +295,24 @@
     <CopyFileToFolders Include="Shader\Atmosphere.hlsl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\Constant.h" />
-    <CopyFileToFolders Include="Shader\RayQuery.inl" />
-    <CopyFileToFolders Include="Shader\Binding.h" />
-    <CopyFileToFolders Include="Shader\Composite.hlsl" />
-    <CopyFileToFolders Include="Shader\DiffTexture.hlsl" />
-    <CopyFileToFolders Include="Shader\Cloud.hlsl" />
+    <CopyFileToFolders Include="Shader\DiffTexture.hlsl">
+      <Filter>Shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Shader\Composite.hlsl">
+      <Filter>Shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Shader\Cloud.hlsl">
+      <Filter>Shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Shader\RayQuery.inl">
+      <Filter>Shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Shader\Binding.h">
+      <Filter>Shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Shader\Constant.h">
+      <Filter>Shader</Filter>
+    </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

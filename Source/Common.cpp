@@ -28,12 +28,12 @@ SIZE_T								gUniversalHeapHandleIncrementSize = 0;
 std::atomic<int>					gUniversalHeapHandleIndex = 0;
 
 bool								gUseDXRInlineShader = true;
-Shader								gDXRInlineShader = Shader().CSName(L"InlineRaytracingCS").UseGlobalRootSignature(true);
+Shader								gDXRInlineShader = Shader().FileName("Shader/Raytracing.hlsl").CSName("InlineRaytracingCS").UseGlobalRootSignature(true);
 
-Shader								gDiffTexture2DShader = Shader().CSName(L"DiffTexture2DShader");
-Shader								gDiffTexture3DShader = Shader().CSName(L"DiffTexture3DShader");
+Shader								gDiffTexture2DShader = Shader().FileName("Shader/DiffTexture.hlsl").CSName("DiffTexture2DShader");
+Shader								gDiffTexture3DShader = Shader().FileName("Shader/DiffTexture.hlsl").CSName("DiffTexture3DShader");
 
-Shader								gCompositeShader = Shader().VSName(L"ScreenspaceTriangleVS").PSName(L"CompositePS");
+Shader								gCompositeShader = Shader().FileName("Shader/Composite.hlsl").VSName("ScreenspaceTriangleVS").PSName("CompositePS");
 
 // Frame
 FrameContext						gFrameContext[NUM_FRAMES_IN_FLIGHT] = {};
@@ -54,7 +54,8 @@ void Shader::InitializeDescriptors(const std::vector<Shader::DescriptorInfo>& in
 		desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 		gValidate(gDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&mData.mDescriptorHeap)));
 
-		mData.mDescriptorHeap->SetName(mCSName != nullptr ? mCSName : mPSName);
+		std::wstring name = gToWString(mCSName != nullptr ? mCSName : mPSName);
+		mData.mDescriptorHeap->SetName(name.c_str());
 	}
 
 	// DescriptorTable

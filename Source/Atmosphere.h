@@ -371,17 +371,17 @@ public:
 
 		// Shaders
 		// [Bruneton17]
-		Shader mComputeTransmittanceShader			= Shader().CSName(L"ComputeTransmittanceCS");
-		Shader mComputeDirectIrradianceShader		= Shader().CSName(L"ComputeDirectIrradianceCS");
-		Shader mComputeSingleScatteringShader		= Shader().CSName(L"ComputeSingleScatteringCS");
-		Shader mComputeScatteringDensityShader		= Shader().CSName(L"ComputeScatteringDensityCS");
-		Shader mComputeIndirectIrradianceShader		= Shader().CSName(L"ComputeIndirectIrradianceCS");
-		Shader mComputeMultipleScatteringShader		= Shader().CSName(L"ComputeMultipleScatteringCS");
+		Shader mComputeTransmittanceShader			= Shader().FileName("Shader/Atmosphere.hlsl").CSName("ComputeTransmittanceCS");
+		Shader mComputeDirectIrradianceShader		= Shader().FileName("Shader/Atmosphere.hlsl").CSName("ComputeDirectIrradianceCS");
+		Shader mComputeSingleScatteringShader		= Shader().FileName("Shader/Atmosphere.hlsl").CSName("ComputeSingleScatteringCS");
+		Shader mComputeScatteringDensityShader		= Shader().FileName("Shader/Atmosphere.hlsl").CSName("ComputeScatteringDensityCS");
+		Shader mComputeIndirectIrradianceShader		= Shader().FileName("Shader/Atmosphere.hlsl").CSName("ComputeIndirectIrradianceCS");
+		Shader mComputeMultipleScatteringShader		= Shader().FileName("Shader/Atmosphere.hlsl").CSName("ComputeMultipleScatteringCS");
 		// [Hillaire20]
-		Shader mTransLUTShader						= Shader().CSName(L"TransLUT");
-		Shader mNewMultiScatCSShader				= Shader().CSName(L"NewMultiScatCS");
-		Shader mSkyViewLutShader					= Shader().CSName(L"SkyViewLut");
-		Shader mCameraVolumesShader					= Shader().CSName(L"CameraVolumes");
+		Shader mTransLUTShader						= Shader().FileName("Shader/Atmosphere.hlsl").CSName("TransLUT");
+		Shader mNewMultiScatCSShader				= Shader().FileName("Shader/Atmosphere.hlsl").CSName("NewMultiScatCS");
+		Shader mSkyViewLutShader					= Shader().FileName("Shader/Atmosphere.hlsl").CSName("SkyViewLut");
+		Shader mCameraVolumesShader					= Shader().FileName("Shader/Atmosphere.hlsl").CSName("CameraVolumes");
 		// Gather shaders
 		Shader mSentinelShader						= Shader();
 		std::span<Shader> mShaders					= std::span<Shader>(&mComputeTransmittanceShader, &mSentinelShader);

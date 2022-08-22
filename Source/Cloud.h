@@ -61,8 +61,8 @@ public:
 		void* mConstantUploadBufferPointer		= nullptr;
 
 		// Shaders
-		Shader mShapeNoiseShader				= Shader().CSName(L"CloudShapeNoiseCS");
-		Shader mErosionNoiseShader				= Shader().CSName(L"CloudErosionNoiseCS");
+		Shader mShapeNoiseShader				= Shader().FileName("Shader/Cloud.hlsl").CSName("CloudShapeNoiseCS");
+		Shader mErosionNoiseShader				= Shader().FileName("Shader/Cloud.hlsl").CSName("CloudErosionNoiseCS");
 		// Gather shaders
 		Shader mSentinelShader					= Shader();
 		std::span<Shader> mShaders				= std::span<Shader>(&mShapeNoiseShader, &mSentinelShader);

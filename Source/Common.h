@@ -67,9 +67,10 @@ struct Shader
 {
 #define SHADER_MEMBER(type, name, default_value) MEMBER(Shader, type, name, default_value)
 
-	SHADER_MEMBER(const wchar_t*, VSName, nullptr);
-	SHADER_MEMBER(const wchar_t*, PSName, nullptr);
-	SHADER_MEMBER(const wchar_t*, CSName, nullptr);
+	SHADER_MEMBER(const char*, FileName, nullptr);
+	SHADER_MEMBER(const char*, VSName, nullptr);
+	SHADER_MEMBER(const char*, PSName, nullptr);
+	SHADER_MEMBER(const char*, CSName, nullptr);
 	SHADER_MEMBER(bool, UseGlobalRootSignature, false);
 
 	struct DescriptorInfo

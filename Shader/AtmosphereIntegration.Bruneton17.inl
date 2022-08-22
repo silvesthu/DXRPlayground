@@ -469,7 +469,7 @@ float3 GetTransmittanceToTopAtmosphereBoundary(float r, float mu)
 	float2 transmittance_uv = XY_to_UV(Encode2D_Transmittance(mu_r), TransmittanceSRV);
 
 	// Sample 2D LUT
-	float3 transmittance = TransmittanceSRV.SampleLevel(BilinearSampler, transmittance_uv, 0).xyz;
+	float3 transmittance = TransmittanceSRV.SampleLevel(BilinearClampSampler, transmittance_uv, 0).xyz;
 
 	// Debug - Compute transmittance directly instead of sampling LUT
 	if (false)
@@ -662,7 +662,7 @@ void ComputeSingleScatteringCS(
 	ScatteringUAV[inDispatchThreadID.xyz] = float4(delta_rayleigh.xyz, delta_mie.x);
 
 	// Debug
-	// DeltaRayleighScatteringUAV[inDispatchThreadID.xyz] = TransmittanceSRV.SampleLevel(BilinearSampler, float2(1,1), 0) * 100;
+	// DeltaRayleighScatteringUAV[inDispatchThreadID.xyz] = TransmittanceSRV.SampleLevel(BilinearClampSampler, float2(1,1), 0) * 100;
 	// DeltaRayleighScatteringUAV[inDispatchThreadID.xyz] = float4(r_mu_mu_s_nu.xyz, 1);
 	// DeltaRayleighScatteringUAV[inDispatchThreadID.xyz] = float4(xyz, xyz.x);
 	// DeltaMieScatteringUAV[inDispatchThreadID.xyz] = float4(xyz, xyz.y);
@@ -685,7 +685,7 @@ float3 GetIrradiance(float r, float mu_s)
 	float2 uv = XY_to_UV(Encode2D_Irradiance(float2(mu_s, r)), DeltaIrradianceSRV);
 
 	// Sample 2D LUT
-	return DeltaIrradianceSRV.SampleLevel(BilinearSampler, uv, 0).xyz;
+	return DeltaIrradianceSRV.SampleLevel(BilinearClampSampler, uv, 0).xyz;
 }
 
 float4 GetScattering(Texture3D<float4> scattering_texture, float r, float mu, float mu_s, float nu, bool intersects_ground)
@@ -695,7 +695,7 @@ float4 GetScattering(Texture3D<float4> scattering_texture, float r, float mu, fl
 	Encode4D(float4(r, mu, mu_s, nu), intersects_ground, scattering_texture, uvw0, uvw1, s);
 
 	// Sample 4D LUT
-	return lerp(scattering_texture.SampleLevel(BilinearSampler, uvw0, 0), scattering_texture.SampleLevel(BilinearSampler, uvw1, 0), s);
+	return lerp(scattering_texture.SampleLevel(BilinearClampSampler, uvw0, 0), scattering_texture.SampleLevel(BilinearClampSampler, uvw1, 0), s);
 }
 
 float3 GetScattering(float r, float mu, float mu_s, float nu, bool intersects_ground, int scattering_order)
@@ -880,7 +880,7 @@ float3 ComputeIndirectIrradiance(float2 mu_s_r)
 		float s;
 		Encode4D(float4(r, 0, mu_s, 0), false, DeltaRayleighScatteringSRV, uvw0, uvw1, s);
 		return uvw0;
-		return lerp(DeltaRayleighScatteringSRV.SampleLevel(BilinearSampler, uvw0, 0), DeltaRayleighScatteringSRV.SampleLevel(BilinearSampler, uvw1, 0), s).xyz;
+		return lerp(DeltaRayleighScatteringSRV.SampleLevel(BilinearClampSampler, uvw0, 0), DeltaRayleighScatteringSRV.SampleLevel(BilinearClampSampler, uvw1, 0), s).xyz;
 		return GetScattering(DeltaRayleighScatteringSRV, r, 0, mu_s, 0, false).xyz;
 	}
 
@@ -913,8 +913,8 @@ void ComputeIndirectIrradianceCS(
 	// DeltaIrradianceUAV[inDispatchThreadID.xy] = float4(xy, 0.0, 1.0);
 	// IrradianceUAV[inDispatchThreadID.xy] = float4(xy, 0.0, 1.0);
 	// DeltaIrradianceUAV[inDispatchThreadID.xy] = float4(mu_s_r.x, (mu_s_r.y - mAtmosphere.mBottomRadius) / (mAtmosphere.mTopRadius - mAtmosphere.mBottomRadius), 0.0, 1.0);
-	// DeltaIrradianceUAV[inDispatchThreadID.xy] = DeltaRayleighScatteringSRV.SampleLevel(BilinearSampler, float3(xy, 0), 0);
-	// DeltaIrradianceUAV[inDispatchThreadID.xy] = DeltaMieScatteringSRV.SampleLevel(BilinearSampler, float3(xy, 0), 0);
+	// DeltaIrradianceUAV[inDispatchThreadID.xy] = DeltaRayleighScatteringSRV.SampleLevel(BilinearClampSampler, float3(xy, 0), 0);
+	// DeltaIrradianceUAV[inDispatchThreadID.xy] = DeltaMieScatteringSRV.SampleLevel(BilinearClampSampler, float3(xy, 0), 0);
 }
 
 void ComputeMultipleScattering(float4 r_mu_mu_s_nu, bool intersects_ground, out float3 delta_multiple_scattering)
@@ -1069,7 +1069,7 @@ void GetSkyRadiance(out float3 outSkyRadiance, out float3 outTransmittanceToTop)
 		//float s;
 		//Encode4D(float4(r, mu, mu_s, nu), ray_r_mu_intersects_ground, ScatteringSRV, uvw0, uvw1, s);
 		//rayleigh_scattering = uvw0;
-		//rayleigh_scattering = ScatteringSRV.SampleLevel(BilinearSampler, uvw0, 0);
+		//rayleigh_scattering = ScatteringSRV.SampleLevel(BilinearClampSampler, uvw0, 0);
 	}
 }
 

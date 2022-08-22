@@ -30,7 +30,7 @@ float AerialPerspectiveSliceToDepth(float slice)
 
 #define TransmittanceLutTexture TransmittanceTexSRV
 #define MultiScatTexture MultiScattTexSRV
-#define samplerLinearClamp BilinearSampler
+#define samplerLinearClamp BilinearClampSampler
 
 // We should precompute those terms from resolutions (Or set resolution as #defined constants)
 float fromUnitToSubUvs(float u, float resolution) { return (u + 0.5f / resolution) * (resolution / (resolution + 1.0f)); }
