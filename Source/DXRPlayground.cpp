@@ -81,7 +81,7 @@ CameraSettings		gCameraSettings = {};
 struct DisplaySettings
 {
 	glm::ivec2		mRenderResolution	= glm::ivec2(0, 0);
-	bool			mVsync				= true;
+	bool			mVsync				= false;
 };
 DisplaySettings		gDisplaySettings	= {};
 
@@ -92,7 +92,7 @@ static void sCreateRenderTarget();
 static void sCleanupRenderTarget();
 static void sWaitForIdle();
 static void sWaitForLastSubmittedFrame();
-static FrameContext* sWaitForNextFrameResources();
+static FrameContext* sWaitForFrameResources();
 static void sUpdate();
 static void sLoadCamera();
 static void sLoadScene();
@@ -177,7 +177,8 @@ static void sUpdate()
 	{
 		ImGui::Begin("DXR Playground");
 		{
-			ImGui::Text("Time %.3f @ Average %.3f ms/frame (%.1f FPS) @ %dx%d",
+			ImGui::Text("Frame %d | Time %.3f s | Average %.3f ms (FPS %.1f) | %dx%d",
+				gPerFrameConstantBuffer.mAccumulationFrameCount,
 				gPerFrameConstantBuffer.mTime,
 				1000.0f / ImGui::GetIO().Framerate,
 				ImGui::GetIO().Framerate,
@@ -558,8 +559,11 @@ void sLoadScene()
 
 void sRender()
 {
+	// New frame	
+	gFrameIndex++;
+
 	// Frame Context
-	FrameContext* frame_context = sWaitForNextFrameResources();
+	FrameContext* frame_context = sWaitForFrameResources();
 	glm::uint32 frame_index = gSwapChain->GetCurrentBackBufferIndex();
 	ID3D12Resource* frame_render_target_resource = gBackBufferRenderTargetResource[frame_index];
 	D3D12_CPU_DESCRIPTOR_HANDLE& frame_render_target_descriptor_handle = gBackBufferRenderTargetRTV[frame_index];
@@ -585,6 +589,8 @@ void sRender()
 
 	// Upload - PerFrameConstants
 	{
+		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Upload");
+
 		{
 			gPerFrameConstantBuffer.mSunDirection = 
 				glm::vec4(0,1,0,0) * glm::rotate(gPerFrameConstantBuffer.mSunZenith, glm::vec3(0, 0, 1)) * glm::rotate(gPerFrameConstantBuffer.mSunAzimuth + glm::pi<float>() / 2.0f, glm::vec3(0, 1, 0));
@@ -617,6 +623,8 @@ void sRender()
 
 	// Atmosphere
 	{
+		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Atmosphere");
+
 		gAtmosphere.Update();
 		gAtmosphere.Precompute();
 		gAtmosphere.Compute();
@@ -625,17 +633,23 @@ void sRender()
 
 	// Cloud
 	{
+		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Cloud");
+
 		gCloud.Update();
 		gCloud.Precompute();
 	}
 
 	// Raytrace
 	{
+		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Raytrace");
+
 		gRaytrace();
 	}
 
 	// Copy
 	{
+		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Copy");
+
 		BarrierScope output_resource_scope(gCommandList, gScene.GetOutputResource(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE);
 
 		// Draw
@@ -663,6 +677,8 @@ void sRender()
 
 	// Draw ImGui
 	{
+		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "ImGui");
+
 		ImGui::Render();
 
 		gCommandList->OMSetRenderTargets(1, &frame_render_target_descriptor_handle, false, nullptr);
@@ -949,20 +965,17 @@ static void sWaitForLastSubmittedFrame()
 	WaitForSingleObject(gIncrementalFenceEvent, INFINITE);
 }
 
-static FrameContext* sWaitForNextFrameResources()
+static FrameContext* sWaitForFrameResources()
 {
-	UINT nextFrameIndex = gFrameIndex + 1;
-	gFrameIndex = nextFrameIndex;
-
 	HANDLE waitableObjects[] = { gSwapChainWaitableObject, nullptr };
 	DWORD numWaitableObjects = 1;
 
-	FrameContext* frame_context = &gFrameContext[nextFrameIndex % NUM_FRAMES_IN_FLIGHT];
+	FrameContext* frame_context = &gFrameContext[gFrameIndex % NUM_FRAMES_IN_FLIGHT];
 	UINT64 fenceValue = frame_context->mFenceValue;
 	if (fenceValue != 0) // means no fence was signaled
 	{
+		gIncrementalFence->SetEventOnCompletion(frame_context->mFenceValue, gIncrementalFenceEvent);
 		frame_context->mFenceValue = 0;
-		gIncrementalFence->SetEventOnCompletion(fenceValue, gIncrementalFenceEvent);
 		waitableObjects[1] = gIncrementalFenceEvent;
 		numWaitableObjects = 2;
 	}

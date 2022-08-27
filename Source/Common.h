@@ -9,6 +9,7 @@
 #include <comdef.h>
 #include <wrl.h>	// For ComPtr. See https://github.com/Microsoft/DirectXTK/wiki/ComPtr
 using Microsoft::WRL::ComPtr;
+#include <pix3.h>
 
 #include <tchar.h>
 #include <string>
