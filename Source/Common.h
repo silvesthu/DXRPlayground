@@ -157,8 +157,8 @@ extern Shader								gCompositeShader;
 // Frame
 enum
 {
-	NUM_FRAMES_IN_FLIGHT = 3,
-	NUM_BACK_BUFFERS = 3
+	NUM_FRAMES_IN_FLIGHT = 2,
+	NUM_BACK_BUFFERS = 2
 };
 struct FrameContext
 {
