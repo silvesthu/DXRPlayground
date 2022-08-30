@@ -92,7 +92,7 @@ static void sCreateRenderTarget();
 static void sCleanupRenderTarget();
 static void sWaitForIdle();
 static void sWaitForLastSubmittedFrame();
-static FrameContext* sWaitForFrameResources();
+static void sWaitForFrameContext();
 static void sUpdate();
 static void sLoadCamera();
 static void sLoadScene();
@@ -401,7 +401,7 @@ static void sUpdate()
 			gScene.RebuildShader();
 			gPerFrameConstantBuffer.mReset = 1;
 
-			gAtmosphere.mRecomputeRequested = true;
+			gAtmosphere.mRuntime.mBruneton17.mRecomputeRequested = true;
 			gCloud.mRecomputeRequested = true;
 		}
 	}
@@ -563,17 +563,16 @@ void sRender()
 	gFrameIndex++;
 
 	// Frame Context
-	FrameContext* frame_context = sWaitForFrameResources();
+	sWaitForFrameContext();
+	FrameContext& frame_context = gGetFrameContext();
 	glm::uint32 frame_index = gSwapChain->GetCurrentBackBufferIndex();
 	ID3D12Resource* frame_render_target_resource = gBackBufferRenderTargetResource[frame_index];
 	D3D12_CPU_DESCRIPTOR_HANDLE& frame_render_target_descriptor_handle = gBackBufferRenderTargetRTV[frame_index];
 
 	// Frame Begin
 	{
-		frame_context->mCommandAllocator->Reset();
-		gCommandList->Reset(frame_context->mCommandAllocator, nullptr);
-		
-		gBarrierTransition(gCommandList, frame_render_target_resource, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		frame_context.mCommandAllocator->Reset();
+		gCommandList->Reset(frame_context.mCommandAllocator.Get(), nullptr);
 	}
 
 	// Update
@@ -614,10 +613,10 @@ void sRender()
 			sPerFrameCopy = gPerFrameConstantBuffer;
 		}
 		
-		memcpy(frame_context->mConstantUploadBufferPointer, &gPerFrameConstantBuffer, sizeof(gPerFrameConstantBuffer));
+		memcpy(frame_context.mConstantUploadBufferPointer, &gPerFrameConstantBuffer, sizeof(gPerFrameConstantBuffer));
 
 		gBarrierTransition(gCommandList, gConstantGPUBuffer.Get(), D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, D3D12_RESOURCE_STATE_COPY_DEST);
-		gCommandList->CopyResource(gConstantGPUBuffer.Get(), frame_context->mConstantUploadBuffer);
+		gCommandList->CopyResource(gConstantGPUBuffer.Get(), frame_context.mConstantUploadBuffer.Get());
 		gBarrierTransition(gCommandList, gConstantGPUBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 	}
 
@@ -626,9 +625,6 @@ void sRender()
 		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Atmosphere");
 
 		gAtmosphere.Update();
-		gAtmosphere.Precompute();
-		gAtmosphere.Compute();
-		gAtmosphere.Validate();
 	}
 
 	// Cloud
@@ -650,6 +646,7 @@ void sRender()
 	{
 		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Copy");
 
+		gBarrierTransition(gCommandList, frame_render_target_resource, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		BarrierScope output_resource_scope(gCommandList, gScene.GetOutputResource(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE);
 
 		// Draw
@@ -726,7 +723,7 @@ void sRender()
 		UINT64 fence_value = gFenceLastSignaledValue + 1;
 		gCommandQueue->Signal(gIncrementalFence, fence_value);
 		gFenceLastSignaledValue = fence_value;
-		frame_context->mFenceValue = fence_value;
+		frame_context.mFenceValue = fence_value;
 	}
 }
 
@@ -832,21 +829,31 @@ static bool sCreateDeviceD3D(HWND hWnd)
 	{
 		std::wstring name;
 
-		gValidate(gDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&gFrameContext[i].mCommandAllocator)));
-		name = L"CommandAllocator_" + std::to_wstring(i);
-		gFrameContext[i].mCommandAllocator->SetName(name.c_str());
+		// Allocator
+		{
+			gValidate(gDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&gFrameContexts[i].mCommandAllocator)));
+			name = L"FrameContext.CommandAllocator_" + std::to_wstring(i);
+			gFrameContexts[i].mCommandAllocator->SetName(name.c_str());
+		}
+
+		// DescriptorHeap
+		{
+			gFrameContexts[i].mDescriptorHeap.Initialize();
+			name = L"FrameContext.DescriptorHeap_" + std::to_wstring(i);
+			gFrameContexts[i].mDescriptorHeap.mHeap->SetName(name.c_str());
+		}
 
 		// Buffer
 		{
 			D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(gAlignUp(static_cast<UINT>(sizeof(PerFrameConstants)), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
 			D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
 
-			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gFrameContext[i].mConstantUploadBuffer)));
-			name = L"Constant_Upload_" + std::to_wstring(i);
-			gFrameContext[i].mConstantUploadBuffer->SetName(name.c_str());
+			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gFrameContexts[i].mConstantUploadBuffer)));
+			name = L"FrameContext.ConstantUpload_" + std::to_wstring(i);
+			gFrameContexts[i].mConstantUploadBuffer->SetName(name.c_str());
 
 			// Persistent map - https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12resource-map#advanced-usage-models
-			gFrameContext[i].mConstantUploadBuffer->Map(0, nullptr, (void**)&gFrameContext[i].mConstantUploadBufferPointer);
+			gFrameContexts[i].mConstantUploadBuffer->Map(0, nullptr, (void**)&gFrameContexts[i].mConstantUploadBufferPointer);
 		}
 	}
 
@@ -863,7 +870,7 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		}
 	}
 
-	gValidate(gDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, gFrameContext[0].mCommandAllocator, nullptr, IID_PPV_ARGS(&gCommandList)));
+	gValidate(gDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, gFrameContexts[0].mCommandAllocator.Get(), nullptr, IID_PPV_ARGS(&gCommandList)));
 	gCommandList->SetName(L"CommandList");
 
 	if (gDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&gIncrementalFence)) != S_OK)
@@ -902,10 +909,7 @@ static void sCleanupDeviceD3D()
 	gSafeCloseHandle(gSwapChainWaitableObject);
 
 	for (UINT i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
-	{
-		gSafeRelease(gFrameContext[i].mCommandAllocator);
-		gSafeRelease(gFrameContext[i].mConstantUploadBuffer);
-	}
+		gFrameContexts[i].Reset();
 
 	gConstantGPUBuffer = nullptr;
 	gUniversalHeap = nullptr;
@@ -951,13 +955,13 @@ static void sWaitForIdle()
 
 static void sWaitForLastSubmittedFrame()
 {
-	FrameContext* frame_context = &gFrameContext[gFrameIndex % NUM_FRAMES_IN_FLIGHT];
+	FrameContext& frame_context = gGetFrameContext();
 
-	UINT64 fenceValue = frame_context->mFenceValue;
+	UINT64 fenceValue = frame_context.mFenceValue;
 	if (fenceValue == 0)
 		return; // No fence was signaled
 
-	frame_context->mFenceValue = 0;
+	frame_context.mFenceValue = 0;
 	if (gIncrementalFence->GetCompletedValue() >= fenceValue)
 		return;
 
@@ -965,24 +969,22 @@ static void sWaitForLastSubmittedFrame()
 	WaitForSingleObject(gIncrementalFenceEvent, INFINITE);
 }
 
-static FrameContext* sWaitForFrameResources()
+static void sWaitForFrameContext()
 {
 	HANDLE waitableObjects[] = { gSwapChainWaitableObject, nullptr };
 	DWORD numWaitableObjects = 1;
 
-	FrameContext* frame_context = &gFrameContext[gFrameIndex % NUM_FRAMES_IN_FLIGHT];
-	UINT64 fenceValue = frame_context->mFenceValue;
+	FrameContext& frame_context = gGetFrameContext();
+	UINT64 fenceValue = frame_context.mFenceValue;
 	if (fenceValue != 0) // means no fence was signaled
 	{
-		gIncrementalFence->SetEventOnCompletion(frame_context->mFenceValue, gIncrementalFenceEvent);
-		frame_context->mFenceValue = 0;
+		gIncrementalFence->SetEventOnCompletion(frame_context.mFenceValue, gIncrementalFenceEvent);
+		frame_context.mFenceValue = 0;
 		waitableObjects[1] = gIncrementalFenceEvent;
 		numWaitableObjects = 2;
 	}
 
 	WaitForMultipleObjects(numWaitableObjects, waitableObjects, TRUE, INFINITE);
-
-	return frame_context;
 }
 
 // Win32 message handler

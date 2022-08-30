@@ -1,6 +1,5 @@
+#pragma once
 // Code shared between HLSL and C++
-#ifndef __INCLUDE_SHARED_INL__
-#define __INCLUDE_SHARED_INL__
 
 #ifdef __cplusplus
 
@@ -44,6 +43,57 @@ static const float kSolarLuminousEfficacy		= 93.0f; // lm/W
 static const float kKW2W						= 1000.0f;
 static const float kSolarKW2LM					= kKW2W * kSolarLuminousEfficacy;
 static const float kSolarLM2KW					= 1.0f / kSolarKW2LM;
+
+// Persistent Descriptor Heap Entries
+// Rather than allocate and pass index around, fixed slot is easier for debugging
+enum class DescriptorIndex : uint
+{
+	NullSRV,
+	NullUAV,
+
+	NullCount,
+
+	RaytraceTLASSRV,
+	RaytraceInstanceDataSRV,
+	RaytraceIndicesSRV,
+	RaytraceVerticesSRV,
+	RaytraceNormalsSRV,
+	RaytraceUVsSRV,
+	RaytraceLightsSRV,
+
+	RaytraceOutputSRV,
+	RaytraceOutputUAV,
+
+	// [Bruneton17]
+	Bruneton17TransmittanceUAV,
+	Bruneton17DeltaIrradianceUAV,
+	Bruneton17IrradianceUAV,
+	Bruneton17DeltaRayleighScatteringUAV,
+	Bruneton17DeltaMieScatteringUAV,
+	Bruneton17ScatteringUAV,
+	Bruneton17DeltaScatteringDensityUAV,
+
+	// [Hillaire20]
+	Hillaire20TransmittanceTexUAV,
+	Hillaire20MultiScattUAV,
+	Hillaire20SkyViewLutUAV,
+	Hillaire20AtmosphereCameraScatteringVolumeUAV,
+
+	// [Wilkie21]
+	Wilkie21SkyViewUAV,
+
+	// [Validation] - [Hillaire20]
+	ValidationHillaire20TransmittanceTexExpectedUAV,
+	ValidationHillaire20MultiScattExpectedUAV,
+	ValidationHillaire20SkyViewLutExpectedUAV,
+	ValidationHillaire20AtmosphereCameraScatteringVolumeExpectedUAV,
+	ValidationHillaire20TransmittanceTexDiffUAV,
+	ValidationHillaire20MultiScattDiffUAV,
+	ValidationHillaire20SkyViewLutDiffUAV,
+	ValidationHillaire20AtmosphereCameraScatteringVolumeDiffUAV,
+
+	Count
+};
 
 enum class DebugMode : uint
 {
@@ -353,5 +403,3 @@ struct CloudConstants
 #undef CONCAT
 #undef CONCAT_INNER
 #undef GENERATE_PAD_NAME
-
-#endif // __INCLUDE_SHARED_INL__

@@ -25,7 +25,7 @@ ShaderTable							gDXRShaderTable = {};
 
 ComPtr<ID3D12DescriptorHeap>		gUniversalHeap = nullptr;
 SIZE_T								gUniversalHeapHandleIncrementSize = 0;
-std::atomic<int>					gUniversalHeapHandleIndex = 0;
+int									gUniversalHeapHandleIndex = 0;
 
 bool								gUseDXRInlineShader = true;
 Shader								gDXRInlineShader = Shader().FileName("Shader/Raytracing.hlsl").CSName("InlineRaytracingCS").UseGlobalRootSignature(true);
@@ -36,7 +36,7 @@ Shader								gDiffTexture3DShader = Shader().FileName("Shader/DiffTexture.hlsl"
 Shader								gCompositeShader = Shader().FileName("Shader/Composite.hlsl").VSName("ScreenspaceTriangleVS").PSName("CompositePS");
 
 // Frame
-FrameContext						gFrameContext[NUM_FRAMES_IN_FLIGHT] = {};
+FrameContext						gFrameContexts[NUM_FRAMES_IN_FLIGHT] = {};
 glm::uint32							gFrameIndex = 0;
 PerFrameConstants					gPerFrameConstantBuffer = {};
 
@@ -179,23 +179,26 @@ void Shader::InitializeDescriptors(const std::vector<Shader::DescriptorInfo>& in
 	}
 }
 
-void Shader::SetupGraphics()
+void Shader::SetupGraphics(ID3D12DescriptorHeap* inHeap, bool inUseTable)
 {
 	gCommandList->SetGraphicsRootSignature(mData.mRootSignature.Get());
-	ID3D12DescriptorHeap* descriptor_heap = mData.mDescriptorHeap.Get();
-	gCommandList->SetDescriptorHeaps(1, &descriptor_heap);
-	gCommandList->SetGraphicsRootDescriptorTable(0, mData.mDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 	gCommandList->SetPipelineState(mData.mPipelineState.Get());
+
+	ID3D12DescriptorHeap* heap = inHeap != nullptr ? inHeap : mData.mDescriptorHeap.Get();
+	gCommandList->SetDescriptorHeaps(1, &heap);
+	if (inUseTable)
+		gCommandList->SetGraphicsRootDescriptorTable(0, heap->GetGPUDescriptorHandleForHeapStart());
 }
 
 void Shader::SetupCompute(ID3D12DescriptorHeap* inHeap, bool inUseTable)
 {
 	gCommandList->SetComputeRootSignature(mData.mRootSignature.Get());
+	gCommandList->SetPipelineState(mData.mPipelineState.Get());
+
 	ID3D12DescriptorHeap* heap = inHeap != nullptr ? inHeap : mData.mDescriptorHeap.Get();
 	gCommandList->SetDescriptorHeaps(1, &heap);
 	if (inUseTable)
 		gCommandList->SetComputeRootDescriptorTable(0, heap->GetGPUDescriptorHandleForHeapStart());
-	gCommandList->SetPipelineState(mData.mPipelineState.Get());
 }
 
 int Texture::GetPixelSize() const
@@ -210,50 +213,65 @@ glm::uint64 Texture::GetSubresourceSize() const
 
 void Texture::Initialize()
 {
-	auto create_uav = [](ID3D12Resource* inResource, int& outHeapIndex)
-	{
-		D3D12_RESOURCE_DESC resource_desc = inResource->GetDesc();
-
-		D3D12_UNORDERED_ACCESS_VIEW_DESC desc = {};
-		if (resource_desc.DepthOrArraySize == 1)
-		{
-			desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-			desc.Texture2D.MipSlice = 0;
-			desc.Texture2D.PlaneSlice = 0;
-		}
-		else
-		{
-			desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE3D;
-			desc.Texture3D.MipSlice = 0;
-			desc.Texture3D.FirstWSlice = 0;
-			desc.Texture3D.WSize = resource_desc.DepthOrArraySize;
-		}
-		D3D12_CPU_DESCRIPTOR_HANDLE handle = gUniversalHeap->GetCPUDescriptorHandleForHeapStart();
-
-		outHeapIndex = gUniversalHeapHandleIndex++;
-		handle.ptr += outHeapIndex * gUniversalHeapHandleIncrementSize;
-		gDevice->CreateUnorderedAccessView(inResource, nullptr, &desc, handle);
-	};
-
-	std::wstring name = gToWString(mName);
-
 	D3D12_RESOURCE_DESC resource_desc = gGetTextureResourceDesc(mWidth, mHeight, mDepth, mFormat);
 	D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
 
 	gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mResource)));
-	mResource->SetName(name.c_str());
-	create_uav(mResource.Get(), mResourceHeapIndex);
+	gSetName(mResource, "", mName);
+
+	// SRV
+	if (mSRVIndex > DescriptorIndex::NullCount && mSRVIndex < DescriptorIndex::Count)
+	{
+		for (int i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
+		{
+			D3D12_CPU_DESCRIPTOR_HANDLE handle = gFrameContexts[i].mDescriptorHeap.AllocateStatic(mSRVIndex);
+
+			D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
+			desc.Format = mFormat;
+			desc.ViewDimension = mDepth == 1 ? D3D12_SRV_DIMENSION_TEXTURE2D : D3D12_SRV_DIMENSION_TEXTURE3D;
+			desc.Texture2D.MipLevels = (UINT)-1;
+			desc.Texture2D.MostDetailedMip = 0;
+			desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+			gDevice->CreateShaderResourceView(mResource.Get(), &desc, handle);
+		}
+	}
+
+	// UAV
+	if (mUAVIndex != DescriptorIndex::Count)
+	{
+		for (int i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
+		{
+			D3D12_CPU_DESCRIPTOR_HANDLE handle = gFrameContexts[i].mDescriptorHeap.AllocateStatic(mUAVIndex);
+
+			D3D12_UNORDERED_ACCESS_VIEW_DESC desc = {};
+			if (resource_desc.DepthOrArraySize == 1)
+			{
+				desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+				desc.Texture2D.MipSlice = 0;
+				desc.Texture2D.PlaneSlice = 0;
+			}
+			else
+			{
+				desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE3D;
+				desc.Texture3D.MipSlice = 0;
+				desc.Texture3D.FirstWSlice = 0;
+				desc.Texture3D.WSize = resource_desc.DepthOrArraySize;
+			}
+			gDevice->CreateUnorderedAccessView(mResource.Get(), nullptr, &desc, handle);
+		}
+	}
 	
 	// SRV for ImGui
 	{
-		ImGui_ImplDX12_AllocateDescriptor(mGuiCPUHandle, mGuiGPUHandle);
-		D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
-		srv_desc.Format = mFormat;
-		srv_desc.ViewDimension = mDepth == 1 ? D3D12_SRV_DIMENSION_TEXTURE2D : D3D12_SRV_DIMENSION_TEXTURE3D;
-		srv_desc.Texture2D.MipLevels = (UINT)-1;
-		srv_desc.Texture2D.MostDetailedMip = 0;
-		srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		gDevice->CreateShaderResourceView(mResource.Get(), &srv_desc, mGuiCPUHandle);
+		D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle;
+		ImGui_ImplDX12_AllocateDescriptor(cpu_handle, mImGuiGPUHandle);
+		D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
+		desc.Format = mFormat;
+		desc.ViewDimension = mDepth == 1 ? D3D12_SRV_DIMENSION_TEXTURE2D : D3D12_SRV_DIMENSION_TEXTURE3D;
+		desc.Texture2D.MipLevels = (UINT)-1;
+		desc.Texture2D.MostDetailedMip = 0;
+		desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		gDevice->CreateShaderResourceView(mResource.Get(), &desc, cpu_handle);
 	}
 
 	// UIScale
@@ -330,7 +348,7 @@ void ImGuiShowTextures(std::span<Texture> inTextures, const std::string& inName,
 				std::swap(uv0.y, uv1.y);
 
 			float item_ui_scale = inTexture.mUIScale * ui_scale;
-			ImGui::Image(reinterpret_cast<ImTextureID>(inTexture.mGuiGPUHandle.ptr), ImVec2(inTexture.mWidth * item_ui_scale, inTexture.mHeight * item_ui_scale), uv0, uv1);
+			ImGui::Image(reinterpret_cast<ImTextureID>(inTexture.mImGuiGPUHandle.ptr), ImVec2(inTexture.mWidth * item_ui_scale, inTexture.mHeight * item_ui_scale), uv0, uv1);
 			if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
 			{
 				sTexture = &inTexture;

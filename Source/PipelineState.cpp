@@ -169,11 +169,14 @@ void GenerateGlobalRootSignatureDescriptor(RootSignatureDescriptor& outDesc)
 	descriptor_range.RegisterSpace = 2;
 	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 	descriptor_range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-	for (int i = 0; i < gAtmosphere.mResource.mTextures.size(); i++)
-	{
-		descriptor_range.BaseShaderRegister = i;
-		outDesc.mDescriptorRanges.push_back(descriptor_range);
-	}
+	int base_shader_register = 0;
+	for (auto&& texture_set : gAtmosphere.mRuntime.mTexturesSet)
+		for (auto&& texture : texture_set)
+		{
+			(void)texture;
+			descriptor_range.BaseShaderRegister = base_shader_register++;
+			outDesc.mDescriptorRanges.push_back(descriptor_range);
+		}
 
 	// b, space3 - Cloud
 	descriptor_range = {};
@@ -190,7 +193,7 @@ void GenerateGlobalRootSignatureDescriptor(RootSignatureDescriptor& outDesc)
 	descriptor_range.RegisterSpace = 3;
 	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 	descriptor_range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-	for (int i = 0; i < gCloud.mResource.mTextures.size(); i++)
+	for (int i = 0; i < gCloud.mRuntime.mTextures.size(); i++)
 	{
 		descriptor_range.BaseShaderRegister = i;
 		outDesc.mDescriptorRanges.push_back(descriptor_range);
@@ -657,10 +660,11 @@ void gCreatePipelineState()
 		succeed &= sCreatePipelineState(gDiffTexture2DShader);
 		succeed &= sCreatePipelineState(gDiffTexture3DShader);
 
-		for (auto&& shader : gAtmosphere.mResource.mShaders)
-			succeed &= sCreatePipelineState(shader);
+		for (auto&& shaders : gAtmosphere.mRuntime.mShadersSet)
+			for (auto&& shader : shaders)
+				succeed &= sCreatePipelineState(shader);
 
-		for (auto&& shader : gCloud.mResource.mShaders)
+		for (auto&& shader : gCloud.mRuntime.mShaders)
 			succeed &= sCreatePipelineState(shader);
 
 		if (!succeed)

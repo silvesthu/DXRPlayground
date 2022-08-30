@@ -3,13 +3,13 @@
 
 void Cloud::Update()
 {
-	gCloud.mProfile.mShapeNoise.mOffset += gCloud.mProfile.mWind * ImGui::GetIO().DeltaTime;
+	mProfile.mShapeNoise.mOffset += mProfile.mWind * ImGui::GetIO().DeltaTime;
 
-	CloudConstants* cloud = static_cast<CloudConstants*>(gCloud.mResource.mConstantUploadBufferPointer);
-	cloud->mMode		= gCloud.mProfile.mMode;
-	cloud->mRaymarch	= gCloud.mProfile.mRaymarch;
-	cloud->mGeometry	= gCloud.mProfile.mGeometry;
-	cloud->mShapeNoise	= gCloud.mProfile.mShapeNoise;
+	CloudConstants* cloud = static_cast<CloudConstants*>(mRuntime.mConstantUploadBufferPointer);
+	cloud->mMode		= mProfile.mMode;
+	cloud->mRaymarch	= mProfile.mRaymarch;
+	cloud->mGeometry	= mProfile.mGeometry;
+	cloud->mShapeNoise	= mProfile.mShapeNoise;
 }
 
 void Cloud::Initialize()
@@ -19,21 +19,21 @@ void Cloud::Initialize()
 		D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(gAlignUp((UINT)sizeof(Cloud), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
 		D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
 
-		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gCloud.mResource.mConstantUploadBuffer)));
-		gCloud.mResource.mConstantUploadBuffer->SetName(L"Cloud.Constant");
-		gCloud.mResource.mConstantUploadBuffer->Map(0, nullptr, (void**)&gCloud.mResource.mConstantUploadBufferPointer);
+		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mRuntime.mConstantUploadBuffer)));
+		mRuntime.mConstantUploadBuffer->SetName(L"Cloud.Constant");
+		mRuntime.mConstantUploadBuffer->Map(0, nullptr, (void**)&mRuntime.mConstantUploadBufferPointer);
 	}
 
 	// Texture
 	{
-		for (auto&& texture : gCloud.mResource.mTextures)
+		for (auto&& texture : mRuntime.mTextures)
 			texture.Initialize();
 	}
 
 	// Shader Binding
 	{
-		gCloud.mResource.mShapeNoiseShader.InitializeDescriptors({ gCloud.mResource.mShapeNoiseInputTexture.mResource.Get(), gCloud.mResource.mShapeNoiseTexture.mResource.Get() });
-		gCloud.mResource.mErosionNoiseShader.InitializeDescriptors({ gCloud.mResource.mErosionNoiseInputTexture.mResource.Get(), gCloud.mResource.mErosionNoiseTexture.mResource.Get() });
+		mRuntime.mShapeNoiseShader.InitializeDescriptors({ mRuntime.mShapeNoiseInputTexture.mResource.Get(), mRuntime.mShapeNoiseTexture.mResource.Get() });
+		mRuntime.mErosionNoiseShader.InitializeDescriptors({ mRuntime.mErosionNoiseInputTexture.mResource.Get(), mRuntime.mErosionNoiseTexture.mResource.Get() });
 	}
 }
 
@@ -46,28 +46,28 @@ void Cloud::Precompute()
 	// Load
 	{
 		{
-			gCloud.mResource.mShapeNoiseTexture.Update();
+			mRuntime.mShapeNoiseTexture.Update();
 			
-			BarrierScope input_resource_scope(gCommandList, gCloud.mResource.mShapeNoiseInputTexture.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-			BarrierScope resource_scope(gCommandList, gCloud.mResource.mShapeNoiseTexture.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-			gCloud.mResource.mShapeNoiseShader.SetupCompute();
-			gCommandList->Dispatch(gCloud.mResource.mShapeNoiseTexture.mWidth / 8, gCloud.mResource.mShapeNoiseTexture.mHeight / 8, gCloud.mResource.mShapeNoiseTexture.mDepth);
+			BarrierScope input_resource_scope(gCommandList, mRuntime.mShapeNoiseInputTexture.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+			BarrierScope resource_scope(gCommandList, mRuntime.mShapeNoiseTexture.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+			mRuntime.mShapeNoiseShader.SetupCompute();
+			gCommandList->Dispatch(mRuntime.mShapeNoiseTexture.mWidth / 8, mRuntime.mShapeNoiseTexture.mHeight / 8, mRuntime.mShapeNoiseTexture.mDepth);
 		}
 
 		{
-			gCloud.mResource.mErosionNoiseTexture.Update();
+			mRuntime.mErosionNoiseTexture.Update();
 
-			BarrierScope input_resource_scope(gCommandList, gCloud.mResource.mErosionNoiseInputTexture.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-			BarrierScope output_resource_scope(gCommandList, gCloud.mResource.mErosionNoiseTexture.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-			gCloud.mResource.mErosionNoiseShader.SetupCompute();
-			gCommandList->Dispatch(gCloud.mResource.mErosionNoiseTexture.mWidth / 8, gCloud.mResource.mErosionNoiseTexture.mHeight / 8, gCloud.mResource.mErosionNoiseTexture.mDepth);
+			BarrierScope input_resource_scope(gCommandList, mRuntime.mErosionNoiseInputTexture.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+			BarrierScope output_resource_scope(gCommandList, mRuntime.mErosionNoiseTexture.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+			mRuntime.mErosionNoiseShader.SetupCompute();
+			gCommandList->Dispatch(mRuntime.mErosionNoiseTexture.mWidth / 8, mRuntime.mErosionNoiseTexture.mHeight / 8, mRuntime.mErosionNoiseTexture.mDepth);
 		}
 	}
 }
 
 void Cloud::Finalize()
 {
-	gCloud.mResource.Reset();
+	mRuntime.Reset();
 }
 
 void Cloud::UpdateImGui()
@@ -125,7 +125,7 @@ void Cloud::UpdateImGui()
 		ImGui::TreePop();
 	}
 
-	ImGuiShowTextures(gCloud.mResource.mTextures);
+	ImGuiShowTextures(mRuntime.mTextures);
 }
 
 Cloud gCloud;

@@ -55,7 +55,7 @@ public:
 	};
 	Profile mProfile;
 
-	struct Resource : ResourceBase<Resource>
+	struct Runtime : RuntimeBase<Runtime>
 	{
 		ComPtr<ID3D12Resource> mConstantUploadBuffer;
 		void* mConstantUploadBufferPointer		= nullptr;
@@ -76,7 +76,7 @@ public:
 		Texture mSentinelTexture				= Texture();
 		std::span<Texture> mTextures			= std::span<Texture>(&mShapeNoiseTexture, &mSentinelTexture);
 	};
-	Resource mResource;
+	Runtime mRuntime;
 
 	void Initialize();
 	void Precompute();

@@ -4,169 +4,210 @@
 
 void Atmosphere::Update()
 {
-	AtmosphereConstants* constants				= static_cast<AtmosphereConstants*>(gAtmosphere.mResource.mConstantUploadBufferPointer);
+	UpdateProfile();
+
+	for (auto&& textures : mRuntime.mTexturesSet)
+		for (auto&& texture : textures)
+			texture.Update();
+
+	for (auto&& textures : mRuntime.mValidationTexturesSet)
+		for (auto&& texture : textures)
+			texture.Update();
+
+	switch (mProfile.mMode)
+	{
+	case AtmosphereMode::Bruneton17:			mRuntime.mBruneton17.Update(mProfile); break;
+	case AtmosphereMode::Hillaire20:			mRuntime.mHillaire20.Update(mProfile); break;
+	case AtmosphereMode::Wilkie21:				mRuntime.mWilkie21.Update(mProfile); break;
+	default:									break;
+	}
+
+	if (mProfile.mMode != AtmosphereMode::Wilkie21 && mRuntime.mWilkie21.mSplitScreen != 0)
+		mRuntime.mWilkie21.Update(mProfile);
+}
+
+void Atmosphere::UpdateProfile()
+{
+	AtmosphereConstants* constants				= static_cast<AtmosphereConstants*>(mRuntime.mConstantUploadBufferPointer);
 
 	auto inv_m_to_inv_km						= [](glm::f64 inInvM) { return static_cast<float>(inInvM * 1000.0); };
 
-	constants->mBottomRadius					= static_cast<float>(gAtmosphere.mProfile.BottomRadius());
-	constants->mTopRadius						= static_cast<float>(gAtmosphere.mProfile.TopRadius());
-	constants->mSceneScale						= gAtmosphere.mProfile.mSceneInKilometer ? 1.0f : 0.001f;
+	constants->mBottomRadius					= static_cast<float>(mProfile.BottomRadius());
+	constants->mTopRadius						= static_cast<float>(mProfile.TopRadius());
+	constants->mSceneScale						= mRuntime.mSceneInKilometer ? 1.0f : 0.001f;
 
-	constants->mMode							= gAtmosphere.mProfile.mMode;
-	constants->mMuSEncodingMode					= gAtmosphere.mProfile.mMuSEncodingMode;
-	constants->mSliceCount						= gAtmosphere.mResource.mSliceCount;
+	constants->mMode							= mProfile.mMode;
+	constants->mMuSEncodingMode					= mRuntime.mBruneton17.mMuSEncodingMode;
+	constants->mSliceCount						= mRuntime.mSliceCount;
 
-	constants->mConstantColor					= gAtmosphere.mProfile.mConstantColor;
+	constants->mConstantColor					= mProfile.mConstantColor;
 
-	constants->mSolarIrradiance					= gAtmosphere.mProfile.mSolarIrradiance;
-	constants->mSunAngularRadius				= static_cast<float>(gAtmosphere.mProfile.kSunAngularRadius);
+	constants->mSolarIrradiance					= mProfile.mSolarIrradiance;
+	constants->mSunAngularRadius				= static_cast<float>(mProfile.kSunAngularRadius);
 
-	constants->mHillaire20SkyViewInLuminance	= gAtmosphere.mProfile.mHillaire20SkyViewInLuminance;
-	constants->mWilkie21SkyViewSplitScreen		= gAtmosphere.mProfile.mWilkie21SkyViewSplitScreen;
-	constants->mAerialPerspective				= (gAtmosphere.mProfile.mMode != AtmosphereMode::RaymarchAtmosphereOnly && gAtmosphere.mProfile.mAerialPerspective) ? 1 : 0;
-	constants->mGroundAlbedo					= gAtmosphere.mProfile.mGroundAlbedo;
-	constants->mRuntimeGroundAlbedo				= gAtmosphere.mProfile.mRuntimeGroundAlbedo;
+	constants->mHillaire20SkyViewInLuminance	= mRuntime.mHillaire20.mSkyViewInLuminance;
+	constants->mWilkie21SkyViewSplitScreen		= mRuntime.mWilkie21.mSplitScreen;
+	constants->mAerialPerspective				= mRuntime.mAerialPerspective ? 1 : 0;
+	constants->mGroundAlbedo					= mProfile.mGroundAlbedo;
+	constants->mRuntimeGroundAlbedo				= mProfile.mRuntimeGroundAlbedo;
 
 	// Density Profile
 	{
 		// Rayleigh
 		{
 			// Scattering Coefficient
-			constants->mRayleighScattering		= gAtmosphere.mProfile.mEnableRayleigh ? gAtmosphere.mProfile.mRayleighScatteringCoefficient : glm::dvec3(1e-9);
+			constants->mRayleighScattering		= mProfile.mEnableRayleigh ? mProfile.mRayleighScatteringCoefficient : glm::dvec3(1e-9);
 
 			// Extinction Coefficient
-			constants->mRayleighExtinction		= gAtmosphere.mProfile.mEnableRayleigh ? gAtmosphere.mProfile.mRayleighScatteringCoefficient : glm::dvec3(1e-9);
+			constants->mRayleighExtinction		= mProfile.mEnableRayleigh ? mProfile.mRayleighScatteringCoefficient : glm::dvec3(1e-9);
 
 			// Density
-			constants->mRayleighDensity			= gAtmosphere.mProfile.mRayleighDensityProfile;
+			constants->mRayleighDensity			= mProfile.mRayleighDensityProfile;
 		}
 
 		// Mie
 		{
 			// Scattering Coefficient
-			constants->mMieScattering			= gAtmosphere.mProfile.mEnableMie ? gAtmosphere.mProfile.mMieScatteringCoefficient : glm::dvec3(1e-9);
+			constants->mMieScattering			= mProfile.mEnableMie ? mProfile.mMieScatteringCoefficient : glm::dvec3(1e-9);
 
 			// Extinction Coefficient
-			constants->mMieExtinction			= gAtmosphere.mProfile.mEnableMie ? gAtmosphere.mProfile.mMieExtinctionCoefficient : glm::dvec3(1e-9);
+			constants->mMieExtinction			= mProfile.mEnableMie ? mProfile.mMieExtinctionCoefficient : glm::dvec3(1e-9);
 
 			// Phase function
-			constants->mMiePhaseFunctionG		= static_cast<float>(gAtmosphere.mProfile.mMiePhaseFunctionG);
+			constants->mMiePhaseFunctionG		= static_cast<float>(mProfile.mMiePhaseFunctionG);
 
 			// Density
-			constants->mMieDensity				= gAtmosphere.mProfile.mMieDensityProfile;
+			constants->mMieDensity				= mProfile.mMieDensityProfile;
 		}
 
 		// Ozone
 		{
 			// Extinction Coefficient
-			constants->mOzoneExtinction			= gAtmosphere.mProfile.mEnableOzone ? gAtmosphere.mProfile.mOZoneAbsorptionCoefficient : glm::dvec3();
+			constants->mOzoneExtinction			= mProfile.mEnableOzone ? mProfile.mOZoneAbsorptionCoefficient : glm::dvec3();
 
 			// Density
-			constants->mOzoneDensity				= gAtmosphere.mProfile.mOzoneDensityProfile;
+			constants->mOzoneDensity				= mProfile.mOzoneDensityProfile;
 		}
 	}
-
-	for (auto&& texture : gAtmosphere.mResource.mTextures)
-		texture.Update();
-
-	for (auto&& texture : gAtmosphere.mResource.mValidation.mTextures)
-		texture.Update();
-
-	ComputeWilkie21();
 }
 
-void Atmosphere::ComputeTransmittance()
+void Atmosphere::Runtime::Bruneton17::Update(const Profile& inProfile)
 {
-	gAtmosphere.mResource.mComputeTransmittanceShader.SetupCompute();
-	gCommandList->Dispatch(gAtmosphere.mResource.mTransmittanceTexture.mWidth / 8, gAtmosphere.mResource.mTransmittanceTexture.mHeight / 8, gAtmosphere.mResource.mTransmittanceTexture.mDepth);
+	static Atmosphere::Profile sAtmosphereProfileCache = inProfile;
+	if (memcmp(&sAtmosphereProfileCache, &inProfile, sizeof(Atmosphere::Profile)) != 0)
+	{
+		sAtmosphereProfileCache = inProfile;
+
+		// Reset accumulation
+		gPerFrameConstantBuffer.mReset = true;
+
+		// Recompute
+		mRecomputeRequested = true;
+	}
+
+	if (mRecomputeRequested || mRecomputeEveryFrame)
+	{
+		ComputeTransmittance();
+		ComputeDirectIrradiance();
+		ComputeSingleScattering();
+
+		for (glm::uint scattering_order = 2; scattering_order <= mScatteringOrder; scattering_order++)
+			ComputeMultipleScattering(scattering_order);
+	}
+
+	mRecomputeRequested = false;
 }
 
-void Atmosphere::ComputeDirectIrradiance()
+void Atmosphere::Runtime::Bruneton17::ComputeTransmittance()
 {
-	gAtmosphere.mResource.mComputeDirectIrradianceShader.SetupCompute();
-	gCommandList->Dispatch(gAtmosphere.mResource.mIrradianceTexture.mWidth / 8, gAtmosphere.mResource.mIrradianceTexture.mHeight / 8, gAtmosphere.mResource.mIrradianceTexture.mDepth);
+	mComputeTransmittanceShader.SetupCompute();
+	gCommandList->Dispatch(mTransmittanceTexture.mWidth / 8, mTransmittanceTexture.mHeight / 8, mTransmittanceTexture.mDepth);
 }
 
-void Atmosphere::ComputeSingleScattering()
+void Atmosphere::Runtime::Bruneton17::ComputeDirectIrradiance()
 {
-	gAtmosphere.mResource.mComputeSingleScatteringShader.SetupCompute();
-	gCommandList->Dispatch(gAtmosphere.mResource.mScatteringTexture.mWidth / 8, gAtmosphere.mResource.mScatteringTexture.mHeight / 8, gAtmosphere.mResource.mScatteringTexture.mDepth);
+	mComputeDirectIrradianceShader.SetupCompute();
+	gCommandList->Dispatch(mIrradianceTexture.mWidth / 8, mIrradianceTexture.mHeight / 8, mIrradianceTexture.mDepth);
 }
 
-void Atmosphere::ComputeScatteringDensity(glm::uint scattering_order)
+void Atmosphere::Runtime::Bruneton17::ComputeSingleScattering()
 {
-	gAtmosphere.mResource.mComputeScatteringDensityShader.SetupCompute();
+	mComputeSingleScatteringShader.SetupCompute();
+	gCommandList->Dispatch(mScatteringTexture.mWidth / 8, mScatteringTexture.mHeight / 8, mScatteringTexture.mDepth);
+}
+
+void Atmosphere::Runtime::Bruneton17::ComputeScatteringDensity(glm::uint scattering_order)
+{
+	mComputeScatteringDensityShader.SetupCompute();
 
 	AtmosphereConstantsPerDraw atmosphere_per_draw = {};
 	atmosphere_per_draw.mScatteringOrder = scattering_order;
 	gCommandList->SetComputeRoot32BitConstants(1, sizeof(AtmosphereConstantsPerDraw) / 4, &atmosphere_per_draw, 0);
 
-	gCommandList->Dispatch(gAtmosphere.mResource.mDeltaScatteringDensityTexture.mWidth / 8, gAtmosphere.mResource.mDeltaScatteringDensityTexture.mHeight / 8, gAtmosphere.mResource.mDeltaScatteringDensityTexture.mDepth);
+	gCommandList->Dispatch(mDeltaScatteringDensityTexture.mWidth / 8, mDeltaScatteringDensityTexture.mHeight / 8, mDeltaScatteringDensityTexture.mDepth);
 }
 
-void Atmosphere::ComputeIndirectIrradiance(glm::uint scattering_order)
+void Atmosphere::Runtime::Bruneton17::ComputeIndirectIrradiance(glm::uint scattering_order)
 {
-	gAtmosphere.mResource.mComputeIndirectIrradianceShader.SetupCompute();
+	mComputeIndirectIrradianceShader.SetupCompute();
 
 	AtmosphereConstantsPerDraw atmosphere_per_draw = {};
 	atmosphere_per_draw.mScatteringOrder = scattering_order - 1;
 	gCommandList->SetComputeRoot32BitConstants(1, sizeof(AtmosphereConstantsPerDraw) / 4, &atmosphere_per_draw, 0);
 
-	gCommandList->Dispatch(gAtmosphere.mResource.mIrradianceTexture.mWidth / 8, gAtmosphere.mResource.mIrradianceTexture.mHeight / 8, gAtmosphere.mResource.mIrradianceTexture.mDepth);
+	gCommandList->Dispatch(mIrradianceTexture.mWidth / 8, mIrradianceTexture.mHeight / 8, mIrradianceTexture.mDepth);
 }
 
-void Atmosphere::AccumulateMultipleScattering()
+void Atmosphere::Runtime::Bruneton17::AccumulateMultipleScattering()
 {
-	gAtmosphere.mResource.mComputeMultipleScatteringShader.SetupCompute();
-	gCommandList->Dispatch(gAtmosphere.mResource.mScatteringTexture.mWidth / 8, gAtmosphere.mResource.mScatteringTexture.mHeight / 8, gAtmosphere.mResource.mScatteringTexture.mDepth);
+	mComputeMultipleScatteringShader.SetupCompute();
+	gCommandList->Dispatch(mScatteringTexture.mWidth / 8, mScatteringTexture.mHeight / 8, mScatteringTexture.mDepth);
 }
 
-void Atmosphere::ComputeMultipleScattering(glm::uint scattering_order)
+void Atmosphere::Runtime::Bruneton17::ComputeMultipleScattering(glm::uint scattering_order)
 {
 	ComputeScatteringDensity(scattering_order);
 	ComputeIndirectIrradiance(scattering_order);
 	AccumulateMultipleScattering();
 }
 
-void Atmosphere::Precompute()
+void Atmosphere::Runtime::Hillaire20::Update(const Profile& inProfile)
 {
-	static Profile sAtmosphereProfileCache = gAtmosphere.mProfile;
-	if (memcmp(&sAtmosphereProfileCache, &gAtmosphere.mProfile, sizeof(Profile)) != 0)
-	{
-		sAtmosphereProfileCache = gAtmosphere.mProfile;
+	(void)inProfile;
 
-		// Reset accumulation
-		gPerFrameConstantBuffer.mReset = true;
-
-		mRecomputeRequested = true;
-	}
-
-	if (gAtmosphere.mProfile.mMode == AtmosphereMode::Bruneton17)
-	{
-		if (mRecomputeRequested || mRecomputeEveryFrame)
-		{
-			ComputeTransmittance();
-			ComputeDirectIrradiance();
-			ComputeSingleScattering();
-
-			for (glm::uint scattering_order = 2; scattering_order <= gAtmosphere.mProfile.mScatteringOrder; scattering_order++)
-				ComputeMultipleScattering(scattering_order);
-		}
-	}
-
-	mRecomputeRequested = false;
-}
-
-void Atmosphere::Compute()
-{
-	// [Hillaire20]
 	TransLUT();
 	NewMultiScatCS();
 	SkyViewLut();
 	CameraVolumes();
+
+	Validate();
 }
 
-void Atmosphere::Validate()
+void Atmosphere::Runtime::Hillaire20::TransLUT()
+{
+	mTransLUTShader.SetupCompute();
+	gCommandList->Dispatch((mTransmittanceTex.mWidth + 7) / 8, (mTransmittanceTex.mHeight + 7) / 8, 1);
+}
+
+void Atmosphere::Runtime::Hillaire20::NewMultiScatCS()
+{
+	mNewMultiScatCSShader.SetupCompute();
+	gCommandList->Dispatch(mMultiScattTex.mWidth, mMultiScattTex.mHeight, 1);
+}
+
+void Atmosphere::Runtime::Hillaire20::SkyViewLut()
+{
+	mSkyViewLutShader.SetupCompute();
+	gCommandList->Dispatch((mSkyViewLut.mWidth + 7) / 8, (mSkyViewLut.mHeight + 7) / 8, 1);
+}
+
+void Atmosphere::Runtime::Hillaire20::CameraVolumes()
+{
+	mCameraVolumesShader.SetupCompute();
+	gCommandList->Dispatch((mAtmosphereCameraScatteringVolume.mWidth + 7) / 8, (mAtmosphereCameraScatteringVolume.mHeight + 7) / 8, mAtmosphereCameraScatteringVolume.mDepth);
+}
+
+void Atmosphere::Runtime::Hillaire20::Validate()
 {
 	auto diff = [](const Texture& inComputed, const Texture& inExpected, const Texture& inOutput)
 	{
@@ -175,55 +216,23 @@ void Atmosphere::Validate()
 		BarrierScope output_scope(gCommandList, inOutput.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 		Shader& shader = inExpected.mDepth == 1 ? gDiffTexture2DShader : gDiffTexture3DShader;
-		shader.SetupCompute(gUniversalHeap.Get(), false);
+		shader.SetupCompute(gGetFrameContext().mDescriptorHeap.mHeap.Get(), false);
 
-		gCommandList->SetComputeRoot32BitConstant(0, inComputed.mResourceHeapIndex, 0);
-		gCommandList->SetComputeRoot32BitConstant(0, inExpected.mResourceHeapIndex, 1);
-		gCommandList->SetComputeRoot32BitConstant(0, inOutput.mResourceHeapIndex, 2);
+		gAssert(inComputed.mUAVIndex > DescriptorIndex::NullCount);
+		gAssert(inExpected.mUAVIndex > DescriptorIndex::NullCount);
+		gAssert(inOutput.mUAVIndex > DescriptorIndex::NullCount);
+
+		gCommandList->SetComputeRoot32BitConstant(0, static_cast<UINT>(inComputed.mUAVIndex), 0);
+		gCommandList->SetComputeRoot32BitConstant(0, static_cast<UINT>(inExpected.mUAVIndex), 1);
+		gCommandList->SetComputeRoot32BitConstant(0, static_cast<UINT>(inOutput.mUAVIndex), 2);
 
 		gCommandList->Dispatch((inExpected.mWidth + 7) / 8, (inExpected.mHeight + 7) / 8, inExpected.mDepth);
 	};
 
-	diff(
-		gAtmosphere.mResource.mTransmittanceTex,
-		gAtmosphere.mResource.mValidation.mTransmittanceTexExpected,
-		gAtmosphere.mResource.mValidation.mTransmittanceTex);
-	diff(
-		gAtmosphere.mResource.mMultiScattTex,
-		gAtmosphere.mResource.mValidation.mMultiScattTexExpected,
-		gAtmosphere.mResource.mValidation.mMultiScattTex);
-	diff(
-		gAtmosphere.mResource.mSkyViewLutTex,
-		gAtmosphere.mResource.mValidation.mSkyViewLutTexExpected,
-		gAtmosphere.mResource.mValidation.mSkyViewLutTex);
-	diff(
-		gAtmosphere.mResource.mAtmosphereCameraScatteringVolume,
-		gAtmosphere.mResource.mValidation.mAtmosphereCameraScatteringVolumeExpected,
-		gAtmosphere.mResource.mValidation.mAtmosphereCameraScatteringVolume);
-}
-
-void Atmosphere::TransLUT()
-{
-	gAtmosphere.mResource.mTransLUTShader.SetupCompute();
-	gCommandList->Dispatch((gAtmosphere.mResource.mTransmittanceTex.mWidth + 7) / 8, (gAtmosphere.mResource.mTransmittanceTex.mHeight + 7) / 8, 1);
-}
-
-void Atmosphere::NewMultiScatCS()
-{
-	gAtmosphere.mResource.mNewMultiScatCSShader.SetupCompute();
-	gCommandList->Dispatch(gAtmosphere.mResource.mMultiScattTex.mWidth, gAtmosphere.mResource.mMultiScattTex.mHeight, 1);
-}
-
-void Atmosphere::SkyViewLut()
-{
-	gAtmosphere.mResource.mSkyViewLutShader.SetupCompute();
-	gCommandList->Dispatch((gAtmosphere.mResource.mSkyViewLutTex.mWidth + 7) / 8, (gAtmosphere.mResource.mSkyViewLutTex.mHeight + 7) / 8, 1);
-}
-
-void Atmosphere::CameraVolumes()
-{
-	gAtmosphere.mResource.mCameraVolumesShader.SetupCompute();
-	gCommandList->Dispatch((gAtmosphere.mResource.mAtmosphereCameraScatteringVolume.mWidth + 7) / 8, (gAtmosphere.mResource.mAtmosphereCameraScatteringVolume.mHeight + 7) / 8, gAtmosphere.mResource.mAtmosphereCameraScatteringVolume.mDepth);
+	diff(mTransmittanceTex,						mTransmittanceTexExpected,						mTransmittanceTexDiff);
+	diff(mMultiScattTex,						mMultiScattExpected,							mMultiScattDiff);
+	diff(mSkyViewLut,							mSkyViewLutExpected,							mSkyViewLutDiff);
+	diff(mAtmosphereCameraScatteringVolume,		mAtmosphereCameraScatteringVolumeExpected,		mAtmosphereCameraScatteringVolumeDiff);
 }
 
 void Atmosphere::Initialize()
@@ -233,54 +242,57 @@ void Atmosphere::Initialize()
 		D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(gAlignUp(static_cast<UINT>(sizeof(AtmosphereConstants)), static_cast<UINT>(D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT)));
 		D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
 
-		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gAtmosphere.mResource.mConstantUploadBuffer)));
-		gAtmosphere.mResource.mConstantUploadBuffer->SetName(L"Atmosphere.Constant");
-		gAtmosphere.mResource.mConstantUploadBuffer->Map(0, nullptr, (void**)&gAtmosphere.mResource.mConstantUploadBufferPointer);
+		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mRuntime.mConstantUploadBuffer)));
+		mRuntime.mConstantUploadBuffer->SetName(L"Atmosphere.Constant");
+		mRuntime.mConstantUploadBuffer->Map(0, nullptr, (void**)&mRuntime.mConstantUploadBufferPointer);
 	}
 
 	// Texture
 	{
-		for (auto&& texture : gAtmosphere.mResource.mTextures)
-			texture.Initialize();
+		for (auto&& texture_set : mRuntime.mTexturesSet)
+			for (auto&& texture : texture_set)
+				texture.Initialize();
 
-		for (auto&& texture : gAtmosphere.mResource.mValidation.mTextures)
+		for (auto&& texture_set : mRuntime.mValidationTexturesSet)
+			for (auto&& texture : texture_set)
 			texture.Initialize();
 	}
 
 	// Shader Binding
 	{
-		// [NOTE] Strictly speaking, binding same texture as UAV and SRV at the same time is not ok, and there should be barriers for state transition
-
 		std::vector<Shader::DescriptorInfo> common_binding;
 		{
 			// CBV
 			common_binding.push_back(gConstantGPUBuffer.Get());
 
 			// CBV
-			common_binding.push_back(gAtmosphere.mResource.mConstantUploadBuffer.Get());
+			common_binding.push_back(mRuntime.mConstantUploadBuffer.Get());
 
 			// UAV
-			for (auto&& texture : gAtmosphere.mResource.mTextures)
-				common_binding.push_back(texture.mResource.Get());
+			for (auto&& textures : mRuntime.mTexturesSet)
+				for (auto&& texture : textures)
+					common_binding.push_back(texture.mResource.Get());
 
 			// SRV
-			for (auto&& texture : gAtmosphere.mResource.mTextures)
-				common_binding.push_back(texture.mResource.Get());
+			for (auto&& textures : mRuntime.mTexturesSet)
+				for (auto&& texture : textures)
+					common_binding.push_back(texture.mResource.Get());
 		}
 
-		for (auto&& shader : gAtmosphere.mResource.mShaders)
-			shader.InitializeDescriptors(common_binding);
+		for (auto&& shaders : mRuntime.mShadersSet)
+			for (auto&& shader : shaders)
+				shader.InitializeDescriptors(common_binding);
 	}
 }
 
 void Atmosphere::Finalize()
 {
-	gAtmosphere.mResource.Reset();
+	mRuntime.Reset();
 }
 
 void Atmosphere::UpdateImGui()
 {
-#define SMALL_BUTTON(func) if (ImGui::SmallButton(NAMEOF(func).c_str())) func(gAtmosphere.mProfile);
+#define SMALL_BUTTON(func) if (ImGui::SmallButton(NAMEOF(func).c_str())) func(mProfile);
 
 	if (ImGui::TreeNodeEx("Mode", ImGuiTreeNodeFlags_DefaultOpen))
 	{
@@ -296,8 +308,8 @@ void Atmosphere::UpdateImGui()
 			if (i != 0)
 				ImGui::SameLine();
 
-			if (ImGui::RadioButton(name.data(), static_cast<int>(gAtmosphere.mProfile.mMode) == i))
-				gAtmosphere.mProfile.mMode = static_cast<AtmosphereMode>(i);
+			if (ImGui::RadioButton(name.data(), static_cast<int>(mProfile.mMode) == i))
+				mProfile.mMode = static_cast<AtmosphereMode>(i);
 		}
 
 		{
@@ -310,58 +322,58 @@ void Atmosphere::UpdateImGui()
 			ImGui::PopID();
 		}
 
-		if (gAtmosphere.mProfile.mMode == AtmosphereMode::ConstantColor)
+		if (mProfile.mMode == AtmosphereMode::ConstantColor)
 		{
-			ImGui::ColorEdit3("Color", reinterpret_cast<float*>(&gAtmosphere.mProfile.mConstantColor), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
+			ImGui::ColorEdit3("Color", reinterpret_cast<float*>(&mProfile.mConstantColor), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
 		}
 		
-		if (gAtmosphere.mProfile.mMode == AtmosphereMode::Bruneton17)
+		if (mProfile.mMode == AtmosphereMode::Bruneton17)
 		{
-			ImGui::SliderInt("Scattering Order", reinterpret_cast<int*>(&gAtmosphere.mProfile.mScatteringOrder), 1, 8);
-			ImGui::Checkbox("Recompute Every Frame", &mRecomputeEveryFrame);
+			ImGui::SliderInt("Scattering Order", reinterpret_cast<int*>(&mRuntime.mBruneton17.mScatteringOrder), 1, 8);
+			ImGui::Checkbox("Recompute Every Frame", &mRuntime.mBruneton17.mRecomputeEveryFrame);
 		}
 
-		ImGui::Checkbox("Scene Unit is Kilometer, otherwise Meter", &gAtmosphere.mProfile.mSceneInKilometer);
-		ImGui::Checkbox("Aerial Perspective", &gAtmosphere.mProfile.mAerialPerspective);
-		ImGui::Checkbox("[Hillaire20] SkyView in Luminance", &gAtmosphere.mProfile.mHillaire20SkyViewInLuminance);
-		if (ImGui::Button("[Wilkie21] Bake -> Split Screen")) gAtmosphere.mWilkie21.mBakeRequested = true;
+		ImGui::Checkbox("Scene Unit is Kilometer, otherwise Meter", &mRuntime.mSceneInKilometer);
+		ImGui::Checkbox("Aerial Perspective", &mRuntime.mAerialPerspective);
+		ImGui::Checkbox("[Hillaire20] SkyView in Luminance", &mRuntime.mHillaire20.mSkyViewInLuminance);
+		if (ImGui::Button("[Wilkie21] Bake -> Split Screen")) mRuntime.mWilkie21.mBakeRequested = true;
 		ImGui::SameLine();
-		if (ImGui::RadioButton("Off", gAtmosphere.mProfile.mWilkie21SkyViewSplitScreen == 0)) gAtmosphere.mProfile.mWilkie21SkyViewSplitScreen = 0;
+		if (ImGui::RadioButton("Off", mRuntime.mWilkie21.mSplitScreen == 0)) mRuntime.mWilkie21.mSplitScreen = 0;
 		ImGui::SameLine();
-		if (ImGui::RadioButton("Left", gAtmosphere.mProfile.mWilkie21SkyViewSplitScreen == 1)) gAtmosphere.mProfile.mWilkie21SkyViewSplitScreen = 1;
+		if (ImGui::RadioButton("Left", mRuntime.mWilkie21.mSplitScreen == 1)) mRuntime.mWilkie21.mSplitScreen = 1;
 		ImGui::SameLine();
-		if (ImGui::RadioButton("Right", gAtmosphere.mProfile.mWilkie21SkyViewSplitScreen == 2)) gAtmosphere.mProfile.mWilkie21SkyViewSplitScreen = 2;		
+		if (ImGui::RadioButton("Right", mRuntime.mWilkie21.mSplitScreen == 2)) mRuntime.mWilkie21.mSplitScreen = 2;
 
 		ImGui::TreePop();
 	}
 
 	if (ImGui::TreeNodeEx("Wilkie21"))
 	{
-		ImGui::SliderDouble("Turbidity", &gAtmosphere.mProfile.mWilkie21.mTurbidity, 1.37, 3.7);
-		ImGui::InputDouble("Visibility", &gAtmosphere.mProfile.mWilkie21.mVisibility, 0.0, 0.0, "%.3f", ImGuiInputTextFlags_ReadOnly);
-		ImGui::SliderDouble("Albedo", &gAtmosphere.mProfile.mWilkie21.mAlbedo, 0.0, 1.0);
+		ImGui::SliderDouble("Turbidity", &mProfile.mWilkie21.mTurbidity, 1.37, 3.7);
+		ImGui::InputDouble("Visibility", &mRuntime.mWilkie21.mVisibility, 0.0, 0.0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+		ImGui::SliderDouble("Albedo", &mProfile.mWilkie21.mAlbedo, 0.0, 1.0);
 
 		if (ImGui::TreeNodeEx("Hosek", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			ImGui::InputDouble3("Zenith Spectrum (as XYZ)", &gAtmosphere.mProfile.mWilkie21.mHosekZenithSpectrum.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
-			ImGui::InputDouble3("Zenith XYZ", &gAtmosphere.mProfile.mWilkie21.mHosekZenithXYZ.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
-			ImGui::InputDouble3("Zenith RGB", &gAtmosphere.mProfile.mWilkie21.mHosekZenithRGB.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
-			ImGui::InputDouble3("Solar Spectrum (as XYZ)", &gAtmosphere.mProfile.mWilkie21.mHosekSolarSpectrum.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+			ImGui::InputDouble3("Zenith Spectrum (as XYZ)", &mRuntime.mWilkie21.mHosekZenithSpectrum.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+			ImGui::InputDouble3("Zenith XYZ", &mRuntime.mWilkie21.mHosekZenithXYZ.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+			ImGui::InputDouble3("Zenith RGB", &mRuntime.mWilkie21.mHosekZenithRGB.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+			ImGui::InputDouble3("Solar Spectrum (as XYZ)", &mRuntime.mWilkie21.mHosekSolarSpectrum.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
 				
 			ImGui::TreePop();
 		}
 
 		if (ImGui::TreeNodeEx("Prague", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			ImGui::InputDouble3("Zenith Spectrum (as XYZ)", &gAtmosphere.mProfile.mWilkie21.mPragueZenithSpectrum.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
-			ImGui::InputDouble3("Zenith Spectrum (as RGB)", &gAtmosphere.mProfile.mWilkie21.mPragueZenithRGB.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
-			ImGui::InputDouble3("Solar Spectrum (as XYZ)", &gAtmosphere.mProfile.mWilkie21.mPragueSolarSpectrum.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
-			ImGui::InputDouble3("Transmittance (as XYZ)", &gAtmosphere.mProfile.mWilkie21.mPragueTransmittance.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+			ImGui::InputDouble3("Zenith Spectrum (as XYZ)", &mRuntime.mWilkie21.mPragueZenithSpectrum.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+			ImGui::InputDouble3("Zenith Spectrum (as RGB)", &mRuntime.mWilkie21.mPragueZenithRGB.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+			ImGui::InputDouble3("Solar Spectrum (as XYZ)", &mRuntime.mWilkie21.mPragueSolarSpectrum.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+			ImGui::InputDouble3("Transmittance (as XYZ)", &mRuntime.mWilkie21.mPragueTransmittance.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
 
 			ImGui::TreePop();
 		}
 
-		ImGui::Checkbox("Bake Hosek", &gAtmosphere.mWilkie21.mBakeHosek);
+		ImGui::Checkbox("Bake Hosek", &mRuntime.mWilkie21.mBakeHosek);
 
 		ImGui::TreePop();
 	}
@@ -372,20 +384,20 @@ void Atmosphere::UpdateImGui()
 		ImGui::SliderAngle("Azimuth Angle", &gPerFrameConstantBuffer.mSunAzimuth, 0.0f, 360.0f);
 		ImGui::SliderAngle("Zenith Angle", &gPerFrameConstantBuffer.mSunZenith, 0.0f, 180.0f);
 
-		ImGui::Text(gAtmosphere.mProfile.mShowSolarIrradianceAsLuminance ? "Solar Irradiance (klm)" : "Solar Irradiance (kW)");
-		float scale = gAtmosphere.mProfile.mShowSolarIrradianceAsLuminance ? kSolarLuminousEfficacy : 1.0f;
-		glm::vec3 solar_value = gAtmosphere.mProfile.mSolarIrradiance * scale;
+		ImGui::Text(mProfile.mShowSolarIrradianceAsLuminance ? "Solar Irradiance (klm)" : "Solar Irradiance (kW)");
+		float scale = mProfile.mShowSolarIrradianceAsLuminance ? kSolarLuminousEfficacy : 1.0f;
+		glm::vec3 solar_value = mProfile.mSolarIrradiance * scale;
 		if (ImGui::ColorEdit3("", &solar_value[0], ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR))
-			gAtmosphere.mProfile.mSolarIrradiance = solar_value / scale;
-		ImGui::Checkbox("Use Luminance", &gAtmosphere.mProfile.mShowSolarIrradianceAsLuminance);
+			mProfile.mSolarIrradiance = solar_value / scale;
+		ImGui::Checkbox("Use Luminance", &mProfile.mShowSolarIrradianceAsLuminance);
 		ImGui::SameLine();
 		ImGui::Text("(Luminous Efficacy = %.2f lm/W)", kSolarLuminousEfficacy);
 
-		if (ImGui::SmallButton("Bruneton17")) Profile::SolarIrradianceReference::Bruneton17(gAtmosphere.mProfile);
+		if (ImGui::SmallButton("Bruneton17")) Profile::SolarIrradianceReference::Bruneton17(mProfile);
 		ImGui::SameLine(); 
-		if (ImGui::SmallButton("Bruneton17Constant")) Profile::SolarIrradianceReference::Bruneton17Constant(gAtmosphere.mProfile);
+		if (ImGui::SmallButton("Bruneton17Constant")) Profile::SolarIrradianceReference::Bruneton17Constant(mProfile);
 		ImGui::SameLine();
-		if (ImGui::SmallButton("Hillaire20")) Profile::SolarIrradianceReference::Hillaire20(gAtmosphere.mProfile);
+		if (ImGui::SmallButton("Hillaire20")) Profile::SolarIrradianceReference::Hillaire20(mProfile);
 
 		ImGui::TreePop();
 	}
@@ -394,8 +406,8 @@ void Atmosphere::UpdateImGui()
 	{
 		ImGui::PushItemWidth(200);
 
-		ImGui::SliderDouble("Earth Radius (km)", &gAtmosphere.mProfile.mBottomRadius, 1.0, 10000.0);
-		ImGui::SliderDouble("AtmosphereConstants Thickness (km)", &gAtmosphere.mProfile.mAtmosphereThickness, 1.0, 100.0);
+		ImGui::SliderDouble("Earth Radius (km)", &mProfile.mBottomRadius, 1.0, 10000.0);
+		ImGui::SliderDouble("AtmosphereConstants Thickness (km)", &mProfile.mAtmosphereThickness, 1.0, 100.0);
 
 		ImGui::PopItemWidth();
 
@@ -410,14 +422,14 @@ void Atmosphere::UpdateImGui()
 
 	if (ImGui::TreeNodeEx("Ground"))
 	{
-		ImGui::ColorEdit3("Albedo (Precomputed)", &gAtmosphere.mProfile.mGroundAlbedo[0], ImGuiColorEditFlags_Float);
-		ImGui::ColorEdit3("Albedo (Runtime)", &gAtmosphere.mProfile.mRuntimeGroundAlbedo[0], ImGuiColorEditFlags_Float);
+		ImGui::ColorEdit3("Albedo (Precomputed)", &mProfile.mGroundAlbedo[0], ImGuiColorEditFlags_Float);
+		ImGui::ColorEdit3("Albedo (Runtime)", &mProfile.mRuntimeGroundAlbedo[0], ImGuiColorEditFlags_Float);
 
-		if (ImGui::SmallButton("Bruneton17")) Profile::GroundReference::Bruneton17(gAtmosphere.mProfile);
+		if (ImGui::SmallButton("Bruneton17")) Profile::GroundReference::Bruneton17(mProfile);
 		ImGui::SameLine();
-		if (ImGui::SmallButton("Hillaire20")) Profile::GroundReference::Hillaire20(gAtmosphere.mProfile);
+		if (ImGui::SmallButton("Hillaire20")) Profile::GroundReference::Hillaire20(mProfile);
 		ImGui::SameLine();
-		if (ImGui::SmallButton("UE4")) Profile::GroundReference::UE4(gAtmosphere.mProfile);
+		if (ImGui::SmallButton("UE4")) Profile::GroundReference::UE4(mProfile);
 
 		ImGui::TreePop();
 	}
@@ -464,13 +476,13 @@ void Atmosphere::UpdateImGui()
 
 		if (ImGui::TreeNodeEx("Rayleigh"))
 		{
-			ImGui::Checkbox("Enable", &gAtmosphere.mProfile.mEnableRayleigh);
+			ImGui::Checkbox("Enable", &mProfile.mEnableRayleigh);
 
-			ImGui::SliderDouble3("Scattering  (/m)", &gAtmosphere.mProfile.mRayleighScatteringCoefficient.x, 1.0e-5, 1.0e-1, "%.3e");
+			ImGui::SliderDouble3("Scattering  (/m)", &mProfile.mRayleighScatteringCoefficient.x, 1.0e-5, 1.0e-1, "%.3e");
 
 			DensityPlot plot;
-			plot.mMax = static_cast<float>(gAtmosphere.mProfile.mAtmosphereThickness);
-			plot.mProfile = &gAtmosphere.mProfile.mRayleighDensityProfile;
+			plot.mMax = static_cast<float>(mProfile.mAtmosphereThickness);
+			plot.mProfile = &mProfile.mRayleighDensityProfile;
 			ImGui::PlotLines("Density", DensityPlot::Func, &plot, plot.mCount, 0, nullptr, 0.0f, 1.0f, ImVec2(0, 40));
 			if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
 			{
@@ -494,17 +506,17 @@ void Atmosphere::UpdateImGui()
 
 		if (ImGui::TreeNodeEx("Mie"))
 		{
-			ImGui::Checkbox("Enable", &gAtmosphere.mProfile.mEnableMie);
+			ImGui::Checkbox("Enable", &mProfile.mEnableMie);
 
-			ImGui::SliderDouble3("Extinction (/km)", &gAtmosphere.mProfile.mMieExtinctionCoefficient[0], 1.0e-5, 1.0e-1, "%.3e");
-			ImGui::SliderDouble3("Scattering (/km)", &gAtmosphere.mProfile.mMieScatteringCoefficient[0], 1.0e-5, 1.0e-1, "%.3e");
-			ImGui::SliderDouble("Phase Function G", &gAtmosphere.mProfile.mMiePhaseFunctionG, -1.0f, 1.0f);
+			ImGui::SliderDouble3("Extinction (/km)", &mProfile.mMieExtinctionCoefficient[0], 1.0e-5, 1.0e-1, "%.3e");
+			ImGui::SliderDouble3("Scattering (/km)", &mProfile.mMieScatteringCoefficient[0], 1.0e-5, 1.0e-1, "%.3e");
+			ImGui::SliderDouble("Phase Function G", &mProfile.mMiePhaseFunctionG, -1.0f, 1.0f);
 
 			DensityPlot plot;
 			plot.mMin = 0.0f;
-			plot.mMax = static_cast<float>(gAtmosphere.mProfile.mAtmosphereThickness);
+			plot.mMax = static_cast<float>(mProfile.mAtmosphereThickness);
 			plot.mCount = 500;
-			plot.mProfile = &gAtmosphere.mProfile.mMieDensityProfile;
+			plot.mProfile = &mProfile.mMieDensityProfile;
 			ImGui::PlotLines("Density", DensityPlot::Func, &plot, plot.mCount, 0, nullptr, 0.0f, 1.0f, ImVec2(0, 40));
 			if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
 			{
@@ -526,15 +538,15 @@ void Atmosphere::UpdateImGui()
 
 		if (ImGui::TreeNodeEx("Ozone"))
 		{
-			ImGui::Checkbox("Enable", &gAtmosphere.mProfile.mEnableOzone);
+			ImGui::Checkbox("Enable", &mProfile.mEnableOzone);
 
-			ImGui::SliderDouble3("Absorption (/km)", &gAtmosphere.mProfile.mOZoneAbsorptionCoefficient[0], 1.0e-5, 1.0e-1, "%.3e");
+			ImGui::SliderDouble3("Absorption (/km)", &mProfile.mOZoneAbsorptionCoefficient[0], 1.0e-5, 1.0e-1, "%.3e");
 		
 			DensityPlot plot;
 			plot.mMin = 0.0f;
-			plot.mMax = static_cast<float>(gAtmosphere.mProfile.mAtmosphereThickness);
+			plot.mMax = static_cast<float>(mProfile.mAtmosphereThickness);
 			plot.mCount = 500;
-			plot.mProfile = &gAtmosphere.mProfile.mOzoneDensityProfile;
+			plot.mProfile = &mProfile.mOzoneDensityProfile;
 			ImGui::PlotLines("Density", DensityPlot::Func, &plot, plot.mCount, 0, nullptr, 0.0f, 1.0f, ImVec2(0, 40));
 			if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
 			{
@@ -546,12 +558,12 @@ void Atmosphere::UpdateImGui()
 			{
 				bool value_changed = false;
 
-				value_changed |= ImGui::SliderDouble("Ozone Bottom Altitude (m)", &gAtmosphere.mProfile.mOzoneBottomAltitude, 1000.0, 100000.0);
-				value_changed |= ImGui::SliderDouble("Ozone Mid Altitude (m)", &gAtmosphere.mProfile.mOzoneMidAltitude, 1000.0, 100000.0);
-				value_changed |= ImGui::SliderDouble("Ozone Top Altitude (m)", &gAtmosphere.mProfile.mOzoneTopAltitude, 1000.0, 100000.0);
+				value_changed |= ImGui::SliderDouble("Ozone Bottom Altitude (m)", &mProfile.mOzoneBottomAltitude, 1000.0, 100000.0);
+				value_changed |= ImGui::SliderDouble("Ozone Mid Altitude (m)", &mProfile.mOzoneMidAltitude, 1000.0, 100000.0);
+				value_changed |= ImGui::SliderDouble("Ozone Top Altitude (m)", &mProfile.mOzoneTopAltitude, 1000.0, 100000.0);
 
 				if (value_changed)
-					Profile::OzoneReference::UpdateDensityProfile(gAtmosphere.mProfile);
+					Profile::OzoneReference::UpdateDensityProfile(mProfile);
 
 				ImGui::EndPopup();
 			}
@@ -568,7 +580,7 @@ void Atmosphere::UpdateImGui()
 
 	if (ImGui::TreeNodeEx("Encoding"))
 	{
-		if (gAtmosphere.mProfile.mMode == AtmosphereMode::Bruneton17)
+		if (mProfile.mMode == AtmosphereMode::Bruneton17)
 		{
 			ImGui::Text(nameof::nameof_enum_type<AtmosphereMuSEncodingMode>().data());
 			for (int i = 0; i < static_cast<int>(AtmosphereMuSEncodingMode::Count); i++)
@@ -577,8 +589,8 @@ void Atmosphere::UpdateImGui()
 				if (i != 0)
 					ImGui::SameLine();
 
-				if (ImGui::RadioButton(name.data(), static_cast<int>(gAtmosphere.mProfile.mMuSEncodingMode) == i))
-					gAtmosphere.mProfile.mMuSEncodingMode = static_cast<AtmosphereMuSEncodingMode>(i);
+				if (ImGui::RadioButton(name.data(), static_cast<int>(mRuntime.mBruneton17.mMuSEncodingMode) == i))
+					mRuntime.mBruneton17.mMuSEncodingMode = static_cast<AtmosphereMuSEncodingMode>(i);
 			}
 		}
 		else
@@ -589,8 +601,10 @@ void Atmosphere::UpdateImGui()
 		ImGui::TreePop();
 	}
 
-	ImGuiShowTextures(gAtmosphere.mResource.mTextures, "Atmosphere", ImGuiTreeNodeFlags_None);
-	ImGuiShowTextures(gAtmosphere.mResource.mValidation.mTextures, "Atmosphere.Validation", ImGuiTreeNodeFlags_None);
+	ImGuiShowTextures(mRuntime.mBruneton17.mTextures,				"Atmosphere.Bruneton17",				ImGuiTreeNodeFlags_None);
+	ImGuiShowTextures(mRuntime.mHillaire20.mTextures,				"Atmosphere.Hillaire20",				ImGuiTreeNodeFlags_None);
+	ImGuiShowTextures(mRuntime.mHillaire20.mValidationTextures,		"Atmosphere.Hillaire20.Validation",		ImGuiTreeNodeFlags_None);
+	ImGuiShowTextures(mRuntime.mWilkie21.mTextures,					"Atmosphere.Wilkie21",					ImGuiTreeNodeFlags_None);
 }
 
 Atmosphere gAtmosphere;
@@ -606,34 +620,33 @@ struct SkyModel
 		double mTurbidity = 0.0;
 		double mAlbedo = 0.0;
 	};
-	Parameters mParameters;
 	
-	void Reset(const SkyModel::Parameters& parameters)
+	void Reset(const SkyModel::Parameters& inParameters, double& outVisibility)
 	{
-		mParameters = parameters;
 		Free();
 
 		mHosek = arhosekskymodelstate_alloc_init(
-			mParameters.mSunElevation,
-			mParameters.mTurbidity,
-			mParameters.mAlbedo);
+			inParameters.mSunElevation,
+			inParameters.mTurbidity,
+			inParameters.mAlbedo);
 
 		mHosekXYZ = arhosek_xyz_skymodelstate_alloc_init(
-			mParameters.mTurbidity,
-			mParameters.mAlbedo,
-			mParameters.mSunElevation);
+			inParameters.mTurbidity,
+			inParameters.mAlbedo,
+			inParameters.mSunElevation);
 
 		mHosekRGB = arhosek_rgb_skymodelstate_alloc_init(
-			mParameters.mTurbidity,
-			mParameters.mAlbedo,
-			mParameters.mSunElevation);
+			inParameters.mTurbidity,
+			inParameters.mAlbedo,
+			inParameters.mSunElevation);
 
-		gAtmosphere.mProfile.mWilkie21.mVisibility = 7487.f * exp(-3.41f * mParameters.mTurbidity) + 117.1f * exp(-0.4768f * mParameters.mTurbidity);		
+		outVisibility = 7487.f * exp(-3.41f * inParameters.mTurbidity) + 117.1f * exp(-0.4768f * inParameters.mTurbidity);
+
 		mPrague = arpragueskymodelground_state_alloc_init(
 			"Asset/ArPragueSkyModelGround/SkyModelDataset.dat",
-			mParameters.mSunElevation,
-			gAtmosphere.mProfile.mWilkie21.mVisibility,
-			mParameters.mAlbedo);
+			inParameters.mSunElevation,
+			outVisibility,
+			inParameters.mAlbedo);
 	}
 
 	void Free()
@@ -663,9 +676,9 @@ struct SkyModel
 };
 SkyModel gArPragueSkyModelGround;
 
-void Atmosphere::ComputeWilkie21()
+void Atmosphere::Runtime::Wilkie21::Update(const Profile& inProfile)
 {
-	if (!gAtmosphere.mWilkie21.mBakeRequested)
+	if (!mBakeRequested)
 		return;
 	
 	double sun_elevation			= glm::pi<double>() / 2.0 - gPerFrameConstantBuffer.mSunZenith;
@@ -677,8 +690,8 @@ void Atmosphere::ComputeWilkie21()
 	double shadow					= 0.0;
 	arpragueskymodelground_compute_angles(sun_elevation, sun_azimuth, &view_direction[0], &up_direction[0], &theta, &gamma, &shadow);
 
-	SkyModel::Parameters parameters = { sun_elevation, gAtmosphere.mProfile.mWilkie21.mTurbidity, gAtmosphere.mProfile.mWilkie21.mAlbedo };
-	gArPragueSkyModelGround.Reset(parameters);
+	SkyModel::Parameters parameters = { sun_elevation, inProfile.mWilkie21.mTurbidity, inProfile.mWilkie21.mAlbedo };
+	gArPragueSkyModelGround.Reset(parameters, mVisibility);
 
 	Color::Spectrum hosek_sky_radiance;
 	Color::Spectrum hosek_solar_radiance;
@@ -720,24 +733,24 @@ void Atmosphere::ComputeWilkie21()
 	// - clear-sky-models
 	//   - https://github.com/ebruneton/clear-sky-models
 	
-	gAtmosphere.mProfile.mWilkie21.mHosekZenithSpectrum = Color::SpectrumToXYZ(hosek_sky_radiance, false).mData * Color::MaxLuminousEfficacy;
-	gAtmosphere.mProfile.mWilkie21.mHosekSolarSpectrum = Color::SpectrumToXYZ(hosek_solar_radiance, false).mData * Color::MaxLuminousEfficacy;
-	gAtmosphere.mProfile.mWilkie21.mHosekZenithXYZ =
+	mHosekZenithSpectrum = Color::SpectrumToXYZ(hosek_sky_radiance, false).mData * Color::MaxLuminousEfficacy;
+	mHosekSolarSpectrum = Color::SpectrumToXYZ(hosek_solar_radiance, false).mData * Color::MaxLuminousEfficacy;
+	mHosekZenithXYZ =
 	{
 		arhosek_tristim_skymodel_radiance(gArPragueSkyModelGround.mHosekXYZ, theta, gamma, 0) * Color::MaxLuminousEfficacy,
 		arhosek_tristim_skymodel_radiance(gArPragueSkyModelGround.mHosekXYZ, theta, gamma, 1) * Color::MaxLuminousEfficacy,
 		arhosek_tristim_skymodel_radiance(gArPragueSkyModelGround.mHosekXYZ, theta, gamma, 2) * Color::MaxLuminousEfficacy,
 	};
-	gAtmosphere.mProfile.mWilkie21.mHosekZenithRGB =
+	mHosekZenithRGB =
 	{
 		arhosek_tristim_skymodel_radiance(gArPragueSkyModelGround.mHosekRGB, theta, gamma, 0) * Color::MaxLuminousEfficacy,
 		arhosek_tristim_skymodel_radiance(gArPragueSkyModelGround.mHosekRGB, theta, gamma, 1) * Color::MaxLuminousEfficacy,
 		arhosek_tristim_skymodel_radiance(gArPragueSkyModelGround.mHosekRGB, theta, gamma, 2) * Color::MaxLuminousEfficacy,
 	};
-	gAtmosphere.mProfile.mWilkie21.mPragueZenithSpectrum = Color::SpectrumToXYZ(prague_sky_radiance, false).mData * Color::MaxLuminousEfficacy;
-	gAtmosphere.mProfile.mWilkie21.mPragueZenithRGB = Color::XYZToRGB({ gAtmosphere.mProfile.mWilkie21.mPragueZenithSpectrum }, Color::RGBColorSpace::Rec709).mData;
-	gAtmosphere.mProfile.mWilkie21.mPragueSolarSpectrum = Color::SpectrumToXYZ(prague_solar_radiance, false).mData * Color::MaxLuminousEfficacy;
-	gAtmosphere.mProfile.mWilkie21.mPragueTransmittance = Color::SpectrumToXYZ(prague_transmittance, true).mData;
+	mPragueZenithSpectrum = Color::SpectrumToXYZ(prague_sky_radiance, false).mData * Color::MaxLuminousEfficacy;
+	mPragueZenithRGB = Color::XYZToRGB({ mPragueZenithSpectrum }, Color::RGBColorSpace::Rec709).mData;
+	mPragueSolarSpectrum = Color::SpectrumToXYZ(prague_solar_radiance, false).mData * Color::MaxLuminousEfficacy;
+	mPragueTransmittance = Color::SpectrumToXYZ(prague_transmittance, true).mData;
 
 	// Bake SkyView
 	{
@@ -780,11 +793,11 @@ void Atmosphere::ComputeWilkie21()
 			}
 		};
 
-		gAtmosphere.mResource.mWilkie21SkyViewLutTex.mUploadData.resize(gAtmosphere.mResource.mWilkie21SkyViewLutTex.GetSubresourceSize());
-		glm::uint64* pixels = reinterpret_cast<glm::uint64*>(gAtmosphere.mResource.mWilkie21SkyViewLutTex.mUploadData.data());
+		mSkyView.mUploadData.resize(mSkyView.GetSubresourceSize());
+		glm::uint64* pixels = reinterpret_cast<glm::uint64*>(mSkyView.mUploadData.data());
 	
-		int width = static_cast<int>(gAtmosphere.mResource.mWilkie21SkyViewLutTex.mWidth);
-		int height = static_cast<int>(gAtmosphere.mResource.mWilkie21SkyViewLutTex.mHeight);
+		int width = static_cast<int>(mSkyView.mWidth);
+		int height = static_cast<int>(mSkyView.mHeight);
 	
 #pragma omp parallel for
 		for (int h = 0; h < height; h++)
@@ -804,7 +817,7 @@ void Atmosphere::ComputeWilkie21()
 				arpragueskymodelground_compute_angles(sun_elevation, sun_azimuth, &view_direction[0], &up_direction[0], &theta, &gamma, &shadow);
 
 				Color::RGB luminance;
-				if (gAtmosphere.mWilkie21.mBakeHosek)
+				if (mBakeHosek)
 				{
 					luminance =
 						{ glm::vec3(
@@ -829,5 +842,5 @@ void Atmosphere::ComputeWilkie21()
 		};
 	}
 
-	gAtmosphere.mWilkie21.mBakeRequested = false;
+	mBakeRequested = false;
 }

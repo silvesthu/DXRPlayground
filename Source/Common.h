@@ -32,181 +32,9 @@ using Microsoft::WRL::ComPtr;
 #include "Thirdparty/DirectXTex/DirectXTex/d3dx12.h"
 #include "ImGui/imgui_impl_helper.h"
 
-// System
-extern ID3D12Device5*						gDevice;
-extern ID3D12DescriptorHeap* 				gRTVDescriptorHeap;
-extern ID3D12CommandQueue* 					gCommandQueue;
-extern ID3D12GraphicsCommandList4* 			gCommandList;
-
-extern ID3D12Fence* 						gIncrementalFence;			// Fence value increment each frame (most time)
-extern HANDLE                       		gIncrementalFenceEvent;		// Allow CPU to wait on fence
-extern uint64_t                       		gFenceLastSignaledValue;
-
-extern IDXGISwapChain3* 					gSwapChain;
-extern HANDLE                       		gSwapChainWaitableObject;
-extern ID3D12Resource*						gBackBufferRenderTargetResource[];
-extern D3D12_CPU_DESCRIPTOR_HANDLE			gBackBufferRenderTargetRTV[];
-
-// Application
-struct ShaderTable
-{
-	ID3D12Resource* mResource = nullptr;
-	glm::uint64								mEntrySize = 0;
-	glm::uint32								mRayGenOffset = 0;
-	glm::uint32								mRayGenCount = 0;
-	glm::uint32								mMissOffset = 0;
-	glm::uint32								mMissCount = 0;
-	glm::uint32								mHitGroupOffset = 0;
-	glm::uint32								mHitGroupCount = 0;
-};
-
-#define MEMBER(parent_type, type, name, default_value) \
-	parent_type& name(type in##name) { m##name = in##name; return *this; } \
-	type m##name = default_value;
-
-struct Shader
-{
-#define SHADER_MEMBER(type, name, default_value) MEMBER(Shader, type, name, default_value)
-
-	SHADER_MEMBER(const char*, FileName, nullptr);
-	SHADER_MEMBER(const char*, VSName, nullptr);
-	SHADER_MEMBER(const char*, PSName, nullptr);
-	SHADER_MEMBER(const char*, CSName, nullptr);
-	SHADER_MEMBER(bool, UseGlobalRootSignature, false);
-
-	struct DescriptorInfo
-	{
-		DescriptorInfo(ID3D12Resource* inResource) : mResource(inResource) {}
-		DescriptorInfo(ID3D12Resource* inResource, glm::uint inStride) : mResource(inResource), mStride(inStride) {}
-
-		ID3D12Resource*		mResource = nullptr;
-		glm::uint			mStride = 0;
-	};
-
-	void InitializeDescriptors(const std::vector<DescriptorInfo>& inEntries);
-	void SetupGraphics();
-	void SetupCompute(ID3D12DescriptorHeap* inHeap = nullptr, bool inUseTable = true);
-	void Reset() { mData = {}; }
-
-	struct Data
-	{
-		ComPtr<ID3D12RootSignatureDeserializer> mRootSignatureDeserializer;
-		ComPtr<ID3D12RootSignature> mRootSignature;
-		ComPtr<ID3D12PipelineState> mPipelineState;
-		ComPtr<ID3D12DescriptorHeap> mDescriptorHeap;
-	};
-	Data mData;
-};
-
-struct Texture
-{
-#define TEXTURE_MEMBER(type, name, default_value) MEMBER(Texture, type, name, default_value)
-
-	TEXTURE_MEMBER(glm::uint32, Width, 1);
-	TEXTURE_MEMBER(glm::uint32, Height, 1);
-	TEXTURE_MEMBER(glm::uint32, Depth, 1);
-	TEXTURE_MEMBER(DXGI_FORMAT, Format, DXGI_FORMAT_R32G32B32A32_FLOAT);
-	TEXTURE_MEMBER(const char*, Name, nullptr);
-	TEXTURE_MEMBER(float, UIScale, 0.0f);
-	TEXTURE_MEMBER(const wchar_t*, Path, nullptr);
-
-	Texture& Dimension(glm::uvec3 dimension) 
-	{
-		mWidth = dimension.x;
-		mHeight = dimension.y;
-		mDepth = dimension.z;
-		return *this;
-	}
-
-	int GetPixelSize() const;
-	glm::uint64 GetSubresourceSize() const;
-	void Initialize();
-	void Update();
-	void InitializeUpload();
-
-	ComPtr<ID3D12Resource> mResource;
-	ComPtr<ID3D12Resource> mUploadResource;
-
-	D3D12_CPU_DESCRIPTOR_HANDLE mGuiCPUHandle = {};
-	D3D12_GPU_DESCRIPTOR_HANDLE mGuiGPUHandle = {};
-
-	int mSubresourceCount = 1; // TODO: Support multiple subresources
-	int mResourceHeapIndex = -1;
-	bool mLoaded = false;
-	std::vector<glm::uint8> mUploadData;
-};
-
-extern ComPtr<ID3D12Resource>				gConstantGPUBuffer;
-extern ComPtr<ID3D12RootSignature>			gDXRGlobalRootSignature;
-extern ComPtr<ID3D12StateObject>			gDXRStateObject;
-
-extern ComPtr<ID3D12DescriptorHeap>			gUniversalHeap;
-extern SIZE_T								gUniversalHeapHandleIncrementSize;
-extern std::atomic<int>						gUniversalHeapHandleIndex;
-
-extern ShaderTable							gDXRShaderTable;
-
-extern bool									gUseDXRInlineShader;
-extern Shader								gDXRInlineShader;
-
-extern Shader								gDiffTexture2DShader;
-extern Shader								gDiffTexture3DShader;
-
-extern Shader								gCompositeShader;
-
-// Frame
-enum
-{
-	NUM_FRAMES_IN_FLIGHT = 2,
-	NUM_BACK_BUFFERS = 2
-};
-struct FrameContext
-{
-	ID3D12CommandAllocator*					mCommandAllocator		= nullptr;
-
-	ID3D12Resource*							mConstantUploadBuffer	= nullptr;
-	void*									mConstantUploadBufferPointer = nullptr;
-
-	glm::uint64								mFenceValue;
-};
-extern FrameContext							gFrameContext[];
-extern glm::uint32							gFrameIndex;
-
-extern Texture*								gDumpTexture;
-extern Texture								gDumpTextureProxy;
-
 #include "../Shader/Shared.inl"
 
-extern PerFrameConstants					gPerFrameConstantBuffer;
-
-// String literals
-static const wchar_t*						kDefaultRayGenerationShader	= L"DefaultRayGeneration";
-static const wchar_t*						kDefaultMissShader			= L"DefaultMiss";
-static const wchar_t*						kDefaultClosestHitShader	= L"DefaultClosestHit";
-static const wchar_t*						kDefaultHitGroup			= L"DefaultHitGroup";
-
-// Helper
-template <typename ResourceType>
-class ResourceBase
-{
-public:
-	ResourceBase() = default;
-	~ResourceBase() = default;
-
-	// Reconstruct this, release all managed resources
-	void Reset()
-	{
-		std::destroy_at<ResourceType>(static_cast<ResourceType*>(this));
-		std::construct_at<ResourceType>(static_cast<ResourceType*>(this));
-	}
-
-	// Make the class non-copyable as std::span is used to referencing members, otherwise those should be re-calculated after copy
-	ResourceBase(const ResourceBase&) = delete;
-	ResourceBase(const ResourceBase&&) = delete;
-	ResourceBase& operator=(const ResourceBase&) = delete;
-	ResourceBase& operator=(const ResourceBase&&) = delete;
-};
-
+// Common helpers
 template <typename T>
 inline T gAlignUp(T value, T alignment)
 {
@@ -228,7 +56,7 @@ inline T gMax(T lhs, T rhs)
 inline std::string gToLower(const std::string& inString)
 {
 	std::string result = inString;
-	std::transform(result.begin(), result.end(), result.begin(), [](unsigned char c){ return static_cast<char>(std::tolower(c)); });
+	std::transform(result.begin(), result.end(), result.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
 	return result;
 }
 
@@ -305,7 +133,7 @@ namespace nameof
 	}
 }
 
-// DirectX helper
+// DirectX helpers
 template <typename T>
 inline void gSafeRelease(T*& pointer)
 {
@@ -348,6 +176,234 @@ inline void gSetName(ComPtr<T>& inObject, std::string_view inBaseName, std::stri
 {
 	gSetName(inObject, gToWString(inBaseName), gToWString(inName));
 }
+
+// System
+enum
+{
+	NUM_FRAMES_IN_FLIGHT = 2,
+	NUM_BACK_BUFFERS = 2
+};
+
+extern ID3D12Device5*						gDevice;
+extern ID3D12DescriptorHeap* 				gRTVDescriptorHeap;
+extern ID3D12CommandQueue* 					gCommandQueue;
+extern ID3D12GraphicsCommandList4* 			gCommandList;
+
+extern ID3D12Fence* 						gIncrementalFence;			// Fence value increment each frame (most time)
+extern HANDLE                       		gIncrementalFenceEvent;		// Allow CPU to wait on fence
+extern uint64_t                       		gFenceLastSignaledValue;
+
+extern IDXGISwapChain3* 					gSwapChain;
+extern HANDLE                       		gSwapChainWaitableObject;
+extern ID3D12Resource*						gBackBufferRenderTargetResource[];
+extern D3D12_CPU_DESCRIPTOR_HANDLE			gBackBufferRenderTargetRTV[];
+
+// Application
+struct ShaderTable
+{
+	ID3D12Resource*							mResource = nullptr;
+	glm::uint64								mEntrySize = 0;
+	glm::uint32								mRayGenOffset = 0;
+	glm::uint32								mRayGenCount = 0;
+	glm::uint32								mMissOffset = 0;
+	glm::uint32								mMissCount = 0;
+	glm::uint32								mHitGroupOffset = 0;
+	glm::uint32								mHitGroupCount = 0;
+};
+
+struct DescriptorHeap
+{
+	ComPtr<ID3D12DescriptorHeap>			mHeap;
+	SIZE_T									mIncrementSize;
+	int										mNextDynamicIndex;
+	D3D12_CPU_DESCRIPTOR_HANDLE				mCPUHandleStart = { };
+	D3D12_GPU_DESCRIPTOR_HANDLE				mGPUHandleStart = { };
+
+	void Reset()
+	{
+		mHeap = nullptr;
+		mIncrementSize = 0;
+		mNextDynamicIndex = 4096;
+		mCPUHandleStart = {};
+		mGPUHandleStart = {};
+
+		gAssert(mNextDynamicIndex > static_cast<int>(DescriptorIndex::Count));
+	}
+
+	void Initialize()
+	{
+		Reset();
+
+		D3D12_DESCRIPTOR_HEAP_DESC desc = {};
+		desc.NumDescriptors = 100000;
+		desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+		desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+		gValidate(gDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&mHeap)));
+
+		mIncrementSize = gDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		mCPUHandleStart = mHeap->GetCPUDescriptorHandleForHeapStart();
+		mGPUHandleStart = mHeap->GetGPUDescriptorHandleForHeapStart();
+	}
+
+	D3D12_CPU_DESCRIPTOR_HANDLE AllocateStatic(DescriptorIndex inIndex)
+	{
+		D3D12_CPU_DESCRIPTOR_HANDLE handle = {};
+		handle = mCPUHandleStart;
+		handle.ptr += static_cast<int>(inIndex) * mIncrementSize;
+		return handle;
+	}
+};
+
+#define MEMBER(parent_type, type, name, default_value) \
+	parent_type& name(type in##name) { m##name = in##name; return *this; } \
+	type m##name = default_value;
+
+struct Shader
+{
+#define SHADER_MEMBER(type, name, default_value) MEMBER(Shader, type, name, default_value)
+
+	SHADER_MEMBER(const char*, FileName, nullptr);
+	SHADER_MEMBER(const char*, VSName, nullptr);
+	SHADER_MEMBER(const char*, PSName, nullptr);
+	SHADER_MEMBER(const char*, CSName, nullptr);
+	SHADER_MEMBER(bool, UseGlobalRootSignature, false);
+
+	struct DescriptorInfo
+	{
+		DescriptorInfo(ID3D12Resource* inResource) : mResource(inResource) {}
+		DescriptorInfo(ID3D12Resource* inResource, glm::uint inStride) : mResource(inResource), mStride(inStride) {}
+
+		ID3D12Resource*		mResource = nullptr;
+		glm::uint			mStride = 0;
+	};
+
+	void InitializeDescriptors(const std::vector<DescriptorInfo>& inEntries);
+	void SetupGraphics(ID3D12DescriptorHeap* inHeap = nullptr, bool inUseTable = true);
+	void SetupCompute(ID3D12DescriptorHeap* inHeap = nullptr, bool inUseTable = true);
+	void Reset() { mData = {}; }
+
+	struct Data
+	{
+		ComPtr<ID3D12RootSignatureDeserializer>		mRootSignatureDeserializer;
+		ComPtr<ID3D12RootSignature>					mRootSignature;
+		ComPtr<ID3D12PipelineState>					mPipelineState;
+		ComPtr<ID3D12DescriptorHeap>				mDescriptorHeap;
+	};
+	Data mData;
+};
+
+struct Texture
+{
+#define TEXTURE_MEMBER(type, name, default_value) MEMBER(Texture, type, name, default_value)
+
+	TEXTURE_MEMBER(glm::uint32, Width, 1);
+	TEXTURE_MEMBER(glm::uint32, Height, 1);
+	TEXTURE_MEMBER(glm::uint32, Depth, 1);
+	TEXTURE_MEMBER(DXGI_FORMAT, Format, DXGI_FORMAT_R32G32B32A32_FLOAT);
+	TEXTURE_MEMBER(const char*, Name, nullptr);
+	TEXTURE_MEMBER(float, UIScale, 0.0f);
+	TEXTURE_MEMBER(const wchar_t*, Path, nullptr);
+	TEXTURE_MEMBER(DescriptorIndex, SRVIndex, DescriptorIndex::NullSRV)
+	TEXTURE_MEMBER(DescriptorIndex, UAVIndex, DescriptorIndex::NullUAV)
+
+	Texture& Dimension(glm::uvec3 dimension) 
+	{
+		mWidth = dimension.x;
+		mHeight = dimension.y;
+		mDepth = dimension.z;
+		return *this;
+	}
+
+	int GetPixelSize() const;
+	glm::uint64 GetSubresourceSize() const;
+	void Initialize();
+	void Update();
+	void InitializeUpload();
+
+	ComPtr<ID3D12Resource> mResource;
+	ComPtr<ID3D12Resource> mUploadResource;
+
+	D3D12_GPU_DESCRIPTOR_HANDLE mImGuiGPUHandle = {};
+
+	int mSubresourceCount = 1; // TODO: Support multiple subresources
+	bool mLoaded = false;
+	std::vector<glm::uint8> mUploadData;
+};
+
+extern ComPtr<ID3D12Resource>				gConstantGPUBuffer;
+extern ComPtr<ID3D12RootSignature>			gDXRGlobalRootSignature;
+extern ComPtr<ID3D12StateObject>			gDXRStateObject;
+
+extern ComPtr<ID3D12DescriptorHeap>			gUniversalHeap;
+extern SIZE_T								gUniversalHeapHandleIncrementSize;
+extern int									gUniversalHeapHandleIndex;
+
+extern ShaderTable							gDXRShaderTable;
+
+extern bool									gUseDXRInlineShader;
+extern Shader								gDXRInlineShader;
+
+extern Shader								gDiffTexture2DShader;
+extern Shader								gDiffTexture3DShader;
+
+extern Shader								gCompositeShader;
+
+struct FrameContext
+{
+	ComPtr<ID3D12CommandAllocator>			mCommandAllocator;
+
+	ComPtr<ID3D12Resource>					mConstantUploadBuffer;
+	void*									mConstantUploadBufferPointer = nullptr;
+
+	glm::uint64								mFenceValue = 0;
+
+	DescriptorHeap							mDescriptorHeap;
+
+	void Reset()
+	{
+		mCommandAllocator					= nullptr;
+		mConstantUploadBuffer				= nullptr;
+		mConstantUploadBufferPointer		= nullptr;
+		mFenceValue							= 0;
+		mDescriptorHeap.Reset();
+	}
+};
+extern FrameContext							gFrameContexts[];
+extern glm::uint32							gFrameIndex;
+inline FrameContext&						gGetFrameContext() { return gFrameContexts[gFrameIndex % NUM_FRAMES_IN_FLIGHT]; }
+
+extern Texture*								gDumpTexture;
+extern Texture								gDumpTextureProxy;
+
+extern PerFrameConstants					gPerFrameConstantBuffer;
+
+// String literals
+static const wchar_t*						kDefaultRayGenerationShader	= L"DefaultRayGeneration";
+static const wchar_t*						kDefaultMissShader			= L"DefaultMiss";
+static const wchar_t*						kDefaultClosestHitShader	= L"DefaultClosestHit";
+static const wchar_t*						kDefaultHitGroup			= L"DefaultHitGroup";
+
+// Helper
+template <typename RuntimeType>
+class RuntimeBase
+{
+public:
+	RuntimeBase() = default;
+	~RuntimeBase() = default;
+
+	// Reconstruct this, release all managed resources
+	void Reset()
+	{
+		std::destroy_at<RuntimeType>(static_cast<RuntimeType*>(this));
+		std::construct_at<RuntimeType>(static_cast<RuntimeType*>(this));
+	}
+
+	// Make the class non-copyable as std::span is used to referencing members, otherwise those should be re-calculated after copy
+	RuntimeBase(const RuntimeBase&) = delete;
+	RuntimeBase(const RuntimeBase&&) = delete;
+	RuntimeBase& operator=(const RuntimeBase&) = delete;
+	RuntimeBase& operator=(const RuntimeBase&&) = delete;
+};
 
 inline void gBarrierTransition(ID3D12GraphicsCommandList4* command_list, ID3D12Resource* resource, D3D12_RESOURCE_STATES state_before, D3D12_RESOURCE_STATES state_after)
 {
