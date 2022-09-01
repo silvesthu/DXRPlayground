@@ -2,9 +2,7 @@
 #include "Shared.inl"
 #include "Binding.h"
 
-RWTexture2D<float4> InputUAV : register(u0, space1);
-RWTexture3D<float4> OutputUAV : register(u1, space1);
-[RootSignature("DescriptorTable(UAV(u0, space = 1, numDescriptors = 2))")]
+[RootSignature("RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED)")]
 [numthreads(8, 8, 1)]
 void CloudShapeNoiseCS(
 	uint3 inGroupThreadID : SV_GroupThreadID,
@@ -12,14 +10,17 @@ void CloudShapeNoiseCS(
 	uint3 inDispatchThreadID : SV_DispatchThreadID,
 	uint inGroupIndex : SV_GroupIndex)
 {
+	RWTexture2D<float4> input_UAV = ResourceDescriptorHeap[(int)DescriptorIndex::CloudShapeNoise2DUAV];
+	RWTexture3D<float4> output_UAV = ResourceDescriptorHeap[(int)DescriptorIndex::CloudShapeNoise3DUAV];
+	
 	uint2 coords = inDispatchThreadID.xy;
 	coords.x += inDispatchThreadID.z * 128;
 
-	float4 input = InputUAV[coords.xy];
-	OutputUAV[inDispatchThreadID.xyz] = pow(input, 1);
+	float4 input = input_UAV[coords.xy];
+	output_UAV[inDispatchThreadID.xyz] = input;
 }
 
-[RootSignature("DescriptorTable(UAV(u0, space = 1, numDescriptors = 2))")]
+[RootSignature("RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED)")]
 [numthreads(8, 8, 1)]
 void CloudErosionNoiseCS(
 	uint3 inGroupThreadID : SV_GroupThreadID,
@@ -27,9 +28,12 @@ void CloudErosionNoiseCS(
 	uint3 inDispatchThreadID : SV_DispatchThreadID,
 	uint inGroupIndex : SV_GroupIndex)
 {
+	RWTexture2D<float4> input_UAV = ResourceDescriptorHeap[(int)DescriptorIndex::CloudErosionNoise2DUAV];
+	RWTexture3D<float4> output_UAV = ResourceDescriptorHeap[(int)DescriptorIndex::CloudErosionNoise3DUAV];
+	
 	uint2 coords = inDispatchThreadID.xy;
 	coords.x += inDispatchThreadID.z * 32;
 
-	float4 input = InputUAV[coords.xy];
-	OutputUAV[inDispatchThreadID.xyz] = pow(input, 1);
+	float4 input = input_UAV[coords.xy];
+	output_UAV[inDispatchThreadID.xyz] = input;
 }
