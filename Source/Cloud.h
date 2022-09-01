@@ -68,21 +68,27 @@ public:
 		std::span<Shader> mShaders				= std::span<Shader>(&mShapeNoiseShader, &mSentinelShader);
 		
 		// Textures
-		Texture mShapeNoiseTexture				= Texture().Width(128).Height(128).Depth(128).Format(DXGI_FORMAT_R8_UNORM).Name("Cloud.ShapeNoise").UIScale(2.0f);
-		Texture mErosionNoiseTexture			= Texture().Width(32).Height(32).Depth(32).Format(DXGI_FORMAT_R8_UNORM).Name("Cloud.ErosionNoise").UIScale(8.0f);
-		Texture mShapeNoiseInputTexture			= Texture().Width(128).Height(128).Depth(128).Format(DXGI_FORMAT_R8_UNORM).Name("Cloud.ShapeNoise.Input").UIScale(2.0f).Path(L"Asset/TileableVolumeNoise/noiseShapePacked.tga");
-		Texture mErosionNoiseInputTexture		= Texture().Width(32).Height(32).Depth(32).Format(DXGI_FORMAT_R8_UNORM).Name("Cloud.ErosionNoise.Input").UIScale(8.0f).Path(L"Asset/TileableVolumeNoise/noiseErosionPacked.tga");
-		// Gather textures
+		Texture mShapeNoise3DTexture			= Texture().Width(128).Height(128).Depth(128).Format(DXGI_FORMAT_R8G8B8A8_UNORM).
+															UAVIndex(DescriptorIndex::CloudShapeNoise3DUAV).SRVIndex(DescriptorIndex::CloudShapeNoise3DSRV).SRVFormat(DXGI_FORMAT_R8G8B8A8_UNORM_SRGB).Name("Cloud.ShapeNoise").UIScale(2.0f);
+		Texture mErosionNoise3DTexture			= Texture().Width(32).Height(32).Depth(32).Format(DXGI_FORMAT_R8G8B8A8_UNORM).
+															UAVIndex(DescriptorIndex::CloudErosionNoise3DUAV).SRVIndex(DescriptorIndex::CloudErosionNoise3DSRV).SRVFormat(DXGI_FORMAT_R8G8B8A8_UNORM_SRGB).Name("Cloud.ErosionNoise").UIScale(8.0f);
+
+		Texture mShapeNoise2DTexture			= Texture().Width(16384).Height(128).Format(DXGI_FORMAT_R8G8B8A8_UNORM).
+															UAVIndex(DescriptorIndex::CloudShapeNoise2DUAV).Name("Cloud.ShapeNoise.Input").UIScale(2.0f).Path(L"Asset/TileableVolumeNoise/noiseShapePacked.tga");
+		Texture mErosionNoise2DTexture			= Texture().Width(1024).Height(32).Format(DXGI_FORMAT_R8G8B8A8_UNORM).
+															UAVIndex(DescriptorIndex::CloudErosionNoise2DUAV).Name("Cloud.ErosionNoise.Input").UIScale(8.0f).Path(L"Asset/TileableVolumeNoise/noiseErosionPacked.tga");
+		
 		Texture mSentinelTexture				= Texture();
-		std::span<Texture> mTextures			= std::span<Texture>(&mShapeNoiseTexture, &mSentinelTexture);
+		std::span<Texture> mTextures			= std::span<Texture>(&mShapeNoise3DTexture, &mSentinelTexture);
 	};
 	Runtime mRuntime;
 
 	void Initialize();
 	void Precompute();
 	void Finalize();
-	void UpdateImGui();
-	void Update();
+	void Update();	
+	void ImGuiShowMenus();
+	void ImGuiShowTextures();
 
 	bool mRecomputeRequested = true;
 };

@@ -53,6 +53,7 @@ enum class DescriptorIndex : uint
 
 	NullCount,
 
+	// [Raytrace]
 	RaytraceTLASSRV,
 	RaytraceInstanceDataSRV,
 	RaytraceIndicesSRV,
@@ -60,7 +61,6 @@ enum class DescriptorIndex : uint
 	RaytraceNormalsSRV,
 	RaytraceUVsSRV,
 	RaytraceLightsSRV,
-
 	RaytraceOutputSRV,
 	RaytraceOutputUAV,
 
@@ -91,6 +91,14 @@ enum class DescriptorIndex : uint
 	ValidationHillaire20MultiScattDiffUAV,
 	ValidationHillaire20SkyViewLutDiffUAV,
 	ValidationHillaire20AtmosphereCameraScatteringVolumeDiffUAV,
+
+	// [Cloud]
+	CloudShapeNoise2DUAV,
+	CloudErosionNoise2DUAV,
+	CloudShapeNoise3DUAV,
+	CloudErosionNoise3DUAV,
+	CloudShapeNoise3DSRV,
+	CloudErosionNoise3DSRV,
 
 	Count
 };

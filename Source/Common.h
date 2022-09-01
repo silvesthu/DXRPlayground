@@ -303,8 +303,9 @@ struct Texture
 	TEXTURE_MEMBER(const char*, Name, nullptr);
 	TEXTURE_MEMBER(float, UIScale, 0.0f);
 	TEXTURE_MEMBER(const wchar_t*, Path, nullptr);
-	TEXTURE_MEMBER(DescriptorIndex, SRVIndex, DescriptorIndex::NullSRV)
-	TEXTURE_MEMBER(DescriptorIndex, UAVIndex, DescriptorIndex::NullUAV)
+	TEXTURE_MEMBER(DescriptorIndex, UAVIndex, DescriptorIndex::NullUAV);
+	TEXTURE_MEMBER(DescriptorIndex, SRVIndex, DescriptorIndex::NullSRV);
+	TEXTURE_MEMBER(DXGI_FORMAT, SRVFormat, DXGI_FORMAT_UNKNOWN);
 
 	Texture& Dimension(glm::uvec3 dimension) 
 	{
@@ -502,4 +503,7 @@ inline D3D12_RESOURCE_DESC gGetUAVResourceDesc(UINT64 inWidth)
 	return desc;
 }
 
-void ImGuiShowTextures(std::span<Texture> inTextures, const std::string& inName = "Texture", ImGuiTreeNodeFlags inFlags = 0);
+namespace ImGui
+{
+	void Textures(std::span<Texture> inTextures, const std::string& inName = "Texture", ImGuiTreeNodeFlags inFlags = 0);
+}

@@ -175,8 +175,14 @@ static void sUpdate()
 
 	// ImGUI
 	{
-		ImGui::Begin("DXR Playground");
+		if (ImGui::Begin("DXR Playground"))
 		{
+			// Floating items
+			{
+				gAtmosphere.ImGuiShowTextures();
+				gCloud.ImGuiShowTextures();
+			}
+
 			ImGui::Text("Frame %d | Time %.3f s | Average %.3f ms (FPS %.1f) | %dx%d",
 				gPerFrameConstantBuffer.mAccumulationFrameCount,
 				gPerFrameConstantBuffer.mTime,
@@ -206,11 +212,9 @@ static void sUpdate()
 				ImGui::Checkbox("Inline Raytracing", &gUseDXRInlineShader);
 			}
 
-			// Always update
-			gPerFrameConstantBuffer.mEV100 = glm::log2((gCameraSettings.mExposureControl.mAperture * gCameraSettings.mExposureControl.mAperture) / (1.0f / gCameraSettings.mExposureControl.mInvShutterSpeed) * 100.0f / gCameraSettings.mExposureControl.mSensitivity);
 			if (ImGui::TreeNodeEx("Camera"))
 			{
-				auto s = [](float pivot = ImGui::GetCursorPosX()) { ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.65f - (ImGui::GetCursorPosX() - pivot)); };
+				auto align_right = [](float pivot = ImGui::GetCursorPosX()) { ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.65f - (ImGui::GetCursorPosX() - pivot)); };
 	
 				ImGui::InputFloat3("Position", (float*)&gPerFrameConstantBuffer.mCameraPosition);
 				ImGui::InputFloat3("Direction", (float*)&gPerFrameConstantBuffer.mCameraDirection);
@@ -224,7 +228,7 @@ static void sUpdate()
 					ImGui::SameLine();
 					if (ImGui::Button(">")) { gCameraSettings.mExposureControl.mAperture *= glm::sqrt(2.0f); }
 					ImGui::SameLine();
-					s(x); ImGui::SliderFloat("Aperture (f/_)", &gCameraSettings.mExposureControl.mAperture, 1.0f, 22.0f);
+					align_right(x); ImGui::SliderFloat("Aperture", &gCameraSettings.mExposureControl.mAperture, 1.0f, 22.0f);
 				}
 				ImGui::PopID();
 				ImGui::PushID("Shutter Speed");
@@ -235,10 +239,10 @@ static void sUpdate()
 					ImGui::SameLine();
 					if (ImGui::Button(">")) { gCameraSettings.mExposureControl.mInvShutterSpeed *= 2.0f; }
 					ImGui::SameLine();
-					s(x); ImGui::SliderFloat("Shutter Speed (1/_ sec)", &gCameraSettings.mExposureControl.mInvShutterSpeed, 1.0f, 500.0f);
+					align_right(x); ImGui::SliderFloat("Shutter Speed (1/sec)", &gCameraSettings.mExposureControl.mInvShutterSpeed, 1.0f, 500.0f);
 				}
 				ImGui::PopID();
-				s(); ImGui::SliderFloat("ISO", &gCameraSettings.mExposureControl.mSensitivity, 100.0f, 1000.0f);
+				align_right(); ImGui::SliderFloat("ISO", &gCameraSettings.mExposureControl.mSensitivity, 100.0f, 1000.0f);
 
 				if (ImGui::SmallButton("Reset Exposure"))
 					gCameraSettings.ResetExposure();
@@ -349,13 +353,13 @@ static void sUpdate()
 
 			if (ImGui::TreeNodeEx("Atmosphere", ImGuiTreeNodeFlags_DefaultOpen))
 			{
-				gAtmosphere.UpdateImGui();
+				gAtmosphere.ImGuiShowMenus();
 				ImGui::TreePop();
 			}
 
 			if (ImGui::TreeNodeEx("Cloud"))
 			{
-				gCloud.UpdateImGui();
+				gCloud.ImGuiShowMenus();
 				ImGui::TreePop();
 			}
 
@@ -591,6 +595,9 @@ void sRender()
 		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Upload");
 
 		{
+			gPerFrameConstantBuffer.mEV100 = 
+				glm::log2((gCameraSettings.mExposureControl.mAperture * gCameraSettings.mExposureControl.mAperture) / (1.0f / gCameraSettings.mExposureControl.mInvShutterSpeed) * 100.0f / gCameraSettings.mExposureControl.mSensitivity);
+
 			gPerFrameConstantBuffer.mSunDirection = 
 				glm::vec4(0,1,0,0) * glm::rotate(gPerFrameConstantBuffer.mSunZenith, glm::vec3(0, 0, 1)) * glm::rotate(gPerFrameConstantBuffer.mSunAzimuth + glm::pi<float>() / 2.0f, glm::vec3(0, 1, 0));
 		}

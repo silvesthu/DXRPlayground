@@ -890,7 +890,7 @@ void Scene::CreateShaderResource()
 				continue;
 
 			D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
-			srv_desc.Format = texture.mFormat;
+			srv_desc.Format = texture.mSRVFormat != DXGI_FORMAT_UNKNOWN ? texture.mSRVFormat : texture.mFormat;
 			srv_desc.ViewDimension = texture.mDepth == 1 ? D3D12_SRV_DIMENSION_TEXTURE2D : D3D12_SRV_DIMENSION_TEXTURE3D;
 			srv_desc.Texture2D.MipLevels = static_cast<UINT>(-1);
 			srv_desc.Texture2D.MostDetailedMip = 0;

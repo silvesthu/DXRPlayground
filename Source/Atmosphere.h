@@ -524,8 +524,9 @@ public:
 
 	void Initialize();
 	void Finalize();
-	void UpdateImGui();
 	void Update();
+	void ImGuiShowMenus();
+	void ImGuiShowTextures();
 
 	void UpdateProfile();
 };

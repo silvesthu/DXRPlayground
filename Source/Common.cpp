@@ -227,7 +227,7 @@ void Texture::Initialize()
 			D3D12_CPU_DESCRIPTOR_HANDLE handle = gFrameContexts[i].mDescriptorHeap.AllocateStatic(mSRVIndex);
 
 			D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
-			desc.Format = mFormat;
+			desc.Format = mSRVFormat != DXGI_FORMAT_UNKNOWN ? mSRVFormat : mFormat;
 			desc.ViewDimension = mDepth == 1 ? D3D12_SRV_DIMENSION_TEXTURE2D : D3D12_SRV_DIMENSION_TEXTURE3D;
 			desc.Texture2D.MipLevels = (UINT)-1;
 			desc.Texture2D.MostDetailedMip = 0;
@@ -281,6 +281,7 @@ void Texture::Initialize()
 
 void Texture::Update()
 {
+	// Upload from file
 	if (!mLoaded && mPath != nullptr)
 	{
 		// Load file
@@ -302,6 +303,7 @@ void Texture::Update()
 		mLoaded = true;
 	}
 
+	// Upload from raw data
 	if (!mUploadData.empty())
 	{
 		D3D12_SUBRESOURCE_DATA subresource = {};
@@ -329,75 +331,84 @@ void Texture::InitializeUpload()
 	mUploadResource->SetName(name.c_str());
 }
 
-void ImGuiShowTextures(std::span<Texture> inTextures, const std::string& inName, ImGuiTreeNodeFlags inFlags)
+namespace ImGui 
 {
-	ImGui::Begin("Textures");
-	
-	static float ui_scale = 1.0f;
-	static bool flip_y = false;
-
-	if (ImGui::TreeNodeEx(inName.c_str(), inFlags))
+	void Textures(std::span<Texture> inTextures, const std::string& inName, ImGuiTreeNodeFlags inFlags)
 	{
-		static Texture* sTexture = nullptr;
-		auto add_texture = [&](Texture& inTexture)
+		ImGui::Begin("Textures");
+
+		static float ui_scale = 1.0f;
+		static bool flip_y = false;
+
+		if (ImGui::TreeNodeEx(inName.c_str(), inFlags))
 		{
-			ImVec2 uv0 = ImVec2(0, 0);
-			ImVec2 uv1 = ImVec2(1, 1);
-
-			if (flip_y)
-				std::swap(uv0.y, uv1.y);
-
-			float item_ui_scale = inTexture.mUIScale * ui_scale;
-			ImGui::Image(reinterpret_cast<ImTextureID>(inTexture.mImGuiGPUHandle.ptr), ImVec2(inTexture.mWidth * item_ui_scale, inTexture.mHeight * item_ui_scale), uv0, uv1);
-			if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+			static Texture* sTexture = nullptr;
+			auto add_texture = [&](Texture& inTexture)
 			{
-				sTexture = &inTexture;
-				ImGui::OpenPopup("Image Options");
-			}
+				ImVec2 uv0 = ImVec2(0, 0);
+				ImVec2 uv1 = ImVec2(1, 1);
 
-			ImGui::SameLine();
-			std::string text = "-----------------------------------\n";
-			text += inTexture.mName;
-			text += "\n";
-			text += std::to_string(inTexture.mWidth) + " x " + std::to_string(inTexture.mHeight) + (inTexture.mDepth == 1 ? "" : " x " + std::to_string(inTexture.mDepth));
-			text += "\n";
-			text += nameof::nameof_enum(inTexture.mFormat);
-			ImGui::Text(text.c_str());
-		};
+				if (flip_y)
+					std::swap(uv0.y, uv1.y);
 
-		if (ImGui::BeginPopup("Image Options"))
-		{
-			if (sTexture != nullptr)
-			{
-				ImGui::Text(sTexture->mName);
+				float item_ui_scale = inTexture.mUIScale * ui_scale;
+				ImGui::Image(reinterpret_cast<ImTextureID>(inTexture.mImGuiGPUHandle.ptr), ImVec2(inTexture.mWidth * item_ui_scale, inTexture.mHeight * item_ui_scale), uv0, uv1);
+				if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+				{
+					sTexture = &inTexture;
+					ImGui::OpenPopup("Image Options");
+				}
 
-				if (ImGui::Button("Dump"))
-					gDumpTexture = sTexture;
-
-				ImGui::Separator();
-			}
-
-			ImGui::TextureOption();
-
-			// Extra options
-			{
-				ImGui::PushItemWidth(100);
-
-				ImGui::SliderFloat("UI Scale", &ui_scale, 1.0, 4.0f);
 				ImGui::SameLine();
-				ImGui::Checkbox("Flip Y", &flip_y);
+				std::string text = "-----------------------------------\n";
+				text += inTexture.mName;
+				text += "\n";
+				text += std::to_string(inTexture.mWidth) + " x " + std::to_string(inTexture.mHeight) + (inTexture.mDepth == 1 ? "" : " x " + std::to_string(inTexture.mDepth));
+				text += "\n";
+				text += nameof::nameof_enum(inTexture.mFormat);
+				if (inTexture.mSRVFormat != DXGI_FORMAT_UNKNOWN)
+				{
+					text += "\n";
+					text += nameof::nameof_enum(inTexture.mSRVFormat);
+					text += " (SRV)";
+				}
+				ImGui::Text(text.c_str());
+			};
 
-				ImGui::PopItemWidth();
+			if (ImGui::BeginPopup("Image Options"))
+			{
+				if (sTexture != nullptr)
+				{
+					ImGui::Text(sTexture->mName);
+
+					if (ImGui::Button("Dump"))
+						gDumpTexture = sTexture;
+
+					ImGui::Separator();
+				}
+
+				ImGui::TextureOption();
+
+				// Extra options
+				{
+					ImGui::PushItemWidth(100);
+
+					ImGui::SliderFloat("UI Scale", &ui_scale, 1.0, 4.0f);
+					ImGui::SameLine();
+					ImGui::Checkbox("Flip Y", &flip_y);
+
+					ImGui::PopItemWidth();
+				}
+
+				ImGui::EndPopup();
 			}
 
-			ImGui::EndPopup();
+			for (auto&& texture : inTextures)
+				add_texture(texture);
+
+			ImGui::TreePop();
 		}
 
-		for (auto&& texture : inTextures)
-			add_texture(texture);
-
-		ImGui::TreePop();
+		ImGui::End();
 	}
-
-	ImGui::End();
 }

@@ -6,14 +6,6 @@ void Atmosphere::Update()
 {
 	UpdateProfile();
 
-	for (auto&& textures : mRuntime.mTexturesSet)
-		for (auto&& texture : textures)
-			texture.Update();
-
-	for (auto&& textures : mRuntime.mValidationTexturesSet)
-		for (auto&& texture : textures)
-			texture.Update();
-
 	switch (mProfile.mMode)
 	{
 	case AtmosphereMode::Bruneton17:			mRuntime.mBruneton17.Update(mProfile); break;
@@ -24,6 +16,14 @@ void Atmosphere::Update()
 
 	if (mProfile.mMode != AtmosphereMode::Wilkie21 && mRuntime.mWilkie21.mSplitScreen != 0)
 		mRuntime.mWilkie21.Update(mProfile);
+
+	for (auto&& textures : mRuntime.mTexturesSet)
+		for (auto&& texture : textures)
+			texture.Update();
+
+	for (auto&& textures : mRuntime.mValidationTexturesSet)
+		for (auto&& texture : textures)
+			texture.Update();
 }
 
 void Atmosphere::UpdateProfile()
@@ -290,7 +290,7 @@ void Atmosphere::Finalize()
 	mRuntime.Reset();
 }
 
-void Atmosphere::UpdateImGui()
+void Atmosphere::ImGuiShowMenus()
 {
 #define SMALL_BUTTON(func) if (ImGui::SmallButton(NAMEOF(func).c_str())) func(mProfile);
 
@@ -600,11 +600,14 @@ void Atmosphere::UpdateImGui()
 
 		ImGui::TreePop();
 	}
+}
 
-	ImGuiShowTextures(mRuntime.mBruneton17.mTextures,				"Atmosphere.Bruneton17",				ImGuiTreeNodeFlags_None);
-	ImGuiShowTextures(mRuntime.mHillaire20.mTextures,				"Atmosphere.Hillaire20",				ImGuiTreeNodeFlags_None);
-	ImGuiShowTextures(mRuntime.mHillaire20.mValidationTextures,		"Atmosphere.Hillaire20.Validation",		ImGuiTreeNodeFlags_None);
-	ImGuiShowTextures(mRuntime.mWilkie21.mTextures,					"Atmosphere.Wilkie21",					ImGuiTreeNodeFlags_None);
+void Atmosphere::ImGuiShowTextures()
+{
+	ImGui::Textures(mRuntime.mBruneton17.mTextures,					"Atmosphere.Bruneton17",				ImGuiTreeNodeFlags_None);
+	ImGui::Textures(mRuntime.mHillaire20.mTextures,					"Atmosphere.Hillaire20",				ImGuiTreeNodeFlags_None);
+	ImGui::Textures(mRuntime.mHillaire20.mValidationTextures,		"Atmosphere.Hillaire20.Validation",		ImGuiTreeNodeFlags_None);
+	ImGui::Textures(mRuntime.mWilkie21.mTextures,					"Atmosphere.Wilkie21",					ImGuiTreeNodeFlags_None);
 }
 
 Atmosphere gAtmosphere;
