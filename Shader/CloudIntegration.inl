@@ -1,7 +1,3 @@
-cbuffer CloudBuffer : register(b0, space3)
-{
-	CloudConstants mCloudConstants;
-}
 
 Texture3D<float4> CloudShapeNoiseSRV : register(t0, space3);
 Texture3D<float4> CloudErosionNoiseSRV : register(t1, space3);
@@ -55,10 +51,10 @@ float SampleCloudDensity(float3 p, bool sample_coarse)
 	// FBM noise
 	if (false)
 	{
-		float frequency = mCloudConstants.mShapeNoise.mFrequency * 10.0;
-		float power = mCloudConstants.mShapeNoise.mPower * 0.2;
-		float scale = mCloudConstants.mShapeNoise.mScale;
-		float3 offset = mCloudConstants.mShapeNoise.mOffset;
+		float frequency = mPerFrameConstants.mCloud.mShapeNoise.mFrequency * 10.0;
+		float power = mPerFrameConstants.mCloud.mShapeNoise.mPower * 0.2;
+		float scale = mPerFrameConstants.mCloud.mShapeNoise.mScale;
+		float3 offset = mPerFrameConstants.mCloud.mShapeNoise.mOffset;
 
 		float shape = fbm((p + offset) * frequency);
 		shape = pow(shape, power) * scale;
@@ -69,10 +65,10 @@ float SampleCloudDensity(float3 p, bool sample_coarse)
 	// Noise texture
 	// if (false)
 	{
-		float frequency = mCloudConstants.mShapeNoise.mFrequency;
-		float power = mCloudConstants.mShapeNoise.mPower;
-		float scale = mCloudConstants.mShapeNoise.mScale;
-		float3 offset = mCloudConstants.mShapeNoise.mOffset;
+		float frequency = mPerFrameConstants.mCloud.mShapeNoise.mFrequency;
+		float power = mPerFrameConstants.mCloud.mShapeNoise.mPower;
+		float scale = mPerFrameConstants.mCloud.mShapeNoise.mScale;
+		float3 offset = mPerFrameConstants.mCloud.mShapeNoise.mOffset;
 
 		// [TODO] Skew
 
@@ -95,10 +91,10 @@ float SampleCloudDensityAlongCone(float3 p, float3 ray_direction, out float3 ray
 {
 	float accumulated_density = 0.0;
 
-	float3 light_step = ray_direction * mCloudConstants.mRaymarch.mLightSampleLength;
+	float3 light_step = ray_direction * mPerFrameConstants.mCloud.mRaymarch.mLightSampleLength;
 
 	p += light_step * 0.5;
-	for (int i = 0; i < mCloudConstants.mRaymarch.mLightSampleCount; i++)
+	for (int i = 0; i < mPerFrameConstants.mCloud.mRaymarch.mLightSampleCount; i++)
 	{
 		// [TODO] line -> cone
 		p += light_step;
@@ -117,7 +113,7 @@ void RaymarchCloud(out float3 outTransmittance, out float3 outLuminance)
 	outTransmittance = 1.0;
 	outLuminance = 0.0;
 
-	if (mCloudConstants.mMode == CloudMode::None)
+	if (mPerFrameConstants.mCloud.mMode == CloudMode::None)
 		return;
 
 	float3 accumulated_light = 0;
@@ -135,9 +131,9 @@ void RaymarchCloud(out float3 outTransmittance, out float3 outLuminance)
 		float2 distance_to_planet = 0;
 		bool hit_planet = IntersectRaySphere(PlanetRayOrigin(), PlanetRayDirection(), PlanetCenter(), PlanetRadius() + 0, distance_to_planet);
 		float2 distance_to_strato = 0;
-		bool hit_strato = IntersectRaySphere(PlanetRayOrigin(), PlanetRayDirection(), PlanetCenter(), PlanetRadius() + mCloudConstants.mGeometry.mStrato, distance_to_strato);
+		bool hit_strato = IntersectRaySphere(PlanetRayOrigin(), PlanetRayDirection(), PlanetCenter(), PlanetRadius() + mPerFrameConstants.mCloud.mGeometry.mStrato, distance_to_strato);
 		float2 distance_to_cirro = 0;
-		bool hit_cirro = IntersectRaySphere(PlanetRayOrigin(), PlanetRayDirection(), PlanetCenter(), PlanetRadius() + mCloudConstants.mGeometry.mCirro, distance_to_cirro);
+		bool hit_cirro = IntersectRaySphere(PlanetRayOrigin(), PlanetRayDirection(), PlanetCenter(), PlanetRadius() + mPerFrameConstants.mCloud.mGeometry.mCirro, distance_to_cirro);
 
 		if (!hit_cirro || distance_to_cirro.y < 0)
 			return; // Hit nothing
@@ -155,7 +151,7 @@ void RaymarchCloud(out float3 outTransmittance, out float3 outLuminance)
 					distance_range = float2(distance_to_strato.y, distance_to_cirro.y); // Hit strato, below cloud scape
 		}
 
-		int sample_count = mCloudConstants.mRaymarch.mSampleCount;
+		int sample_count = mPerFrameConstants.mCloud.mRaymarch.mSampleCount;
 		float step_length = (distance_range.y - distance_range.x) / sample_count;
 		float3 step = PlanetRayDirection() * step_length;
 

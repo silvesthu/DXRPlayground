@@ -580,7 +580,7 @@ void sRender()
 		gCommandList->Reset(frame_context.mCommandAllocator.Get(), nullptr);
 	}
 
-	// Update
+	// Update Scene
 	{
 		if (sPreviousScene != sCurrentScene)
 		{
@@ -591,7 +591,7 @@ void sRender()
 		}
 	}
 
-	// Upload - PerFrameConstants
+	// Update and Upload PerFrameConstants
 	{
 		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Upload");
 
@@ -601,16 +601,20 @@ void sRender()
 
 			gPerFrameConstantBuffer.mSunDirection = 
 				glm::vec4(0,1,0,0) * glm::rotate(gPerFrameConstantBuffer.mSunZenith, glm::vec3(0, 0, 1)) * glm::rotate(gPerFrameConstantBuffer.mSunAzimuth + glm::pi<float>() / 2.0f, glm::vec3(0, 1, 0));
+
+			gPerFrameConstantBuffer.mDebugCoord = 
+				glm::uvec2(static_cast<glm::uint32>(ImGui::GetMousePos().x), (glm::uint32)ImGui::GetMousePos().y);
 		}
 
 		// Accumulation reset check
 		{
 			static PerFrameConstants sPerFrameCopy = gPerFrameConstantBuffer;
 
-			sPerFrameCopy.mDebugCoord = gPerFrameConstantBuffer.mDebugCoord = glm::uvec2(static_cast<glm::uint32>(ImGui::GetMousePos().x), (glm::uint32)ImGui::GetMousePos().y);
-			sPerFrameCopy.mAccumulationFrameCount = gPerFrameConstantBuffer.mAccumulationFrameCount;
-			sPerFrameCopy.mFrameIndex = gPerFrameConstantBuffer.mFrameIndex;
-			sPerFrameCopy.mTime = gPerFrameConstantBuffer.mTime;
+			// Whitelist
+			sPerFrameCopy.mDebugCoord				= gPerFrameConstantBuffer.mDebugCoord;
+			sPerFrameCopy.mAccumulationFrameCount	= gPerFrameConstantBuffer.mAccumulationFrameCount;
+			sPerFrameCopy.mFrameIndex				= gPerFrameConstantBuffer.mFrameIndex;
+			sPerFrameCopy.mTime						= gPerFrameConstantBuffer.mTime;
 
 			if (gPerFrameConstantBuffer.mReset == 0 && memcmp(&sPerFrameCopy, &gPerFrameConstantBuffer, sizeof(PerFrameConstants)) == 0)
 				gPerFrameConstantBuffer.mAccumulationFrameCount++;

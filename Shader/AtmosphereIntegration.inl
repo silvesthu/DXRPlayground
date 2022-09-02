@@ -34,7 +34,6 @@ Texture2D<float4> Wilkie21SkyViewLutTexSRV							: register(t11, space2);
 #define AtmosphereRootSignature							\
 "DescriptorTable("										\
 	"  CBV(b0, space = 0)"								\
-	", CBV(b0, space = 2)"								\
 	", UAV(u0, space = 2, numDescriptors = 12)"			\
 	", SRV(t0, space = 2, numDescriptors = 12)"			\
 ")"														\
@@ -80,13 +79,13 @@ float ClampDistance(float d)
 
 float ClampRadius(float r) 
 {
-	return clamp(r, mAtmosphere.mBottomRadius, mAtmosphere.mTopRadius);
+	return clamp(r, mPerFrameConstants.mAtmosphere.mBottomRadius, mPerFrameConstants.mAtmosphere.mTopRadius);
 }
 
 // r, mu -> d
 float DistanceToTopAtmosphereBoundary(float r, float mu)
 {
-	float R_t = mAtmosphere.mTopRadius;
+	float R_t = mPerFrameConstants.mAtmosphere.mTopRadius;
 
 	float discriminant = r * r * (mu * mu - 1.0) + R_t * R_t;
 	return ClampDistance(-r * mu + SafeSqrt(discriminant));
@@ -98,7 +97,7 @@ float InvDistanceToTopAtmosphereBoundary(float r, float d)
 	if (d == 0)
 		return 1.0;
 
-	float R_t = mAtmosphere.mTopRadius;
+	float R_t = mPerFrameConstants.mAtmosphere.mTopRadius;
 	return (R_t * R_t - r * r - d * d) / (2.0 * r * d);
 
 	// [Bruneton17] R_t * R_t - r * r == H * H - rho * rho
@@ -108,7 +107,7 @@ float InvDistanceToTopAtmosphereBoundary(float r, float d)
 // r, mu -> d
 float DistanceToBottomAtmosphereBoundary(float r, float mu)
 {
-	float R_g = mAtmosphere.mBottomRadius;
+	float R_g = mPerFrameConstants.mAtmosphere.mBottomRadius;
 
 	float discriminant = r * r * (mu * mu - 1.0) + R_g * R_g;
 	return ClampDistance(-r * mu - SafeSqrt(discriminant));
@@ -126,7 +125,7 @@ float DistanceToNearestAtmosphereBoundary(float r, float mu, bool intersects_gro
 // r, mu -> bool
 bool RayIntersectsGround(float r, float mu) 
 {
-	return mu < 0.0 && (r * r * (mu * mu - 1.0) + mAtmosphere.mBottomRadius * mAtmosphere.mBottomRadius) >= 0.0;
+	return mu < 0.0 && (r * r * (mu * mu - 1.0) + mPerFrameConstants.mAtmosphere.mBottomRadius * mPerFrameConstants.mAtmosphere.mBottomRadius) >= 0.0;
 }
 
 #define USE_HALF_PIXEL_OFFSET
@@ -186,7 +185,7 @@ void GetSunAndSkyIrradiance(float3 inHitPosition, float3 inNormal, out float3 ou
 	outSunIrradiance = 0;
 	outSkyIrradiance = 0;
 
-	switch (mAtmosphere.mMode)
+	switch (mPerFrameConstants.mAtmosphere.mMode)
 	{
     case AtmosphereMode::ConstantColor:				break; // Not supported
 	case AtmosphereMode::RaymarchAtmosphereOnly:	break; // Not supported
@@ -201,16 +200,16 @@ void GetSkyRadiance(out float3 outSkyRadiance, out float3 outTransmittanceToTop)
 	outSkyRadiance = 0;
 	outTransmittanceToTop = 1;
 
-	AtmosphereMode mode = mAtmosphere.mMode;
+	AtmosphereMode mode = mPerFrameConstants.mAtmosphere.mMode;
 	bool left_screen = sGetDispatchRaysIndex().x * 1.0 / sGetDispatchRaysDimensions().x < 0.5;
-	if (mAtmosphere.mWilkie21SkyViewSplitScreen == 1 && left_screen)
+	if (mPerFrameConstants.mAtmosphere.mWilkie21SkyViewSplitScreen == 1 && left_screen)
 		mode = AtmosphereMode::Wilkie21;
-	if (mAtmosphere.mWilkie21SkyViewSplitScreen == 2 && !left_screen)
+	if (mPerFrameConstants.mAtmosphere.mWilkie21SkyViewSplitScreen == 2 && !left_screen)
 		mode = AtmosphereMode::Wilkie21;
 
 	switch (mode)
 	{
-	case AtmosphereMode::ConstantColor:				outSkyRadiance = mAtmosphere.mConstantColor.xyz; break;
+	case AtmosphereMode::ConstantColor:				outSkyRadiance = mPerFrameConstants.mAtmosphere.mConstantColor.xyz; break;
 	case AtmosphereMode::Wilkie21:					AtmosphereIntegration::Wilkie21::GetSkyRadiance(outSkyRadiance, outTransmittanceToTop); break;
 	case AtmosphereMode::RaymarchAtmosphereOnly:	AtmosphereIntegration::Raymarch::GetSkyRadiance(outSkyRadiance, outTransmittanceToTop); break;
 	case AtmosphereMode::Bruneton17: 				AtmosphereIntegration::Bruneton17::GetSkyRadiance(outSkyRadiance, outTransmittanceToTop); break;
@@ -224,11 +223,11 @@ void GetSkyLuminanceToPoint(out float3 outSkyLuminance, out float3 outTransmitta
 	outSkyLuminance = 0;
 	outTransmittance = 1;
 
-	if (mAtmosphere.mAerialPerspective == 0)
+	if (mPerFrameConstants.mAtmosphere.mAerialPerspective == 0)
 		return;
 
 	float3 radiance = 0;
-    switch (mAtmosphere.mMode)
+    switch (mPerFrameConstants.mAtmosphere.mMode)
     {
     case AtmosphereMode::ConstantColor:				break; // Not supported
 	case AtmosphereMode::RaymarchAtmosphereOnly:	break; // Not supported
@@ -263,15 +262,15 @@ float3 GetSkyLuminance()
 	}
 
 	// Sun
-	if (mAtmosphere.mMode != AtmosphereMode::ConstantColor &&
-		dot(PlanetRayDirection(), GetSunDirection()) > cos(mAtmosphere.mSunAngularRadius))
+	if (mPerFrameConstants.mAtmosphere.mMode != AtmosphereMode::ConstantColor &&
+		dot(PlanetRayDirection(), GetSunDirection()) > cos(mPerFrameConstants.mAtmosphere.mSunAngularRadius))
 	{
 		// https://en.wikipedia.org/wiki/Solid_angle#Celestial_objects
 		// https://pages.mtu.edu/~scarn/teaching/GE4250/radiation_lecture_slides.pdf
 		// static const float kSunSolidAngle = 6.8E-5;
 		static const float kSunSolidAngle = 6.8E-5;
 		static const float kSolarRadianceScale = 1E-5; // Limit radiance to prevent fireflies...		
-		float3 solar_radiance = mAtmosphere.mSolarIrradiance / kSunSolidAngle * kSolarRadianceScale;
+		float3 solar_radiance = mPerFrameConstants.mAtmosphere.mSolarIrradiance / kSunSolidAngle * kSolarRadianceScale;
 		radiance = radiance + transmittance_to_top * solar_radiance;
 	}
 

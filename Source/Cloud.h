@@ -57,9 +57,6 @@ public:
 
 	struct Runtime : RuntimeBase<Runtime>
 	{
-		ComPtr<ID3D12Resource> mConstantUploadBuffer;
-		void* mConstantUploadBufferPointer		= nullptr;
-
 		// Shaders
 		Shader mShapeNoiseShader				= Shader().FileName("Shader/Cloud.hlsl").CSName("CloudShapeNoiseCS");
 		Shader mErosionNoiseShader				= Shader().FileName("Shader/Cloud.hlsl").CSName("CloudErosionNoiseCS");

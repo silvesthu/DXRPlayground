@@ -216,40 +216,6 @@ enum class CloudMode  : uint
 	Count
 };
 
-struct PerFrameConstants
-{
-	float4						mCameraPosition					CONSTANT_DEFAULT(float4(0.0f, 0.0f, 0.0f, 0.0f));
-	float4						mCameraDirection				CONSTANT_DEFAULT(float4(0.0f, 0.0f, 1.0f, 0.0f));
-	float4						mCameraRightExtend				CONSTANT_DEFAULT(float4(1.0f, 0.0f, 0.0f, 0.0f));
-	float4						mCameraUpExtend					CONSTANT_DEFAULT(float4(0.0f, 1.0f, 0.0f, 0.0f));
-
-	float						mEV100							CONSTANT_DEFAULT(16.0f);
-	ToneMappingMode				mToneMappingMode				CONSTANT_DEFAULT(ToneMappingMode::Knarkowicz);
-	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
-	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
-	
-	float						mSolarLuminanceScale			CONSTANT_DEFAULT(1.0f);
-	float						mSunAzimuth						CONSTANT_DEFAULT(0);
-	float						mSunZenith						CONSTANT_DEFAULT(MATH_PI / 4.0f);
-	float						mTime							CONSTANT_DEFAULT(0);
-
-	float4						mSunDirection					CONSTANT_DEFAULT(float4(1.0f, 0.0f, 0.0f, 0.0f));
-
-	DebugMode					mDebugMode						CONSTANT_DEFAULT(DebugMode::None);
-	DebugInstanceMode			mDebugInstanceMode				CONSTANT_DEFAULT(DebugInstanceMode::None);
-	int							mDebugInstanceIndex				CONSTANT_DEFAULT(-1);
-	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
-
-	RecursionMode				mRecursionMode					CONSTANT_DEFAULT(RecursionMode::RussianRoulette);
-	uint						mRecursionCountMax				CONSTANT_DEFAULT(4);
-	uint						mFrameIndex						CONSTANT_DEFAULT(0);
-	uint						mAccumulationFrameCount			CONSTANT_DEFAULT(1);
-
-	uint2						mDebugCoord						CONSTANT_DEFAULT(uint2(0, 0));
-	uint						mReset							CONSTANT_DEFAULT(0);
-	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
-};
-
 struct InstanceData
 {
 	// [TODO] Split material
@@ -367,14 +333,6 @@ struct AtmosphereConstants
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 };
 
-struct AtmosphereConstantsPerDraw
-{
-	uint						mScatteringOrder				CONSTANT_DEFAULT(0);
-	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
-	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
-	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
-};
-
 struct CloudConstants
 {
 	CloudMode					mMode							CONSTANT_DEFAULT(CloudMode::Noise);
@@ -411,6 +369,51 @@ struct CloudConstants
 		float					GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 	};
 	ShapeNoise					mShapeNoise;
+};
+
+struct PerFrameConstants
+{
+	float4						mCameraPosition					CONSTANT_DEFAULT(float4(0.0f, 0.0f, 0.0f, 0.0f));
+	float4						mCameraDirection				CONSTANT_DEFAULT(float4(0.0f, 0.0f, 1.0f, 0.0f));
+	float4						mCameraRightExtend				CONSTANT_DEFAULT(float4(1.0f, 0.0f, 0.0f, 0.0f));
+	float4						mCameraUpExtend					CONSTANT_DEFAULT(float4(0.0f, 1.0f, 0.0f, 0.0f));
+
+	float						mEV100							CONSTANT_DEFAULT(16.0f);
+	ToneMappingMode				mToneMappingMode				CONSTANT_DEFAULT(ToneMappingMode::Knarkowicz);
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+
+	float						mSolarLuminanceScale			CONSTANT_DEFAULT(1.0f);
+	float						mSunAzimuth						CONSTANT_DEFAULT(0);
+	float						mSunZenith						CONSTANT_DEFAULT(MATH_PI / 4.0f);
+	float						mTime							CONSTANT_DEFAULT(0);
+
+	float4						mSunDirection					CONSTANT_DEFAULT(float4(1.0f, 0.0f, 0.0f, 0.0f));
+
+	DebugMode					mDebugMode						CONSTANT_DEFAULT(DebugMode::None);
+	DebugInstanceMode			mDebugInstanceMode				CONSTANT_DEFAULT(DebugInstanceMode::None);
+	int							mDebugInstanceIndex				CONSTANT_DEFAULT(-1);
+	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+
+	RecursionMode				mRecursionMode					CONSTANT_DEFAULT(RecursionMode::RussianRoulette);
+	uint						mRecursionCountMax				CONSTANT_DEFAULT(4);
+	uint						mFrameIndex						CONSTANT_DEFAULT(0);
+	uint						mAccumulationFrameCount			CONSTANT_DEFAULT(1);
+
+	uint2						mDebugCoord						CONSTANT_DEFAULT(uint2(0, 0));
+	uint						mReset							CONSTANT_DEFAULT(0);
+	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+
+	AtmosphereConstants			mAtmosphere;
+	CloudConstants				mCloud;
+};
+
+struct AtmosphereConstantsPerDraw
+{
+	uint						mScatteringOrder				CONSTANT_DEFAULT(0);
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 };
 
 #undef CONSTANT_DEFAULT

@@ -7,8 +7,8 @@ const static int DENSITY_SAMPLE_COUNT = 500;
 // [Bruneton08] 4. Precomputations.Parameterization
 float Encode_R_Transmittance(float r)
 {
-	float R_g = mAtmosphere.mBottomRadius;					// Ground
-	float R_t = mAtmosphere.mTopRadius;						// Top
+	float R_g = mPerFrameConstants.mAtmosphere.mBottomRadius;					// Ground
+	float R_t = mPerFrameConstants.mAtmosphere.mTopRadius;						// Top
 
 	float H = sqrt(R_t * R_t - R_g * R_g);					// Ground to Horizon
 	float rho = sqrt(max(0, r * r - R_g * R_g));			// Ground towards Horizon [0, H]
@@ -19,8 +19,8 @@ float Encode_R_Transmittance(float r)
 // Inverse of Encode_R
 float Decode_R_Transmittance(float u_r)
 {
-	float R_g = mAtmosphere.mBottomRadius;
-	float R_t = mAtmosphere.mTopRadius;
+	float R_g = mPerFrameConstants.mAtmosphere.mBottomRadius;
+	float R_t = mPerFrameConstants.mAtmosphere.mTopRadius;
 
 	float H = sqrt(R_t * R_t - R_g * R_g);
 	float rho = H * u_r;
@@ -35,8 +35,8 @@ const static float kMuTransmittancePower = kUseMuTransmittancePower ? 0.4 : 1.0;
 // [Bruneton08] 4. Precomputations.Parameterization ?
 float Encode_Mu_Transmittance(float mu, float r)
 {
-	float R_g = mAtmosphere.mBottomRadius;
-	float R_t = mAtmosphere.mTopRadius;
+	float R_g = mPerFrameConstants.mAtmosphere.mBottomRadius;
+	float R_t = mPerFrameConstants.mAtmosphere.mTopRadius;
 
 	float H = sqrt(R_t * R_t - R_g * R_g);					// Ground to Horizon
 	float rho = sqrt(max(0, r * r - R_g * R_g));			// Ground towards Horizon [0, H]
@@ -60,8 +60,8 @@ float Decode_Mu_Transmittance(float u_mu, float u_r)
 {
 	u_mu = pow(u_mu, kMuTransmittancePower);
 
-	float R_g = mAtmosphere.mBottomRadius;
-	float R_t = mAtmosphere.mTopRadius;
+	float R_g = mPerFrameConstants.mAtmosphere.mBottomRadius;
+	float R_t = mPerFrameConstants.mAtmosphere.mTopRadius;
 
 	float r = Decode_R_Transmittance(u_r);
 
@@ -97,7 +97,7 @@ float2 Encode2D_Transmittance(float2 mu_r)
 float2 Decode2D_Irradiance(float2 u_mu_u_r)
 {
 	float mu = lerp(-1, 1, u_mu_u_r.x);
-	float r = lerp(mAtmosphere.mBottomRadius, mAtmosphere.mTopRadius, u_mu_u_r.y);
+	float r = lerp(mPerFrameConstants.mAtmosphere.mBottomRadius, mPerFrameConstants.mAtmosphere.mTopRadius, u_mu_u_r.y);
 
 	return float2(mu, r);
 }
@@ -106,7 +106,7 @@ float2 Decode2D_Irradiance(float2 u_mu_u_r)
 float2 Encode2D_Irradiance(float2 mu_r)
 {
 	float u_mu = invlerp(-1, 1, mu_r.x);
-	float u_r = invlerp(mAtmosphere.mBottomRadius, mAtmosphere.mTopRadius, mu_r.y);
+	float u_r = invlerp(mPerFrameConstants.mAtmosphere.mBottomRadius, mPerFrameConstants.mAtmosphere.mTopRadius, mu_r.y);
 
 	return float2(u_mu, u_r);
 }
@@ -126,7 +126,7 @@ float4 Decode4D(uint3 inTexCoords, RWTexture3D<float4> inTexture, out bool inter
 
 		uint3 size;
 		inTexture.GetDimensions(size.x, size.y, size.z);
-		uint slice_count = mAtmosphere.mSliceCount;
+		uint slice_count = mPerFrameConstants.mAtmosphere.mSliceCount;
 		uint slice_size = size.x / slice_count;
 
 		u_mu_s = (inTexCoords.x % slice_size) / (slice_size - 1.0);		// X
@@ -144,7 +144,7 @@ float4 Decode4D(uint3 inTexCoords, RWTexture3D<float4> inTexture, out bool inter
 
 		uint3 size;
 		inTexture.GetDimensions(size.x, size.y, size.z);
-		uint slice_count = mAtmosphere.mSliceCount;
+		uint slice_count = mPerFrameConstants.mAtmosphere.mSliceCount;
 		uint slice_size = size.z / slice_count;
 
 		u_mu_s = (inTexCoords.z % slice_size) / (slice_size - 1.0);		// Z
@@ -163,8 +163,8 @@ float4 Decode4D(uint3 inTexCoords, RWTexture3D<float4> inTexture, out bool inter
 	float nu;	// Cosine of view sun angle
 
 	// [Bruneton08]
-	float R_t = mAtmosphere.mTopRadius;				// Top
-	float R_g = mAtmosphere.mBottomRadius;			// Ground
+	float R_t = mPerFrameConstants.mAtmosphere.mTopRadius;				// Top
+	float R_g = mPerFrameConstants.mAtmosphere.mBottomRadius;			// Ground
 	float H_squared = R_t * R_t - R_g * R_g;		// [NOTE] Avoid precision loss on sqrt(squared)
 	float H = sqrt(H_squared);						// Ground to Horizon
 	float rho = H * u_r;							// Ground towards Horizon [0, H]
@@ -213,7 +213,7 @@ float4 Decode4D(uint3 inTexCoords, RWTexture3D<float4> inTexture, out bool inter
 		// [Mapping] Sun Zenith -> ?
 
 		// [NOTE] Formulas other than Bruneton17 are likely fitted curve with max_sun_zenith_angle = 102.0 degrees
-		switch (mAtmosphere.mMuSEncodingMode)
+		switch (mPerFrameConstants.mAtmosphere.mMuSEncodingMode)
 		{
 		case AtmosphereMuSEncodingMode::Bruneton17:
 			{
@@ -277,30 +277,30 @@ void Encode4D(float4 r_mu_mu_s_nu, bool intersects_ground, Texture3D<float4> inT
 	float nu = r_mu_mu_s_nu.w;
 
 	// [Bruneton08]
-	float R_t = mAtmosphere.mTopRadius;				// Top
-	float R_g = mAtmosphere.mBottomRadius;			// Ground
+	float R_t = mPerFrameConstants.mAtmosphere.mTopRadius;				// Top
+	float R_g = mPerFrameConstants.mAtmosphere.mBottomRadius;			// Ground
 	float H_squared = R_t * R_t - R_g * R_g;		// [NOTE] Avoid precision loss on sqrt(squared)
 	float H = sqrt(H_squared);
-	float rho = SafeSqrt(r * r - mAtmosphere.mBottomRadius * mAtmosphere.mBottomRadius);
+	float rho = SafeSqrt(r * r - mPerFrameConstants.mAtmosphere.mBottomRadius * mPerFrameConstants.mAtmosphere.mBottomRadius);
 
 	// r - Height
 	float u_r = rho / H;
 
 	// mu - View Zenith
 	float r_mu = r * mu;
-	float discriminant = r_mu * r_mu - r * r + mAtmosphere.mBottomRadius * mAtmosphere.mBottomRadius;
+	float discriminant = r_mu * r_mu - r * r + mPerFrameConstants.mAtmosphere.mBottomRadius * mPerFrameConstants.mAtmosphere.mBottomRadius;
 	float u_mu;
 	if (intersects_ground)
 	{
 		float d = -r_mu - SafeSqrt(discriminant);
-		float d_min = r - mAtmosphere.mBottomRadius;
+		float d_min = r - mPerFrameConstants.mAtmosphere.mBottomRadius;
 		float d_max = rho;
 		u_mu = d_max == d_min ? 0.0 : (d - d_min) / (d_max - d_min);
 	}
 	else
 	{
 		float d = -r_mu + SafeSqrt(discriminant + H_squared);
-		float d_min = mAtmosphere.mTopRadius - r;
+		float d_min = mPerFrameConstants.mAtmosphere.mTopRadius - r;
 		float d_max = rho + H;
 		u_mu = (d - d_min) / (d_max - d_min);
 	}
@@ -309,7 +309,7 @@ void Encode4D(float4 r_mu_mu_s_nu, bool intersects_ground, Texture3D<float4> inT
 	float u_mu_s = 0.0;
 
 	// [NOTE] Formulas other than Bruneton17 are likely fitted curve with max_sun_zenith_angle = 102.0 degrees
-	switch (mAtmosphere.mMuSEncodingMode)
+	switch (mPerFrameConstants.mAtmosphere.mMuSEncodingMode)
 	{
 	default: // fallthrough
 	case AtmosphereMuSEncodingMode::Bruneton17:
@@ -318,11 +318,11 @@ void Encode4D(float4 r_mu_mu_s_nu, bool intersects_ground, Texture3D<float4> inT
 		float max_sun_zenith_angle = (use_half_precision ? 102.0 : 120.0) / 180.0 * MATH_PI;
 		float mu_s_min = cos(max_sun_zenith_angle);
 
-		float d = DistanceToTopAtmosphereBoundary(mAtmosphere.mBottomRadius, mu_s);
-		float d_min = mAtmosphere.mTopRadius - mAtmosphere.mBottomRadius;
+		float d = DistanceToTopAtmosphereBoundary(mPerFrameConstants.mAtmosphere.mBottomRadius, mu_s);
+		float d_min = mPerFrameConstants.mAtmosphere.mTopRadius - mPerFrameConstants.mAtmosphere.mBottomRadius;
 		float d_max = H;
 		float a = (d - d_min) / (d_max - d_min);
-		float D = DistanceToTopAtmosphereBoundary(mAtmosphere.mBottomRadius, mu_s_min);
+		float D = DistanceToTopAtmosphereBoundary(mPerFrameConstants.mAtmosphere.mBottomRadius, mu_s_min);
 		float A = (D - d_min) / (d_max - d_min);
 		u_mu_s = max(1.0 - a / A, 0.0) / (1.0 + a);
 	}
@@ -355,7 +355,7 @@ void Encode4D(float4 r_mu_mu_s_nu, bool intersects_ground, Texture3D<float4> inT
 
 		uint3 size;
 		inTexture.GetDimensions(size.x, size.y, size.z);
-		uint slice_count = mAtmosphere.mSliceCount;
+		uint slice_count = mPerFrameConstants.mAtmosphere.mSliceCount;
 		uint slice_size = size.x / slice_count;
 
 		float offset = u_mu_s * (slice_size - 1.0);
@@ -383,7 +383,7 @@ void Encode4D(float4 r_mu_mu_s_nu, bool intersects_ground, Texture3D<float4> inT
 
 		uint3 size;
 		inTexture.GetDimensions(size.x, size.y, size.z);
-		uint slice_count = mAtmosphere.mSliceCount;
+		uint slice_count = mPerFrameConstants.mAtmosphere.mSliceCount;
 		uint slice_size = size.z / slice_count;
 
 		float offset = u_mu_s * (slice_size - 1.0);
@@ -432,7 +432,7 @@ float IntegrateDensity(DensityProfile inProfile, float2 mu_r)
 		float r_i = sqrt(d_i * d_i + 2.0 * r * mu * d_i + r * r);
 
 		// Extinction Coefficient Multiplier (Density) based on altitude.
-		float altitude = r_i - mAtmosphere.mBottomRadius;
+		float altitude = r_i - mPerFrameConstants.mAtmosphere.mBottomRadius;
 		float beta_i = GetProfileDensity(inProfile, altitude);
 
 		// Sample weight (from the trapezoidal rule).
@@ -453,9 +453,9 @@ float3 ComputeTransmittance(float2 mu_r)
 	// See [Bruneton08] 2.2 (5)
 	// Extinction Coefficients at sea level is extracted out of integration
 
-	float3 rayleigh		= mAtmosphere.mRayleighExtinction.xyz * IntegrateDensity(mAtmosphere.mRayleighDensity, mu_r);
-	float3 mie			= mAtmosphere.mMieExtinction.xyz *		IntegrateDensity(mAtmosphere.mMieDensity, mu_r);
-	float3 ozone		= mAtmosphere.mOzoneExtinction.xyz *	IntegrateDensity(mAtmosphere.mOzoneDensity, mu_r);
+	float3 rayleigh		= mPerFrameConstants.mAtmosphere.mRayleighExtinction.xyz * IntegrateDensity(mPerFrameConstants.mAtmosphere.mRayleighDensity, mu_r);
+	float3 mie			= mPerFrameConstants.mAtmosphere.mMieExtinction.xyz *		IntegrateDensity(mPerFrameConstants.mAtmosphere.mMieDensity, mu_r);
+	float3 ozone		= mPerFrameConstants.mAtmosphere.mOzoneExtinction.xyz *	IntegrateDensity(mPerFrameConstants.mAtmosphere.mOzoneDensity, mu_r);
 
 	float3 transmittance = exp(-(rayleigh + mie + ozone));
 	return transmittance;
@@ -497,13 +497,13 @@ float3 GetTransmittanceToSun(float r, float mu_s)
 {
 	// [Bruneton17] GetTransmittanceToSun
 
-	float sin_theta_h = mAtmosphere.mBottomRadius / r;
+	float sin_theta_h = mPerFrameConstants.mAtmosphere.mBottomRadius / r;
 	float cos_theta_h = -sqrt(max(1.0 - sin_theta_h * sin_theta_h, 0.0));
 
 	// [Bruneton08 Doc] Approximate visible sun disk fraction
 	// [TODO] Add notes
 	return GetTransmittanceToTopAtmosphereBoundary(r, mu_s) *
-		smoothstep(-sin_theta_h * mAtmosphere.mSunAngularRadius, sin_theta_h * mAtmosphere.mSunAngularRadius, mu_s - cos_theta_h);
+		smoothstep(-sin_theta_h * mPerFrameConstants.mAtmosphere.mSunAngularRadius, sin_theta_h * mPerFrameConstants.mAtmosphere.mSunAngularRadius, mu_s - cos_theta_h);
 }
 
 void ComputeSingleScatteringIntegrand(float4 r_mu_mu_s_nu, float d, bool intersects_ground, out float3 rayleigh, out float3 mie)
@@ -522,8 +522,8 @@ void ComputeSingleScatteringIntegrand(float4 r_mu_mu_s_nu, float d, bool interse
 	// Eye -> P then P -> Sun
 	float3 transmittance = GetTransmittance(r, mu, d, intersects_ground) * GetTransmittanceToSun(r_d, mu_s_d);
 
-	rayleigh = transmittance * GetProfileDensity(mAtmosphere.mRayleighDensity, r_d - mAtmosphere.mBottomRadius);
-	mie = transmittance * GetProfileDensity(mAtmosphere.mMieDensity, r_d - mAtmosphere.mBottomRadius);
+	rayleigh = transmittance * GetProfileDensity(mPerFrameConstants.mAtmosphere.mRayleighDensity, r_d - mPerFrameConstants.mAtmosphere.mBottomRadius);
+	mie = transmittance * GetProfileDensity(mPerFrameConstants.mAtmosphere.mMieDensity, r_d - mPerFrameConstants.mAtmosphere.mBottomRadius);
 }
 
 [RootSignature(AtmosphereRootSignature)]
@@ -550,7 +550,7 @@ void ComputeTransmittanceCS(
 	// float3 debug = float3(uv, 0);
 	// debug = (r - 6360) / 60.0;
 	// debug = mu.xxx;
-	// debug = IntegrateDensity(mAtmosphere.mRayleighDensity, r, mu).xxx;
+	// debug = IntegrateDensity(mPerFrameConstants.mAtmosphere.mRayleighDensity, r, mu).xxx;
 	// TransmittanceUAV[inDispatchThreadID.xy] = float4(debug, 1.0);
 	// TransmittanceUAV[inDispatchThreadID.xy] = float4(mu_r.xy, 0, 1);
 	// TransmittanceUAV[inDispatchThreadID.xy] = float4(xy, 0, 1);
@@ -574,7 +574,7 @@ void ComputeDirectIrradianceCS(
 	float r = mu_r.y;
 
 	// Approximate average of the cosine factor mu_s over the visible fraction of the Sun disc.
-	float alpha_s = mAtmosphere.mSunAngularRadius;
+	float alpha_s = mPerFrameConstants.mAtmosphere.mSunAngularRadius;
 	float average_cosine_factor = 0.0;
 	if (mu_s < -alpha_s) // Sun below horizon
 		average_cosine_factor = 0.0;
@@ -633,8 +633,8 @@ void IntegrateSingleScattering(float4 r_mu_mu_s_nu, bool intersects_ground, out 
 		mie_sum += mie_i * weight_i;
 	}
 
-	rayleigh = rayleigh_sum * dx * mAtmosphere.mRayleighScattering;
-	mie = mie_sum * dx * mAtmosphere.mMieScattering;
+	rayleigh = rayleigh_sum * dx * mPerFrameConstants.mAtmosphere.mRayleighScattering;
+	mie = mie_sum * dx * mPerFrameConstants.mAtmosphere.mMieScattering;
 }
 
 [RootSignature(AtmosphereRootSignature)]
@@ -706,7 +706,7 @@ float3 GetScattering(float r, float mu, float mu_s, float nu, bool intersects_gr
 	{
 		float3 rayleigh = GetScattering(DeltaRayleighScatteringSRV, r, mu, mu_s, nu, intersects_ground).xyz;
 		float3 mie = GetScattering(DeltaMieScatteringSRV, r, mu, mu_s, nu, intersects_ground).xyz;
-		return rayleigh * RayleighPhaseFunction(nu) + mie * MiePhaseFunction(mAtmosphere.mMiePhaseFunctionG, nu);
+		return rayleigh * RayleighPhaseFunction(nu) + mie * MiePhaseFunction(mPerFrameConstants.mAtmosphere.mMiePhaseFunctionG, nu);
 	}
 
 	return GetScattering(DeltaRayleighScatteringSRV, r, mu, mu_s, nu, intersects_ground).xyz;
@@ -753,7 +753,7 @@ float3 ComputeScatteringDensity(float4 r_mu_mu_s_nu, bool intersects_ground)
 			distance_to_ground = DistanceToBottomAtmosphereBoundary(r, cos_theta);
 			transmittance_to_ground = GetTransmittance(r, cos_theta, distance_to_ground, true /* ray_intersects_ground */);
 
-			ground_albedo = mAtmosphere.mGroundAlbedo;
+			ground_albedo = mPerFrameConstants.mAtmosphere.mGroundAlbedo;
 		}
 
 		for (int m = 0; m < 2 * SAMPLE_COUNT; ++m)
@@ -774,7 +774,7 @@ float3 ComputeScatteringDensity(float4 r_mu_mu_s_nu, bool intersects_ground)
 			// transmittance to the ground, the ground albedo, the ground BRDF, and
 			// the irradiance received on the ground after n-2 bounces.
 			float3 ground_normal = normalize(zenith_direction * r + omega_i * distance_to_ground);
-			float3 ground_irradiance = GetIrradiance(mAtmosphere.mBottomRadius, dot(ground_normal, omega_s));
+			float3 ground_irradiance = GetIrradiance(mPerFrameConstants.mAtmosphere.mBottomRadius, dot(ground_normal, omega_s));
 			incident_radiance += transmittance_to_ground * ground_albedo * (1.0 / (MATH_PI)) * ground_irradiance;
 
 			// The radiance finally scattered from direction omega_i towards direction
@@ -782,14 +782,14 @@ float3 ComputeScatteringDensity(float4 r_mu_mu_s_nu, bool intersects_ground)
 			// coefficient, and the phase function for directions omega and omega_i
 			// (all this summed over all particle types, i.e. Rayleigh and Mie).
 			float nu2 = dot(omega, omega_i);
-			float rayleigh_density = GetProfileDensity(mAtmosphere.mRayleighDensity, r - mAtmosphere.mBottomRadius);
-			float mie_density = GetProfileDensity(mAtmosphere.mMieDensity, r - mAtmosphere.mBottomRadius);
+			float rayleigh_density = GetProfileDensity(mPerFrameConstants.mAtmosphere.mRayleighDensity, r - mPerFrameConstants.mAtmosphere.mBottomRadius);
+			float mie_density = GetProfileDensity(mPerFrameConstants.mAtmosphere.mMieDensity, r - mPerFrameConstants.mAtmosphere.mBottomRadius);
 
 			rayleigh_mie += incident_radiance *
 				(
-					mAtmosphere.mRayleighScattering * rayleigh_density * RayleighPhaseFunction(nu2)
+					mPerFrameConstants.mAtmosphere.mRayleighScattering * rayleigh_density * RayleighPhaseFunction(nu2)
 					+
-					mAtmosphere.mMieScattering * mie_density * MiePhaseFunction(mAtmosphere.mMiePhaseFunctionG, nu2)
+					mPerFrameConstants.mAtmosphere.mMieScattering * mie_density * MiePhaseFunction(mPerFrameConstants.mAtmosphere.mMiePhaseFunctionG, nu2)
 					) * domega_i;
 		}
 	}
@@ -912,7 +912,7 @@ void ComputeIndirectIrradianceCS(
 	// Debug
 	// DeltaIrradianceUAV[inDispatchThreadID.xy] = float4(xy, 0.0, 1.0);
 	// IrradianceUAV[inDispatchThreadID.xy] = float4(xy, 0.0, 1.0);
-	// DeltaIrradianceUAV[inDispatchThreadID.xy] = float4(mu_s_r.x, (mu_s_r.y - mAtmosphere.mBottomRadius) / (mAtmosphere.mTopRadius - mAtmosphere.mBottomRadius), 0.0, 1.0);
+	// DeltaIrradianceUAV[inDispatchThreadID.xy] = float4(mu_s_r.x, (mu_s_r.y - mPerFrameConstants.mAtmosphere.mBottomRadius) / (mPerFrameConstants.mAtmosphere.mTopRadius - mPerFrameConstants.mAtmosphere.mBottomRadius), 0.0, 1.0);
 	// DeltaIrradianceUAV[inDispatchThreadID.xy] = DeltaRayleighScatteringSRV.SampleLevel(BilinearClampSampler, float3(xy, 0), 0);
 	// DeltaIrradianceUAV[inDispatchThreadID.xy] = DeltaMieScatteringSRV.SampleLevel(BilinearClampSampler, float3(xy, 0), 0);
 }
@@ -1006,7 +1006,7 @@ float3 GetExtrapolatedSingleMieScattering(float4 scattering)
 	if (scattering.r <= 0.0)
 		return 0.0;
 
-	return scattering.rgb * scattering.a / scattering.r * (mAtmosphere.mRayleighScattering.r / mAtmosphere.mMieScattering.r) * (mAtmosphere.mMieScattering / mAtmosphere.mRayleighScattering);
+	return scattering.rgb * scattering.a / scattering.r * (mPerFrameConstants.mAtmosphere.mRayleighScattering.r / mPerFrameConstants.mAtmosphere.mMieScattering.r) * (mPerFrameConstants.mAtmosphere.mMieScattering / mPerFrameConstants.mAtmosphere.mRayleighScattering);
 }
 
 void GetCombinedScattering(float r, float mu, float mu_s, float nu, bool ray_r_mu_intersects_ground, out float3 rayleigh_scattering, out float3 single_mie_scattering)
@@ -1028,7 +1028,7 @@ void GetSkyRadiance(out float3 outSkyRadiance, out float3 outTransmittanceToTop)
 
 	float r = length(camera);
 	float rmu = dot(camera, view_ray);
-	float distance_to_top_atmosphere_boundary = -rmu - sqrt(rmu * rmu - r * r + mAtmosphere.mTopRadius * mAtmosphere.mTopRadius);
+	float distance_to_top_atmosphere_boundary = -rmu - sqrt(rmu * rmu - r * r + mPerFrameConstants.mAtmosphere.mTopRadius * mPerFrameConstants.mAtmosphere.mTopRadius);
 
 	if (distance_to_top_atmosphere_boundary > 0.0) 
 	{
@@ -1036,10 +1036,10 @@ void GetSkyRadiance(out float3 outSkyRadiance, out float3 outTransmittanceToTop)
 
 		// Move camera to top of atmosphere along view direction
 		camera = camera + view_ray * distance_to_top_atmosphere_boundary;
-		r = mAtmosphere.mTopRadius;
+		r = mPerFrameConstants.mAtmosphere.mTopRadius;
 		rmu += distance_to_top_atmosphere_boundary;
 	}
-	else if (r > mAtmosphere.mTopRadius) 
+	else if (r > mPerFrameConstants.mAtmosphere.mTopRadius) 
 	{
 		// No hit
 		return;
@@ -1059,8 +1059,8 @@ void GetSkyRadiance(out float3 outSkyRadiance, out float3 outTransmittanceToTop)
 
 	// [TODO] light shafts
 
-	outSkyRadiance = rayleigh_scattering * RayleighPhaseFunction(nu) + single_mie_scattering * MiePhaseFunction(mAtmosphere.mMiePhaseFunctionG, nu);
-	outSkyRadiance *= mAtmosphere.mSolarIrradiance;
+	outSkyRadiance = rayleigh_scattering * RayleighPhaseFunction(nu) + single_mie_scattering * MiePhaseFunction(mPerFrameConstants.mAtmosphere.mMiePhaseFunctionG, nu);
+	outSkyRadiance *= mPerFrameConstants.mAtmosphere.mSolarIrradiance;
 
 	// override
 	{
@@ -1085,7 +1085,7 @@ void GetSkyRadianceToPoint(out float3 outSkyRadiance, out float3 outTransmittanc
 	float3 view_ray = PlanetRayDirection();
 	float r = length(camera);
 	float rmu = dot(camera, view_ray);
-	float distance_to_top_atmosphere_boundary = -rmu - sqrt(rmu * rmu - r * r + mAtmosphere.mTopRadius * mAtmosphere.mTopRadius);
+	float distance_to_top_atmosphere_boundary = -rmu - sqrt(rmu * rmu - r * r + mPerFrameConstants.mAtmosphere.mTopRadius * mPerFrameConstants.mAtmosphere.mTopRadius);
 
 	// If the viewer is in space and the view ray intersects the atmosphere, move
 	// the viewer to the top atmosphere boundary (along the view ray):
@@ -1095,10 +1095,10 @@ void GetSkyRadianceToPoint(out float3 outSkyRadiance, out float3 outTransmittanc
 
 		// Move camera to top of atmosphere along view direction
 		camera = camera + view_ray * distance_to_top_atmosphere_boundary;
-		r = mAtmosphere.mTopRadius;
+		r = mPerFrameConstants.mAtmosphere.mTopRadius;
 		rmu += distance_to_top_atmosphere_boundary;
 	}
-	else if (r > mAtmosphere.mTopRadius)
+	else if (r > mPerFrameConstants.mAtmosphere.mTopRadius)
 	{
 		// No hit
 		return;
@@ -1151,8 +1151,8 @@ void GetSkyRadianceToPoint(out float3 outSkyRadiance, out float3 outTransmittanc
 	// Hack to avoid rendering artifacts when the sun is below the horizon.
 	single_mie_scattering = single_mie_scattering * smoothstep(float(0.0), float(0.01), mu_s);
 
-	outSkyRadiance = rayleigh_scattering* RayleighPhaseFunction(nu) + single_mie_scattering * MiePhaseFunction(mAtmosphere.mMiePhaseFunctionG, nu);
-	outSkyRadiance *= mAtmosphere.mSolarIrradiance;
+	outSkyRadiance = rayleigh_scattering* RayleighPhaseFunction(nu) + single_mie_scattering * MiePhaseFunction(mPerFrameConstants.mAtmosphere.mMiePhaseFunctionG, nu);
+	outSkyRadiance *= mPerFrameConstants.mAtmosphere.mSolarIrradiance;
 }
 
 void GetSunAndSkyIrradiance(float3 inHitPosition, float3 inNormal, out float3 outSunIrradiance, out float3 outSkyIrradiance)
@@ -1165,11 +1165,11 @@ void GetSunAndSkyIrradiance(float3 inHitPosition, float3 inNormal, out float3 ou
 
 	// Indirect irradiance from sky (approximated if the surface is not horizontal).
 	outSkyIrradiance = GetIrradiance(r, mu_s) * (1.0 + dot(inNormal, local_position) / r) * 0.5;
-	outSkyIrradiance *= mAtmosphere.mSolarIrradiance;
+	outSkyIrradiance *= mPerFrameConstants.mAtmosphere.mSolarIrradiance;
 
 	// Direct irradiance from sun
 	outSunIrradiance = GetTransmittanceToSun(r, mu_s) * max(dot(inNormal, sun_direction), 0.0);
-	outSunIrradiance *= mAtmosphere.mSolarIrradiance;
+	outSunIrradiance *= mPerFrameConstants.mAtmosphere.mSolarIrradiance;
 }
 
 }} // namespace AtmosphereIntegration { namespace Bruneton17 {

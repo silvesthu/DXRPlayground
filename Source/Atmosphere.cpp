@@ -28,65 +28,65 @@ void Atmosphere::Update()
 
 void Atmosphere::UpdateProfile()
 {
-	AtmosphereConstants* constants				= static_cast<AtmosphereConstants*>(mRuntime.mConstantUploadBufferPointer);
+	AtmosphereConstants& constants				= gPerFrameConstantBuffer.mAtmosphere;
 
 	auto inv_m_to_inv_km						= [](glm::f64 inInvM) { return static_cast<float>(inInvM * 1000.0); };
 
-	constants->mBottomRadius					= static_cast<float>(mProfile.BottomRadius());
-	constants->mTopRadius						= static_cast<float>(mProfile.TopRadius());
-	constants->mSceneScale						= mRuntime.mSceneInKilometer ? 1.0f : 0.001f;
+	constants.mBottomRadius						= static_cast<float>(mProfile.BottomRadius());
+	constants.mTopRadius						= static_cast<float>(mProfile.TopRadius());
+	constants.mSceneScale						= mRuntime.mSceneInKilometer ? 1.0f : 0.001f;
 
-	constants->mMode							= mProfile.mMode;
-	constants->mMuSEncodingMode					= mRuntime.mBruneton17.mMuSEncodingMode;
-	constants->mSliceCount						= mRuntime.mSliceCount;
+	constants.mMode								= mProfile.mMode;
+	constants.mMuSEncodingMode					= mRuntime.mBruneton17.mMuSEncodingMode;
+	constants.mSliceCount						= mRuntime.mSliceCount;
 
-	constants->mConstantColor					= mProfile.mConstantColor;
+	constants.mConstantColor					= mProfile.mConstantColor;
 
-	constants->mSolarIrradiance					= mProfile.mSolarIrradiance;
-	constants->mSunAngularRadius				= static_cast<float>(mProfile.kSunAngularRadius);
+	constants.mSolarIrradiance					= mProfile.mSolarIrradiance;
+	constants.mSunAngularRadius					= static_cast<float>(mProfile.kSunAngularRadius);
 
-	constants->mHillaire20SkyViewInLuminance	= mRuntime.mHillaire20.mSkyViewInLuminance;
-	constants->mWilkie21SkyViewSplitScreen		= mRuntime.mWilkie21.mSplitScreen;
-	constants->mAerialPerspective				= mRuntime.mAerialPerspective ? 1 : 0;
-	constants->mGroundAlbedo					= mProfile.mGroundAlbedo;
-	constants->mRuntimeGroundAlbedo				= mProfile.mRuntimeGroundAlbedo;
+	constants.mHillaire20SkyViewInLuminance		= mRuntime.mHillaire20.mSkyViewInLuminance;
+	constants.mWilkie21SkyViewSplitScreen		= mRuntime.mWilkie21.mSplitScreen;
+	constants.mAerialPerspective				= mRuntime.mAerialPerspective ? 1 : 0;
+	constants.mGroundAlbedo						= mProfile.mGroundAlbedo;
+	constants.mRuntimeGroundAlbedo				= mProfile.mRuntimeGroundAlbedo;
 
 	// Density Profile
 	{
 		// Rayleigh
 		{
 			// Scattering Coefficient
-			constants->mRayleighScattering		= mProfile.mEnableRayleigh ? mProfile.mRayleighScatteringCoefficient : glm::dvec3(1e-9);
+			constants.mRayleighScattering		= mProfile.mEnableRayleigh ? mProfile.mRayleighScatteringCoefficient : glm::dvec3(1e-9);
 
 			// Extinction Coefficient
-			constants->mRayleighExtinction		= mProfile.mEnableRayleigh ? mProfile.mRayleighScatteringCoefficient : glm::dvec3(1e-9);
+			constants.mRayleighExtinction		= mProfile.mEnableRayleigh ? mProfile.mRayleighScatteringCoefficient : glm::dvec3(1e-9);
 
 			// Density
-			constants->mRayleighDensity			= mProfile.mRayleighDensityProfile;
+			constants.mRayleighDensity			= mProfile.mRayleighDensityProfile;
 		}
 
 		// Mie
 		{
 			// Scattering Coefficient
-			constants->mMieScattering			= mProfile.mEnableMie ? mProfile.mMieScatteringCoefficient : glm::dvec3(1e-9);
+			constants.mMieScattering			= mProfile.mEnableMie ? mProfile.mMieScatteringCoefficient : glm::dvec3(1e-9);
 
 			// Extinction Coefficient
-			constants->mMieExtinction			= mProfile.mEnableMie ? mProfile.mMieExtinctionCoefficient : glm::dvec3(1e-9);
+			constants.mMieExtinction			= mProfile.mEnableMie ? mProfile.mMieExtinctionCoefficient : glm::dvec3(1e-9);
 
 			// Phase function
-			constants->mMiePhaseFunctionG		= static_cast<float>(mProfile.mMiePhaseFunctionG);
+			constants.mMiePhaseFunctionG		= static_cast<float>(mProfile.mMiePhaseFunctionG);
 
 			// Density
-			constants->mMieDensity				= mProfile.mMieDensityProfile;
+			constants.mMieDensity				= mProfile.mMieDensityProfile;
 		}
 
 		// Ozone
 		{
 			// Extinction Coefficient
-			constants->mOzoneExtinction			= mProfile.mEnableOzone ? mProfile.mOZoneAbsorptionCoefficient : glm::dvec3();
+			constants.mOzoneExtinction			= mProfile.mEnableOzone ? mProfile.mOZoneAbsorptionCoefficient : glm::dvec3();
 
 			// Density
-			constants->mOzoneDensity				= mProfile.mOzoneDensityProfile;
+			constants.mOzoneDensity				= mProfile.mOzoneDensityProfile;
 		}
 	}
 }
@@ -97,9 +97,6 @@ void Atmosphere::Runtime::Bruneton17::Update(const Profile& inProfile)
 	if (memcmp(&sAtmosphereProfileCache, &inProfile, sizeof(Atmosphere::Profile)) != 0)
 	{
 		sAtmosphereProfileCache = inProfile;
-
-		// Reset accumulation
-		gPerFrameConstantBuffer.mReset = true;
 
 		// Recompute
 		mRecomputeRequested = true;
@@ -113,6 +110,9 @@ void Atmosphere::Runtime::Bruneton17::Update(const Profile& inProfile)
 
 		for (glm::uint scattering_order = 2; scattering_order <= mScatteringOrder; scattering_order++)
 			ComputeMultipleScattering(scattering_order);
+
+		// Reset accumulation
+		gPerFrameConstantBuffer.mReset = true;
 	}
 
 	mRecomputeRequested = false;
@@ -140,9 +140,8 @@ void Atmosphere::Runtime::Bruneton17::ComputeScatteringDensity(glm::uint scatter
 {
 	mComputeScatteringDensityShader.SetupCompute(nullptr, false);
 
-	AtmosphereConstantsPerDraw atmosphere_per_draw = {};
-	atmosphere_per_draw.mScatteringOrder = scattering_order;
-	gCommandList->SetComputeRoot32BitConstants(1, sizeof(AtmosphereConstantsPerDraw) / 4, &atmosphere_per_draw, 0);
+	AtmosphereConstantsPerDraw constants = { .mScatteringOrder = scattering_order };
+	gCommandList->SetComputeRoot32BitConstants(1, sizeof(AtmosphereConstantsPerDraw) / 4, &constants, 0);
 
 	gCommandList->Dispatch(mDeltaScatteringDensityTexture.mWidth / 8, mDeltaScatteringDensityTexture.mHeight / 8, mDeltaScatteringDensityTexture.mDepth);
 }
@@ -151,9 +150,8 @@ void Atmosphere::Runtime::Bruneton17::ComputeIndirectIrradiance(glm::uint scatte
 {
 	mComputeIndirectIrradianceShader.SetupCompute(nullptr, false);
 
-	AtmosphereConstantsPerDraw atmosphere_per_draw = {};
-	atmosphere_per_draw.mScatteringOrder = scattering_order - 1;
-	gCommandList->SetComputeRoot32BitConstants(1, sizeof(AtmosphereConstantsPerDraw) / 4, &atmosphere_per_draw, 0);
+	AtmosphereConstantsPerDraw constants = { .mScatteringOrder = scattering_order - 1 };
+	gCommandList->SetComputeRoot32BitConstants(1, sizeof(AtmosphereConstantsPerDraw) / 4, &constants, 0);
 
 	gCommandList->Dispatch(mIrradianceTexture.mWidth / 8, mIrradianceTexture.mHeight / 8, mIrradianceTexture.mDepth);
 }
@@ -237,16 +235,6 @@ void Atmosphere::Runtime::Hillaire20::Validate()
 
 void Atmosphere::Initialize()
 {
-	// Buffer
-	{
-		D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(gAlignUp(static_cast<UINT>(sizeof(AtmosphereConstants)), static_cast<UINT>(D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT)));
-		D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
-
-		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mRuntime.mConstantUploadBuffer)));
-		mRuntime.mConstantUploadBuffer->SetName(L"Atmosphere.Constant");
-		mRuntime.mConstantUploadBuffer->Map(0, nullptr, (void**)&mRuntime.mConstantUploadBufferPointer);
-	}
-
 	// Texture
 	{
 		for (auto&& texture_set : mRuntime.mTexturesSet)
@@ -264,9 +252,6 @@ void Atmosphere::Initialize()
 		{
 			// CBV
 			common_binding.push_back(gConstantGPUBuffer.Get());
-
-			// CBV
-			common_binding.push_back(mRuntime.mConstantUploadBuffer.Get());
 
 			// UAV
 			for (auto&& textures : mRuntime.mTexturesSet)
@@ -329,7 +314,8 @@ void Atmosphere::ImGuiShowMenus()
 		
 		if (mProfile.mMode == AtmosphereMode::Bruneton17)
 		{
-			ImGui::SliderInt("Scattering Order", reinterpret_cast<int*>(&mRuntime.mBruneton17.mScatteringOrder), 1, 8);
+			gAtmosphere.mRuntime.mBruneton17.mRecomputeRequested |= 
+				ImGui::SliderInt("Scattering Order", reinterpret_cast<int*>(&mRuntime.mBruneton17.mScatteringOrder), 1, 8);
 			ImGui::Checkbox("Recompute Every Frame", &mRuntime.mBruneton17.mRecomputeEveryFrame);
 		}
 

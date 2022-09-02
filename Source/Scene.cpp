@@ -831,17 +831,6 @@ void Scene::CreateShaderResource()
 			handle.ptr += increment_size;
 		}
 
-		// b, space2 - Atmosphere
-		if (gAtmosphere.mRuntime.mConstantUploadBuffer != nullptr)
-		{
-			D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
-			desc.BufferLocation = gAtmosphere.mRuntime.mConstantUploadBuffer->GetGPUVirtualAddress();
-			desc.SizeInBytes = gAlignUp(static_cast<UINT>(sizeof(AtmosphereConstants)), static_cast<UINT>(D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
-			gDevice->CreateConstantBufferView(&desc, handle);
-
-			handle.ptr += increment_size;
-		}
-
 		// t, space2 - Atmosphere
 		for (auto&& texture_set : gAtmosphere.mRuntime.mTexturesSet)
 			for (auto&& texture : texture_set)
@@ -859,17 +848,6 @@ void Scene::CreateShaderResource()
 
 				handle.ptr += increment_size;
 			}
-
-		// b, space3 - Cloud
-		if (gCloud.mRuntime.mConstantUploadBuffer != nullptr)
-		{
-			D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
-			desc.BufferLocation = gCloud.mRuntime.mConstantUploadBuffer->GetGPUVirtualAddress();
-			desc.SizeInBytes = gAlignUp(static_cast<UINT>(sizeof(Cloud)), static_cast<UINT>(D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
-			gDevice->CreateConstantBufferView(&desc, handle);
-
-			handle.ptr += increment_size;
-		}
 
 		// t, space3 - Cloud
 		for (auto&& texture : gCloud.mRuntime.mTextures)

@@ -154,15 +154,6 @@ void GenerateGlobalRootSignatureDescriptor(RootSignatureDescriptor& outDesc)
 		outDesc.mDescriptorRanges.push_back(descriptor_range);
 	}
 
-	// b0, space2 - Atmosphere
-	descriptor_range = {};
-	descriptor_range.BaseShaderRegister = 0;
-	descriptor_range.NumDescriptors = 1;
-	descriptor_range.RegisterSpace = 2;
-	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-	descriptor_range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-	outDesc.mDescriptorRanges.push_back(descriptor_range);
-
 	// t, space2 - Atmosphere
 	descriptor_range = {};
 	descriptor_range.NumDescriptors = 1;
@@ -177,15 +168,6 @@ void GenerateGlobalRootSignatureDescriptor(RootSignatureDescriptor& outDesc)
 			descriptor_range.BaseShaderRegister = base_shader_register++;
 			outDesc.mDescriptorRanges.push_back(descriptor_range);
 		}
-
-	// b, space3 - Cloud
-	descriptor_range = {};
-	descriptor_range.BaseShaderRegister = 0;
-	descriptor_range.NumDescriptors = 1;
-	descriptor_range.RegisterSpace = 3;
-	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-	descriptor_range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-	outDesc.mDescriptorRanges.push_back(descriptor_range);
 
 	// t, space3 - Cloud
 	descriptor_range = {};

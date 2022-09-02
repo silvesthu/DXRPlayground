@@ -5,36 +5,22 @@ void Cloud::Update()
 {
 	mProfile.mShapeNoise.mOffset += mProfile.mWind * ImGui::GetIO().DeltaTime;
 
-	CloudConstants* cloud = static_cast<CloudConstants*>(mRuntime.mConstantUploadBufferPointer);
-	cloud->mMode		= mProfile.mMode;
-	cloud->mRaymarch	= mProfile.mRaymarch;
-	cloud->mGeometry	= mProfile.mGeometry;
-	cloud->mShapeNoise	= mProfile.mShapeNoise;
+	CloudConstants& constants	= gPerFrameConstantBuffer.mCloud;
+	constants.mMode				= mProfile.mMode;
+	constants.mRaymarch			= mProfile.mRaymarch;
+	constants.mGeometry			= mProfile.mGeometry;
+	constants.mShapeNoise		= mProfile.mShapeNoise;
 
 	// Texture
-	{
-		for (auto&& texture : mRuntime.mTextures)
-			texture.Update();
-	}
+	for (auto&& texture : mRuntime.mTextures)
+		texture.Update();
 }
 
 void Cloud::Initialize()
 {
-	// Buffer
-	{
-		D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(gAlignUp((UINT)sizeof(Cloud), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
-		D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
-
-		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mRuntime.mConstantUploadBuffer)));
-		mRuntime.mConstantUploadBuffer->SetName(L"Cloud.Constant");
-		mRuntime.mConstantUploadBuffer->Map(0, nullptr, (void**)&mRuntime.mConstantUploadBufferPointer);
-	}
-
 	// Texture
-	{
-		for (auto&& texture : mRuntime.mTextures)
-			texture.Initialize();
-	}
+	for (auto&& texture : mRuntime.mTextures)
+		texture.Initialize();
 }
 
 void Cloud::Precompute()

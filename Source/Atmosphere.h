@@ -340,9 +340,6 @@ public:
 
 	struct Runtime : RuntimeBase<Runtime>
 	{
-		ComPtr<ID3D12Resource> mConstantUploadBuffer;
-		void* mConstantUploadBufferPointer = nullptr;
-
 		// Textures
 		struct Bruneton17
 		{
