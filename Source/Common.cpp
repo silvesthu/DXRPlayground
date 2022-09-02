@@ -40,6 +40,20 @@ FrameContext						gFrameContexts[NUM_FRAMES_IN_FLIGHT] = {};
 glm::uint32							gFrameIndex = 0;
 PerFrameConstants					gPerFrameConstantBuffer = {};
 
+// Renderer
+void Renderer::ReleaseResources()
+{
+	for (auto&& texture : mRuntime.mTextures)
+		texture.ReleaseResources();
+}
+
+void Renderer::ImGuiShowTextures()
+{
+	ImGui::Textures(mRuntime.mTextures, "Renderer", ImGuiTreeNodeFlags_None);
+}
+
+Renderer							gRenderer;
+
 // Capture
 Texture*							gDumpTexture = nullptr;
 Texture								gDumpTextureProxy = {};
@@ -179,26 +193,40 @@ void Shader::InitializeDescriptors(const std::vector<Shader::DescriptorInfo>& in
 	}
 }
 
-void Shader::SetupGraphics(ID3D12DescriptorHeap* inHeap, bool inUseTable)
+void Shader::SetupGraphics(ID3D12DescriptorHeap* inHeap, bool inBindless)
 {
+	// Bindless heap needs to be set before RootSignature
+	// See https://microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_6_DynamicResources.html#setdescriptorheaps-and-setrootsignature
+	ID3D12DescriptorHeap* bindless_heap = gGetFrameContext().mDescriptorHeap.mHeap.Get();
+	if (inBindless)
+		gCommandList->SetDescriptorHeaps(1, &bindless_heap);
+
 	gCommandList->SetGraphicsRootSignature(mData.mRootSignature.Get());
 	gCommandList->SetPipelineState(mData.mPipelineState.Get());
 
-	ID3D12DescriptorHeap* heap = inHeap != nullptr ? inHeap : mData.mDescriptorHeap.Get();
-	gCommandList->SetDescriptorHeaps(1, &heap);
-	if (inUseTable)
+	if (!inBindless)
+	{
+		ID3D12DescriptorHeap* heap = inHeap != nullptr ? inHeap : mData.mDescriptorHeap.Get();
+		gCommandList->SetDescriptorHeaps(1, &heap);
 		gCommandList->SetGraphicsRootDescriptorTable(0, heap->GetGPUDescriptorHandleForHeapStart());
+	}
 }
 
-void Shader::SetupCompute(ID3D12DescriptorHeap* inHeap, bool inUseTable)
+void Shader::SetupCompute(ID3D12DescriptorHeap* inHeap, bool inBindless)
 {
+	ID3D12DescriptorHeap* bindless_heap = gGetFrameContext().mDescriptorHeap.mHeap.Get();
+	if (inBindless)
+		gCommandList->SetDescriptorHeaps(1, &bindless_heap);
+
 	gCommandList->SetComputeRootSignature(mData.mRootSignature.Get());
 	gCommandList->SetPipelineState(mData.mPipelineState.Get());
 
-	ID3D12DescriptorHeap* heap = inHeap != nullptr ? inHeap : mData.mDescriptorHeap.Get();
-	gCommandList->SetDescriptorHeaps(1, &heap);
-	if (inUseTable)
+	if (!inBindless)
+	{
+		ID3D12DescriptorHeap* heap = inHeap != nullptr ? inHeap : mData.mDescriptorHeap.Get();
+		gCommandList->SetDescriptorHeaps(1, &heap);
 		gCommandList->SetComputeRootDescriptorTable(0, heap->GetGPUDescriptorHandleForHeapStart());
+	}
 }
 
 int Texture::GetPixelSize() const
@@ -263,15 +291,18 @@ void Texture::Initialize()
 	
 	// SRV for ImGui
 	{
-		D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle;
-		ImGui_ImplDX12_AllocateDescriptor(cpu_handle, mImGuiGPUHandle);
+		if (!mImGuiInitialized)
+			ImGui_ImplDX12_AllocateDescriptor(mImGuiCPUHandle, mImGuiGPUHandle);
+
 		D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
 		desc.Format = mFormat;
 		desc.ViewDimension = mDepth == 1 ? D3D12_SRV_DIMENSION_TEXTURE2D : D3D12_SRV_DIMENSION_TEXTURE3D;
 		desc.Texture2D.MipLevels = (UINT)-1;
 		desc.Texture2D.MostDetailedMip = 0;
 		desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		gDevice->CreateShaderResourceView(mResource.Get(), &desc, cpu_handle);
+		gDevice->CreateShaderResourceView(mResource.Get(), &desc, mImGuiCPUHandle);
+
+		mImGuiInitialized = true;
 	}
 
 	// UIScale
@@ -329,6 +360,12 @@ void Texture::InitializeUpload()
 	gValidate(gDevice->CreateCommittedResource(&upload_properties, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mUploadResource)));
 	std::wstring name = gToWString(mName);
 	mUploadResource->SetName(name.c_str());
+}
+
+void Texture::ReleaseResources()
+{
+	mResource = nullptr;
+	mUploadResource = nullptr;
 }
 
 namespace ImGui 

@@ -801,8 +801,6 @@ void NewMultiScatCS(
 	// Debug
 }
 
-
-
 [RootSignature(AtmosphereRootSignature)]
 [numthreads(8, 8, 1)]
 void SkyViewLut(

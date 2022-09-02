@@ -53,7 +53,15 @@ enum class DescriptorIndex : uint
 
 	NullCount,
 
-	// [Raytrace]
+	// [Constants]
+	PerFrameConstants,
+
+	// [Screen]
+	ScreenColorUAV,
+	ScreenColorSRV,
+	ScreenDebugUAV,
+
+	// [Raytrace] - [Input]
 	RaytraceTLASSRV,
 	RaytraceInstanceDataSRV,
 	RaytraceIndicesSRV,
@@ -61,8 +69,6 @@ enum class DescriptorIndex : uint
 	RaytraceNormalsSRV,
 	RaytraceUVsSRV,
 	RaytraceLightsSRV,
-	RaytraceOutputSRV,
-	RaytraceOutputUAV,
 
 	// [Bruneton17]
 	Bruneton17TransmittanceUAV,

@@ -698,26 +698,14 @@ void Scene::CreateShaderResource()
 		DXGI_SWAP_CHAIN_DESC1 swap_chain_desc;
 		gSwapChain->GetDesc1(&swap_chain_desc);
 
-		D3D12_RESOURCE_DESC resource_desc = gGetTextureResourceDesc(swap_chain_desc.Width, swap_chain_desc.Height, 1, DXGI_FORMAT_R32G32B32A32_FLOAT);
-		D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
-
-		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&mOutputResource)));
-		mOutputResource->SetName(L"Scene.OutputResource");
+		gRenderer.mRuntime.mScreenColorTexture.Width(swap_chain_desc.Width).Height(swap_chain_desc.Height).Initialize();
+		gRenderer.mRuntime.mScreenDebugTexture.Width(swap_chain_desc.Width).Height(swap_chain_desc.Height).Initialize();
 	}
 
 	// Composite 
 	{
 		gDiffTexture2DShader.InitializeDescriptors({});
 		gDiffTexture3DShader.InitializeDescriptors({});
-	}
-
-	// Composite 
-	{
-		gCompositeShader.InitializeDescriptors(
-			{
-				gConstantGPUBuffer.Get(),
-				mOutputResource.Get()
-			});
 	}
 
 	// DXR DescriptorHeap
@@ -738,7 +726,7 @@ void Scene::CreateShaderResource()
 		{
 			D3D12_UNORDERED_ACCESS_VIEW_DESC desc = {};
 			desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-			gDevice->CreateUnorderedAccessView(mOutputResource.Get(), nullptr, &desc, handle);
+			gDevice->CreateUnorderedAccessView(gRenderer.mRuntime.mScreenColorTexture.mResource.Get(), nullptr, &desc, handle);
 
 			handle.ptr += increment_size;
 		}
@@ -904,6 +892,6 @@ void Scene::CreateShaderResource()
 
 void Scene::CleanupShaderResource()
 {
-	mOutputResource = nullptr;
+	gRenderer.ReleaseResources();
 	mDXRDescriptorHeap = nullptr;
 }

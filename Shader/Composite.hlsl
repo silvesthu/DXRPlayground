@@ -13,7 +13,7 @@ float3 ToneMapping_ACES_Knarkowicz(float3 x)
 	return saturate((x * (a * x + b)) / (x * (c * x + d) + e));
 }
 
-float3 LuminanceToColor(float3 luminance)
+float3 LuminanceToColor(float3 inLuminance, PerFrameConstants inPerFrameConstants)
 {
 	// Exposure
 	float3 normalized_luminance = 0;
@@ -25,8 +25,8 @@ float3 LuminanceToColor(float3 luminance)
 		float kVignettingAttenuation = 0.78f; // To cancel out saturation. Typically 0.65 for real lens, see https://www.unrealengine.com/en-US/tech-blog/how-epic-games-is-handling-auto-exposure-in-4-25
 		float kLensSaturation = kSaturationBasedSpeedConstant / kISO / kVignettingAttenuation;
 
-		float exposure_normalization_factor = 1.0 / (pow(2.0, mPerFrameConstants.mEV100) * kLensSaturation); // = 1.0 / luminance_max
-		normalized_luminance = luminance * (exposure_normalization_factor / kPreExposure);
+		float exposure_normalization_factor = 1.0 / (pow(2.0, inPerFrameConstants.mEV100) * kLensSaturation); // = 1.0 / luminance_max
+		normalized_luminance = inLuminance * (exposure_normalization_factor / kPreExposure);
 
 		// [Reference]
 		// https://en.wikipedia.org/wiki/Exposure_value
@@ -38,7 +38,7 @@ float3 LuminanceToColor(float3 luminance)
 	float3 tone_mapped_color = 0;
 	// Tone Mapping
 	{
-		switch (mPerFrameConstants.mToneMappingMode)
+		switch (inPerFrameConstants.mToneMappingMode)
 		{
 			case ToneMappingMode::Knarkowicz:	tone_mapped_color = ToneMapping_ACES_Knarkowicz(normalized_luminance); break;
             case ToneMappingMode::Passthrough:	// fallthrough
@@ -53,7 +53,7 @@ float3 LuminanceToColor(float3 luminance)
 	return tone_mapped_color;
 }
 
-// From https://github.com/microsoft/DirectX-Graphics-Samples/blob/master/MiniEngine/Core/Shaders/ColorSpaceUtility.hlsli
+// https://github.com/microsoft/DirectX-Graphics-Samples/blob/master/MiniEngine/Core/Shaders/ColorSpaceUtility.hlsli
 float3 ApplySRGBCurve( float3 x )
 {
     // Approximately pow(x, 1.0 / 2.2)
@@ -75,15 +75,17 @@ float4 ScreenspaceTriangleVS(uint id : SV_VertexID) : SV_POSITION
 	return float4 (x, y, 0, 1);
 }
 
-Texture2D<float4> InputTexture : register(t0, space1);
-[RootSignature("DescriptorTable(CBV(b0, numDescriptors = 1, space = 0), SRV(t0, numDescriptors = 1, space = 1))")]
+[RootSignature("RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED)")]
 float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 {
-	float3 color = InputTexture.Load(int3(position.xy, 0)).xyz;
+	ConstantBuffer<PerFrameConstants> per_frame_constants = ResourceDescriptorHeap[(int)DescriptorIndex::PerFrameConstants];
+	RWTexture2D<float4> screen_color = ResourceDescriptorHeap[(int)DescriptorIndex::ScreenColorUAV];
+	
+	float4 color = screen_color[position.xy];
 
-	if (mPerFrameConstants.mDebugMode == DebugMode::None)
-		color = LuminanceToColor(color /* as luminance */);
+	if (per_frame_constants.mDebugMode == DebugMode::None)
+		color.xyz = LuminanceToColor(color.xyz, per_frame_constants);
 
-	color = ApplySRGBCurve(color);
-	return float4(color, 1);
+	color.xyz = ApplySRGBCurve(color.xyz);
+	return float4(color.xyz, 1);
 }

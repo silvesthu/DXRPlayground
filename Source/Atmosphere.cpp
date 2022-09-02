@@ -120,25 +120,25 @@ void Atmosphere::Runtime::Bruneton17::Update(const Profile& inProfile)
 
 void Atmosphere::Runtime::Bruneton17::ComputeTransmittance()
 {
-	mComputeTransmittanceShader.SetupCompute();
+	mComputeTransmittanceShader.SetupCompute(nullptr, false);
 	gCommandList->Dispatch(mTransmittanceTexture.mWidth / 8, mTransmittanceTexture.mHeight / 8, mTransmittanceTexture.mDepth);
 }
 
 void Atmosphere::Runtime::Bruneton17::ComputeDirectIrradiance()
 {
-	mComputeDirectIrradianceShader.SetupCompute();
+	mComputeDirectIrradianceShader.SetupCompute(nullptr, false);
 	gCommandList->Dispatch(mIrradianceTexture.mWidth / 8, mIrradianceTexture.mHeight / 8, mIrradianceTexture.mDepth);
 }
 
 void Atmosphere::Runtime::Bruneton17::ComputeSingleScattering()
 {
-	mComputeSingleScatteringShader.SetupCompute();
+	mComputeSingleScatteringShader.SetupCompute(nullptr, false);
 	gCommandList->Dispatch(mScatteringTexture.mWidth / 8, mScatteringTexture.mHeight / 8, mScatteringTexture.mDepth);
 }
 
 void Atmosphere::Runtime::Bruneton17::ComputeScatteringDensity(glm::uint scattering_order)
 {
-	mComputeScatteringDensityShader.SetupCompute();
+	mComputeScatteringDensityShader.SetupCompute(nullptr, false);
 
 	AtmosphereConstantsPerDraw atmosphere_per_draw = {};
 	atmosphere_per_draw.mScatteringOrder = scattering_order;
@@ -149,7 +149,7 @@ void Atmosphere::Runtime::Bruneton17::ComputeScatteringDensity(glm::uint scatter
 
 void Atmosphere::Runtime::Bruneton17::ComputeIndirectIrradiance(glm::uint scattering_order)
 {
-	mComputeIndirectIrradianceShader.SetupCompute();
+	mComputeIndirectIrradianceShader.SetupCompute(nullptr, false);
 
 	AtmosphereConstantsPerDraw atmosphere_per_draw = {};
 	atmosphere_per_draw.mScatteringOrder = scattering_order - 1;
@@ -160,7 +160,7 @@ void Atmosphere::Runtime::Bruneton17::ComputeIndirectIrradiance(glm::uint scatte
 
 void Atmosphere::Runtime::Bruneton17::AccumulateMultipleScattering()
 {
-	mComputeMultipleScatteringShader.SetupCompute();
+	mComputeMultipleScatteringShader.SetupCompute(nullptr, false);
 	gCommandList->Dispatch(mScatteringTexture.mWidth / 8, mScatteringTexture.mHeight / 8, mScatteringTexture.mDepth);
 }
 
@@ -185,25 +185,25 @@ void Atmosphere::Runtime::Hillaire20::Update(const Profile& inProfile)
 
 void Atmosphere::Runtime::Hillaire20::TransLUT()
 {
-	mTransLUTShader.SetupCompute();
+	mTransLUTShader.SetupCompute(nullptr, false);
 	gCommandList->Dispatch((mTransmittanceTex.mWidth + 7) / 8, (mTransmittanceTex.mHeight + 7) / 8, 1);
 }
 
 void Atmosphere::Runtime::Hillaire20::NewMultiScatCS()
 {
-	mNewMultiScatCSShader.SetupCompute();
+	mNewMultiScatCSShader.SetupCompute(nullptr, false);
 	gCommandList->Dispatch(mMultiScattTex.mWidth, mMultiScattTex.mHeight, 1);
 }
 
 void Atmosphere::Runtime::Hillaire20::SkyViewLut()
 {
-	mSkyViewLutShader.SetupCompute();
+	mSkyViewLutShader.SetupCompute(nullptr, false);
 	gCommandList->Dispatch((mSkyViewLut.mWidth + 7) / 8, (mSkyViewLut.mHeight + 7) / 8, 1);
 }
 
 void Atmosphere::Runtime::Hillaire20::CameraVolumes()
 {
-	mCameraVolumesShader.SetupCompute();
+	mCameraVolumesShader.SetupCompute(nullptr, false);
 	gCommandList->Dispatch((mAtmosphereCameraScatteringVolume.mWidth + 7) / 8, (mAtmosphereCameraScatteringVolume.mHeight + 7) / 8, mAtmosphereCameraScatteringVolume.mDepth);
 }
 
@@ -216,7 +216,7 @@ void Atmosphere::Runtime::Hillaire20::Validate()
 		BarrierScope output_scope(gCommandList, inOutput.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 		Shader& shader = inExpected.mDepth == 1 ? gDiffTexture2DShader : gDiffTexture3DShader;
-		shader.SetupCompute(gGetFrameContext().mDescriptorHeap.mHeap.Get(), false);
+		shader.SetupCompute(nullptr, true);
 
 		gAssert(inComputed.mUAVIndex > DescriptorIndex::NullCount);
 		gAssert(inExpected.mUAVIndex > DescriptorIndex::NullCount);

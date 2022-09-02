@@ -49,7 +49,7 @@ static IDxcBlob* sCompileShader(const char* inFilename, const char* inEntryPoint
 		dxc_define_profile.Name = L"SHADER_PROFILE_CS";
 	if (profile._Starts_with(L"ps"))
 		dxc_define_profile.Name = L"SHADER_PROFILE_PS";
-	if (profile._Starts_with(L"VS"))
+	if (profile._Starts_with(L"vs"))
 		dxc_define_profile.Name = L"SHADER_PROFILE_VS";
 	defines.push_back(dxc_define_profile);
 
@@ -61,9 +61,9 @@ static IDxcBlob* sCompileShader(const char* inFilename, const char* inEntryPoint
 	defines.push_back(dxc_define_entry_point);
 
 	std::vector<LPCWSTR> arguments;
-	arguments.push_back(DXC_ARG_DEBUG);								// -Zi
 	arguments.push_back(DXC_ARG_WARNINGS_ARE_ERRORS);				// -WX
 	arguments.push_back(DXC_ARG_ALL_RESOURCES_BOUND);				// -all_resources_bound
+	arguments.push_back(DXC_ARG_DEBUG);								// -Zi
 	arguments.push_back(L"-Qembed_debug");							// -Qembed_debug
 
 	IDxcOperationResult* operation_result;

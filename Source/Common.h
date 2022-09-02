@@ -278,8 +278,8 @@ struct Shader
 	};
 
 	void InitializeDescriptors(const std::vector<DescriptorInfo>& inEntries);
-	void SetupGraphics(ID3D12DescriptorHeap* inHeap = nullptr, bool inUseTable = true);
-	void SetupCompute(ID3D12DescriptorHeap* inHeap = nullptr, bool inUseTable = true);
+	void SetupGraphics(ID3D12DescriptorHeap* inHeap, bool inBindless);
+	void SetupCompute(ID3D12DescriptorHeap* inHeap, bool inBindless);
 	void Reset() { mData = {}; }
 
 	struct Data
@@ -320,15 +320,40 @@ struct Texture
 	void Initialize();
 	void Update();
 	void InitializeUpload();
+	void ReleaseResources();
 
 	ComPtr<ID3D12Resource> mResource;
 	ComPtr<ID3D12Resource> mUploadResource;
 
+	bool mImGuiInitialized = false;
+	D3D12_CPU_DESCRIPTOR_HANDLE mImGuiCPUHandle = {};
 	D3D12_GPU_DESCRIPTOR_HANDLE mImGuiGPUHandle = {};
 
 	int mSubresourceCount = 1; // TODO: Support multiple subresources
 	bool mLoaded = false;
 	std::vector<glm::uint8> mUploadData;
+};
+
+// Helper
+template <typename RuntimeType>
+class RuntimeBase
+{
+public:
+	RuntimeBase() = default;
+	~RuntimeBase() = default;
+
+	// Reconstruct this, release all managed resources
+	void Reset()
+	{
+		std::destroy_at<RuntimeType>(static_cast<RuntimeType*>(this));
+		std::construct_at<RuntimeType>(static_cast<RuntimeType*>(this));
+	}
+
+	// Make the class non-copyable as std::span is used to referencing members, otherwise those should be re-calculated after copy
+	RuntimeBase(const RuntimeBase&) = delete;
+	RuntimeBase(const RuntimeBase&&) = delete;
+	RuntimeBase& operator=(const RuntimeBase&) = delete;
+	RuntimeBase& operator=(const RuntimeBase&&) = delete;
 };
 
 extern ComPtr<ID3D12Resource>				gConstantGPUBuffer;
@@ -373,6 +398,23 @@ extern FrameContext							gFrameContexts[];
 extern glm::uint32							gFrameIndex;
 inline FrameContext&						gGetFrameContext() { return gFrameContexts[gFrameIndex % NUM_FRAMES_IN_FLIGHT]; }
 
+struct Renderer
+{
+	struct Runtime : RuntimeBase<Runtime>
+	{
+		Texture								mScreenColorTexture = Texture().Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(DescriptorIndex::ScreenColorUAV).SRVIndex(DescriptorIndex::ScreenColorSRV).Name("Renderer.ScreenColorTexture");
+		Texture								mScreenDebugTexture = Texture().Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(DescriptorIndex::ScreenDebugUAV).Name("Renderer.ScreenDebugTexture");
+
+		Texture								mSentinelTexture;
+		std::span<Texture> mTextures		= std::span<Texture>(&mScreenColorTexture, &mSentinelTexture);
+	};
+	Runtime mRuntime;
+
+	void									ReleaseResources();
+	void									ImGuiShowTextures();
+};
+extern Renderer								gRenderer;
+
 extern Texture*								gDumpTexture;
 extern Texture								gDumpTextureProxy;
 
@@ -383,28 +425,6 @@ static const wchar_t*						kDefaultRayGenerationShader	= L"DefaultRayGeneration"
 static const wchar_t*						kDefaultMissShader			= L"DefaultMiss";
 static const wchar_t*						kDefaultClosestHitShader	= L"DefaultClosestHit";
 static const wchar_t*						kDefaultHitGroup			= L"DefaultHitGroup";
-
-// Helper
-template <typename RuntimeType>
-class RuntimeBase
-{
-public:
-	RuntimeBase() = default;
-	~RuntimeBase() = default;
-
-	// Reconstruct this, release all managed resources
-	void Reset()
-	{
-		std::destroy_at<RuntimeType>(static_cast<RuntimeType*>(this));
-		std::construct_at<RuntimeType>(static_cast<RuntimeType*>(this));
-	}
-
-	// Make the class non-copyable as std::span is used to referencing members, otherwise those should be re-calculated after copy
-	RuntimeBase(const RuntimeBase&) = delete;
-	RuntimeBase(const RuntimeBase&&) = delete;
-	RuntimeBase& operator=(const RuntimeBase&) = delete;
-	RuntimeBase& operator=(const RuntimeBase&&) = delete;
-};
 
 inline void gBarrierTransition(ID3D12GraphicsCommandList4* command_list, ID3D12Resource* resource, D3D12_RESOURCE_STATES state_before, D3D12_RESOURCE_STATES state_after)
 {

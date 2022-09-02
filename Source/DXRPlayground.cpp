@@ -179,6 +179,7 @@ static void sUpdate()
 		{
 			// Floating items
 			{
+				gRenderer.ImGuiShowTextures();
 				gAtmosphere.ImGuiShowTextures();
 				gCloud.ImGuiShowTextures();
 			}
@@ -202,7 +203,7 @@ static void sUpdate()
 
 				if (ImGui::Button("Dump Luminance") || ImGui::IsKeyPressed(VK_F9))
 				{
-					gDumpTextureProxy.mResource = gScene.GetOutputResource();
+					gDumpTextureProxy.mResource = gRenderer.mRuntime.mScreenColorTexture.mResource;
 					gDumpTextureProxy.mName = "Luminance";
 					gDumpTexture = &gDumpTextureProxy;
 				}
@@ -649,12 +650,12 @@ void sRender()
 		gRaytrace();
 	}
 
-	// Copy
+	// Composite
 	{
-		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Copy");
+		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Composite");
 
+		gBarrierUAV(gCommandList, gRenderer.mRuntime.mScreenColorTexture.mResource.Get());
 		gBarrierTransition(gCommandList, frame_render_target_resource, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
-		BarrierScope output_resource_scope(gCommandList, gScene.GetOutputResource(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE);
 
 		// Draw
 		D3D12_RESOURCE_DESC desc = frame_render_target_resource->GetDesc();
@@ -675,7 +676,7 @@ void sRender()
 		gCommandList->OMSetRenderTargets(1, &frame_render_target_descriptor_handle, false, nullptr);
 		gCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-		gCompositeShader.SetupGraphics();
+		gCompositeShader.SetupGraphics(nullptr, true);
 		gCommandList->DrawInstanced(3, 1, 0, 0);
 	}
 
@@ -704,12 +705,8 @@ void sRender()
 	{
 		if (gDumpTexture != nullptr && gDumpTexture->mResource != nullptr)
 		{
-			D3D12_RESOURCE_STATES resource_state = D3D12_RESOURCE_STATE_COMMON;
-			if (gScene.GetOutputResource() == gDumpTexture->mResource.Get())
-				resource_state = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-
 			DirectX::ScratchImage image;
-			DirectX::CaptureTexture(gCommandQueue, gDumpTexture->mResource.Get(), false, image, resource_state, resource_state);
+			DirectX::CaptureTexture(gCommandQueue, gDumpTexture->mResource.Get(), false, image, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COMMON);
 
 			std::wstring directory = L"TextureDump/";
 			std::filesystem::create_directory(directory);
@@ -850,7 +847,7 @@ static bool sCreateDeviceD3D(HWND hWnd)
 			gFrameContexts[i].mDescriptorHeap.mHeap->SetName(name.c_str());
 		}
 
-		// Buffer
+		// UploadBuffer
 		{
 			D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(gAlignUp(static_cast<UINT>(sizeof(PerFrameConstants)), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
 			D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
@@ -874,6 +871,15 @@ static bool sCreateDeviceD3D(HWND hWnd)
 			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&gConstantGPUBuffer)));
 			std::wstring name = L"Constant_GPU";
 			gConstantGPUBuffer->SetName(name.c_str());
+
+			D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
+			desc.SizeInBytes = static_cast<UINT>(resource_desc.Width);
+			desc.BufferLocation = gConstantGPUBuffer->GetGPUVirtualAddress();
+			for (int i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
+			{
+				D3D12_CPU_DESCRIPTOR_HANDLE handle = gFrameContexts[i].mDescriptorHeap.AllocateStatic(DescriptorIndex::PerFrameConstants);
+				gDevice->CreateConstantBufferView(&desc, handle);
+			}
 		}
 	}
 

@@ -50,7 +50,7 @@ void Cloud::Precompute()
 			
 			BarrierScope input_resource_scope(gCommandList, mRuntime.mShapeNoise2DTexture.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 			BarrierScope resource_scope(gCommandList, mRuntime.mShapeNoise3DTexture.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-			mRuntime.mShapeNoiseShader.SetupCompute(gGetFrameContext().mDescriptorHeap.mHeap.Get(), false);
+			mRuntime.mShapeNoiseShader.SetupCompute(nullptr, true);
 			gCommandList->Dispatch(mRuntime.mShapeNoise3DTexture.mWidth / 8, mRuntime.mShapeNoise3DTexture.mHeight / 8, mRuntime.mShapeNoise3DTexture.mDepth);
 		}
 
@@ -59,7 +59,7 @@ void Cloud::Precompute()
 
 			BarrierScope input_resource_scope(gCommandList, mRuntime.mErosionNoise2DTexture.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 			BarrierScope output_resource_scope(gCommandList, mRuntime.mErosionNoise3DTexture.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-			mRuntime.mErosionNoiseShader.SetupCompute(gGetFrameContext().mDescriptorHeap.mHeap.Get(), false);
+			mRuntime.mErosionNoiseShader.SetupCompute(nullptr, true);
 			gCommandList->Dispatch(mRuntime.mErosionNoise3DTexture.mWidth / 8, mRuntime.mErosionNoise3DTexture.mHeight / 8, mRuntime.mErosionNoise3DTexture.mDepth);
 		}
 	}
