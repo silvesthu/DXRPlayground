@@ -463,28 +463,28 @@ public:
 
 		glm::uint mSliceCount = 0; // Slice axis to use 3D texture as 4D storage
 
-		static void Bruneton17(Runtime& runtime)
+		static void Bruneton17(Runtime& inRuntime)
 		{
 			constexpr glm::uvec3 kDimension = glm::uvec3(256, 128, 32);
 
-			runtime.mBruneton17.mDeltaRayleighScatteringTexture.Dimension(kDimension);
-			runtime.mBruneton17.mDeltaMieScatteringTexture.Dimension(kDimension);
-			runtime.mBruneton17.mScatteringTexture.Dimension(kDimension);
-			runtime.mBruneton17.mDeltaScatteringDensityTexture.Dimension(kDimension);
+			inRuntime.mBruneton17.mDeltaRayleighScatteringTexture.Dimension(kDimension);
+			inRuntime.mBruneton17.mDeltaMieScatteringTexture.Dimension(kDimension);
+			inRuntime.mBruneton17.mScatteringTexture.Dimension(kDimension);
+			inRuntime.mBruneton17.mDeltaScatteringDensityTexture.Dimension(kDimension);
 
-			runtime.mSliceCount = 8;
+			inRuntime.mSliceCount = 8;
 		}
 
-		static void Yusov13(Runtime& runtime)
+		static void Yusov13(Runtime& inRuntime)
 		{
 			constexpr glm::uvec3 kDimension = glm::uvec3(32, 128, 1024);
 
-			runtime.mBruneton17.mDeltaRayleighScatteringTexture.Dimension(kDimension);
-			runtime.mBruneton17.mDeltaMieScatteringTexture.Dimension(kDimension);
-			runtime.mBruneton17.mScatteringTexture.Dimension(kDimension);
-			runtime.mBruneton17.mDeltaScatteringDensityTexture.Dimension(kDimension);
+			inRuntime.mBruneton17.mDeltaRayleighScatteringTexture.Dimension(kDimension);
+			inRuntime.mBruneton17.mDeltaMieScatteringTexture.Dimension(kDimension);
+			inRuntime.mBruneton17.mScatteringTexture.Dimension(kDimension);
+			inRuntime.mBruneton17.mDeltaScatteringDensityTexture.Dimension(kDimension);
 
-			runtime.mSliceCount = 16;
+			inRuntime.mSliceCount = 16;
 		}
 
 		std::span<Shader> mShadersSet[3] =

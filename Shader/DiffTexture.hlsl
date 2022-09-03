@@ -2,7 +2,7 @@
 #include "Shared.inl"
 #include "Binding.h"
 
-[RootSignature("RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0), RootConstants(num32BitConstants=3, b0, space = 11)")]
+[RootSignature(ROOT_SIGNATURE_DIFF)]
 [numthreads(8, 8, 1)]
 void DiffTexture2DShader(
 	uint3 inGroupThreadID : SV_GroupThreadID,
@@ -18,7 +18,7 @@ void DiffTexture2DShader(
 	output[inDispatchThreadID.xy] = equal ? float4(0, 1, 0, 1) : float4(1, 0, 0, 1);
 }
 
-[RootSignature("RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0), RootConstants(num32BitConstants=3, b0, space = 11)")]
+[RootSignature(ROOT_SIGNATURE_DIFF)]
 [numthreads(8, 8, 1)]
 void DiffTexture3DShader(
 	uint3 inGroupThreadID : SV_GroupThreadID,

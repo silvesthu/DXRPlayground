@@ -370,7 +370,7 @@ void DefaultRayGeneration()
 }
 
 #ifdef ENABLE_RAY_QUERY
-[RootSignature("RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0)")]
+[RootSignature(ROOT_SIGNATURE_COMMON)]
 [numthreads(8, 8, 1)]
 void InlineRaytracingCS(	
 	uint3 inGroupThreadID : SV_GroupThreadID,

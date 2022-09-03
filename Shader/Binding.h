@@ -6,18 +6,24 @@ cbuffer ConstantsBuffer : register(b0, space0)
 {
 	Constants mConstants;
 }
+#define ROOT_SIGNATURE_COMMON \
+"RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0)"
 
-cbuffer DiffTextureConstants : register(b0, space11)
+cbuffer RootConstantsDiff : register(b0, space1)
 {
 	uint mComputedIndex;
 	uint mExpectedIndex;
 	uint mOutputIndex;
 };
+#define ROOT_SIGNATURE_DIFF \
+"RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0), RootConstants(num32BitConstants=3, b0, space = 1)"
 
-cbuffer AtmosphereConstantsPerDrawBuffer : register(b1, space2)
+cbuffer RootConstantsAtmosphere : register(b0, space2)
 {
-	AtmosphereConstantsPerDraw mAtmospherePerDraw;
+	uint mScatteringOrder;
 }
+#define ROOT_SIGNATURE_ATMOSPHERE \
+"RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0), RootConstants(num32BitConstants=1, b0, space = 2)"
 
 // CBV Helper
 float3 GetSunDirection() { return mConstants.mSunDirection.xyz; }

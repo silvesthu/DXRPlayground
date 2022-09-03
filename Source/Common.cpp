@@ -65,7 +65,7 @@ void Shader::SetupGraphics()
 	};
 	gCommandList->SetDescriptorHeaps(ARRAYSIZE(bindless_heaps), bindless_heaps);
 	gCommandList->SetGraphicsRootSignature(mData.mRootSignature.Get());
-	gCommandList->SetGraphicsRootConstantBufferView(0, gConstantGPUBuffer->GetGPUVirtualAddress());
+	gCommandList->SetGraphicsRootConstantBufferView((int)RootParameterIndex::Constants, gConstantGPUBuffer->GetGPUVirtualAddress());
 	gCommandList->SetPipelineState(mData.mPipelineState.Get());
 }
 
@@ -80,7 +80,7 @@ void Shader::SetupCompute()
 	};
 	gCommandList->SetDescriptorHeaps(ARRAYSIZE(bindless_heaps), bindless_heaps);
 	gCommandList->SetComputeRootSignature(mData.mRootSignature.Get());
-	gCommandList->SetComputeRootConstantBufferView(0, gConstantGPUBuffer->GetGPUVirtualAddress());
+	gCommandList->SetComputeRootConstantBufferView((int)RootParameterIndex::Constants, gConstantGPUBuffer->GetGPUVirtualAddress());
 	gCommandList->SetPipelineState(mData.mPipelineState.Get());
 }
 

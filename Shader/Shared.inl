@@ -116,10 +116,18 @@ enum class ViewDescriptorIndex : uint
 
 enum class SamplerDescriptorIndex : uint
 {
-	BilinearClamp,
+	BilinearClamp = 0,
 	BilinearWrap,
 
 	Count,
+};
+
+enum class RootParameterIndex : uint
+{
+	Constants = 0,				// ROOT_SIGNATURE_COMMON
+
+	ConstantsDiff = 1,			// ROOT_SIGNATURE_DIFF
+	ConstantsAtmosphere = 1,	// ROOT_SIGNATURE_ATMOSPHERE
 };
 
 enum class DebugMode : uint
@@ -419,14 +427,6 @@ struct Constants
 
 	AtmosphereConstants			mAtmosphere;
 	CloudConstants				mCloud;
-};
-
-struct AtmosphereConstantsPerDraw
-{
-	uint						mScatteringOrder				CONSTANT_DEFAULT(0);
-	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
-	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
-	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 };
 
 #undef CONSTANT_DEFAULT

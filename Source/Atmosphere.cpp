@@ -135,23 +135,19 @@ void Atmosphere::Runtime::Bruneton17::ComputeSingleScattering()
 	gCommandList->Dispatch(mScatteringTexture.mWidth / 8, mScatteringTexture.mHeight / 8, mScatteringTexture.mDepth);
 }
 
-void Atmosphere::Runtime::Bruneton17::ComputeScatteringDensity(glm::uint scattering_order)
+void Atmosphere::Runtime::Bruneton17::ComputeScatteringDensity(glm::uint inScatteringOrder)
 {
 	mComputeScatteringDensityShader.SetupCompute();
-
-	AtmosphereConstantsPerDraw constants = { .mScatteringOrder = scattering_order };
-	gCommandList->SetComputeRoot32BitConstants(1, sizeof(AtmosphereConstantsPerDraw) / 4, &constants, 0);
-
+	glm::uint scattering_order = inScatteringOrder;
+	gCommandList->SetComputeRoot32BitConstants((int)RootParameterIndex::ConstantsAtmosphere, 1, &scattering_order, 0);
 	gCommandList->Dispatch(mDeltaScatteringDensityTexture.mWidth / 8, mDeltaScatteringDensityTexture.mHeight / 8, mDeltaScatteringDensityTexture.mDepth);
 }
 
-void Atmosphere::Runtime::Bruneton17::ComputeIndirectIrradiance(glm::uint scattering_order)
+void Atmosphere::Runtime::Bruneton17::ComputeIndirectIrradiance(glm::uint inScatteringOrder)
 {
 	mComputeIndirectIrradianceShader.SetupCompute();
-
-	AtmosphereConstantsPerDraw constants = { .mScatteringOrder = scattering_order - 1 };
-	gCommandList->SetComputeRoot32BitConstants(1, sizeof(AtmosphereConstantsPerDraw) / 4, &constants, 0);
-
+	glm::uint scattering_order = inScatteringOrder - 1;
+	gCommandList->SetComputeRoot32BitConstants((int)RootParameterIndex::ConstantsAtmosphere, 1, &scattering_order, 0);
 	gCommandList->Dispatch(mIrradianceTexture.mWidth / 8, mIrradianceTexture.mHeight / 8, mIrradianceTexture.mDepth);
 }
 
@@ -219,9 +215,9 @@ void Atmosphere::Runtime::Hillaire20::Validate()
 		gAssert(inExpected.mUAVIndex != ViewDescriptorIndex::Count);
 		gAssert(inOutput.mUAVIndex != ViewDescriptorIndex::Count);
 
-		gCommandList->SetComputeRoot32BitConstant(1, static_cast<UINT>(inComputed.mUAVIndex), 0);
-		gCommandList->SetComputeRoot32BitConstant(1, static_cast<UINT>(inExpected.mUAVIndex), 1);
-		gCommandList->SetComputeRoot32BitConstant(1, static_cast<UINT>(inOutput.mUAVIndex), 2);
+		gCommandList->SetComputeRoot32BitConstant((int)RootParameterIndex::ConstantsDiff, static_cast<UINT>(inComputed.mUAVIndex), 0);
+		gCommandList->SetComputeRoot32BitConstant((int)RootParameterIndex::ConstantsDiff, static_cast<UINT>(inExpected.mUAVIndex), 1);
+		gCommandList->SetComputeRoot32BitConstant((int)RootParameterIndex::ConstantsDiff, static_cast<UINT>(inOutput.mUAVIndex), 2);
 
 		gCommandList->Dispatch((inExpected.mWidth + 7) / 8, (inExpected.mHeight + 7) / 8, inExpected.mDepth);
 	};
