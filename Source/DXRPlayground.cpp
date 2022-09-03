@@ -61,8 +61,6 @@ static ScenePreset kScenePresets[(int)ScenePresetType::COUNT] =
 	{ "VeachMISMitsuba",			"Asset/Comparison/benedikt-bitterli/veach-mis/scene_ggx_v3.xml",	glm::vec4(0.0f, 2.0f, 15.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
 };
 
-static bool sReloadRequested = false;
-
 struct CameraSettings
 {
 	glm::vec2		mMoveRotateSpeed = glm::vec2(0.1f, 0.01f);
@@ -201,7 +199,7 @@ static void sUpdate()
 				ImGui::SameLine();
 
 				if (ImGui::Button("Reload Shader") || ImGui::IsKeyPressed(VK_F5))
-					sReloadRequested = true;
+					gRenderer.mReloadShader = true;
 
 				if (ImGui::Button("Dump Luminance") || ImGui::IsKeyPressed(VK_F9))
 				{
@@ -212,7 +210,7 @@ static void sUpdate()
 
 				ImGui::SameLine();
 				
-				ImGui::Checkbox("Inline Raytracing", &gUseDXRInlineShader);
+				ImGui::Checkbox("Inline Raytracing", &gUseDXRRayQueryShader);
 			}
 
 			if (ImGui::TreeNodeEx("Camera"))
@@ -354,7 +352,7 @@ static void sUpdate()
 				ImGui::TreePop();
 			}
 
-			if (ImGui::TreeNodeEx("Atmosphere", ImGuiTreeNodeFlags_DefaultOpen))
+			if (ImGui::TreeNodeEx("Atmosphere"))
 			{
 				gAtmosphere.ImGuiShowMenus();
 				ImGui::TreePop();
@@ -363,6 +361,19 @@ static void sUpdate()
 			if (ImGui::TreeNodeEx("Cloud"))
 			{
 				gCloud.ImGuiShowMenus();
+				ImGui::TreePop();
+			}
+
+			if (ImGui::TreeNodeEx("Shader"))
+			{
+				if (ImGui::Button("Print Disassembly RayQuery"))
+				{
+					gRenderer.mDumpDisassemblyRayQuery = true;
+					gRenderer.mReloadShader = true;
+				}
+
+				ImGui::Checkbox("Print D3D12_STATE_OBJECT_DESC", &gRenderer.mPrintStateObjectDesc);
+
 				ImGui::TreePop();
 			}
 
@@ -400,9 +411,9 @@ static void sUpdate()
 
 	{
 		// Reload
-		if (sReloadRequested)
+		if (gRenderer.mReloadShader)
 		{
-			sReloadRequested = false;
+			gRenderer.mReloadShader = false;
 
 			sWaitForLastSubmittedFrame();
 			gScene.RebuildShader();
@@ -458,15 +469,16 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 
 	// File watch
 	filewatch::FileWatch<std::string> file_watch("Shader/", 
-		[] (const std::string& inPath, const filewatch::Event /*inChangeType*/) 
+		[] (const std::string& inPath, const filewatch::Event inChangeType) 
 		{
+			(void)inChangeType;
 			std::regex pattern(".*\\.(hlsl|h|inl)");
-			if (std::regex_match(inPath, pattern) && inPath.find("Generated") == std::string::npos)
+			if (std::regex_match(inPath, pattern) && inChangeType == filewatch::Event::modified)
 			{
 				std::string msg = "Reload triggered by " + inPath + "\n";
 				gTrace(msg.c_str());
 
-				sReloadRequested = true;
+				gRenderer.mReloadShader = true;
 			}
 		});
 
@@ -714,10 +726,15 @@ void sRender()
 			DirectX::ScratchImage image;
 			DirectX::CaptureTexture(gCommandQueue, gDumpTexture->mResource.Get(), false, image, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COMMON);
 
-			std::wstring directory = L"TextureDump/";
-			std::filesystem::create_directory(directory);
-			std::wstring path = directory + gToWString(gDumpTexture->mName) + L".dds";
-			DirectX::SaveToDDSFile(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::DDS_FLAGS_NONE, path.c_str());
+			gDump([&](const std::filesystem::path& inDirectory)
+			{
+				std::filesystem::path path = inDirectory;
+				path += gDumpTexture->mName;
+				path += ".dds";
+				DirectX::SaveToDDSFile(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::DDS_FLAGS_NONE, path.c_str());
+
+				return path;
+			}, true);
 			
 			gDumpTexture = nullptr;
 		}

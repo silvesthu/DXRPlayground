@@ -82,6 +82,23 @@ inline void gTrace(const T& data)
 	OutputDebugStringA(str.c_str());
 }
 
+inline void gDump(std::function<std::filesystem::path(const std::filesystem::path& inDirectory)> inWriteFileCallback, bool inOpenFile)
+{
+	std::filesystem::path directory = ".\\Dump\\";
+	std::filesystem::create_directory(directory);
+
+	std::filesystem::path path = inWriteFileCallback(directory);
+
+	if (inOpenFile)
+	{
+		std::filesystem::path command = "explorer ";
+		command += std::filesystem::current_path();
+		command += "\\";
+		command += path;
+		system(command.string().c_str());
+	}
+}
+
 #define gAssert assert
 
 inline void gVerify(bool inExpr)
@@ -277,7 +294,6 @@ struct Shader
 	SHADER_MEMBER(const char*, VSName, nullptr);
 	SHADER_MEMBER(const char*, PSName, nullptr);
 	SHADER_MEMBER(const char*, CSName, nullptr);
-	SHADER_MEMBER(bool, UseGlobalRootSignature, false);
 
 	struct DescriptorInfo
 	{
@@ -369,8 +385,8 @@ extern ComPtr<ID3D12StateObject>			gDXRStateObject;
 
 extern ShaderTable							gDXRShaderTable;
 
-extern bool									gUseDXRInlineShader;
-extern Shader								gDXRInlineShader;
+extern bool									gUseDXRRayQueryShader;
+extern Shader								gDXRRayQueryShader;
 
 extern Shader								gDiffTexture2DShader;
 extern Shader								gDiffTexture3DShader;
@@ -417,13 +433,19 @@ struct Renderer
 
 	void									ReleaseResources();
 	void									ImGuiShowTextures();
+
+	bool									mReloadShader = false;
+
+	bool									mDumpDisassemblyRayQuery = false;
+
+	bool									mPrintStateObjectDesc = false;
 };
 extern Renderer								gRenderer;
 
 extern Texture*								gDumpTexture;
 extern Texture								gDumpTextureProxy;
 
-extern Constants					gConstants;
+extern Constants							gConstants;
 
 // String literals
 static const wchar_t*						kDefaultRayGenerationShader	= L"DefaultRayGeneration";

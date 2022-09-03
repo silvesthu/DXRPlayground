@@ -99,8 +99,8 @@ static IDxcBlob* sCompileShader(const char* inFilename, const char* inEntryPoint
 	IDxcBlob* blob = nullptr;
 	gValidate(operation_result->GetResult(&blob));
 
-	// Dissassemble
-	if (false)
+
+	if (gRenderer.mDumpDisassemblyRayQuery && std::string_view("RayQueryCS") == inEntryPoint)
 	{
 		IDxcBlob* blob_to_dissemble = blob;
 		IDxcBlobEncoding* disassemble = nullptr;
@@ -108,7 +108,22 @@ static IDxcBlob* sCompileShader(const char* inFilename, const char* inEntryPoint
 		compiler->Disassemble(blob_to_dissemble, &disassemble);
 		gValidate(utils->GetBlobAsUtf8(disassemble, &blob_8));
 		std::string str(static_cast<LPCSTR>(blob_8->GetBufferPointer()), blob_8->GetBufferSize());
-		OutputDebugStringA(str.c_str());
+
+		gDump([&](const std::filesystem::path& inDirectory)
+		{
+			static int counter = 0;
+			std::filesystem::path path = inDirectory;
+			path += "RayQueryCS_";
+			path += std::to_string(counter++);
+			path += ".txt";
+			std::ofstream stream(path);
+			stream << str;
+			stream.close();
+
+			return path;
+		}, true);
+
+		gRenderer.mDumpDisassemblyRayQuery = false;
 	}
 
 	return blob;
@@ -296,27 +311,17 @@ static bool sCreateCSPipelineState(const char* inShaderFileName, const char* inC
 	LPVOID root_signature_pointer = cs_blob->GetBufferPointer();
 	SIZE_T root_signature_size = cs_blob->GetBufferSize();
 
-	{
-		if (FAILED(gDevice->CreateRootSignature(0, root_signature_pointer, root_signature_size, IID_PPV_ARGS(&ioSystemShader.mData.mRootSignature))))
-			return false;
+	if (FAILED(gDevice->CreateRootSignature(0, root_signature_pointer, root_signature_size, IID_PPV_ARGS(&ioSystemShader.mData.mRootSignature))))
+		return false;
 
-		ComPtr<ID3D12RootSignatureDeserializer> deserializer;
-		if (FAILED(D3D12CreateRootSignatureDeserializer(cs_blob->GetBufferPointer(), cs_blob->GetBufferSize(), IID_PPV_ARGS(&ioSystemShader.mData.mRootSignatureDeserializer))))
-			return false;
-	}
-
-	D3D12_RASTERIZER_DESC rasterizer_desc = {};
-	rasterizer_desc.FillMode = D3D12_FILL_MODE_SOLID;
-	rasterizer_desc.CullMode = D3D12_CULL_MODE_NONE;
-
-	D3D12_BLEND_DESC blend_desc = {};
-	blend_desc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+	ComPtr<ID3D12RootSignatureDeserializer> deserializer;
+	if (FAILED(D3D12CreateRootSignatureDeserializer(cs_blob->GetBufferPointer(), cs_blob->GetBufferSize(), IID_PPV_ARGS(&ioSystemShader.mData.mRootSignatureDeserializer))))
+		return false;
 
 	D3D12_COMPUTE_PIPELINE_STATE_DESC pipeline_state_desc = {};
 	pipeline_state_desc.CS.pShaderBytecode = cs_blob->GetBufferPointer();
 	pipeline_state_desc.CS.BytecodeLength = cs_blob->GetBufferSize();
 	pipeline_state_desc.pRootSignature = ioSystemShader.mData.mRootSignature.Get();
-
 	if (FAILED(gDevice->CreateComputePipelineState(&pipeline_state_desc, IID_PPV_ARGS(&ioSystemShader.mData.mPipelineState))))
 		return false;
 
@@ -451,7 +456,7 @@ void gCreatePipelineState()
 
 		succeed &= sCreatePipelineState(gCompositeShader);
 
-		succeed &= sCreatePipelineState(gDXRInlineShader);
+		succeed &= sCreatePipelineState(gDXRRayQueryShader);
 
 		succeed &= sCreatePipelineState(gDiffTexture2DShader);
 		succeed &= sCreatePipelineState(gDiffTexture3DShader);
@@ -520,8 +525,8 @@ void gCreatePipelineState()
 	PipelineConfig pipeline_config(31); // [0, 31] https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_raytracing_pipeline_config
 	subobjects[index++] = pipeline_config.mStateSubobject;
 
-	// Global root signature - grab from inline version
-	gDXRGlobalRootSignature = gDXRInlineShader.mData.mRootSignature;
+	// Global root signature - grab from RayQuery version
+	gDXRGlobalRootSignature = gDXRRayQueryShader.mData.mRootSignature;
 	GlobalRootSignature global_root_signature(gDXRGlobalRootSignature);
 	subobjects[index++] = global_root_signature.mStateSubobject;
 
@@ -530,8 +535,10 @@ void gCreatePipelineState()
 	desc.NumSubobjects = index;
 	desc.pSubobjects = subobjects.data();
 	desc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
-	sPrintStateObjectDesc(&desc);
 	gValidate(gDevice->CreateStateObject(&desc, IID_PPV_ARGS(&gDXRStateObject)));
+
+	if (gRenderer.mPrintStateObjectDesc)
+		sPrintStateObjectDesc(&desc);
 }
 
 void gCleanupPipelineState()
@@ -539,7 +546,7 @@ void gCleanupPipelineState()
 	gDXRStateObject = nullptr;
 	gDXRGlobalRootSignature = nullptr;
 
-	gDXRInlineShader.Reset();
+	gDXRRayQueryShader.Reset();
 
 	gDiffTexture2DShader.Reset();
 	gDiffTexture3DShader.Reset();

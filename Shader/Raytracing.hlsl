@@ -372,7 +372,7 @@ void DefaultRayGeneration()
 #ifdef ENABLE_RAY_QUERY
 [RootSignature(ROOT_SIGNATURE_COMMON)]
 [numthreads(8, 8, 1)]
-void InlineRaytracingCS(	
+void RayQueryCS(
 	uint3 inGroupThreadID : SV_GroupThreadID,
 	uint3 inGroupID : SV_GroupID,
 	uint3 inDispatchThreadID : SV_DispatchThreadID,

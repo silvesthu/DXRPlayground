@@ -23,8 +23,8 @@ ComPtr<ID3D12RootSignature>			gDXRGlobalRootSignature = nullptr;
 ComPtr<ID3D12StateObject>			gDXRStateObject = nullptr;
 ShaderTable							gDXRShaderTable = {};
 
-bool								gUseDXRInlineShader = true;
-Shader								gDXRInlineShader = Shader().FileName("Shader/Raytracing.hlsl").CSName("InlineRaytracingCS").UseGlobalRootSignature(true);
+bool								gUseDXRRayQueryShader = true;
+Shader								gDXRRayQueryShader = Shader().FileName("Shader/Raytracing.hlsl").CSName("RayQueryCS");
 
 Shader								gDiffTexture2DShader = Shader().FileName("Shader/DiffTexture.hlsl").CSName("DiffTexture2DShader");
 Shader								gDiffTexture3DShader = Shader().FileName("Shader/DiffTexture.hlsl").CSName("DiffTexture3DShader");

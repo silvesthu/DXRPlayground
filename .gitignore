@@ -1,7 +1,6 @@
-Shader/Generated/
 packages/
 Asset/ArPragueSkyModelGround/SkyModelDataset.dat
-TextureDump/
+Dump/
 imgui.ini
 
 # Visual Studio
