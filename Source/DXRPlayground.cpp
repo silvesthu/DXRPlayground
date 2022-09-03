@@ -769,7 +769,7 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		sd.Stereo = FALSE;
 	}
 
-	if (DX12_ENABLE_DEBUG_LAYER)
+	if (DX12_ENABLE_DEBUG_LAYER && GetModuleHandleA("Nvda.Graphics.Interception.dll") == NULL)
 	{
 		ComPtr<ID3D12Debug> dx12Debug = nullptr;
 		if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&dx12Debug))))
