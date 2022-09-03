@@ -526,7 +526,7 @@ void ComputeSingleScatteringIntegrand(float4 r_mu_mu_s_nu, float d, bool interse
 	mie = transmittance * GetProfileDensity(mConstants.mAtmosphere.mMieDensity, r_d - mConstants.mAtmosphere.mBottomRadius);
 }
 
-[RootSignature("RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED)")]
+[RootSignature("RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0)")]
 [numthreads(8, 8, 1)]
 void ComputeTransmittanceCS(
 	uint3 inGroupThreadID : SV_GroupThreadID,
@@ -557,7 +557,7 @@ void ComputeTransmittanceCS(
 	// TransmittanceUAV[inDispatchThreadID.xy] = float4(1,0,0, 1.0);
 }
 
-[RootSignature("RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED)")]
+[RootSignature("RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0)")]
 [numthreads(8, 8, 1)]
 void ComputeDirectIrradianceCS(
 	uint3 inGroupThreadID : SV_GroupThreadID,
@@ -637,7 +637,7 @@ void IntegrateSingleScattering(float4 r_mu_mu_s_nu, bool intersects_ground, out 
 	mie = mie_sum * dx * mConstants.mAtmosphere.mMieScattering;
 }
 
-[RootSignature("RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED)")]
+[RootSignature("RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0)")]
 [numthreads(8, 8, 1)]
 void ComputeSingleScatteringCS(
 	uint3 inGroupThreadID : SV_GroupThreadID,
@@ -710,11 +710,6 @@ float3 GetScattering(float r, float mu, float mu_s, float nu, bool intersects_gr
 	}
 
 	return GetScattering(DeltaRayleighScatteringSRV, r, mu, mu_s, nu, intersects_ground).xyz;
-}
-
-cbuffer AtmosphereConstantsPerDrawBuffer : register(b1, space2)
-{
-	AtmosphereConstantsPerDraw mAtmospherePerDraw;
 }
 
 float3 ComputeScatteringDensity(float4 r_mu_mu_s_nu, bool intersects_ground)
@@ -809,7 +804,7 @@ float3 ComputeScatteringDensity(float4 r_mu_mu_s_nu, bool intersects_ground)
 	return rayleigh_mie;
 }
 
-[RootSignature("RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), RootConstants(num32BitConstants=4, b1, space = 2)")]
+[RootSignature("RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0), RootConstants(num32BitConstants=4, b1, space = 2)")]
 [numthreads(8, 8, 1)]
 void ComputeScatteringDensityCS(
 	uint3 inGroupThreadID : SV_GroupThreadID,
@@ -892,7 +887,7 @@ float3 ComputeIndirectIrradiance(float2 mu_s_r)
 	return result;
 }
 
-[RootSignature("RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), RootConstants(num32BitConstants=4, b1, space = 2)")]
+[RootSignature("RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0), RootConstants(num32BitConstants=4, b1, space = 2)")]
 [numthreads(8, 8, 1)]
 void ComputeIndirectIrradianceCS(
 	uint3 inGroupThreadID : SV_GroupThreadID,
@@ -963,7 +958,7 @@ void ComputeMultipleScattering(float4 r_mu_mu_s_nu, bool intersects_ground, out 
 	delta_multiple_scattering = rayleigh_mie_sum;
 }
 
-[RootSignature("RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED)")]
+[RootSignature("RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0)")]
 [numthreads(8, 8, 1)]
 void ComputeMultipleScatteringCS(
 	uint3 inGroupThreadID : SV_GroupThreadID,

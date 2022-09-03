@@ -2,7 +2,22 @@
 #include "Shared.inl"
 
 // CBV
-static ConstantBuffer<Constants> mConstants = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Constants];
+cbuffer ConstantsBuffer : register(b0, space0)
+{
+	Constants mConstants;
+}
+
+cbuffer DiffTextureConstants : register(b0, space11)
+{
+	uint mComputedIndex;
+	uint mExpectedIndex;
+	uint mOutputIndex;
+};
+
+cbuffer AtmosphereConstantsPerDrawBuffer : register(b1, space2)
+{
+	AtmosphereConstantsPerDraw mAtmospherePerDraw;
+}
 
 // CBV Helper
 float3 GetSunDirection() { return mConstants.mSunDirection.xyz; }

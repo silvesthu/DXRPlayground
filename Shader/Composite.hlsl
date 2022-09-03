@@ -75,7 +75,7 @@ float4 ScreenspaceTriangleVS(uint id : SV_VertexID) : SV_POSITION
 	return float4 (x, y, 0, 1);
 }
 
-[RootSignature("RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED)")]
+[RootSignature("RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0)")]
 float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 {
 	ConstantBuffer<Constants> constants = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Constants];

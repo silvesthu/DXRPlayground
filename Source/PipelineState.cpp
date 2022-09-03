@@ -238,13 +238,10 @@ struct PipelineConfig : public StateSubobjectHolder<D3D12_RAYTRACING_PIPELINE_CO
 // Global root signature
 struct GlobalRootSignature : public StateSubobjectHolder<ID3D12RootSignature*, D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE>
 {
-	GlobalRootSignature(const D3D12_ROOT_SIGNATURE_DESC& inDesc)
+	GlobalRootSignature(const ComPtr<ID3D12RootSignature>& inRootSignature)
 	{
-		mRootSignature = CreateRootSignature(inDesc);
-		mRootSignature->SetName(L"GlobalRootSignature");
-		mDesc = mRootSignature.Get();
+		mDesc = inRootSignature.Get();
 	}
-	ComPtr<ID3D12RootSignature> mRootSignature;
 };
 
 static bool sCreateVSPSPipelineState(const char* inShaderFileName, const char* inVSName, const char* inPSName, Shader& ioSystemShader)
@@ -299,9 +296,6 @@ static bool sCreateCSPipelineState(const char* inShaderFileName, const char* inC
 	LPVOID root_signature_pointer = cs_blob->GetBufferPointer();
 	SIZE_T root_signature_size = cs_blob->GetBufferSize();
 
-	if (ioSystemShader.mUseGlobalRootSignature)
-		ioSystemShader.mData.mRootSignature = gDXRGlobalRootSignature;
-	else
 	{
 		if (FAILED(gDevice->CreateRootSignature(0, root_signature_pointer, root_signature_size, IID_PPV_ARGS(&ioSystemShader.mData.mRootSignature))))
 			return false;
@@ -451,21 +445,37 @@ void sPrintStateObjectDesc(const D3D12_STATE_OBJECT_DESC* desc)
 
 void gCreatePipelineState()
 {
-	static bool first_run = true;
+	// Create non-lib shaders
+	{
+		bool succeed = true;
+
+		succeed &= sCreatePipelineState(gCompositeShader);
+
+		succeed &= sCreatePipelineState(gDXRInlineShader);
+
+		succeed &= sCreatePipelineState(gDiffTexture2DShader);
+		succeed &= sCreatePipelineState(gDiffTexture3DShader);
+
+		for (auto&& shaders : gAtmosphere.mRuntime.mShadersSet)
+			for (auto&& shader : shaders)
+				succeed &= sCreatePipelineState(shader);
+
+		for (auto&& shader : gCloud.mRuntime.mShaders)
+			succeed &= sCreatePipelineState(shader);
+	}
 
 	// Create lib shaders
 	const wchar_t* entry_points[] = { kDefaultRayGenerationShader, kDefaultMissShader, kDefaultClosestHitShader };
 	IDxcBlob* blob = sCompileShader("Shader/Raytracing.hlsl", "", "lib_6_6");
 	if (blob == nullptr)
 	{
-		if (first_run)
-			assert(gDXRStateObject != nullptr);
+		assert(gDXRStateObject != nullptr);
 		return;
 	}
 
 	// See D3D12_STATE_SUBOBJECT_TYPE
 	// Note that all pointers should be valid until CreateStateObject
-	
+
 	// Subobjects:
 	//  DXIL library
 	//  Hit group
@@ -510,11 +520,9 @@ void gCreatePipelineState()
 	PipelineConfig pipeline_config(31); // [0, 31] https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_raytracing_pipeline_config
 	subobjects[index++] = pipeline_config.mStateSubobject;
 
-	// Global root signature
-	D3D12_ROOT_SIGNATURE_DESC root_signature_desc = {};
-	root_signature_desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED;
-	GlobalRootSignature global_root_signature(root_signature_desc);
-	gDXRGlobalRootSignature = global_root_signature.mRootSignature;
+	// Global root signature - grab from inline version
+	gDXRGlobalRootSignature = gDXRInlineShader.mData.mRootSignature;
+	GlobalRootSignature global_root_signature(gDXRGlobalRootSignature);
 	subobjects[index++] = global_root_signature.mStateSubobject;
 
 	// Create the state object
@@ -524,34 +532,6 @@ void gCreatePipelineState()
 	desc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
 	sPrintStateObjectDesc(&desc);
 	gValidate(gDevice->CreateStateObject(&desc, IID_PPV_ARGS(&gDXRStateObject)));
-
-	// Create non-lib shaders
-	{
-		bool succeed = true;
-
-		succeed &= sCreatePipelineState(gCompositeShader);
-
-		succeed &= sCreatePipelineState(gDXRInlineShader);
-
-		succeed &= sCreatePipelineState(gDiffTexture2DShader);
-		succeed &= sCreatePipelineState(gDiffTexture3DShader);
-
-		for (auto&& shaders : gAtmosphere.mRuntime.mShadersSet)
-			for (auto&& shader : shaders)
-				succeed &= sCreatePipelineState(shader);
-
-		for (auto&& shader : gCloud.mRuntime.mShaders)
-			succeed &= sCreatePipelineState(shader);
-
-		if (!succeed)
-		{
-			if (first_run)
-				assert(gDXRStateObject != nullptr);
-			return;
-		}
-	}
-
-	first_run = false; // disable assert for unsuccessful shader reload
 }
 
 void gCleanupPipelineState()
