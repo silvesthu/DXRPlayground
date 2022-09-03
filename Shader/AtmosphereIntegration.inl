@@ -79,13 +79,13 @@ float ClampDistance(float d)
 
 float ClampRadius(float r) 
 {
-	return clamp(r, mPerFrameConstants.mAtmosphere.mBottomRadius, mPerFrameConstants.mAtmosphere.mTopRadius);
+	return clamp(r, mConstants.mAtmosphere.mBottomRadius, mConstants.mAtmosphere.mTopRadius);
 }
 
 // r, mu -> d
 float DistanceToTopAtmosphereBoundary(float r, float mu)
 {
-	float R_t = mPerFrameConstants.mAtmosphere.mTopRadius;
+	float R_t = mConstants.mAtmosphere.mTopRadius;
 
 	float discriminant = r * r * (mu * mu - 1.0) + R_t * R_t;
 	return ClampDistance(-r * mu + SafeSqrt(discriminant));
@@ -97,7 +97,7 @@ float InvDistanceToTopAtmosphereBoundary(float r, float d)
 	if (d == 0)
 		return 1.0;
 
-	float R_t = mPerFrameConstants.mAtmosphere.mTopRadius;
+	float R_t = mConstants.mAtmosphere.mTopRadius;
 	return (R_t * R_t - r * r - d * d) / (2.0 * r * d);
 
 	// [Bruneton17] R_t * R_t - r * r == H * H - rho * rho
@@ -107,7 +107,7 @@ float InvDistanceToTopAtmosphereBoundary(float r, float d)
 // r, mu -> d
 float DistanceToBottomAtmosphereBoundary(float r, float mu)
 {
-	float R_g = mPerFrameConstants.mAtmosphere.mBottomRadius;
+	float R_g = mConstants.mAtmosphere.mBottomRadius;
 
 	float discriminant = r * r * (mu * mu - 1.0) + R_g * R_g;
 	return ClampDistance(-r * mu - SafeSqrt(discriminant));
@@ -125,7 +125,7 @@ float DistanceToNearestAtmosphereBoundary(float r, float mu, bool intersects_gro
 // r, mu -> bool
 bool RayIntersectsGround(float r, float mu) 
 {
-	return mu < 0.0 && (r * r * (mu * mu - 1.0) + mPerFrameConstants.mAtmosphere.mBottomRadius * mPerFrameConstants.mAtmosphere.mBottomRadius) >= 0.0;
+	return mu < 0.0 && (r * r * (mu * mu - 1.0) + mConstants.mAtmosphere.mBottomRadius * mConstants.mAtmosphere.mBottomRadius) >= 0.0;
 }
 
 #define USE_HALF_PIXEL_OFFSET
@@ -185,7 +185,7 @@ void GetSunAndSkyIrradiance(float3 inHitPosition, float3 inNormal, out float3 ou
 	outSunIrradiance = 0;
 	outSkyIrradiance = 0;
 
-	switch (mPerFrameConstants.mAtmosphere.mMode)
+	switch (mConstants.mAtmosphere.mMode)
 	{
     case AtmosphereMode::ConstantColor:				break; // Not supported
 	case AtmosphereMode::RaymarchAtmosphereOnly:	break; // Not supported
@@ -200,16 +200,16 @@ void GetSkyRadiance(out float3 outSkyRadiance, out float3 outTransmittanceToTop)
 	outSkyRadiance = 0;
 	outTransmittanceToTop = 1;
 
-	AtmosphereMode mode = mPerFrameConstants.mAtmosphere.mMode;
+	AtmosphereMode mode = mConstants.mAtmosphere.mMode;
 	bool left_screen = sGetDispatchRaysIndex().x * 1.0 / sGetDispatchRaysDimensions().x < 0.5;
-	if (mPerFrameConstants.mAtmosphere.mWilkie21SkyViewSplitScreen == 1 && left_screen)
+	if (mConstants.mAtmosphere.mWilkie21SkyViewSplitScreen == 1 && left_screen)
 		mode = AtmosphereMode::Wilkie21;
-	if (mPerFrameConstants.mAtmosphere.mWilkie21SkyViewSplitScreen == 2 && !left_screen)
+	if (mConstants.mAtmosphere.mWilkie21SkyViewSplitScreen == 2 && !left_screen)
 		mode = AtmosphereMode::Wilkie21;
 
 	switch (mode)
 	{
-	case AtmosphereMode::ConstantColor:				outSkyRadiance = mPerFrameConstants.mAtmosphere.mConstantColor.xyz; break;
+	case AtmosphereMode::ConstantColor:				outSkyRadiance = mConstants.mAtmosphere.mConstantColor.xyz; break;
 	case AtmosphereMode::Wilkie21:					AtmosphereIntegration::Wilkie21::GetSkyRadiance(outSkyRadiance, outTransmittanceToTop); break;
 	case AtmosphereMode::RaymarchAtmosphereOnly:	AtmosphereIntegration::Raymarch::GetSkyRadiance(outSkyRadiance, outTransmittanceToTop); break;
 	case AtmosphereMode::Bruneton17: 				AtmosphereIntegration::Bruneton17::GetSkyRadiance(outSkyRadiance, outTransmittanceToTop); break;
@@ -223,11 +223,11 @@ void GetSkyLuminanceToPoint(out float3 outSkyLuminance, out float3 outTransmitta
 	outSkyLuminance = 0;
 	outTransmittance = 1;
 
-	if (mPerFrameConstants.mAtmosphere.mAerialPerspective == 0)
+	if (mConstants.mAtmosphere.mAerialPerspective == 0)
 		return;
 
 	float3 radiance = 0;
-    switch (mPerFrameConstants.mAtmosphere.mMode)
+    switch (mConstants.mAtmosphere.mMode)
     {
     case AtmosphereMode::ConstantColor:				break; // Not supported
 	case AtmosphereMode::RaymarchAtmosphereOnly:	break; // Not supported
@@ -236,7 +236,7 @@ void GetSkyLuminanceToPoint(out float3 outSkyLuminance, out float3 outTransmitta
     default: break;
     }
 
-	outSkyLuminance = radiance * kSolarKW2LM * kPreExposure * mPerFrameConstants.mSolarLuminanceScale;
+	outSkyLuminance = radiance * kSolarKW2LM * kPreExposure * mConstants.mSolarLuminanceScale;
 }
 
 float3 GetSkyLuminance()
@@ -247,7 +247,7 @@ float3 GetSkyLuminance()
 	GetSkyRadiance(radiance, transmittance_to_top);
 
 	// Debug
-	switch (mPerFrameConstants.mDebugMode)
+	switch (mConstants.mDebugMode)
 	{
 	case DebugMode::Barycentrics: 			return 0;
 	case DebugMode::Vertex: 				return PlanetRayDirection(); // rays are supposed to go infinity
@@ -262,17 +262,17 @@ float3 GetSkyLuminance()
 	}
 
 	// Sun
-	if (mPerFrameConstants.mAtmosphere.mMode != AtmosphereMode::ConstantColor &&
-		dot(PlanetRayDirection(), GetSunDirection()) > cos(mPerFrameConstants.mAtmosphere.mSunAngularRadius))
+	if (mConstants.mAtmosphere.mMode != AtmosphereMode::ConstantColor &&
+		dot(PlanetRayDirection(), GetSunDirection()) > cos(mConstants.mAtmosphere.mSunAngularRadius))
 	{
 		// https://en.wikipedia.org/wiki/Solid_angle#Celestial_objects
 		// https://pages.mtu.edu/~scarn/teaching/GE4250/radiation_lecture_slides.pdf
 		// static const float kSunSolidAngle = 6.8E-5;
 		static const float kSunSolidAngle = 6.8E-5;
 		static const float kSolarRadianceScale = 1E-5; // Limit radiance to prevent fireflies...		
-		float3 solar_radiance = mPerFrameConstants.mAtmosphere.mSolarIrradiance / kSunSolidAngle * kSolarRadianceScale;
+		float3 solar_radiance = mConstants.mAtmosphere.mSolarIrradiance / kSunSolidAngle * kSolarRadianceScale;
 		radiance = radiance + transmittance_to_top * solar_radiance;
 	}
 
-	return radiance * kSolarKW2LM * kPreExposure * mPerFrameConstants.mSolarLuminanceScale;
+	return radiance * kSolarKW2LM * kPreExposure * mConstants.mSolarLuminanceScale;
 }

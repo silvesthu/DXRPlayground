@@ -11,7 +11,7 @@ void GetSkyRadiance(out float3 outSkyRadiance, out float3 outTransmittanceToTop)
 
 	float r = length(camera);
 	float rmu = dot(camera, view_ray);
-	float distance_to_top_atmosphere_boundary = -rmu - sqrt(rmu * rmu - r * r + mPerFrameConstants.mAtmosphere.mTopRadius * mPerFrameConstants.mAtmosphere.mTopRadius);
+	float distance_to_top_atmosphere_boundary = -rmu - sqrt(rmu * rmu - r * r + mConstants.mAtmosphere.mTopRadius * mConstants.mAtmosphere.mTopRadius);
 
 	if (distance_to_top_atmosphere_boundary > 0.0) 
 	{
@@ -19,10 +19,10 @@ void GetSkyRadiance(out float3 outSkyRadiance, out float3 outTransmittanceToTop)
 
 		// Move camera to top of atmosphere along view direction
 		camera = camera + view_ray * distance_to_top_atmosphere_boundary;
-		r = mPerFrameConstants.mAtmosphere.mTopRadius;
+		r = mConstants.mAtmosphere.mTopRadius;
 		rmu += distance_to_top_atmosphere_boundary;
 	}
-	else if (r > mPerFrameConstants.mAtmosphere.mTopRadius) 
+	else if (r > mConstants.mAtmosphere.mTopRadius) 
 	{
 		// No hit
 		return;

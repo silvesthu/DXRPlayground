@@ -211,8 +211,12 @@ struct ShaderTable
 	glm::uint32								mHitGroupCount = 0;
 };
 
+template <typename DescriptorIndex>
 struct DescriptorHeap
 {
+	D3D12_DESCRIPTOR_HEAP_TYPE				mType = D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES;
+	int										mCount = 0; // [TODO] Support dynamic range when necessary
+
 	ComPtr<ID3D12DescriptorHeap>			mHeap;
 	SIZE_T									mIncrementSize;
 	int										mNextDynamicIndex;
@@ -223,30 +227,32 @@ struct DescriptorHeap
 	{
 		mHeap = nullptr;
 		mIncrementSize = 0;
-		mNextDynamicIndex = 4096;
 		mCPUHandleStart = {};
 		mGPUHandleStart = {};
-
-		gAssert(mNextDynamicIndex > static_cast<int>(DescriptorIndex::Count));
 	}
 
 	void Initialize()
 	{
+		gAssert(mType != D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES && mCount != 0);
+		gAssert(mCount >= (int)DescriptorIndex::Count);
+
 		Reset();
 
 		D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-		desc.NumDescriptors = 100000;
-		desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+		desc.NumDescriptors = mCount;
+		desc.Type = mType;
 		desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 		gValidate(gDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&mHeap)));
 
-		mIncrementSize = gDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		mIncrementSize = gDevice->GetDescriptorHandleIncrementSize(mType);
 		mCPUHandleStart = mHeap->GetCPUDescriptorHandleForHeapStart();
 		mGPUHandleStart = mHeap->GetGPUDescriptorHandleForHeapStart();
 	}
 
-	D3D12_CPU_DESCRIPTOR_HANDLE AllocateStatic(DescriptorIndex inIndex)
+	D3D12_CPU_DESCRIPTOR_HANDLE GetHandle(DescriptorIndex inIndex)
 	{
+		gAssert(inIndex < DescriptorIndex::Count);
+
 		D3D12_CPU_DESCRIPTOR_HANDLE handle = {};
 		handle = mCPUHandleStart;
 		handle.ptr += static_cast<int>(inIndex) * mIncrementSize;
@@ -287,7 +293,7 @@ struct Shader
 		ComPtr<ID3D12RootSignatureDeserializer>		mRootSignatureDeserializer;
 		ComPtr<ID3D12RootSignature>					mRootSignature;
 		ComPtr<ID3D12PipelineState>					mPipelineState;
-		ComPtr<ID3D12DescriptorHeap>				mDescriptorHeap;
+		ComPtr<ID3D12DescriptorHeap>				mViewDescriptorHeap;
 	};
 	Data mData;
 };
@@ -303,8 +309,8 @@ struct Texture
 	TEXTURE_MEMBER(const char*, Name, nullptr);
 	TEXTURE_MEMBER(float, UIScale, 0.0f);
 	TEXTURE_MEMBER(const wchar_t*, Path, nullptr);
-	TEXTURE_MEMBER(DescriptorIndex, UAVIndex, DescriptorIndex::NullUAV);
-	TEXTURE_MEMBER(DescriptorIndex, SRVIndex, DescriptorIndex::NullSRV);
+	TEXTURE_MEMBER(ViewDescriptorIndex, UAVIndex, ViewDescriptorIndex::Count);
+	TEXTURE_MEMBER(ViewDescriptorIndex, SRVIndex, ViewDescriptorIndex::Count);
 	TEXTURE_MEMBER(DXGI_FORMAT, SRVFormat, DXGI_FORMAT_UNKNOWN);
 
 	Texture& Dimension(glm::uvec3 dimension) 
@@ -383,7 +389,8 @@ struct FrameContext
 
 	glm::uint64								mFenceValue = 0;
 
-	DescriptorHeap							mDescriptorHeap;
+	DescriptorHeap<ViewDescriptorIndex>		mViewDescriptorHeap		{ .mType = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, .mCount = 4096 };
+	DescriptorHeap<SamplerDescriptorIndex>	mSamplerDescriptorHeap	{ .mType = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, .mCount = 128 };
 
 	void Reset()
 	{
@@ -391,7 +398,8 @@ struct FrameContext
 		mConstantUploadBuffer				= nullptr;
 		mConstantUploadBufferPointer		= nullptr;
 		mFenceValue							= 0;
-		mDescriptorHeap.Reset();
+		mViewDescriptorHeap.Reset();
+		mSamplerDescriptorHeap.Reset();
 	}
 };
 extern FrameContext							gFrameContexts[];
@@ -402,8 +410,8 @@ struct Renderer
 {
 	struct Runtime : RuntimeBase<Runtime>
 	{
-		Texture								mScreenColorTexture = Texture().Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(DescriptorIndex::ScreenColorUAV).SRVIndex(DescriptorIndex::ScreenColorSRV).Name("Renderer.ScreenColorTexture");
-		Texture								mScreenDebugTexture = Texture().Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(DescriptorIndex::ScreenDebugUAV).Name("Renderer.ScreenDebugTexture");
+		Texture								mScreenColorTexture = Texture().Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(ViewDescriptorIndex::ScreenColorUAV).SRVIndex(ViewDescriptorIndex::ScreenColorSRV).Name("Renderer.ScreenColorTexture");
+		Texture								mScreenDebugTexture = Texture().Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(ViewDescriptorIndex::ScreenDebugUAV).Name("Renderer.ScreenDebugTexture");
 
 		Texture								mSentinelTexture;
 		std::span<Texture> mTextures		= std::span<Texture>(&mScreenColorTexture, &mSentinelTexture);
@@ -418,7 +426,7 @@ extern Renderer								gRenderer;
 extern Texture*								gDumpTexture;
 extern Texture								gDumpTextureProxy;
 
-extern PerFrameConstants					gPerFrameConstantBuffer;
+extern Constants					gConstants;
 
 // String literals
 static const wchar_t*						kDefaultRayGenerationShader	= L"DefaultRayGeneration";

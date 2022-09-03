@@ -5,7 +5,7 @@ void Cloud::Update()
 {
 	mProfile.mShapeNoise.mOffset += mProfile.mWind * ImGui::GetIO().DeltaTime;
 
-	CloudConstants& constants	= gPerFrameConstantBuffer.mCloud;
+	CloudConstants& constants	= gConstants.mCloud;
 	constants.mMode				= mProfile.mMode;
 	constants.mRaymarch			= mProfile.mRaymarch;
 	constants.mGeometry			= mProfile.mGeometry;

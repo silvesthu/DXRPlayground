@@ -38,7 +38,7 @@ Shader								gCompositeShader = Shader().FileName("Shader/Composite.hlsl").VSNa
 // Frame
 FrameContext						gFrameContexts[NUM_FRAMES_IN_FLIGHT] = {};
 glm::uint32							gFrameIndex = 0;
-PerFrameConstants					gPerFrameConstantBuffer = {};
+Constants							gConstants = {};
 
 // Renderer
 void Renderer::ReleaseResources()
@@ -66,10 +66,10 @@ void Shader::InitializeDescriptors(const std::vector<Shader::DescriptorInfo>& in
 		desc.NumDescriptors = 1000000; // Max
 		desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 		desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-		gValidate(gDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&mData.mDescriptorHeap)));
+		gValidate(gDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&mData.mViewDescriptorHeap)));
 
 		std::wstring name = gToWString(mCSName != nullptr ? mCSName : mPSName);
-		mData.mDescriptorHeap->SetName(name.c_str());
+		mData.mViewDescriptorHeap->SetName(name.c_str());
 	}
 
 	// DescriptorTable
@@ -82,7 +82,7 @@ void Shader::InitializeDescriptors(const std::vector<Shader::DescriptorInfo>& in
 
 		const D3D12_ROOT_DESCRIPTOR_TABLE& table = root_signature_desc->pParameters[0].DescriptorTable;
 
-		D3D12_CPU_DESCRIPTOR_HANDLE handle = mData.mDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+		D3D12_CPU_DESCRIPTOR_HANDLE handle = mData.mViewDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
 		UINT increment_size = gDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 		int entry_index = 0;
@@ -195,18 +195,24 @@ void Shader::InitializeDescriptors(const std::vector<Shader::DescriptorInfo>& in
 
 void Shader::SetupGraphics(ID3D12DescriptorHeap* inHeap, bool inBindless)
 {
-	// Bindless heap needs to be set before RootSignature
-	// See https://microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_6_DynamicResources.html#setdescriptorheaps-and-setrootsignature
-	ID3D12DescriptorHeap* bindless_heap = gGetFrameContext().mDescriptorHeap.mHeap.Get();
 	if (inBindless)
-		gCommandList->SetDescriptorHeaps(1, &bindless_heap);
+	{
+		// Bindless heap needs to be set before RootSignature
+		// See https://microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_6_DynamicResources.html#setdescriptorheaps-and-setrootsignature
+		ID3D12DescriptorHeap* bindless_heaps[] =
+		{
+			gGetFrameContext().mViewDescriptorHeap.mHeap.Get(),
+			gGetFrameContext().mSamplerDescriptorHeap.mHeap.Get(),
+		};
+		gCommandList->SetDescriptorHeaps(ARRAYSIZE(bindless_heaps), bindless_heaps);
+	}
 
 	gCommandList->SetGraphicsRootSignature(mData.mRootSignature.Get());
 	gCommandList->SetPipelineState(mData.mPipelineState.Get());
 
 	if (!inBindless)
 	{
-		ID3D12DescriptorHeap* heap = inHeap != nullptr ? inHeap : mData.mDescriptorHeap.Get();
+		ID3D12DescriptorHeap* heap = inHeap != nullptr ? inHeap : mData.mViewDescriptorHeap.Get();
 		gCommandList->SetDescriptorHeaps(1, &heap);
 		gCommandList->SetGraphicsRootDescriptorTable(0, heap->GetGPUDescriptorHandleForHeapStart());
 	}
@@ -214,16 +220,24 @@ void Shader::SetupGraphics(ID3D12DescriptorHeap* inHeap, bool inBindless)
 
 void Shader::SetupCompute(ID3D12DescriptorHeap* inHeap, bool inBindless)
 {
-	ID3D12DescriptorHeap* bindless_heap = gGetFrameContext().mDescriptorHeap.mHeap.Get();
 	if (inBindless)
-		gCommandList->SetDescriptorHeaps(1, &bindless_heap);
+	{
+		// Bindless heap needs to be set before RootSignature
+		// See https://microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_6_DynamicResources.html#setdescriptorheaps-and-setrootsignature
+		ID3D12DescriptorHeap* bindless_heaps[] =
+		{
+			gGetFrameContext().mViewDescriptorHeap.mHeap.Get(),
+			gGetFrameContext().mSamplerDescriptorHeap.mHeap.Get(),
+		};
+		gCommandList->SetDescriptorHeaps(ARRAYSIZE(bindless_heaps), bindless_heaps);
+	}
 
 	gCommandList->SetComputeRootSignature(mData.mRootSignature.Get());
 	gCommandList->SetPipelineState(mData.mPipelineState.Get());
 
 	if (!inBindless)
 	{
-		ID3D12DescriptorHeap* heap = inHeap != nullptr ? inHeap : mData.mDescriptorHeap.Get();
+		ID3D12DescriptorHeap* heap = inHeap != nullptr ? inHeap : mData.mViewDescriptorHeap.Get();
 		gCommandList->SetDescriptorHeaps(1, &heap);
 		gCommandList->SetComputeRootDescriptorTable(0, heap->GetGPUDescriptorHandleForHeapStart());
 	}
@@ -248,11 +262,11 @@ void Texture::Initialize()
 	gSetName(mResource, "", mName);
 
 	// SRV
-	if (mSRVIndex > DescriptorIndex::NullCount && mSRVIndex < DescriptorIndex::Count)
+	if (mSRVIndex != ViewDescriptorIndex::Count)
 	{
 		for (int i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
 		{
-			D3D12_CPU_DESCRIPTOR_HANDLE handle = gFrameContexts[i].mDescriptorHeap.AllocateStatic(mSRVIndex);
+			D3D12_CPU_DESCRIPTOR_HANDLE handle = gFrameContexts[i].mViewDescriptorHeap.GetHandle(mSRVIndex);
 
 			D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
 			desc.Format = mSRVFormat != DXGI_FORMAT_UNKNOWN ? mSRVFormat : mFormat;
@@ -265,11 +279,11 @@ void Texture::Initialize()
 	}
 
 	// UAV
-	if (mUAVIndex != DescriptorIndex::Count)
+	if (mUAVIndex != ViewDescriptorIndex::Count)
 	{
 		for (int i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
 		{
-			D3D12_CPU_DESCRIPTOR_HANDLE handle = gFrameContexts[i].mDescriptorHeap.AllocateStatic(mUAVIndex);
+			D3D12_CPU_DESCRIPTOR_HANDLE handle = gFrameContexts[i].mViewDescriptorHeap.GetHandle(mUAVIndex);
 
 			D3D12_UNORDERED_ACCESS_VIEW_DESC desc = {};
 			if (resource_desc.DepthOrArraySize == 1)

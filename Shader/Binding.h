@@ -1,13 +1,13 @@
 #pragma once
 
 // CBV
-cbuffer                             PerFrameConstantsBuffer :   register(b0, space0)
+cbuffer                             ConstantsBuffer :           register(b0, space0)
 {
-    PerFrameConstants mPerFrameConstants;
+    Constants mConstants;
 };
 
 // CBV Helper
-float3 GetSunDirection()            { return mPerFrameConstants.mSunDirection.xyz; }
+float3 GetSunDirection()            { return mConstants.mSunDirection.xyz; }
 
 // SRV
 RaytracingAccelerationStructure     RaytracingScene :           register(t0, space0);

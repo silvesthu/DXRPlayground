@@ -13,7 +13,7 @@ float3 ToneMapping_ACES_Knarkowicz(float3 x)
 	return saturate((x * (a * x + b)) / (x * (c * x + d) + e));
 }
 
-float3 LuminanceToColor(float3 inLuminance, PerFrameConstants inPerFrameConstants)
+float3 LuminanceToColor(float3 inLuminance, Constants inConstants)
 {
 	// Exposure
 	float3 normalized_luminance = 0;
@@ -25,7 +25,7 @@ float3 LuminanceToColor(float3 inLuminance, PerFrameConstants inPerFrameConstant
 		float kVignettingAttenuation = 0.78f; // To cancel out saturation. Typically 0.65 for real lens, see https://www.unrealengine.com/en-US/tech-blog/how-epic-games-is-handling-auto-exposure-in-4-25
 		float kLensSaturation = kSaturationBasedSpeedConstant / kISO / kVignettingAttenuation;
 
-		float exposure_normalization_factor = 1.0 / (pow(2.0, inPerFrameConstants.mEV100) * kLensSaturation); // = 1.0 / luminance_max
+		float exposure_normalization_factor = 1.0 / (pow(2.0, inConstants.mEV100) * kLensSaturation); // = 1.0 / luminance_max
 		normalized_luminance = inLuminance * (exposure_normalization_factor / kPreExposure);
 
 		// [Reference]
@@ -38,7 +38,7 @@ float3 LuminanceToColor(float3 inLuminance, PerFrameConstants inPerFrameConstant
 	float3 tone_mapped_color = 0;
 	// Tone Mapping
 	{
-		switch (inPerFrameConstants.mToneMappingMode)
+		switch (inConstants.mToneMappingMode)
 		{
 			case ToneMappingMode::Knarkowicz:	tone_mapped_color = ToneMapping_ACES_Knarkowicz(normalized_luminance); break;
             case ToneMappingMode::Passthrough:	// fallthrough
@@ -78,8 +78,8 @@ float4 ScreenspaceTriangleVS(uint id : SV_VertexID) : SV_POSITION
 [RootSignature("RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED)")]
 float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 {
-	ConstantBuffer<PerFrameConstants> per_frame_constants = ResourceDescriptorHeap[(int)DescriptorIndex::PerFrameConstants];
-	RWTexture2D<float4> screen_color = ResourceDescriptorHeap[(int)DescriptorIndex::ScreenColorUAV];
+	ConstantBuffer<Constants> per_frame_constants = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Constants];
+	RWTexture2D<float4> screen_color = ResourceDescriptorHeap[(int)ViewDescriptorIndex::ScreenColorUAV];
 	
 	float4 color = screen_color[position.xy];
 

@@ -118,18 +118,18 @@ static void sUpdate()
 
 		if (mouse_delta.x != 0 || mouse_delta.y != 0) // otherwise result of glm::normalize might oscillate
 		{
-			glm::vec4 front = gPerFrameConstantBuffer.mCameraDirection;
+			glm::vec4 front = gConstants.mCameraDirection;
 			glm::vec4 right = glm::vec4(glm::normalize(glm::cross(glm::vec3(front), glm::vec3(0, 1, 0))), 0);
 			glm::vec4 up = glm::vec4(glm::normalize(glm::cross(glm::vec3(right), glm::vec3(front))), 0);
 
 			front = glm::rotate(-mouse_delta.x * gCameraSettings.mMoveRotateSpeed.y, glm::vec3(up)) * front;
 			front = glm::rotate(-mouse_delta.y * gCameraSettings.mMoveRotateSpeed.y, glm::vec3(right)) * front;
 
-			gPerFrameConstantBuffer.mCameraDirection = glm::normalize(front);
+			gConstants.mCameraDirection = glm::normalize(front);
 		}
 
-		if (glm::isnan(gPerFrameConstantBuffer.mCameraDirection.x))
-			gPerFrameConstantBuffer.mCameraDirection = glm::vec4(0, 0, 1, 0);
+		if (glm::isnan(gConstants.mCameraDirection.x))
+			gConstants.mCameraDirection = glm::vec4(0, 0, 1, 0);
 	}
 
 	// Move Camera
@@ -143,34 +143,34 @@ static void sUpdate()
 			move_speed *= 0.1f;
 
 		if (ImGui::IsKeyDown('W'))
-			gPerFrameConstantBuffer.mCameraPosition += gPerFrameConstantBuffer.mCameraDirection * move_speed;
+			gConstants.mCameraPosition += gConstants.mCameraDirection * move_speed;
 		if (ImGui::IsKeyDown('S'))
-			gPerFrameConstantBuffer.mCameraPosition -= gPerFrameConstantBuffer.mCameraDirection * move_speed;
+			gConstants.mCameraPosition -= gConstants.mCameraDirection * move_speed;
 
-		glm::vec4 right = glm::vec4(glm::normalize(glm::cross(glm::vec3(gPerFrameConstantBuffer.mCameraDirection), glm::vec3(0, 1, 0))), 0);
+		glm::vec4 right = glm::vec4(glm::normalize(glm::cross(glm::vec3(gConstants.mCameraDirection), glm::vec3(0, 1, 0))), 0);
 
 		if (ImGui::IsKeyDown('A'))
-			gPerFrameConstantBuffer.mCameraPosition -= right * move_speed;
+			gConstants.mCameraPosition -= right * move_speed;
 		if (ImGui::IsKeyDown('D'))
-			gPerFrameConstantBuffer.mCameraPosition += right * move_speed;
+			gConstants.mCameraPosition += right * move_speed;
 
-		glm::vec4 up = glm::vec4(glm::normalize(glm::cross(glm::vec3(right), glm::vec3(gPerFrameConstantBuffer.mCameraDirection))), 0);
+		glm::vec4 up = glm::vec4(glm::normalize(glm::cross(glm::vec3(right), glm::vec3(gConstants.mCameraDirection))), 0);
 
 		if (ImGui::IsKeyDown('Q'))
-			gPerFrameConstantBuffer.mCameraPosition -= up * move_speed;
+			gConstants.mCameraPosition -= up * move_speed;
 		if (ImGui::IsKeyDown('E'))
-			gPerFrameConstantBuffer.mCameraPosition += up * move_speed;
+			gConstants.mCameraPosition += up * move_speed;
 	}
 
 	// Frustum
 	{
 		float horizontal_tan = glm::tan(gCameraSettings.mHorizontalFovDegree * 0.5f * glm::pi<float>() / 180.0f);
 
-		glm::vec4 right = glm::vec4(glm::normalize(glm::cross(glm::vec3(gPerFrameConstantBuffer.mCameraDirection), glm::vec3(0, 1, 0))), 0);
-		gPerFrameConstantBuffer.mCameraRightExtend = right * horizontal_tan;
+		glm::vec4 right = glm::vec4(glm::normalize(glm::cross(glm::vec3(gConstants.mCameraDirection), glm::vec3(0, 1, 0))), 0);
+		gConstants.mCameraRightExtend = right * horizontal_tan;
 
-		glm::vec4 up = glm::vec4(glm::normalize(glm::cross(glm::vec3(right), glm::vec3(gPerFrameConstantBuffer.mCameraDirection))), 0);
-		gPerFrameConstantBuffer.mCameraUpExtend = up * horizontal_tan * (gDisplaySettings.mRenderResolution.y * 1.0f / gDisplaySettings.mRenderResolution.x);
+		glm::vec4 up = glm::vec4(glm::normalize(glm::cross(glm::vec3(right), glm::vec3(gConstants.mCameraDirection))), 0);
+		gConstants.mCameraUpExtend = up * horizontal_tan * (gDisplaySettings.mRenderResolution.y * 1.0f / gDisplaySettings.mRenderResolution.x);
 	}
 
 	// ImGUI
@@ -185,8 +185,8 @@ static void sUpdate()
 			}
 
 			ImGui::Text("Frame %d | Time %.3f s | Average %.3f ms (FPS %.1f) | %dx%d",
-				gPerFrameConstantBuffer.mAccumulationFrameCount,
-				gPerFrameConstantBuffer.mTime,
+				gConstants.mAccumulationFrameCount,
+				gConstants.mTime,
 				1000.0f / ImGui::GetIO().Framerate,
 				ImGui::GetIO().Framerate,
 				gDisplaySettings.mRenderResolution.x,
@@ -217,8 +217,8 @@ static void sUpdate()
 			{
 				auto align_right = [](float pivot = ImGui::GetCursorPosX()) { ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.65f - (ImGui::GetCursorPosX() - pivot)); };
 	
-				ImGui::InputFloat3("Position", (float*)&gPerFrameConstantBuffer.mCameraPosition);
-				ImGui::InputFloat3("Direction", (float*)&gPerFrameConstantBuffer.mCameraDirection);
+				ImGui::InputFloat3("Position", (float*)&gConstants.mCameraPosition);
+				ImGui::InputFloat3("Direction", (float*)&gConstants.mCameraDirection);
 				ImGui::SliderFloat("Horz Fov", (float*)&gCameraSettings.mHorizontalFovDegree, 30.0f, 160.0f);
 
 				ImGui::PushID("Aperture");
@@ -248,14 +248,14 @@ static void sUpdate()
 				if (ImGui::SmallButton("Reset Exposure"))
 					gCameraSettings.ResetExposure();
 				ImGui::SameLine();
-				ImGui::Text("EV100 = %.2f", gPerFrameConstantBuffer.mEV100);
+				ImGui::Text("EV100 = %.2f", gConstants.mEV100);
 
 				ImGui::Text("ToneMappingMode");
 				for (int i = 0; i < static_cast<int>(ToneMappingMode::Count); i++)
 				{
 					const auto& name = nameof::nameof_enum(static_cast<ToneMappingMode>(i));
 					ImGui::SameLine();
-					ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gPerFrameConstantBuffer.mToneMappingMode), i);
+					ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mToneMappingMode), i);
 				}
 
 				ImGui::TreePop();
@@ -268,9 +268,9 @@ static void sUpdate()
 				{
 					const auto& name = nameof::nameof_enum(static_cast<RecursionMode>(i));
 					ImGui::SameLine();
-					ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gPerFrameConstantBuffer.mRecursionMode), i);
+					ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mRecursionMode), i);
 				}
-				ImGui::SliderInt("Recursion Count Max", reinterpret_cast<int*>(&gPerFrameConstantBuffer.mRecursionCountMax), 0, 8);
+				ImGui::SliderInt("Recursion Count Max", reinterpret_cast<int*>(&gConstants.mRecursionCountMax), 0, 8);
 
 				for (int i = 0; i < static_cast<int>(DebugMode::Count); i++)
 				{
@@ -284,7 +284,7 @@ static void sUpdate()
 					if (i != 0)
 						ImGui::SameLine();
 
-					ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gPerFrameConstantBuffer.mDebugMode), i);
+					ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mDebugMode), i);
 				}
 
 				ImGui::TreePop();
@@ -304,11 +304,11 @@ static void sUpdate()
 					if (i != 0)
 						ImGui::SameLine();
 
-					ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gPerFrameConstantBuffer.mDebugInstanceMode), i);
+					ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mDebugInstanceMode), i);
 				}
 
-				ImGui::SliderInt("DebugInstanceIndex", &gPerFrameConstantBuffer.mDebugInstanceIndex, -1, gScene.GetInstanceCount() - 1);
-				gPerFrameConstantBuffer.mDebugInstanceIndex = glm::clamp(gPerFrameConstantBuffer.mDebugInstanceIndex, -1, gScene.GetInstanceCount() - 1);
+				ImGui::SliderInt("DebugInstanceIndex", &gConstants.mDebugInstanceIndex, -1, gScene.GetInstanceCount() - 1);
+				gConstants.mDebugInstanceIndex = glm::clamp(gConstants.mDebugInstanceIndex, -1, gScene.GetInstanceCount() - 1);
 
 				ImGui::TreePop();
 			}
@@ -404,7 +404,7 @@ static void sUpdate()
 
 			sWaitForLastSubmittedFrame();
 			gScene.RebuildShader();
-			gPerFrameConstantBuffer.mReset = 1;
+			gConstants.mReset = 1;
 
 			gAtmosphere.mRuntime.mBruneton17.mRecomputeRequested = true;
 			gCloud.mRecomputeRequested = true;
@@ -527,14 +527,14 @@ void sLoadCamera()
 {
 	int current_scene_index = static_cast<int>(sCurrentScene);
 
-	gPerFrameConstantBuffer.mCameraPosition = kScenePresets[current_scene_index].mCameraPosition;
-	gPerFrameConstantBuffer.mCameraDirection = glm::normalize(kScenePresets[current_scene_index].mCameraDirection);
+	gConstants.mCameraPosition = kScenePresets[current_scene_index].mCameraPosition;
+	gConstants.mCameraDirection = glm::normalize(kScenePresets[current_scene_index].mCameraDirection);
 	gCameraSettings.mHorizontalFovDegree = kScenePresets[current_scene_index].mHorizontalFovDegree;
 
 	if (gScene.GetSceneContent().mCameraTransform.has_value())
 	{
-		gPerFrameConstantBuffer.mCameraPosition = gScene.GetSceneContent().mCameraTransform.value()[3];
-		gPerFrameConstantBuffer.mCameraDirection = gScene.GetSceneContent().mCameraTransform.value()[2];
+		gConstants.mCameraPosition = gScene.GetSceneContent().mCameraTransform.value()[3];
+		gConstants.mCameraDirection = gScene.GetSceneContent().mCameraTransform.value()[2];
 	}
 
 	if (gScene.GetSceneContent().mFov.has_value())
@@ -549,8 +549,8 @@ void sLoadScene()
 	gScene.Load(kScenePresets[current_scene_index].mPath, kScenePresets[current_scene_index].mTransform);
 	gScene.Build(gCommandList);
 
-	gPerFrameConstantBuffer.mSunAzimuth = kScenePresets[current_scene_index].mSunAzimuth;
-	gPerFrameConstantBuffer.mSunZenith = kScenePresets[current_scene_index].mSunZenith;
+	gConstants.mSunAzimuth = kScenePresets[current_scene_index].mSunAzimuth;
+	gConstants.mSunZenith = kScenePresets[current_scene_index].mSunZenith;
 
 	gAtmosphere.mProfile.mMode = AtmosphereMode::Hillaire20;
 	if (gScene.GetSceneContent().mAtmosphereMode.has_value())
@@ -591,41 +591,41 @@ void sRender()
 		}
 	}
 
-	// Update and Upload PerFrameConstants
+	// Update and Upload Constants
 	{
 		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Upload");
 
 		{
-			gPerFrameConstantBuffer.mEV100 = 
+			gConstants.mEV100 = 
 				glm::log2((gCameraSettings.mExposureControl.mAperture * gCameraSettings.mExposureControl.mAperture) / (1.0f / gCameraSettings.mExposureControl.mInvShutterSpeed) * 100.0f / gCameraSettings.mExposureControl.mSensitivity);
 
-			gPerFrameConstantBuffer.mSunDirection = 
-				glm::vec4(0,1,0,0) * glm::rotate(gPerFrameConstantBuffer.mSunZenith, glm::vec3(0, 0, 1)) * glm::rotate(gPerFrameConstantBuffer.mSunAzimuth + glm::pi<float>() / 2.0f, glm::vec3(0, 1, 0));
+			gConstants.mSunDirection = 
+				glm::vec4(0,1,0,0) * glm::rotate(gConstants.mSunZenith, glm::vec3(0, 0, 1)) * glm::rotate(gConstants.mSunAzimuth + glm::pi<float>() / 2.0f, glm::vec3(0, 1, 0));
 
-			gPerFrameConstantBuffer.mDebugCoord = 
+			gConstants.mDebugCoord = 
 				glm::uvec2(static_cast<glm::uint32>(ImGui::GetMousePos().x), (glm::uint32)ImGui::GetMousePos().y);
 		}
 
 		// Accumulation reset check
 		{
-			static PerFrameConstants sPerFrameCopy = gPerFrameConstantBuffer;
+			static Constants sConstantsCopy = gConstants;
 
 			// Whitelist
-			sPerFrameCopy.mDebugCoord				= gPerFrameConstantBuffer.mDebugCoord;
-			sPerFrameCopy.mAccumulationFrameCount	= gPerFrameConstantBuffer.mAccumulationFrameCount;
-			sPerFrameCopy.mFrameIndex				= gPerFrameConstantBuffer.mFrameIndex;
-			sPerFrameCopy.mTime						= gPerFrameConstantBuffer.mTime;
+			sConstantsCopy.mDebugCoord				= gConstants.mDebugCoord;
+			sConstantsCopy.mAccumulationFrameCount	= gConstants.mAccumulationFrameCount;
+			sConstantsCopy.mFrameIndex				= gConstants.mFrameIndex;
+			sConstantsCopy.mTime						= gConstants.mTime;
 
-			if (gPerFrameConstantBuffer.mReset == 0 && memcmp(&sPerFrameCopy, &gPerFrameConstantBuffer, sizeof(PerFrameConstants)) == 0)
-				gPerFrameConstantBuffer.mAccumulationFrameCount++;
+			if (gConstants.mReset == 0 && memcmp(&sConstantsCopy, &gConstants, sizeof(Constants)) == 0)
+				gConstants.mAccumulationFrameCount++;
 			else
-				gPerFrameConstantBuffer.mAccumulationFrameCount = 1;
+				gConstants.mAccumulationFrameCount = 1;
 
-			gPerFrameConstantBuffer.mReset = 0;
-			sPerFrameCopy = gPerFrameConstantBuffer;
+			gConstants.mReset = 0;
+			sConstantsCopy = gConstants;
 		}
 		
-		memcpy(frame_context.mConstantUploadBufferPointer, &gPerFrameConstantBuffer, sizeof(gPerFrameConstantBuffer));
+		memcpy(frame_context.mConstantUploadBufferPointer, &gConstants, sizeof(gConstants));
 
 		gBarrierTransition(gCommandList, gConstantGPUBuffer.Get(), D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, D3D12_RESOURCE_STATE_COPY_DEST);
 		gCommandList->CopyResource(gConstantGPUBuffer.Get(), frame_context.mConstantUploadBuffer.Get());
@@ -701,8 +701,8 @@ void sRender()
 		gCommandList->Close();
 		gCommandQueue->ExecuteCommandLists(1, reinterpret_cast<ID3D12CommandList* const*>(&gCommandList));
 
-		gPerFrameConstantBuffer.mTime += ImGui::GetIO().DeltaTime;
-		gPerFrameConstantBuffer.mFrameIndex++;
+		gConstants.mTime += ImGui::GetIO().DeltaTime;
+		gConstants.mFrameIndex++;
 	}
 
 	// Dump Texture
@@ -832,7 +832,7 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		}
 	}
 
-	// PerFrameConstants
+	// Constants
 	for (UINT i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
 	{
 		std::wstring name;
@@ -846,14 +846,27 @@ static bool sCreateDeviceD3D(HWND hWnd)
 
 		// DescriptorHeap
 		{
-			gFrameContexts[i].mDescriptorHeap.Initialize();
+			gFrameContexts[i].mViewDescriptorHeap.Initialize();
 			name = L"FrameContext.DescriptorHeap_" + std::to_wstring(i);
-			gFrameContexts[i].mDescriptorHeap.mHeap->SetName(name.c_str());
+			gFrameContexts[i].mViewDescriptorHeap.mHeap->SetName(name.c_str());
+
+			gFrameContexts[i].mSamplerDescriptorHeap.Initialize();
+			name = L"FrameContext.SamplerDescriptorHeap_" + std::to_wstring(i);
+			gFrameContexts[i].mSamplerDescriptorHeap.mHeap->SetName(name.c_str());
+
+			D3D12_SAMPLER_DESC sampler_descs[] =
+			{
+				{.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR, .AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP, .AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP, .AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP, .MipLODBias = 0, .MaxAnisotropy = 0, .ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS, .BorderColor = {0,0,0,0}, .MinLOD = 0, .MaxLOD = D3D12_FLOAT32_MAX },
+				{.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR, .AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP, .AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP, .AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP, .MipLODBias = 0, .MaxAnisotropy = 0, .ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS, .BorderColor = {0,0,0,0}, .MinLOD = 0, .MaxLOD = D3D12_FLOAT32_MAX },
+			};
+			static_assert(ARRAYSIZE(sampler_descs) == (int)SamplerDescriptorIndex::Count);
+			for (int sampler_index = 0; sampler_index < (int)SamplerDescriptorIndex::Count; sampler_index++)
+				gDevice->CreateSampler(&sampler_descs[sampler_index], gFrameContexts[i].mSamplerDescriptorHeap.GetHandle((SamplerDescriptorIndex)i));
 		}
 
 		// UploadBuffer
 		{
-			D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(gAlignUp(static_cast<UINT>(sizeof(PerFrameConstants)), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
+			D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(gAlignUp(static_cast<UINT>(sizeof(Constants)), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
 			D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
 
 			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gFrameContexts[i].mConstantUploadBuffer)));
@@ -865,11 +878,11 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		}
 	}
 
-	// PerFrameConstants (GPU)
+	// Constants (GPU)
 	{
 		// Buffer
 		{
-			D3D12_RESOURCE_DESC resource_desc = gGetBufferResourceDesc(gAlignUp(static_cast<UINT>(sizeof(PerFrameConstants)), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
+			D3D12_RESOURCE_DESC resource_desc = gGetBufferResourceDesc(gAlignUp(static_cast<UINT>(sizeof(Constants)), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
 			D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
 
 			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&gConstantGPUBuffer)));
@@ -881,7 +894,7 @@ static bool sCreateDeviceD3D(HWND hWnd)
 			desc.BufferLocation = gConstantGPUBuffer->GetGPUVirtualAddress();
 			for (int i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
 			{
-				D3D12_CPU_DESCRIPTOR_HANDLE handle = gFrameContexts[i].mDescriptorHeap.AllocateStatic(DescriptorIndex::PerFrameConstants);
+				D3D12_CPU_DESCRIPTOR_HANDLE handle = gFrameContexts[i].mViewDescriptorHeap.GetHandle(ViewDescriptorIndex::Constants);
 				gDevice->CreateConstantBufferView(&desc, handle);
 			}
 		}

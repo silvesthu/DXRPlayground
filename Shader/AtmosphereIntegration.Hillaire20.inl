@@ -578,25 +578,25 @@ void UvToLutTransmittanceParams(AtmosphereParameters Atmosphere, out float viewH
 AtmosphereParameters GetAtmosphereParameters()
 {
 	AtmosphereParameters Parameters;
-	Parameters.AbsorptionExtinction = mPerFrameConstants.mAtmosphere.mOzoneExtinction;
+	Parameters.AbsorptionExtinction = mConstants.mAtmosphere.mOzoneExtinction;
 
 	// Traslation from Bruneton2017 parameterisation.
-	Parameters.RayleighDensityExpScale = mPerFrameConstants.mAtmosphere.mRayleighDensity.mLayer1.mExpScale;
-	Parameters.MieDensityExpScale = mPerFrameConstants.mAtmosphere.mMieDensity.mLayer1.mExpScale;
-	Parameters.AbsorptionDensity0LayerWidth = mPerFrameConstants.mAtmosphere.mOzoneDensity.mLayer0.mWidth;
-	Parameters.AbsorptionDensity0ConstantTerm = mPerFrameConstants.mAtmosphere.mOzoneDensity.mLayer0.mConstantTerm;
-	Parameters.AbsorptionDensity0LinearTerm = mPerFrameConstants.mAtmosphere.mOzoneDensity.mLayer0.mLinearTerm;
-	Parameters.AbsorptionDensity1ConstantTerm = mPerFrameConstants.mAtmosphere.mOzoneDensity.mLayer1.mConstantTerm;
-	Parameters.AbsorptionDensity1LinearTerm = mPerFrameConstants.mAtmosphere.mOzoneDensity.mLayer1.mLinearTerm;
+	Parameters.RayleighDensityExpScale = mConstants.mAtmosphere.mRayleighDensity.mLayer1.mExpScale;
+	Parameters.MieDensityExpScale = mConstants.mAtmosphere.mMieDensity.mLayer1.mExpScale;
+	Parameters.AbsorptionDensity0LayerWidth = mConstants.mAtmosphere.mOzoneDensity.mLayer0.mWidth;
+	Parameters.AbsorptionDensity0ConstantTerm = mConstants.mAtmosphere.mOzoneDensity.mLayer0.mConstantTerm;
+	Parameters.AbsorptionDensity0LinearTerm = mConstants.mAtmosphere.mOzoneDensity.mLayer0.mLinearTerm;
+	Parameters.AbsorptionDensity1ConstantTerm = mConstants.mAtmosphere.mOzoneDensity.mLayer1.mConstantTerm;
+	Parameters.AbsorptionDensity1LinearTerm = mConstants.mAtmosphere.mOzoneDensity.mLayer1.mLinearTerm;
 
-	Parameters.MiePhaseG = mPerFrameConstants.mAtmosphere.mMiePhaseFunctionG;
-	Parameters.RayleighScattering = mPerFrameConstants.mAtmosphere.mRayleighScattering;
-	Parameters.MieScattering = mPerFrameConstants.mAtmosphere.mMieScattering;
-	Parameters.MieAbsorption = mPerFrameConstants.mAtmosphere.mMieExtinction - mPerFrameConstants.mAtmosphere.mMieScattering;
-	Parameters.MieExtinction = mPerFrameConstants.mAtmosphere.mMieExtinction;
-	Parameters.GroundAlbedo = mPerFrameConstants.mAtmosphere.mGroundAlbedo;
-	Parameters.BottomRadius = mPerFrameConstants.mAtmosphere.mBottomRadius;
-	Parameters.TopRadius = mPerFrameConstants.mAtmosphere.mTopRadius;
+	Parameters.MiePhaseG = mConstants.mAtmosphere.mMiePhaseFunctionG;
+	Parameters.RayleighScattering = mConstants.mAtmosphere.mRayleighScattering;
+	Parameters.MieScattering = mConstants.mAtmosphere.mMieScattering;
+	Parameters.MieAbsorption = mConstants.mAtmosphere.mMieExtinction - mConstants.mAtmosphere.mMieScattering;
+	Parameters.MieExtinction = mConstants.mAtmosphere.mMieExtinction;
+	Parameters.GroundAlbedo = mConstants.mAtmosphere.mGroundAlbedo;
+	Parameters.BottomRadius = mConstants.mAtmosphere.mBottomRadius;
+	Parameters.TopRadius = mConstants.mAtmosphere.mTopRadius;
 	return Parameters;
 }
 
@@ -817,7 +817,7 @@ void SkyViewLut(
 	float2 pixPos = inDispatchThreadID.xy + 0.5; 		// half pixel offset
 	float2 uv = pixPos / dimensions;
 
-	float3 camera_position = mPerFrameConstants.mCameraPosition.xyz;
+	float3 camera_position = mConstants.mCameraPosition.xyz;
 	camera_position.y = max(camera_position.y, 0);		// Keep observer position above ground
 	float3 WorldPos = camera_position + float3(0, Atmosphere.BottomRadius, 0);
 	float viewHeight = length(WorldPos);
@@ -860,8 +860,8 @@ void SkyViewLut(
 	SingleScatteringResult ss = IntegrateScatteredLuminance(pixPos, WorldPos, WorldDir, SunDir, Atmosphere, ground, SampleCountIni, DepthBufferValue, VariableSampleCount, MieRayPhase);
 
 	float3 L = ss.L;
-	if (mPerFrameConstants.mAtmosphere.mHillaire20SkyViewInLuminance)
-		L *= kSolarKW2LM * kPreExposure * mPerFrameConstants.mAtmosphere.mSolarIrradiance;
+	if (mConstants.mAtmosphere.mHillaire20SkyViewInLuminance)
+		L *= kSolarKW2LM * kPreExposure * mConstants.mAtmosphere.mSolarIrradiance;
 	SkyViewLutTexUAV[inDispatchThreadID.xy] = float4(L, 1); // match
 
 	// Debug
@@ -894,20 +894,20 @@ void CameraVolumes(
 	float2 d = ((pixPos / dims) * 2.f - 1.f); // 0~1 => -1~1
 	d.y = -d.y;
 
-	float3 right = mPerFrameConstants.mCameraRightExtend.xyz;
-	float3 up = mPerFrameConstants.mCameraUpExtend.xyz;
+	float3 right = mConstants.mCameraRightExtend.xyz;
+	float3 up = mConstants.mCameraUpExtend.xyz;
 
 	// Debug
 	right = -right; // handness?
 
-	float3 WorldDir = normalize(mPerFrameConstants.mCameraDirection.xyz + right * d.x + up * d.y);
+	float3 WorldDir = normalize(mConstants.mCameraDirection.xyz + right * d.x + up * d.y);
 	WorldDir.xyz = WorldDir.xzy; // Y-up to Z-up
-	float3 SunDir = mPerFrameConstants.mSunDirection.xzy; // Y-up to Z-up
+	float3 SunDir = mConstants.mSunDirection.xzy; // Y-up to Z-up
 
 	// Debug
 	float3 WorldDir_Raw = WorldDir;
 
-	float3 camera = mPerFrameConstants.mCameraPosition.xzy; // Y-up to Z-up
+	float3 camera = mConstants.mCameraPosition.xzy; // Y-up to Z-up
 
 	// Debug
 	camera.xy = 0; // flat
@@ -1001,7 +1001,7 @@ void CameraVolumes(
 	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(WorldPos, 1.0); // match
 	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(SunDir, 1.0); // match
 	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(SampleCountIni.xxx, 1.0); // match
-	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(mPerFrameConstants.mCameraDirection.xzy, 1.0); // match
+	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(mConstants.mCameraDirection.xzy, 1.0); // match
 	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(WorldDir_Raw, 1.0); // match	
 	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(newWorldPos, 1.0); // almost match
 	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(WorldDir, 1.0); // match
@@ -1021,7 +1021,7 @@ void GetSkyRadiance(out float3 outSkyRadiance, out float3 outTransmittanceToTop)
 
 	float r = length(camera);
 	float rmu = dot(camera, view_ray);
-	float distance_to_top_atmosphere_boundary = -rmu - sqrt(rmu * rmu - r * r + mPerFrameConstants.mAtmosphere.mTopRadius * mPerFrameConstants.mAtmosphere.mTopRadius);
+	float distance_to_top_atmosphere_boundary = -rmu - sqrt(rmu * rmu - r * r + mConstants.mAtmosphere.mTopRadius * mConstants.mAtmosphere.mTopRadius);
 
 	if (distance_to_top_atmosphere_boundary > 0.0) 
 	{
@@ -1029,10 +1029,10 @@ void GetSkyRadiance(out float3 outSkyRadiance, out float3 outTransmittanceToTop)
 
 		// Move camera to top of atmosphere along view direction
 		camera = camera + view_ray * distance_to_top_atmosphere_boundary;
-		r = mPerFrameConstants.mAtmosphere.mTopRadius;
+		r = mConstants.mAtmosphere.mTopRadius;
 		rmu += distance_to_top_atmosphere_boundary;
 	}
-	else if (r > mPerFrameConstants.mAtmosphere.mTopRadius) 
+	else if (r > mConstants.mAtmosphere.mTopRadius) 
 	{
 		// No hit
 		return;
@@ -1062,10 +1062,10 @@ void GetSkyRadiance(out float3 outSkyRadiance, out float3 outTransmittanceToTop)
 	SkyViewLutParamsToUv(Atmosphere, ray_r_mu_intersects_ground, mu, lightViewCosAngle, r, uv);
 	outSkyRadiance = SkyViewLutTexSRV.SampleLevel(samplerLinearClamp, uv, 0).rgb;
 
-	if (mPerFrameConstants.mAtmosphere.mHillaire20SkyViewInLuminance)
+	if (mConstants.mAtmosphere.mHillaire20SkyViewInLuminance)
 		outSkyRadiance = outSkyRadiance / kPreExposure * kSolarLM2KW; // PreExposed lm/m^2 -> kW/m^2
 	else
-		outSkyRadiance *= mPerFrameConstants.mAtmosphere.mSolarIrradiance;
+		outSkyRadiance *= mConstants.mAtmosphere.mSolarIrradiance;
 
 	// Debug
 	// outSkyRadiance = 0.1234;

@@ -353,13 +353,13 @@ public:
 			Shader mSentinelShader								= Shader();
 			std::span<Shader> mShaders							= std::span<Shader>(&mComputeTransmittanceShader, &mSentinelShader);
 
-			Texture mTransmittanceTexture						= Texture().Width(256).Height(64).Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(DescriptorIndex::Bruneton17TransmittanceUAV).Name("Atmosphere.Bruneton17.Transmittance");
-			Texture mDeltaIrradianceTexture						= Texture().Width(64).Height(16).Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(DescriptorIndex::Bruneton17DeltaIrradianceUAV).Name("Atmosphere.Bruneton17.DeltaIrradiance");
-			Texture mIrradianceTexture							= Texture().Width(64).Height(16).Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(DescriptorIndex::Bruneton17IrradianceUAV).Name("Atmosphere.Bruneton17.Irradiance");
-			Texture mDeltaRayleighScatteringTexture				= Texture().Format(DXGI_FORMAT_R16G16B16A16_FLOAT).UAVIndex(DescriptorIndex::Bruneton17DeltaRayleighScatteringUAV).Name("Atmosphere.Bruneton17.DeltaRayleighScattering");
-			Texture mDeltaMieScatteringTexture					= Texture().Format(DXGI_FORMAT_R16G16B16A16_FLOAT).UAVIndex(DescriptorIndex::Bruneton17DeltaMieScatteringUAV).Name("Atmosphere.Bruneton17.DeltaMieScattering");
-			Texture mScatteringTexture							= Texture().Format(DXGI_FORMAT_R16G16B16A16_FLOAT).UAVIndex(DescriptorIndex::Bruneton17ScatteringUAV).Name("Atmosphere.Bruneton17.Scattering");
-			Texture mDeltaScatteringDensityTexture				= Texture().Format(DXGI_FORMAT_R16G16B16A16_FLOAT).UAVIndex(DescriptorIndex::Bruneton17DeltaScatteringDensityUAV).Name("Atmosphere.Bruneton17.DeltaScatteringDensity");
+			Texture mTransmittanceTexture						= Texture().Width(256).Height(64).Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(ViewDescriptorIndex::Bruneton17TransmittanceUAV).Name("Atmosphere.Bruneton17.Transmittance");
+			Texture mDeltaIrradianceTexture						= Texture().Width(64).Height(16).Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(ViewDescriptorIndex::Bruneton17DeltaIrradianceUAV).Name("Atmosphere.Bruneton17.DeltaIrradiance");
+			Texture mIrradianceTexture							= Texture().Width(64).Height(16).Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(ViewDescriptorIndex::Bruneton17IrradianceUAV).Name("Atmosphere.Bruneton17.Irradiance");
+			Texture mDeltaRayleighScatteringTexture				= Texture().Format(DXGI_FORMAT_R16G16B16A16_FLOAT).UAVIndex(ViewDescriptorIndex::Bruneton17DeltaRayleighScatteringUAV).Name("Atmosphere.Bruneton17.DeltaRayleighScattering");
+			Texture mDeltaMieScatteringTexture					= Texture().Format(DXGI_FORMAT_R16G16B16A16_FLOAT).UAVIndex(ViewDescriptorIndex::Bruneton17DeltaMieScatteringUAV).Name("Atmosphere.Bruneton17.DeltaMieScattering");
+			Texture mScatteringTexture							= Texture().Format(DXGI_FORMAT_R16G16B16A16_FLOAT).UAVIndex(ViewDescriptorIndex::Bruneton17ScatteringUAV).Name("Atmosphere.Bruneton17.Scattering");
+			Texture mDeltaScatteringDensityTexture				= Texture().Format(DXGI_FORMAT_R16G16B16A16_FLOAT).UAVIndex(ViewDescriptorIndex::Bruneton17DeltaScatteringDensityUAV).Name("Atmosphere.Bruneton17.DeltaScatteringDensity");
 
 			Texture mSentinelTexture							= Texture();
 			std::span<Texture> mTextures						= std::span<Texture>(&mTransmittanceTexture, &mSentinelTexture);
@@ -395,23 +395,23 @@ public:
 			Shader mSentinelShader								= Shader();
 			std::span<Shader> mShaders							= std::span<Shader>(&mTransLUTShader, &mSentinelShader);
 
-			Texture mTransmittanceTex							= Texture().Width(256).Height(64).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).UAVIndex(DescriptorIndex::Hillaire20TransmittanceTexUAV).Name("Atmosphere.Hillaire20.TransmittanceTex");
-			Texture mMultiScattTex								= Texture().Width(32).Height(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).UAVIndex(DescriptorIndex::Hillaire20MultiScattUAV).Name("Atmosphere.Hillaire20.MultiScattTex");
-			Texture mSkyViewLut									= Texture().Width(192).Height(108).Format(DXGI_FORMAT_R11G11B10_FLOAT).UAVIndex(DescriptorIndex::Hillaire20SkyViewLutUAV).Name("Atmosphere.Hillaire20.SkyViewLutTex");
-			Texture mAtmosphereCameraScatteringVolume			= Texture().Width(32).Height(32).Depth(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).UAVIndex(DescriptorIndex::Hillaire20AtmosphereCameraScatteringVolumeUAV).Name("Atmosphere.Hillaire20.AtmosphereCameraScatteringVolume");
+			Texture mTransmittanceTex							= Texture().Width(256).Height(64).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).UAVIndex(ViewDescriptorIndex::Hillaire20TransmittanceTexUAV).Name("Atmosphere.Hillaire20.TransmittanceTex");
+			Texture mMultiScattTex								= Texture().Width(32).Height(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).UAVIndex(ViewDescriptorIndex::Hillaire20MultiScattUAV).Name("Atmosphere.Hillaire20.MultiScattTex");
+			Texture mSkyViewLut									= Texture().Width(192).Height(108).Format(DXGI_FORMAT_R11G11B10_FLOAT).UAVIndex(ViewDescriptorIndex::Hillaire20SkyViewLutUAV).Name("Atmosphere.Hillaire20.SkyViewLutTex");
+			Texture mAtmosphereCameraScatteringVolume			= Texture().Width(32).Height(32).Depth(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).UAVIndex(ViewDescriptorIndex::Hillaire20AtmosphereCameraScatteringVolumeUAV).Name("Atmosphere.Hillaire20.AtmosphereCameraScatteringVolume");
 
 			Texture mSentinelTexture							= Texture();
 			std::span<Texture> mTextures						= std::span<Texture>(&mTransmittanceTex, &mSentinelTexture);
 
-			Texture mTransmittanceTexExpected					= Texture().Width(256).Height(64).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).UAVIndex(DescriptorIndex::ValidationHillaire20TransmittanceTexExpectedUAV).Name("Atmosphere.Validation.Hillaire20.TransmittanceTex.Expected").Path(L"Asset/Validation/TransmittanceTex.dds");
-			Texture mMultiScattExpected							= Texture().Width(32).Height(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).UAVIndex(DescriptorIndex::ValidationHillaire20MultiScattExpectedUAV).Name("Atmosphere.Validation.Hillaire20.MultiScatt.Expected").Path(L"Asset/Validation/MultiScattTex.dds");
-			Texture mSkyViewLutExpected							= Texture().Width(192).Height(108).Format(DXGI_FORMAT_R11G11B10_FLOAT).UAVIndex(DescriptorIndex::ValidationHillaire20SkyViewLutExpectedUAV).Name("Atmosphere.Validation.Hillaire20.SkyViewLut.Expected").Path(L"Asset/Validation/SkyViewLutTex.dds");
-			Texture mAtmosphereCameraScatteringVolumeExpected	= Texture().Width(32).Height(32).Depth(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).UAVIndex(DescriptorIndex::ValidationHillaire20AtmosphereCameraScatteringVolumeExpectedUAV).Name("Atmosphere.Validation.Hillaire20.AtmosphereCameraScatteringVolume.Expected").Path(L"Asset/Validation/AtmosphereCameraScatteringVolume.dds");
+			Texture mTransmittanceTexExpected					= Texture().Width(256).Height(64).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).UAVIndex(ViewDescriptorIndex::ValidationHillaire20TransmittanceTexExpectedUAV).Name("Atmosphere.Validation.Hillaire20.TransmittanceTex.Expected").Path(L"Asset/Validation/TransmittanceTex.dds");
+			Texture mMultiScattExpected							= Texture().Width(32).Height(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).UAVIndex(ViewDescriptorIndex::ValidationHillaire20MultiScattExpectedUAV).Name("Atmosphere.Validation.Hillaire20.MultiScatt.Expected").Path(L"Asset/Validation/MultiScattTex.dds");
+			Texture mSkyViewLutExpected							= Texture().Width(192).Height(108).Format(DXGI_FORMAT_R11G11B10_FLOAT).UAVIndex(ViewDescriptorIndex::ValidationHillaire20SkyViewLutExpectedUAV).Name("Atmosphere.Validation.Hillaire20.SkyViewLut.Expected").Path(L"Asset/Validation/SkyViewLutTex.dds");
+			Texture mAtmosphereCameraScatteringVolumeExpected	= Texture().Width(32).Height(32).Depth(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).UAVIndex(ViewDescriptorIndex::ValidationHillaire20AtmosphereCameraScatteringVolumeExpectedUAV).Name("Atmosphere.Validation.Hillaire20.AtmosphereCameraScatteringVolume.Expected").Path(L"Asset/Validation/AtmosphereCameraScatteringVolume.dds");
 
-			Texture mTransmittanceTexDiff						= Texture().Width(256).Height(64).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).UAVIndex(DescriptorIndex::ValidationHillaire20TransmittanceTexDiffUAV).Name("Atmosphere.Validation.Hillaire20.TransmittanceTexDiff");
-			Texture mMultiScattDiff								= Texture().Width(32).Height(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).UAVIndex(DescriptorIndex::ValidationHillaire20MultiScattDiffUAV).Name("Atmosphere.Validation.Hillaire20.MultiScattDiff");
-			Texture mSkyViewLutDiff								= Texture().Width(192).Height(108).Format(DXGI_FORMAT_R11G11B10_FLOAT).UAVIndex(DescriptorIndex::ValidationHillaire20SkyViewLutDiffUAV).Name("Atmosphere.Validation.Hillaire20.SkyViewLutDiff");
-			Texture mAtmosphereCameraScatteringVolumeDiff		= Texture().Width(32).Height(32).Depth(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).UAVIndex(DescriptorIndex::ValidationHillaire20AtmosphereCameraScatteringVolumeDiffUAV).Name("Atmosphere.Validation.Hillaire20.AtmosphereCameraScatteringVolumeDiff");
+			Texture mTransmittanceTexDiff						= Texture().Width(256).Height(64).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).UAVIndex(ViewDescriptorIndex::ValidationHillaire20TransmittanceTexDiffUAV).Name("Atmosphere.Validation.Hillaire20.TransmittanceTexDiff");
+			Texture mMultiScattDiff								= Texture().Width(32).Height(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).UAVIndex(ViewDescriptorIndex::ValidationHillaire20MultiScattDiffUAV).Name("Atmosphere.Validation.Hillaire20.MultiScattDiff");
+			Texture mSkyViewLutDiff								= Texture().Width(192).Height(108).Format(DXGI_FORMAT_R11G11B10_FLOAT).UAVIndex(ViewDescriptorIndex::ValidationHillaire20SkyViewLutDiffUAV).Name("Atmosphere.Validation.Hillaire20.SkyViewLutDiff");
+			Texture mAtmosphereCameraScatteringVolumeDiff		= Texture().Width(32).Height(32).Depth(32).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).UAVIndex(ViewDescriptorIndex::ValidationHillaire20AtmosphereCameraScatteringVolumeDiffUAV).Name("Atmosphere.Validation.Hillaire20.AtmosphereCameraScatteringVolumeDiff");
 
 			Texture mValidationSentinelTexture					= Texture();
 			std::span<Texture> mValidationTextures				= std::span<Texture>(&mTransmittanceTexExpected, &mValidationSentinelTexture);
@@ -434,7 +434,7 @@ public:
 			Shader mSentinelShader								= Shader();
 			std::span<Shader> mShaders							= std::span<Shader>(&mSentinelShader, &mSentinelShader);
 
-			Texture mSkyView									= Texture().Width(192).Height(108).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).UAVIndex(DescriptorIndex::Wilkie21SkyViewUAV).Name("Atmosphere.Wilkie21.SkyView");
+			Texture mSkyView									= Texture().Width(192).Height(108).Format(DXGI_FORMAT_R16G16B16A16_FLOAT).UAVIndex(ViewDescriptorIndex::Wilkie21SkyViewUAV).Name("Atmosphere.Wilkie21.SkyView");
 
 			Texture mSentinelTexture							= Texture();
 			std::span<Texture> mTextures						= std::span<Texture>(&mSkyView, &mSentinelTexture);

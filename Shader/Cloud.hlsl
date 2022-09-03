@@ -10,8 +10,8 @@ void CloudShapeNoiseCS(
 	uint3 inDispatchThreadID : SV_DispatchThreadID,
 	uint inGroupIndex : SV_GroupIndex)
 {
-	RWTexture2D<float4> input_UAV = ResourceDescriptorHeap[(int)DescriptorIndex::CloudShapeNoise2DUAV];
-	RWTexture3D<float4> output_UAV = ResourceDescriptorHeap[(int)DescriptorIndex::CloudShapeNoise3DUAV];
+	RWTexture2D<float4> input_UAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::CloudShapeNoise2DUAV];
+	RWTexture3D<float4> output_UAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::CloudShapeNoise3DUAV];
 	
 	uint2 coords = inDispatchThreadID.xy;
 	coords.x += inDispatchThreadID.z * 128;
@@ -28,8 +28,8 @@ void CloudErosionNoiseCS(
 	uint3 inDispatchThreadID : SV_DispatchThreadID,
 	uint inGroupIndex : SV_GroupIndex)
 {
-	RWTexture2D<float4> input_UAV = ResourceDescriptorHeap[(int)DescriptorIndex::CloudErosionNoise2DUAV];
-	RWTexture3D<float4> output_UAV = ResourceDescriptorHeap[(int)DescriptorIndex::CloudErosionNoise3DUAV];
+	RWTexture2D<float4> input_UAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::CloudErosionNoise2DUAV];
+	RWTexture3D<float4> output_UAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::CloudErosionNoise3DUAV];
 	
 	uint2 coords = inDispatchThreadID.xy;
 	coords.x += inDispatchThreadID.z * 32;

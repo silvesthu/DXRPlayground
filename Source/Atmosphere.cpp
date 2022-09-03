@@ -28,7 +28,7 @@ void Atmosphere::Update()
 
 void Atmosphere::UpdateProfile()
 {
-	AtmosphereConstants& constants				= gPerFrameConstantBuffer.mAtmosphere;
+	AtmosphereConstants& constants				= gConstants.mAtmosphere;
 
 	auto inv_m_to_inv_km						= [](glm::f64 inInvM) { return static_cast<float>(inInvM * 1000.0); };
 
@@ -93,15 +93,15 @@ void Atmosphere::UpdateProfile()
 
 void Atmosphere::Runtime::Bruneton17::Update(const Profile& inProfile)
 {
+	// Check if recompute is required
 	static Atmosphere::Profile sAtmosphereProfileCache = inProfile;
 	if (memcmp(&sAtmosphereProfileCache, &inProfile, sizeof(Atmosphere::Profile)) != 0)
 	{
 		sAtmosphereProfileCache = inProfile;
-
-		// Recompute
 		mRecomputeRequested = true;
 	}
 
+	// Recompute
 	if (mRecomputeRequested || mRecomputeEveryFrame)
 	{
 		ComputeTransmittance();
@@ -112,9 +112,8 @@ void Atmosphere::Runtime::Bruneton17::Update(const Profile& inProfile)
 			ComputeMultipleScattering(scattering_order);
 
 		// Reset accumulation
-		gPerFrameConstantBuffer.mReset = true;
+		gConstants.mReset = true;
 	}
-
 	mRecomputeRequested = false;
 }
 
@@ -216,9 +215,9 @@ void Atmosphere::Runtime::Hillaire20::Validate()
 		Shader& shader = inExpected.mDepth == 1 ? gDiffTexture2DShader : gDiffTexture3DShader;
 		shader.SetupCompute(nullptr, true);
 
-		gAssert(inComputed.mUAVIndex > DescriptorIndex::NullCount);
-		gAssert(inExpected.mUAVIndex > DescriptorIndex::NullCount);
-		gAssert(inOutput.mUAVIndex > DescriptorIndex::NullCount);
+		gAssert(inComputed.mUAVIndex != ViewDescriptorIndex::Count);
+		gAssert(inExpected.mUAVIndex != ViewDescriptorIndex::Count);
+		gAssert(inOutput.mUAVIndex != ViewDescriptorIndex::Count);
 
 		gCommandList->SetComputeRoot32BitConstant(0, static_cast<UINT>(inComputed.mUAVIndex), 0);
 		gCommandList->SetComputeRoot32BitConstant(0, static_cast<UINT>(inExpected.mUAVIndex), 1);
@@ -366,9 +365,9 @@ void Atmosphere::ImGuiShowMenus()
 
 	if (ImGui::TreeNodeEx("Sun"))
 	{
-		ImGui::SliderFloat("Luminance Scale", &gPerFrameConstantBuffer.mSolarLuminanceScale, 0.0f, 1.0f);
-		ImGui::SliderAngle("Azimuth Angle", &gPerFrameConstantBuffer.mSunAzimuth, 0.0f, 360.0f);
-		ImGui::SliderAngle("Zenith Angle", &gPerFrameConstantBuffer.mSunZenith, 0.0f, 180.0f);
+		ImGui::SliderFloat("Luminance Scale", &gConstants.mSolarLuminanceScale, 0.0f, 1.0f);
+		ImGui::SliderAngle("Azimuth Angle", &gConstants.mSunAzimuth, 0.0f, 360.0f);
+		ImGui::SliderAngle("Zenith Angle", &gConstants.mSunZenith, 0.0f, 180.0f);
 
 		ImGui::Text(mProfile.mShowSolarIrradianceAsLuminance ? "Solar Irradiance (klm)" : "Solar Irradiance (kW)");
 		float scale = mProfile.mShowSolarIrradianceAsLuminance ? kSolarLuminousEfficacy : 1.0f;
@@ -670,8 +669,8 @@ void Atmosphere::Runtime::Wilkie21::Update(const Profile& inProfile)
 	if (!mBakeRequested)
 		return;
 	
-	double sun_elevation			= glm::pi<double>() / 2.0 - gPerFrameConstantBuffer.mSunZenith;
-	double sun_azimuth				= gPerFrameConstantBuffer.mSunAzimuth;
+	double sun_elevation			= glm::pi<double>() / 2.0 - gConstants.mSunZenith;
+	double sun_azimuth				= gConstants.mSunAzimuth;
 	glm::dvec3 view_direction		= glm::dvec3(0, 0, 1);
 	glm::dvec3 up_direction			= glm::dvec3(0, 0, 1);	
 	double theta					= 0.0;

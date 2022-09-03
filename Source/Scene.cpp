@@ -735,7 +735,7 @@ void Scene::CreateShaderResource()
 		{
 			D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
 			desc.BufferLocation = gConstantGPUBuffer->GetGPUVirtualAddress();
-			desc.SizeInBytes = gAlignUp((UINT)sizeof(PerFrameConstants), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+			desc.SizeInBytes = gAlignUp((UINT)sizeof(Constants), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
 			gDevice->CreateConstantBufferView(&desc, handle);
 
 			handle.ptr += increment_size;

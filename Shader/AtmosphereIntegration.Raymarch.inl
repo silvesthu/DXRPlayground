@@ -30,7 +30,7 @@ float optic(float3 p, float3 q, DensityProfile density_profile)
 	float sum = 0.0;
 	for (int i = 0; i < kOutScatteringStepCount; i++) 
 	{
-		sum += GetProfileDensity(density_profile, length(v) - mPerFrameConstants.mAtmosphere.mBottomRadius);
+		sum += GetProfileDensity(density_profile, length(v) - mConstants.mAtmosphere.mBottomRadius);
 		v += s;
 	}
 	sum *= length(s);
@@ -57,26 +57,26 @@ float3 in_scatter(float3 o, float3 dir, float2 e, float3 l)
 	
 	for (int i = 0; i < kInScatteringStepCount; i++, v += s)
 	{
-		float d_ray = GetProfileDensity(mPerFrameConstants.mAtmosphere.mRayleighDensity, length(v) - mPerFrameConstants.mAtmosphere.mBottomRadius) * len;
-		float d_mie = GetProfileDensity(mPerFrameConstants.mAtmosphere.mMieDensity, length(v) - mPerFrameConstants.mAtmosphere.mBottomRadius) * len;
-		float d_ozone = GetProfileDensity(mPerFrameConstants.mAtmosphere.mOzoneDensity, length(v) - mPerFrameConstants.mAtmosphere.mBottomRadius) * len;
+		float d_ray = GetProfileDensity(mConstants.mAtmosphere.mRayleighDensity, length(v) - mConstants.mAtmosphere.mBottomRadius) * len;
+		float d_mie = GetProfileDensity(mConstants.mAtmosphere.mMieDensity, length(v) - mConstants.mAtmosphere.mBottomRadius) * len;
+		float d_ozone = GetProfileDensity(mConstants.mAtmosphere.mOzoneDensity, length(v) - mConstants.mAtmosphere.mBottomRadius) * len;
 		
 		n_ray0 += d_ray;
 		n_mie0 += d_mie;
 		n_ozone0 += d_ozone;
 		
-		float2 f = ray_vs_sphere(v, l, mPerFrameConstants.mAtmosphere.mTopRadius);
+		float2 f = ray_vs_sphere(v, l, mConstants.mAtmosphere.mTopRadius);
 		float3 u = v + l * f.y;
 
-		float n_ray1 = optic(v, u, mPerFrameConstants.mAtmosphere.mRayleighDensity);
-		float n_mie1 = optic(v, u, mPerFrameConstants.mAtmosphere.mMieDensity);
-		float n_ozone1 = optic(v, u, mPerFrameConstants.mAtmosphere.mOzoneDensity);
+		float n_ray1 = optic(v, u, mConstants.mAtmosphere.mRayleighDensity);
+		float n_mie1 = optic(v, u, mConstants.mAtmosphere.mMieDensity);
+		float n_ozone1 = optic(v, u, mConstants.mAtmosphere.mOzoneDensity);
 		
 		// Transmittance: Eye to v then v to Sun
 		float3 att = exp(
-			- (n_ray0 + n_ray1) * mPerFrameConstants.mAtmosphere.mRayleighExtinction 
-			- (n_mie0 + n_mie1) * mPerFrameConstants.mAtmosphere.mMieExtinction
-			- (n_ozone0 + n_ozone1) * mPerFrameConstants.mAtmosphere.mOzoneExtinction
+			- (n_ray0 + n_ray1) * mConstants.mAtmosphere.mRayleighExtinction 
+			- (n_mie0 + n_mie1) * mConstants.mAtmosphere.mMieExtinction
+			- (n_ozone0 + n_ozone1) * mConstants.mAtmosphere.mOzoneExtinction
 		);
 
 		sum_ray += d_ray * att;
@@ -85,8 +85,8 @@ float3 in_scatter(float3 o, float3 dir, float2 e, float3 l)
 
 	float c  = dot(dir, l);
 	float3 scatter =
-		sum_ray * mPerFrameConstants.mAtmosphere.mRayleighScattering * RayleighPhaseFunction(c) +
-	 	sum_mie * mPerFrameConstants.mAtmosphere.mMieScattering * MiePhaseFunction(mPerFrameConstants.mAtmosphere.mMiePhaseFunctionG, c);
+		sum_ray * mConstants.mAtmosphere.mRayleighScattering * RayleighPhaseFunction(c) +
+	 	sum_mie * mConstants.mAtmosphere.mMieScattering * MiePhaseFunction(mConstants.mAtmosphere.mMiePhaseFunctionG, c);
 
 	return scatter;
 }
@@ -100,8 +100,8 @@ void GetSkyRadiance(out float3 sky_radiance, out float3 transmittance_to_top)
 	float3 camera = PlanetRayOrigin() - PlanetCenter();
 	float3 view_ray = PlanetRayDirection();
 
-	float2 atmosphere_hit = ray_vs_sphere(camera, view_ray, mPerFrameConstants.mAtmosphere.mTopRadius);
-	float2 earth_hit = ray_vs_sphere(camera, view_ray, mPerFrameConstants.mAtmosphere.mBottomRadius);
+	float2 atmosphere_hit = ray_vs_sphere(camera, view_ray, mConstants.mAtmosphere.mTopRadius);
+	float2 earth_hit = ray_vs_sphere(camera, view_ray, mConstants.mAtmosphere.mBottomRadius);
 
 	if (atmosphere_hit.x > atmosphere_hit.y)
 		return; // no hit on atmosphere
@@ -162,7 +162,7 @@ void GetSkyRadiance(out float3 sky_radiance, out float3 transmittance_to_top)
 	}
 
 	sky_radiance = in_scatter(camera, view_ray, from_to, GetSunDirection());
-	sky_radiance *= mPerFrameConstants.mAtmosphere.mSolarIrradiance;
+	sky_radiance *= mConstants.mAtmosphere.mSolarIrradiance;
 }
 
 }} // namespace AtmosphereIntegration { namespace Raymarch {

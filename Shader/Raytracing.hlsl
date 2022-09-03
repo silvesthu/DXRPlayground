@@ -167,7 +167,7 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	// Debug - Global
 	{
 		bool terminate = true;
-		switch (mPerFrameConstants.mDebugMode)
+		switch (mConstants.mDebugMode)
 		{
 		case DebugMode::Barycentrics: 			hit_info.mEmission = barycentrics; break;
 		case DebugMode::Vertex: 				hit_info.mEmission = vertex; break;
@@ -192,9 +192,9 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	}
 
 	// Debug - Per instance
-    if (mPerFrameConstants.mDebugInstanceIndex == -1 || mPerFrameConstants.mDebugInstanceIndex == sGetInstanceID())
+    if (mConstants.mDebugInstanceIndex == -1 || mConstants.mDebugInstanceIndex == sGetInstanceID())
 	{
-		switch (mPerFrameConstants.mDebugInstanceMode)
+		switch (mConstants.mDebugInstanceMode)
 		{
 		case DebugInstanceMode::Barycentrics:
 			hit_info.mEmission = barycentrics; 
@@ -244,14 +244,14 @@ void TraceRay()
 	d.y = -d.y;
 	
 	RayDesc ray;
-	ray.Origin = mPerFrameConstants.mCameraPosition.xyz;
-	ray.Direction = normalize(mPerFrameConstants.mCameraDirection.xyz + mPerFrameConstants.mCameraRightExtend.xyz * d.x + mPerFrameConstants.mCameraUpExtend.xyz * d.y);
+	ray.Origin = mConstants.mCameraPosition.xyz;
+	ray.Direction = normalize(mConstants.mCameraDirection.xyz + mConstants.mCameraRightExtend.xyz * d.x + mConstants.mCameraUpExtend.xyz * d.y);
 	ray.TMin = 0.001;				// Near
 	ray.TMax = 100000;				// Far
 
 	RayPayload payload = (RayPayload)0;
 	payload.mThroughput = 1; // Camera gather all the light
-	payload.mRandomState = uint(uint(sGetDispatchRaysIndex().x) * uint(1973) + uint(sGetDispatchRaysIndex().y) * uint(9277) + uint(mPerFrameConstants.mAccumulationFrameCount) * uint(26699)) | uint(1); // From https://www.shadertoy.com/view/tsBBWW
+	payload.mRandomState = uint(uint(sGetDispatchRaysIndex().x) * uint(1973) + uint(sGetDispatchRaysIndex().y) * uint(9277) + uint(mConstants.mAccumulationFrameCount) * uint(26699)) | uint(1); // From https://www.shadertoy.com/view/tsBBWW
 
 #ifdef ENABLE_RAY_QUERY
 	// Note that RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH will give first hit for "Any Hit". The result may not be the closest one
@@ -310,9 +310,9 @@ void TraceRay()
 		// Russian Roulette
 		// http://www.pbr-book.org/3ed-2018/Monte_Carlo_Integration/Russian_Roulette_and_Splitting.html
 		// https://computergraphics.stackexchange.com/questions/2316/is-russian-roulette-really-the-answer
-		if (recursion >= mPerFrameConstants.mRecursionCountMax)
+		if (recursion >= mConstants.mRecursionCountMax)
 		{
-			if (mPerFrameConstants.mRecursionMode == RecursionMode::RussianRoulette && recursion <= 8)
+			if (mConstants.mRecursionMode == RecursionMode::RussianRoulette && recursion <= 8)
 			{
 				// Probability can be chosen in almost any manner
 				// e.g. Fixed threshold
@@ -340,16 +340,16 @@ void TraceRay()
 
 		float3 previous_output = RaytracingOutput[sGetDispatchRaysIndex().xy].xyz;
 		previous_output = max(0, previous_output); // Eliminate nan
-		float3 mixed_output = lerp(previous_output, current_output, 1.0f / (float)(mPerFrameConstants.mAccumulationFrameCount));
+		float3 mixed_output = lerp(previous_output, current_output, 1.0f / (float)(mConstants.mAccumulationFrameCount));
 
 		if (recursion == 0)
 			mixed_output = current_output;
 
-		if (mPerFrameConstants.mDebugMode == DebugMode::RecursionCount)
-			mixed_output = hsv2rgb(float3(recursion * 1.0 / (mPerFrameConstants.mRecursionCountMax + 1), 1, 1));
+		if (mConstants.mDebugMode == DebugMode::RecursionCount)
+			mixed_output = hsv2rgb(float3(recursion * 1.0 / (mConstants.mRecursionCountMax + 1), 1, 1));
 
-		if (mPerFrameConstants.mDebugMode == DebugMode::RussianRouletteCount)
-			mixed_output = hsv2rgb(float3(max(0.0, (recursion * 1.0 - mPerFrameConstants.mRecursionCountMax * 1.0)) / 10.0 /* for visualization only */, 1, 1));
+		if (mConstants.mDebugMode == DebugMode::RussianRouletteCount)
+			mixed_output = hsv2rgb(float3(max(0.0, (recursion * 1.0 - mConstants.mRecursionCountMax * 1.0)) / 10.0 /* for visualization only */, 1, 1));
 
 		RaytracingOutput[sGetDispatchRaysIndex().xy] = float4(mixed_output, 1);
 	}

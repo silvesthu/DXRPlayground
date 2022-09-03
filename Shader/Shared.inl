@@ -45,16 +45,10 @@ static const float kSolarKW2LM					= kKW2W * kSolarLuminousEfficacy;
 static const float kSolarLM2KW					= 1.0f / kSolarKW2LM;
 
 // Persistent Descriptor Heap Entries
-// Rather than allocate and pass index around, fixed slot is easier for debugging
-enum class DescriptorIndex : uint
+enum class ViewDescriptorIndex : uint
 {
-	NullSRV,
-	NullUAV,
-
-	NullCount,
-
 	// [Constants]
-	PerFrameConstants,
+	Constants,
 
 	// [Screen]
 	ScreenColorUAV,
@@ -106,7 +100,15 @@ enum class DescriptorIndex : uint
 	CloudShapeNoise3DSRV,
 	CloudErosionNoise3DSRV,
 
-	Count
+	Count,
+};
+
+enum class SamplerDescriptorIndex : uint
+{
+	BilinearClamp,
+	BilinearWrap,
+
+	Count,
 };
 
 enum class DebugMode : uint
@@ -371,7 +373,7 @@ struct CloudConstants
 	ShapeNoise					mShapeNoise;
 };
 
-struct PerFrameConstants
+struct Constants
 {
 	float4						mCameraPosition					CONSTANT_DEFAULT(float4(0.0f, 0.0f, 0.0f, 0.0f));
 	float4						mCameraDirection				CONSTANT_DEFAULT(float4(0.0f, 0.0f, 1.0f, 0.0f));
