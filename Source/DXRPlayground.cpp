@@ -13,6 +13,7 @@
 
 #define DX12_ENABLE_DEBUG_LAYER			(1)
 #define DX12_ENABLE_GBV					(0)
+#define DX12_ENABLE_INFO_QUEUE_CALLBACK (0)
 
 static const wchar_t*					kApplicationTitleW = L"DXR Playground";
 
@@ -736,6 +737,17 @@ void sRender()
 	}
 }
 
+static void sMessageCallback(D3D12_MESSAGE_CATEGORY inCategory, D3D12_MESSAGE_SEVERITY inSeverity, D3D12_MESSAGE_ID inID, LPCSTR inDescription, void* inContext)
+{
+	(void)inContext;
+	std::string message = std::format("{}\n\tD3D12_MESSAGE_CATEGORY = {}\n\tD3D12_MESSAGE_SEVERITY = {}\n\tD3D12_MESSAGE_ID = {}\n", 
+		inDescription,
+		nameof::nameof_enum(inCategory), 
+		nameof::nameof_enum(inSeverity), 
+		nameof::nameof_enum(inID)); // Note NAMEOF_ENUM_RANGE_MAX is not large enough for this
+	gTrace(message);
+}
+
 // Helper functions
 static bool sCreateDeviceD3D(HWND hWnd)
 {
@@ -787,6 +799,17 @@ static bool sCreateDeviceD3D(HWND hWnd)
 	if (FAILED(gDevice->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &options5, sizeof(D3D12_FEATURE_DATA_D3D12_OPTIONS5)))
 		|| options5.RaytracingTier < D3D12_RAYTRACING_TIER_1_1)
 		return false;
+
+	if (DX12_ENABLE_INFO_QUEUE_CALLBACK)
+	{
+		ComPtr<ID3D12InfoQueue1> info_queue;
+		if (SUCCEEDED(gDevice->QueryInterface(IID_PPV_ARGS(&info_queue))))
+		{
+			DWORD cookie = 0;
+			if (FAILED(info_queue->RegisterMessageCallback(sMessageCallback, D3D12_MESSAGE_CALLBACK_FLAG_NONE, nullptr, &cookie)))
+				return false;
+		}
+	}
 
 	// RTV Descriptor Heap
 	{
