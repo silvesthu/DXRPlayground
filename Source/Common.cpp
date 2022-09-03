@@ -54,36 +54,6 @@ Renderer							gRenderer;
 Texture*							gDumpTexture = nullptr;
 Texture								gDumpTextureProxy = {};
 
-void Shader::SetupGraphics()
-{
-	// Bindless heap needs to be set before RootSignature
-	// See https://microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_6_DynamicResources.html#setdescriptorheaps-and-setrootsignature
-	ID3D12DescriptorHeap* bindless_heaps[] =
-	{
-		gGetFrameContext().mViewDescriptorHeap.mHeap.Get(),
-		gGetFrameContext().mSamplerDescriptorHeap.mHeap.Get(),
-	};
-	gCommandList->SetDescriptorHeaps(ARRAYSIZE(bindless_heaps), bindless_heaps);
-	gCommandList->SetGraphicsRootSignature(mData.mRootSignature.Get());
-	gCommandList->SetGraphicsRootConstantBufferView((int)RootParameterIndex::Constants, gConstantGPUBuffer->GetGPUVirtualAddress());
-	gCommandList->SetPipelineState(mData.mPipelineState.Get());
-}
-
-void Shader::SetupCompute()
-{
-	// Bindless heap needs to be set before RootSignature
-	// See https://microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_6_DynamicResources.html#setdescriptorheaps-and-setrootsignature
-	ID3D12DescriptorHeap* bindless_heaps[] =
-	{
-		gGetFrameContext().mViewDescriptorHeap.mHeap.Get(),
-		gGetFrameContext().mSamplerDescriptorHeap.mHeap.Get(),
-	};
-	gCommandList->SetDescriptorHeaps(ARRAYSIZE(bindless_heaps), bindless_heaps);
-	gCommandList->SetComputeRootSignature(mData.mRootSignature.Get());
-	gCommandList->SetComputeRootConstantBufferView((int)RootParameterIndex::Constants, gConstantGPUBuffer->GetGPUVirtualAddress());
-	gCommandList->SetPipelineState(mData.mPipelineState.Get());
-}
-
 int Texture::GetPixelSize() const
 {
 	return static_cast<int>(DirectX::BitsPerPixel(mFormat) / 8);

@@ -269,10 +269,6 @@ static bool sCreateVSPSPipelineState(const char* inShaderFileName, const char* i
 	if (FAILED(gDevice->CreateRootSignature(0, ps_blob->GetBufferPointer(), ps_blob->GetBufferSize(), IID_PPV_ARGS(&ioSystemShader.mData.mRootSignature))))
 		return false;
 
-	ComPtr<ID3D12RootSignatureDeserializer> deserializer;
-	if (FAILED(D3D12CreateRootSignatureDeserializer(ps_blob->GetBufferPointer(), ps_blob->GetBufferSize(), IID_PPV_ARGS(&ioSystemShader.mData.mRootSignatureDeserializer))))
-		return false;
-
 	D3D12_RASTERIZER_DESC rasterizer_desc = {};
 	rasterizer_desc.FillMode = D3D12_FILL_MODE_SOLID;
 	rasterizer_desc.CullMode = D3D12_CULL_MODE_NONE;
@@ -312,10 +308,6 @@ static bool sCreateCSPipelineState(const char* inShaderFileName, const char* inC
 	SIZE_T root_signature_size = cs_blob->GetBufferSize();
 
 	if (FAILED(gDevice->CreateRootSignature(0, root_signature_pointer, root_signature_size, IID_PPV_ARGS(&ioSystemShader.mData.mRootSignature))))
-		return false;
-
-	ComPtr<ID3D12RootSignatureDeserializer> deserializer;
-	if (FAILED(D3D12CreateRootSignatureDeserializer(cs_blob->GetBufferPointer(), cs_blob->GetBufferSize(), IID_PPV_ARGS(&ioSystemShader.mData.mRootSignatureDeserializer))))
 		return false;
 
 	D3D12_COMPUTE_PIPELINE_STATE_DESC pipeline_state_desc = {};

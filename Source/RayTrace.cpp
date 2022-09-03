@@ -8,7 +8,7 @@ void gRaytrace()
 
 	if (gUseDXRRayQueryShader)
 	{
-		gDXRRayQueryShader.SetupCompute();
+		gRenderer.Setup(gDXRRayQueryShader.mData);
 		gCommandList->Dispatch(swap_chain_desc.Width / 8, swap_chain_desc.Height / 8, 1);
 		return;
 	}
@@ -35,15 +35,9 @@ void gRaytrace()
 		dispatch_rays_desc.HitGroupTable.SizeInBytes = gDXRShaderTable.mEntrySize * gDXRShaderTable.mHitGroupCount;
 	}
 
-	// Bind
-	ID3D12DescriptorHeap* bindless_heaps[] =
-	{
-		gGetFrameContext().mViewDescriptorHeap.mHeap.Get(),
-		gGetFrameContext().mSamplerDescriptorHeap.mHeap.Get(),
-	};
-	gCommandList->SetDescriptorHeaps(ARRAYSIZE(bindless_heaps), bindless_heaps);
-	gCommandList->SetComputeRootSignature(gDXRGlobalRootSignature.Get());
-	gCommandList->SetPipelineState1(gDXRStateObject.Get());
+	// Setup
+	Shader::Data shader_data { .mRootSignature = gDXRGlobalRootSignature, .mStateObject = gDXRStateObject };
+	gRenderer.Setup(shader_data);
 
 	// Dispatch
 	gCommandList->DispatchRays(&dispatch_rays_desc);

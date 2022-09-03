@@ -694,7 +694,7 @@ void sRender()
 		gCommandList->OMSetRenderTargets(1, &frame_render_target_descriptor_handle, false, nullptr);
 		gCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-		gCompositeShader.SetupGraphics();
+		gRenderer.Setup(gCompositeShader);
 		gCommandList->DrawInstanced(3, 1, 0, 0);
 	}
 
@@ -763,6 +763,7 @@ static void sMessageCallback(D3D12_MESSAGE_CATEGORY inCategory, D3D12_MESSAGE_SE
 		nameof::nameof_enum(inSeverity), 
 		nameof::nameof_enum(inID)); // Note NAMEOF_ENUM_RANGE_MAX is not large enough for this
 	gTrace(message);
+	gAssert(false);
 }
 
 // Helper functions

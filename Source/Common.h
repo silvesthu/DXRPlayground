@@ -304,15 +304,13 @@ struct Shader
 		glm::uint			mStride = 0;
 	};
 
-	void SetupGraphics();
-	void SetupCompute();
 	void Reset() { mData = {}; }
 
 	struct Data
 	{
-		ComPtr<ID3D12RootSignatureDeserializer>		mRootSignatureDeserializer;
 		ComPtr<ID3D12RootSignature>					mRootSignature;
 		ComPtr<ID3D12PipelineState>					mPipelineState;
+		ComPtr<ID3D12StateObject>					mStateObject;
 	};
 	Data mData;
 };
@@ -433,6 +431,39 @@ struct Renderer
 
 	void									ReleaseResources();
 	void									ImGuiShowTextures();
+
+	void									Setup(const Shader& inShader)
+	{
+		Setup(inShader.mData, inShader.mCSName == nullptr);
+	}
+
+	void									Setup(const Shader::Data& inShaderData, bool inGraphics = false)
+	{
+		// Heaps of Dynamic Resources needs to be set before RootSignature
+		// See https://microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_6_DynamicResources.html#setdescriptorheaps-and-setrootsignature
+		ID3D12DescriptorHeap* bindless_heaps[] =
+		{
+			gGetFrameContext().mViewDescriptorHeap.mHeap.Get(),
+			gGetFrameContext().mSamplerDescriptorHeap.mHeap.Get(),
+		};
+		gCommandList->SetDescriptorHeaps(ARRAYSIZE(bindless_heaps), bindless_heaps);
+
+		if (inGraphics)
+			gCommandList->SetGraphicsRootSignature(inShaderData.mRootSignature.Get());
+		else
+			gCommandList->SetComputeRootSignature(inShaderData.mRootSignature.Get());
+
+		if (inShaderData.mStateObject != nullptr)
+			gCommandList->SetPipelineState1(inShaderData.mStateObject.Get());
+		else
+			gCommandList->SetPipelineState(inShaderData.mPipelineState.Get());
+
+		// Root parameters need to be set after RootSignature
+		if (inGraphics)
+			gCommandList->SetGraphicsRootConstantBufferView((int)RootParameterIndex::Constants, gConstantGPUBuffer->GetGPUVirtualAddress());
+		else
+			gCommandList->SetComputeRootConstantBufferView((int)RootParameterIndex::Constants, gConstantGPUBuffer->GetGPUVirtualAddress());
+	}
 
 	bool									mReloadShader = false;
 
