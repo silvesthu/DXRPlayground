@@ -78,13 +78,13 @@ float4 ScreenspaceTriangleVS(uint id : SV_VertexID) : SV_POSITION
 [RootSignature("RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED)")]
 float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 {
-	ConstantBuffer<Constants> per_frame_constants = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Constants];
+	ConstantBuffer<Constants> constants = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Constants];
 	RWTexture2D<float4> screen_color = ResourceDescriptorHeap[(int)ViewDescriptorIndex::ScreenColorUAV];
 	
 	float4 color = screen_color[position.xy];
 
-	if (per_frame_constants.mDebugMode == DebugMode::None)
-		color.xyz = LuminanceToColor(color.xyz, per_frame_constants);
+	if (constants.mDebugMode == DebugMode::None)
+		color.xyz = LuminanceToColor(color.xyz, constants);
 
 	color.xyz = ApplySRGBCurve(color.xyz);
 	return float4(color.xyz, 1);

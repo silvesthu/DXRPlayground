@@ -30,6 +30,13 @@ void DefaultMiss(inout RayPayload payload)
 
 HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attributes)
 {
+	StructuredBuffer<InstanceData> InstanceDatas = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RaytraceInstanceDataSRV];
+	StructuredBuffer<uint> Indices = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RaytraceIndicesSRV];
+	StructuredBuffer<float3> Vertices = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RaytraceVerticesSRV ];
+	StructuredBuffer<float3> Normals = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RaytraceNormalsSRV];
+	StructuredBuffer<float2> UVs = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RaytraceUVsSRV];
+	StructuredBuffer<Light> LightDataBuffer = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RaytraceLightsSRV];
+	
 	HitInfo hit_info = (HitInfo)0;
 	hit_info.mDone = true;
 
@@ -261,6 +268,7 @@ void TraceRay()
 	uint ray_instance_mask = 0xffffffff;
 #endif // ENABLE_RAY_QUERY
 
+	RaytracingAccelerationStructure RaytracingScene = ResourceDescriptorHeap[(int) ViewDescriptorIndex::RaytraceTLASSRV];
 	uint recursion = 0;
 	for (;;)
 	{

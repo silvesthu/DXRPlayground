@@ -283,9 +283,8 @@ struct Shader
 		glm::uint			mStride = 0;
 	};
 
-	void InitializeDescriptors(const std::vector<DescriptorInfo>& inEntries);
-	void SetupGraphics(ID3D12DescriptorHeap* inHeap, bool inBindless);
-	void SetupCompute(ID3D12DescriptorHeap* inHeap, bool inBindless);
+	void SetupGraphics();
+	void SetupCompute();
 	void Reset() { mData = {}; }
 
 	struct Data
@@ -293,7 +292,6 @@ struct Shader
 		ComPtr<ID3D12RootSignatureDeserializer>		mRootSignatureDeserializer;
 		ComPtr<ID3D12RootSignature>					mRootSignature;
 		ComPtr<ID3D12PipelineState>					mPipelineState;
-		ComPtr<ID3D12DescriptorHeap>				mViewDescriptorHeap;
 	};
 	Data mData;
 };
@@ -366,10 +364,6 @@ extern ComPtr<ID3D12Resource>				gConstantGPUBuffer;
 extern ComPtr<ID3D12RootSignature>			gDXRGlobalRootSignature;
 extern ComPtr<ID3D12StateObject>			gDXRStateObject;
 
-extern ComPtr<ID3D12DescriptorHeap>			gUniversalHeap;
-extern SIZE_T								gUniversalHeapHandleIncrementSize;
-extern int									gUniversalHeapHandleIndex;
-
 extern ShaderTable							gDXRShaderTable;
 
 extern bool									gUseDXRInlineShader;
@@ -410,7 +404,7 @@ struct Renderer
 {
 	struct Runtime : RuntimeBase<Runtime>
 	{
-		Texture								mScreenColorTexture = Texture().Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(ViewDescriptorIndex::ScreenColorUAV).SRVIndex(ViewDescriptorIndex::ScreenColorSRV).Name("Renderer.ScreenColorTexture");
+		Texture								mScreenColorTexture = Texture().Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(ViewDescriptorIndex::ScreenColorUAV).Name("Renderer.ScreenColorTexture");
 		Texture								mScreenDebugTexture = Texture().Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(ViewDescriptorIndex::ScreenDebugUAV).Name("Renderer.ScreenDebugTexture");
 
 		Texture								mSentinelTexture;

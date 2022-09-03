@@ -9,7 +9,7 @@ void gRaytrace()
 	if (gUseDXRInlineShader)
 	{
 		// Inline Raytracing
-		gDXRInlineShader.SetupCompute(gScene.GetDXRDescriptorHeap(), false);
+		gDXRInlineShader.SetupCompute();
 		gCommandList->Dispatch(swap_chain_desc.Width / 8, swap_chain_desc.Height / 8, 1);
 		return;
 	}
@@ -37,10 +37,13 @@ void gRaytrace()
 	}
 
 	// Bind
+	ID3D12DescriptorHeap* bindless_heaps[] =
+	{
+		gGetFrameContext().mViewDescriptorHeap.mHeap.Get(),
+		gGetFrameContext().mSamplerDescriptorHeap.mHeap.Get(),
+	};
+	gCommandList->SetDescriptorHeaps(ARRAYSIZE(bindless_heaps), bindless_heaps);
 	gCommandList->SetComputeRootSignature(gDXRGlobalRootSignature.Get());
-	ID3D12DescriptorHeap* descriptor_heap = gScene.GetDXRDescriptorHeap();
-	gCommandList->SetDescriptorHeaps(1, &descriptor_heap);
-	gCommandList->SetComputeRootDescriptorTable(0, gScene.GetDXRDescriptorHeap()->GetGPUDescriptorHandleForHeapStart());
 	gCommandList->SetPipelineState1(gDXRStateObject.Get());
 
 	// Dispatch

@@ -23,10 +23,6 @@ ComPtr<ID3D12RootSignature>			gDXRGlobalRootSignature = nullptr;
 ComPtr<ID3D12StateObject>			gDXRStateObject = nullptr;
 ShaderTable							gDXRShaderTable = {};
 
-ComPtr<ID3D12DescriptorHeap>		gUniversalHeap = nullptr;
-SIZE_T								gUniversalHeapHandleIncrementSize = 0;
-int									gUniversalHeapHandleIndex = 0;
-
 bool								gUseDXRInlineShader = true;
 Shader								gDXRInlineShader = Shader().FileName("Shader/Raytracing.hlsl").CSName("InlineRaytracingCS").UseGlobalRootSignature(true);
 
@@ -58,189 +54,32 @@ Renderer							gRenderer;
 Texture*							gDumpTexture = nullptr;
 Texture								gDumpTextureProxy = {};
 
-void Shader::InitializeDescriptors(const std::vector<Shader::DescriptorInfo>& inEntries)
+void Shader::SetupGraphics()
 {
-	// DescriptorHeap
+	// Bindless heap needs to be set before RootSignature
+	// See https://microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_6_DynamicResources.html#setdescriptorheaps-and-setrootsignature
+	ID3D12DescriptorHeap* bindless_heaps[] =
 	{
-		D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-		desc.NumDescriptors = 1000000; // Max
-		desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-		desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-		gValidate(gDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&mData.mViewDescriptorHeap)));
-
-		std::wstring name = gToWString(mCSName != nullptr ? mCSName : mPSName);
-		mData.mViewDescriptorHeap->SetName(name.c_str());
-	}
-
-	// DescriptorTable
-	if (!inEntries.empty())
-	{
-		// Check if root signature is supported
-		const D3D12_ROOT_SIGNATURE_DESC* root_signature_desc = mData.mRootSignatureDeserializer->GetRootSignatureDesc();
-		gAssert(root_signature_desc->NumParameters >= 1);
-		gAssert(root_signature_desc->pParameters[0].ParameterType == D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE);
-
-		const D3D12_ROOT_DESCRIPTOR_TABLE& table = root_signature_desc->pParameters[0].DescriptorTable;
-
-		D3D12_CPU_DESCRIPTOR_HANDLE handle = mData.mViewDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-		UINT increment_size = gDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
-		int entry_index = 0;
-		for (UINT i = 0; i < table.NumDescriptorRanges; i++)
-		{
-			const D3D12_DESCRIPTOR_RANGE& range = table.pDescriptorRanges[i];
-			switch (range.RangeType)
-			{
-			case D3D12_DESCRIPTOR_RANGE_TYPE_SRV:
-			{
-				for (UINT j = 0; j < range.NumDescriptors; j++)
-				{
-					const DescriptorInfo& info = inEntries[entry_index];
-					ID3D12Resource* resource = inEntries[entry_index].mResource;
-					D3D12_RESOURCE_DESC resource_desc = inEntries[entry_index].mResource->GetDesc();
-
-					D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
-					desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-					desc.Format = resource_desc.Format;
-					switch (resource_desc.Dimension)
-					{
-					case D3D12_RESOURCE_DIMENSION_TEXTURE2D:
-					{
-						desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-						desc.Texture2D.MipLevels = (UINT)-1;
-						desc.Texture2D.MostDetailedMip = 0;
-						break;
-					}
-					case D3D12_RESOURCE_DIMENSION_TEXTURE3D:
-					{
-						desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
-						desc.Texture3D.MipLevels = (UINT)-1;
-						desc.Texture3D.MostDetailedMip = 0;
-						break;
-					}
-					case D3D12_RESOURCE_DIMENSION_BUFFER:
-					{
-						if (info.mStride == 0)
-						{
-							desc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
-							desc.RaytracingAccelerationStructure.Location = resource->GetGPUVirtualAddress();
-							gAssert(desc.RaytracingAccelerationStructure.Location != NULL);
-							resource = nullptr;
-						}
-						else
-						{
-							desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-							desc.Buffer.NumElements = (UINT)(resource_desc.Width / info.mStride);
-							desc.Buffer.StructureByteStride = info.mStride;
-							desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
-						}
-						break;
-					}
-					default:
-						gAssert(false);
-						break;
-					}
-					gDevice->CreateShaderResourceView(resource, &desc, handle);
-
-					entry_index++;
-					handle.ptr += increment_size;
-				}
-			}
-			break;
-			case D3D12_DESCRIPTOR_RANGE_TYPE_UAV:
-			{
-				for (UINT j = 0; j < range.NumDescriptors; j++)
-				{
-					D3D12_UNORDERED_ACCESS_VIEW_DESC desc = {};
-					if (inEntries[entry_index].mResource->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D)
-					{
-						desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-						desc.Texture2D.MipSlice = 0;
-						desc.Texture2D.PlaneSlice = 0;
-					}
-					else
-					{
-						desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE3D;
-						desc.Texture3D.MipSlice = 0;
-						desc.Texture3D.FirstWSlice = 0;
-						desc.Texture3D.WSize = inEntries[entry_index].mResource->GetDesc().DepthOrArraySize;
-					}
-					gDevice->CreateUnorderedAccessView(inEntries[entry_index].mResource, nullptr, &desc, handle);
-
-					entry_index++;
-					handle.ptr += increment_size;
-				}
-			}
-			break;
-			case D3D12_DESCRIPTOR_RANGE_TYPE_CBV:
-			{
-				for (UINT j = 0; j < range.NumDescriptors; j++)
-				{
-					D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
-					desc.SizeInBytes = gAlignUp((UINT)inEntries[entry_index].mResource->GetDesc().Width, (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
-					desc.BufferLocation = inEntries[entry_index].mResource->GetGPUVirtualAddress();
-					gAssert(desc.BufferLocation != NULL);
-					gDevice->CreateConstantBufferView(&desc, handle);
-
-					entry_index++;
-					handle.ptr += increment_size;
-				}
-			}
-			break;
-			default: gAssert(false); break;
-			}
-		}
-	}
-}
-
-void Shader::SetupGraphics(ID3D12DescriptorHeap* inHeap, bool inBindless)
-{
-	if (inBindless)
-	{
-		// Bindless heap needs to be set before RootSignature
-		// See https://microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_6_DynamicResources.html#setdescriptorheaps-and-setrootsignature
-		ID3D12DescriptorHeap* bindless_heaps[] =
-		{
-			gGetFrameContext().mViewDescriptorHeap.mHeap.Get(),
-			gGetFrameContext().mSamplerDescriptorHeap.mHeap.Get(),
-		};
-		gCommandList->SetDescriptorHeaps(ARRAYSIZE(bindless_heaps), bindless_heaps);
-	}
-
+		gGetFrameContext().mViewDescriptorHeap.mHeap.Get(),
+		gGetFrameContext().mSamplerDescriptorHeap.mHeap.Get(),
+	};
+	gCommandList->SetDescriptorHeaps(ARRAYSIZE(bindless_heaps), bindless_heaps);
 	gCommandList->SetGraphicsRootSignature(mData.mRootSignature.Get());
 	gCommandList->SetPipelineState(mData.mPipelineState.Get());
-
-	if (!inBindless)
-	{
-		ID3D12DescriptorHeap* heap = inHeap != nullptr ? inHeap : mData.mViewDescriptorHeap.Get();
-		gCommandList->SetDescriptorHeaps(1, &heap);
-		gCommandList->SetGraphicsRootDescriptorTable(0, heap->GetGPUDescriptorHandleForHeapStart());
-	}
 }
 
-void Shader::SetupCompute(ID3D12DescriptorHeap* inHeap, bool inBindless)
+void Shader::SetupCompute()
 {
-	if (inBindless)
+	// Bindless heap needs to be set before RootSignature
+	// See https://microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_6_DynamicResources.html#setdescriptorheaps-and-setrootsignature
+	ID3D12DescriptorHeap* bindless_heaps[] =
 	{
-		// Bindless heap needs to be set before RootSignature
-		// See https://microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_6_DynamicResources.html#setdescriptorheaps-and-setrootsignature
-		ID3D12DescriptorHeap* bindless_heaps[] =
-		{
-			gGetFrameContext().mViewDescriptorHeap.mHeap.Get(),
-			gGetFrameContext().mSamplerDescriptorHeap.mHeap.Get(),
-		};
-		gCommandList->SetDescriptorHeaps(ARRAYSIZE(bindless_heaps), bindless_heaps);
-	}
-
+		gGetFrameContext().mViewDescriptorHeap.mHeap.Get(),
+		gGetFrameContext().mSamplerDescriptorHeap.mHeap.Get(),
+	};
+	gCommandList->SetDescriptorHeaps(ARRAYSIZE(bindless_heaps), bindless_heaps);
 	gCommandList->SetComputeRootSignature(mData.mRootSignature.Get());
 	gCommandList->SetPipelineState(mData.mPipelineState.Get());
-
-	if (!inBindless)
-	{
-		ID3D12DescriptorHeap* heap = inHeap != nullptr ? inHeap : mData.mViewDescriptorHeap.Get();
-		gCommandList->SetDescriptorHeaps(1, &heap);
-		gCommandList->SetComputeRootDescriptorTable(0, heap->GetGPUDescriptorHandleForHeapStart());
-	}
 }
 
 int Texture::GetPixelSize() const
@@ -266,15 +105,13 @@ void Texture::Initialize()
 	{
 		for (int i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
 		{
-			D3D12_CPU_DESCRIPTOR_HANDLE handle = gFrameContexts[i].mViewDescriptorHeap.GetHandle(mSRVIndex);
-
 			D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
 			desc.Format = mSRVFormat != DXGI_FORMAT_UNKNOWN ? mSRVFormat : mFormat;
 			desc.ViewDimension = mDepth == 1 ? D3D12_SRV_DIMENSION_TEXTURE2D : D3D12_SRV_DIMENSION_TEXTURE3D;
 			desc.Texture2D.MipLevels = (UINT)-1;
 			desc.Texture2D.MostDetailedMip = 0;
 			desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			gDevice->CreateShaderResourceView(mResource.Get(), &desc, handle);
+			gDevice->CreateShaderResourceView(mResource.Get(), &desc, gFrameContexts[i].mViewDescriptorHeap.GetHandle(mSRVIndex));
 		}
 	}
 
@@ -283,8 +120,6 @@ void Texture::Initialize()
 	{
 		for (int i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
 		{
-			D3D12_CPU_DESCRIPTOR_HANDLE handle = gFrameContexts[i].mViewDescriptorHeap.GetHandle(mUAVIndex);
-
 			D3D12_UNORDERED_ACCESS_VIEW_DESC desc = {};
 			if (resource_desc.DepthOrArraySize == 1)
 			{
@@ -299,7 +134,7 @@ void Texture::Initialize()
 				desc.Texture3D.FirstWSlice = 0;
 				desc.Texture3D.WSize = resource_desc.DepthOrArraySize;
 			}
-			gDevice->CreateUnorderedAccessView(mResource.Get(), nullptr, &desc, handle);
+			gDevice->CreateUnorderedAccessView(mResource.Get(), nullptr, &desc, gFrameContexts[i].mViewDescriptorHeap.GetHandle(mUAVIndex));
 		}
 	}
 	

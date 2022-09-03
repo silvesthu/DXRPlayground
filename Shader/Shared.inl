@@ -52,7 +52,6 @@ enum class ViewDescriptorIndex : uint
 
 	// [Screen]
 	ScreenColorUAV,
-	ScreenColorSRV,
 	ScreenDebugUAV,
 
 	// [Raytrace] - [Input]
@@ -66,21 +65,33 @@ enum class ViewDescriptorIndex : uint
 
 	// [Bruneton17]
 	Bruneton17TransmittanceUAV,
+	Bruneton17TransmittanceSRV,
 	Bruneton17DeltaIrradianceUAV,
+	Bruneton17DeltaIrradianceSRV,
 	Bruneton17IrradianceUAV,
+	Bruneton17IrradianceSRV,
 	Bruneton17DeltaRayleighScatteringUAV,
+	Bruneton17DeltaRayleighScatteringSRV,
 	Bruneton17DeltaMieScatteringUAV,
+	Bruneton17DeltaMieScatteringSRV,
 	Bruneton17ScatteringUAV,
+	Bruneton17ScatteringSRV,
 	Bruneton17DeltaScatteringDensityUAV,
+	Bruneton17DeltaScatteringDensitySRV,
 
 	// [Hillaire20]
 	Hillaire20TransmittanceTexUAV,
+	Hillaire20TransmittanceTexSRV,
 	Hillaire20MultiScattUAV,
+	Hillaire20MultiScattSRV,
 	Hillaire20SkyViewLutUAV,
+	Hillaire20SkyViewLutSRV,
 	Hillaire20AtmosphereCameraScatteringVolumeUAV,
+	Hillaire20AtmosphereCameraScatteringVolumeSRV,
 
 	// [Wilkie21]
 	Wilkie21SkyViewUAV,
+	Wilkie21SkyViewSRV,
 
 	// [Validation] - [Hillaire20]
 	ValidationHillaire20TransmittanceTexExpectedUAV,

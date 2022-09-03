@@ -12,6 +12,7 @@
 #include "Cloud.h"
 
 #define DX12_ENABLE_DEBUG_LAYER			(1)
+#define DX12_ENABLE_GBV					(0)
 
 static const wchar_t*					kApplicationTitleW = L"DXR Playground";
 
@@ -680,7 +681,7 @@ void sRender()
 		gCommandList->OMSetRenderTargets(1, &frame_render_target_descriptor_handle, false, nullptr);
 		gCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-		gCompositeShader.SetupGraphics(nullptr, true);
+		gCompositeShader.SetupGraphics();
 		gCommandList->DrawInstanced(3, 1, 0, 0);
 	}
 
@@ -759,15 +760,15 @@ static bool sCreateDeviceD3D(HWND hWnd)
 	if (DX12_ENABLE_DEBUG_LAYER)
 	{
 		ComPtr<ID3D12Debug> dx12Debug = nullptr;
-		ComPtr<ID3D12Debug1> dx12Debug1 = nullptr;
 		if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&dx12Debug))))
-		{
 			dx12Debug->EnableDebugLayer();
+	}
 
-			// GBV don't work well yet
-//  		if (SUCCEEDED(dx12Debug->QueryInterface(IID_PPV_ARGS(&dx12Debug1))))
-//  			dx12Debug1->SetEnableGPUBasedValidation(true);
-		}
+	if (DX12_ENABLE_GBV)
+	{
+		ComPtr<ID3D12Debug1> dx12Debug1 = nullptr;
+		if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&dx12Debug1))))
+			dx12Debug1->SetEnableGPUBasedValidation(true);
 	}
 
 	// Create device with highest feature level as possible
@@ -818,20 +819,6 @@ static bool sCreateDeviceD3D(HWND hWnd)
 			return false;
 	}
 
-	// Heap
-	{
-		// DescriptorHeap
-		{
-			D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-			desc.NumDescriptors = 1000000; // Max
-			desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-			desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-			gValidate(gDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&gUniversalHeap)));
-			gUniversalHeap->SetName(L"UniversalHeap");			
-			gUniversalHeapHandleIncrementSize = gDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-		}
-	}
-
 	// Constants
 	for (UINT i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
 	{
@@ -861,7 +848,7 @@ static bool sCreateDeviceD3D(HWND hWnd)
 			};
 			static_assert(ARRAYSIZE(sampler_descs) == (int)SamplerDescriptorIndex::Count);
 			for (int sampler_index = 0; sampler_index < (int)SamplerDescriptorIndex::Count; sampler_index++)
-				gDevice->CreateSampler(&sampler_descs[sampler_index], gFrameContexts[i].mSamplerDescriptorHeap.GetHandle((SamplerDescriptorIndex)i));
+				gDevice->CreateSampler(&sampler_descs[sampler_index], gFrameContexts[i].mSamplerDescriptorHeap.GetHandle((SamplerDescriptorIndex)sampler_index));
 		}
 
 		// UploadBuffer
@@ -942,7 +929,6 @@ static void sCleanupDeviceD3D()
 		gFrameContexts[i].Reset();
 
 	gConstantGPUBuffer = nullptr;
-	gUniversalHeap = nullptr;
 	gSafeRelease(gCommandQueue);
 	gSafeRelease(gCommandList);
 	gSafeRelease(gRTVDescriptorHeap);

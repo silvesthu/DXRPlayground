@@ -114,112 +114,6 @@ static IDxcBlob* sCompileShader(const char* inFilename, const char* inEntryPoint
 	return blob;
 }
 
-struct RootSignatureDescriptor
-{
-	D3D12_ROOT_SIGNATURE_DESC mDesc = {};
-	std::vector<D3D12_DESCRIPTOR_RANGE> mDescriptorRanges;
-	std::vector<D3D12_ROOT_PARAMETER> mRootParameters;
-	std::vector<D3D12_STATIC_SAMPLER_DESC> mStaticSamplerDescs;
-};
-
-void GenerateGlobalRootSignatureDescriptor(RootSignatureDescriptor& outDesc)
-{
-	// u0
-	D3D12_DESCRIPTOR_RANGE descriptor_range = {};
-	descriptor_range.BaseShaderRegister = 0;
-	descriptor_range.NumDescriptors = 1;
-	descriptor_range.RegisterSpace = 0;
-	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-	descriptor_range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-	outDesc.mDescriptorRanges.push_back(descriptor_range);
-
-	// b0
-	descriptor_range = {};
-	descriptor_range.BaseShaderRegister = 0;
-	descriptor_range.NumDescriptors = 1;
-	descriptor_range.RegisterSpace = 0;
-	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-	descriptor_range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-	outDesc.mDescriptorRanges.push_back(descriptor_range);
-
-	// t, space0
-	descriptor_range = {};
-	descriptor_range.NumDescriptors = 1;
-	descriptor_range.RegisterSpace = 0;
-	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-	descriptor_range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-	for (int i = 0; i < 7; i++)
-	{
-		descriptor_range.BaseShaderRegister = i;
-		outDesc.mDescriptorRanges.push_back(descriptor_range);
-	}
-
-	// t, space2 - Atmosphere
-	descriptor_range = {};
-	descriptor_range.NumDescriptors = 1;
-	descriptor_range.RegisterSpace = 2;
-	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-	descriptor_range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-	int base_shader_register = 0;
-	for (auto&& texture_set : gAtmosphere.mRuntime.mTexturesSet)
-		for (auto&& texture : texture_set)
-		{
-			(void)texture;
-			descriptor_range.BaseShaderRegister = base_shader_register++;
-			outDesc.mDescriptorRanges.push_back(descriptor_range);
-		}
-
-	// t, space3 - Cloud
-	descriptor_range = {};
-	descriptor_range.NumDescriptors = 1;
-	descriptor_range.RegisterSpace = 3;
-	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-	descriptor_range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-	for (int i = 0; i < gCloud.mRuntime.mTextures.size(); i++)
-	{
-		descriptor_range.BaseShaderRegister = i;
-		outDesc.mDescriptorRanges.push_back(descriptor_range);
-	}
-
-	// Table
-	D3D12_ROOT_PARAMETER root_parameter = {};
-	root_parameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	root_parameter.DescriptorTable.NumDescriptorRanges = static_cast<UINT>(outDesc.mDescriptorRanges.size());
-	root_parameter.DescriptorTable.pDescriptorRanges = outDesc.mDescriptorRanges.data();
-	outDesc.mRootParameters.push_back(root_parameter);
-
-	D3D12_STATIC_SAMPLER_DESC sampler = {};
-	sampler.MipLODBias = 0.f;
-	sampler.MaxAnisotropy = 0;
-	sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
-	sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
-	sampler.MinLOD = 0.f;
-	sampler.MaxLOD = D3D12_FLOAT32_MAX;
-	sampler.RegisterSpace = 0;
-	sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-
-	sampler.ShaderRegister = 0;
-	sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-	sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-	sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-	sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-	outDesc.mStaticSamplerDescs.push_back(sampler);
-
-	sampler.ShaderRegister = 1;
-	sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-	sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-	sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-	sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-	outDesc.mStaticSamplerDescs.push_back(sampler);
-
-	// Descriptor to table
-	outDesc.mDesc.NumParameters = static_cast<UINT>(outDesc.mRootParameters.size());
-	outDesc.mDesc.pParameters = outDesc.mRootParameters.data();
-	outDesc.mDesc.NumStaticSamplers = static_cast<UINT>(outDesc.mStaticSamplerDescs.size());
-	outDesc.mDesc.pStaticSamplers = outDesc.mStaticSamplerDescs.data();
-	outDesc.mDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
-}
-
 ComPtr<ID3D12RootSignature> CreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC & desc)
 {
 	ComPtr<ID3DBlob> signature_blob;
@@ -598,9 +492,9 @@ void gCreatePipelineState()
 	subobjects[index++] = default_hit_group.mStateSubobject;
 
 	// Local root signatures and association
-	RootSignatureDescriptor local_root_signature_descriptor;
-	local_root_signature_descriptor.mDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
-	LocalRootSignature local_root_signature(local_root_signature_descriptor.mDesc);
+	D3D12_ROOT_SIGNATURE_DESC local_signature_desc = {};
+	local_signature_desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
+	LocalRootSignature local_root_signature(local_signature_desc);
 	subobjects[index++] = local_root_signature.mStateSubobject;
 	SubobjectToExportsAssociation export_association(entry_points, ARRAYSIZE(entry_points), &(subobjects[index - 1]));
 	subobjects[index++] = export_association.mStateSubobject;
@@ -617,9 +511,9 @@ void gCreatePipelineState()
 	subobjects[index++] = pipeline_config.mStateSubobject;
 
 	// Global root signature
-	RootSignatureDescriptor global_root_signature_descriptor;
-	GenerateGlobalRootSignatureDescriptor(global_root_signature_descriptor);
-	GlobalRootSignature global_root_signature(global_root_signature_descriptor.mDesc);
+	D3D12_ROOT_SIGNATURE_DESC root_signature_desc = {};
+	root_signature_desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED;
+	GlobalRootSignature global_root_signature(root_signature_desc);
 	gDXRGlobalRootSignature = global_root_signature.mRootSignature;
 	subobjects[index++] = global_root_signature.mStateSubobject;
 

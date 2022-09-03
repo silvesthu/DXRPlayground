@@ -1,7 +1,4 @@
 
-Texture3D<float4> CloudShapeNoiseSRV : register(t0, space3);
-Texture3D<float4> CloudErosionNoiseSRV : register(t1, space3);
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // https://www.shadertoy.com/view/ll3SWl
 
@@ -71,6 +68,9 @@ float SampleCloudDensity(float3 p, bool sample_coarse)
 		float3 offset = mConstants.mCloud.mShapeNoise.mOffset;
 
 		// [TODO] Skew
+
+		Texture3D<float4> CloudShapeNoiseSRV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::CloudShapeNoise3DSRV];
+		Texture3D<float4> CloudErosionNoiseSRV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::CloudErosionNoise3DSRV];
 
 		float shape = CloudShapeNoiseSRV.SampleLevel(BilinearWrapSampler, (p + offset) * frequency, 0).x;
 		shape = pow(shape, power) * scale;

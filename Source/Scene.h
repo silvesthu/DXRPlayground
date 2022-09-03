@@ -79,7 +79,6 @@ public:
 	void RebuildShader();
 
 	const SceneContent& GetSceneContent() const					{ return mSceneContent; }
-	ID3D12DescriptorHeap* GetDXRDescriptorHeap() const			{ return mDXRDescriptorHeap.Get(); }
 
 	int GetInstanceCount() const								{ return static_cast<int>(mSceneContent.mInstanceInfos.size()); }
 	const InstanceInfo& GetInstanceInfo(int inIndex) const		{ return mSceneContent.mInstanceInfos[inIndex]; }
@@ -121,8 +120,6 @@ private:
 		ComPtr<ID3D12Resource>				mLights;
 	};
 	Buffers									mBuffers;
-
-	ComPtr<ID3D12DescriptorHeap>			mDXRDescriptorHeap;
 };
 
 extern Scene gScene;
