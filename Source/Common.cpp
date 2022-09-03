@@ -140,18 +140,25 @@ void Texture::Initialize()
 	
 	// SRV for ImGui
 	{
-		if (!mImGuiInitialized)
-			ImGui_ImplDX12_AllocateDescriptor(mImGuiCPUHandle, mImGuiGPUHandle);
+		if (mImGuiTextureIndex == -1)
+			mImGuiTextureIndex = ImGui_ImplDX12_AllocateTexture(resource_desc);
 
 		D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
 		desc.Format = mFormat;
-		desc.ViewDimension = mDepth == 1 ? D3D12_SRV_DIMENSION_TEXTURE2D : D3D12_SRV_DIMENSION_TEXTURE3D;
-		desc.Texture2D.MipLevels = (UINT)-1;
-		desc.Texture2D.MostDetailedMip = 0;
+		if (mDepth == 1)
+		{
+			desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+			desc.Texture2D.MipLevels = (UINT)-1;
+			desc.Texture2D.MostDetailedMip = 0;
+		}
+		else
+		{
+			desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
+			desc.Texture3D.MipLevels = (UINT)-1;
+			desc.Texture3D.MostDetailedMip = 0;
+		}
 		desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		gDevice->CreateShaderResourceView(mResource.Get(), &desc, mImGuiCPUHandle);
-
-		mImGuiInitialized = true;
+		gDevice->CreateShaderResourceView(mResource.Get(), &desc, ImGui_ImplDX12_TextureCPUHandle(mImGuiTextureIndex));
 	}
 
 	// UIScale
@@ -238,7 +245,7 @@ namespace ImGui
 					std::swap(uv0.y, uv1.y);
 
 				float item_ui_scale = inTexture.mUIScale * ui_scale;
-				ImGui::Image(reinterpret_cast<ImTextureID>(inTexture.mImGuiGPUHandle.ptr), ImVec2(inTexture.mWidth * item_ui_scale, inTexture.mHeight * item_ui_scale), uv0, uv1);
+				ImGui::Image(reinterpret_cast<ImTextureID>(ImGui_ImplDX12_TextureGPUHandle(inTexture.mImGuiTextureIndex).ptr), ImVec2(inTexture.mWidth * item_ui_scale, inTexture.mHeight * item_ui_scale), uv0, uv1);
 				if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
 				{
 					sTexture = &inTexture;
@@ -263,28 +270,25 @@ namespace ImGui
 
 			if (ImGui::BeginPopup("Image Options"))
 			{
-				if (sTexture != nullptr)
-				{
-					ImGui::Text(sTexture->mName);
+				gAssert(sTexture != nullptr);
 
-					if (ImGui::Button("Dump"))
-						gDumpTexture = sTexture;
+				ImGui::Text(sTexture->mName);
 
-					ImGui::Separator();
-				}
+				if (ImGui::Button("Dump"))
+					gDumpTexture = sTexture;
 
-				ImGui::TextureOption();
+				ImGui::Separator();
 
-				// Extra options
-				{
-					ImGui::PushItemWidth(100);
+				ImGui_ImplDX12_ShowTextureOption(sTexture->mImGuiTextureIndex);
 
-					ImGui::SliderFloat("UI Scale", &ui_scale, 1.0, 4.0f);
-					ImGui::SameLine();
-					ImGui::Checkbox("Flip Y", &flip_y);
+				ImGui::Separator();
 
-					ImGui::PopItemWidth();
-				}
+				ImGui::Text("GUI Options (Global)");
+				ImGui::PushItemWidth(100);
+				ImGui::SliderFloat("UI Scale", &ui_scale, 1.0, 4.0f);
+				ImGui::SameLine();
+				ImGui::Checkbox("Flip Y", &flip_y);
+				ImGui::PopItemWidth();
 
 				ImGui::EndPopup();
 			}

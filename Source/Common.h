@@ -60,14 +60,19 @@ inline std::string gToLower(const std::string& inString)
 	return result;
 }
 
-inline void gTrace(const char* string)
+inline void gTrace(const char* inString)
 {
-	OutputDebugStringA(string);
+	OutputDebugStringA(inString);
 }
 
-inline void gTrace(const std::string_view& data)
+inline void gTrace(const std::string& inString)
 {
-	OutputDebugStringA(data.data());
+	OutputDebugStringA(inString.c_str());
+}
+
+inline void gTrace(const std::string_view& inString)
+{
+	OutputDebugStringA(inString.data());
 }
 
 template <typename T>
@@ -329,9 +334,7 @@ struct Texture
 	ComPtr<ID3D12Resource> mResource;
 	ComPtr<ID3D12Resource> mUploadResource;
 
-	bool mImGuiInitialized = false;
-	D3D12_CPU_DESCRIPTOR_HANDLE mImGuiCPUHandle = {};
-	D3D12_GPU_DESCRIPTOR_HANDLE mImGuiGPUHandle = {};
+	int mImGuiTextureIndex = -1;
 
 	int mSubresourceCount = 1; // TODO: Support multiple subresources
 	bool mLoaded = false;
