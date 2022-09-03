@@ -1,13 +1,25 @@
 #pragma once
 #include "Shared.inl"
 
+#define USE_SAMPLER_HEAP_DIRECTLY_INDEXED // No obvious difference in DXIL
+
+// Common
+#ifdef USE_SAMPLER_HEAP_DIRECTLY_INDEXED
+#define ROOT_SIGNATURE_SAMPLER
+#else
+#define ROOT_SIGNATURE_SAMPLER \
+", StaticSampler(s0, filter = FILTER_MIN_MAG_MIP_LINEAR, addressU = TEXTURE_ADDRESS_CLAMP, addressV = TEXTURE_ADDRESS_CLAMP, addressW = TEXTURE_ADDRESS_CLAMP)"	\
+", StaticSampler(s1, filter = FILTER_MIN_MAG_MIP_LINEAR, addressU = TEXTURE_ADDRESS_WRAP, addressV = TEXTURE_ADDRESS_WRAP, addressW = TEXTURE_ADDRESS_WRAP)"
+#endif // USE_SAMPLER_HEAP_DIRECTLY_INDEXED
+
 // CBV
 cbuffer ConstantsBuffer : register(b0, space0)
 {
 	Constants mConstants;
 }
 #define ROOT_SIGNATURE_COMMON \
-"RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0)"
+"RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0)" \
+ROOT_SIGNATURE_SAMPLER
 
 cbuffer RootConstantsDiff : register(b0, space1)
 {
@@ -16,14 +28,16 @@ cbuffer RootConstantsDiff : register(b0, space1)
 	uint mOutputIndex;
 };
 #define ROOT_SIGNATURE_DIFF \
-"RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0), RootConstants(num32BitConstants=3, b0, space = 1)"
+"RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0), RootConstants(num32BitConstants=3, b0, space = 1)" \
+ROOT_SIGNATURE_SAMPLER
 
 cbuffer RootConstantsAtmosphere : register(b0, space2)
 {
 	uint mScatteringOrder;
 }
 #define ROOT_SIGNATURE_ATMOSPHERE \
-"RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0), RootConstants(num32BitConstants=1, b0, space = 2)"
+"RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0), RootConstants(num32BitConstants=1, b0, space = 2)" \
+ROOT_SIGNATURE_SAMPLER
 
 // CBV Helper
 float3 GetSunDirection() { return mConstants.mSunDirection.xyz; }
@@ -59,5 +73,10 @@ static RWTexture2D<float4> Wilkie21SkyViewLutTexUAV = ResourceDescriptorHeap[(in
 static RWTexture2D<float4> RaytracingOutput = ResourceDescriptorHeap[(int)ViewDescriptorIndex::ScreenColorUAV];
 
 // Samplers Helper
+#ifdef USE_SAMPLER_HEAP_DIRECTLY_INDEXED
 static SamplerState BilinearClampSampler = SamplerDescriptorHeap[(int)SamplerDescriptorIndex::BilinearClamp];
 static SamplerState BilinearWrapSampler = SamplerDescriptorHeap[(int)SamplerDescriptorIndex::BilinearWrap];
+#else
+SamplerState BilinearClampSampler : register(s0);
+SamplerState BilinearWrapSampler : register(s1);
+#endif // USE_SAMPLER_HEAP_DIRECTLY_INDEXED
