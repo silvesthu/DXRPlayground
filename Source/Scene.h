@@ -75,7 +75,6 @@ public:
 	void Unload();
 
 	void Build(ID3D12GraphicsCommandList4* inCommandList);
-	void RebuildBinding(std::function<void()> inCallback);
 	void RebuildShader();
 
 	const SceneContent& GetSceneContent() const					{ return mSceneContent; }
@@ -95,7 +94,6 @@ private:
 	void InitializeAccelerationStructures();
 
 	void CreateShaderResource();
-	void CleanupShaderResource();
 
 	struct Primitives
 	{

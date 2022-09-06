@@ -13,8 +13,6 @@ UINT64                       		gFenceLastSignaledValue = 0;
 
 IDXGISwapChain3*					gSwapChain = nullptr;
 HANDLE                       		gSwapChainWaitableObject = nullptr;
-ID3D12Resource*						gBackBufferRenderTargetResource[NUM_BACK_BUFFERS] = {};
-D3D12_CPU_DESCRIPTOR_HANDLE			gBackBufferRenderTargetRTV[NUM_BACK_BUFFERS] = {};
 
 // Application
 ComPtr<ID3D12Resource>				gConstantGPUBuffer = nullptr;
@@ -23,29 +21,55 @@ ComPtr<ID3D12RootSignature>			gDXRGlobalRootSignature = nullptr;
 ComPtr<ID3D12StateObject>			gDXRStateObject = nullptr;
 ShaderTable							gDXRShaderTable = {};
 
-bool								gUseDXRRayQueryShader = true;
-Shader								gDXRRayQueryShader = Shader().FileName("Shader/Raytracing.hlsl").CSName("RayQueryCS");
-
-Shader								gDiffTexture2DShader = Shader().FileName("Shader/DiffTexture.hlsl").CSName("DiffTexture2DShader");
-Shader								gDiffTexture3DShader = Shader().FileName("Shader/DiffTexture.hlsl").CSName("DiffTexture3DShader");
-
-Shader								gCompositeShader = Shader().FileName("Shader/Composite.hlsl").VSName("ScreenspaceTriangleVS").PSName("CompositePS");
-
 // Frame
 FrameContext						gFrameContexts[NUM_FRAMES_IN_FLIGHT] = {};
 glm::uint32							gFrameIndex = 0;
 Constants							gConstants = {};
 
 // Renderer
-void Renderer::ReleaseResources()
+void Renderer::Initialize()
 {
-	for (auto&& texture : mRuntime.mTextures)
-		texture.ReleaseResources();
+	AcquireBackBuffers();
+
+	ResetScreen();
+}
+
+void Renderer::Finalize()
+{
+	ReleaseBackBuffers();
+
+	mRuntime.Reset();
 }
 
 void Renderer::ImGuiShowTextures()
 {
 	ImGui::Textures(mRuntime.mTextures, "Renderer", ImGuiTreeNodeFlags_None);
+}
+
+void Renderer::ResetScreen()
+{
+	DXGI_SWAP_CHAIN_DESC1 swap_chain_desc;
+	gSwapChain->GetDesc1(&swap_chain_desc);
+
+	gRenderer.mRuntime.mScreenColorTexture.Width(swap_chain_desc.Width).Height(swap_chain_desc.Height).Initialize();
+	gRenderer.mRuntime.mScreenDebugTexture.Width(swap_chain_desc.Width).Height(swap_chain_desc.Height).Initialize();
+}
+
+void Renderer::AcquireBackBuffers()
+{
+	for (int i = 0; i < NUM_BACK_BUFFERS; i++)
+	{
+		gSwapChain->GetBuffer(i, IID_PPV_ARGS(mRuntime.mBackBuffers[i].GetAddressOf()));
+		std::wstring name = L"BackBuffer_" + std::to_wstring(i);
+		mRuntime.mBackBuffers[i]->SetName(name.c_str());
+		gDevice->CreateRenderTargetView(mRuntime.mBackBuffers[i].Get(), nullptr, mRuntime.mBufferBufferRTVs[i]);
+	}
+}
+
+void Renderer::ReleaseBackBuffers()
+{
+	for (int i = 0; i < NUM_BACK_BUFFERS; i++)
+		mRuntime.mBackBuffers[i] = nullptr;
 }
 
 Renderer							gRenderer;
@@ -188,12 +212,6 @@ void Texture::InitializeUpload()
 	gValidate(gDevice->CreateCommittedResource(&upload_properties, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mUploadResource)));
 	std::wstring name = gToWString(mName);
 	mUploadResource->SetName(name.c_str());
-}
-
-void Texture::ReleaseResources()
-{
-	mResource = nullptr;
-	mUploadResource = nullptr;
 }
 
 namespace ImGui 

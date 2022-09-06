@@ -1,8 +1,9 @@
 #pragma once
 #include "Shared.inl"
 
-// #define USE_DYNAMIC_RESOURCE_CBV		// Dynamic Resource costs +50%
-// #define USE_DYNAMIC_RESOURCE_SAMPLER	// No obvious difference in DXIL
+// #define USE_DYNAMIC_RESOURCE_CBV		// 2x slower
+// #define USE_DYNAMIC_RESOURCE_SRV_UAV	// [TODO]
+// #define USE_DYNAMIC_RESOURCE_SAMPLER	// Almost same with 2 samplers
 
 // Common
 #ifdef USE_DYNAMIC_RESOURCE_SAMPLER
@@ -15,11 +16,16 @@
 
 // CBV
 #ifdef USE_DYNAMIC_RESOURCE_CBV
-static ConstantBuffer<Constants> mConstants = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Constants];
+// 0.11ms
+// Top SOLs    SM 59.4% | TEX 45.3% | L2 17.9% | VRAM 1.5% | VPC 0.0%
+static ConstantBuffer<Constants> mConstants = ResourceDescriptorHeap[0];
 ConstantBuffer<Constants> mConstantsUnused : register(b0, space0);
 #else
+// 0.05ms
+// Top SOLs    SM 48.8% | TEX 17.5% | L2 0.9% | VRAM 0.4% | VPC 0.0%
 ConstantBuffer<Constants> mConstants : register(b0, space0);
 #endif // USE_DYNAMIC_RESOURCE_CBV
+
 #define ROOT_SIGNATURE_COMMON \
 "RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0)" \
 ROOT_SIGNATURE_SAMPLER
@@ -46,6 +52,13 @@ ROOT_SIGNATURE_SAMPLER
 float3 GetSunDirection() { return mConstants.mSunDirection.xyz; }
 
 // SRV Helper
+static StructuredBuffer<InstanceData> InstanceDatas = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RaytraceInstanceDataSRV];
+static StructuredBuffer<uint> Indices = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RaytraceIndicesSRV];
+static StructuredBuffer<float3> Vertices = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RaytraceVerticesSRV];
+static StructuredBuffer<float3> Normals = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RaytraceNormalsSRV];
+static StructuredBuffer<float2> UVs = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RaytraceUVsSRV];
+static StructuredBuffer<Light> Lights = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RaytraceLightsSRV];
+
 static Texture2D<float4> TransmittanceSRV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Bruneton17TransmittanceSRV];
 static Texture2D<float4> DeltaIrradianceSRV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Bruneton17DeltaIrradianceSRV];
 static Texture2D<float4> IrradianceSRV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Bruneton17IrradianceSRV];

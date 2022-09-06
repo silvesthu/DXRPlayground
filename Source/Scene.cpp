@@ -649,7 +649,6 @@ void Scene::Load(const char* inFilename, const glm::mat4x4& inTransform)
 void Scene::Unload()
 {
 	gCleanupShaderTable();
-	CleanupShaderResource();
 	gCleanupPipelineState();
 
 	mPrimitives = {};
@@ -671,17 +670,6 @@ void Scene::Build(ID3D12GraphicsCommandList4* inCommandList)
 	gBarrierUAV(inCommandList, nullptr);
 }
 
-void Scene::RebuildBinding(std::function<void()> inCallback)
-{
-	gCleanupShaderTable();
-
-	if (inCallback)
-		inCallback();
-
-	CreateShaderResource();
-	gCreateShaderTable();
-}
-
 void Scene::RebuildShader()
 {
 	// gCleanupPipelineState(); // Skip cleanup in case rebuild fails
@@ -693,15 +681,6 @@ void Scene::RebuildShader()
 
 void Scene::CreateShaderResource()
 {
-	// Screen
-	{
-		DXGI_SWAP_CHAIN_DESC1 swap_chain_desc;
-		gSwapChain->GetDesc1(&swap_chain_desc);
-
-		gRenderer.mRuntime.mScreenColorTexture.Width(swap_chain_desc.Width).Height(swap_chain_desc.Height).Initialize();
-		gRenderer.mRuntime.mScreenDebugTexture.Width(swap_chain_desc.Width).Height(swap_chain_desc.Height).Initialize();
-	}
-
 	auto create_acceleration_structure_SRV = [](ID3D12Resource* inResource, ViewDescriptorIndex inViewDescriptorIndex)
 	{
 		D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
@@ -733,9 +712,4 @@ void Scene::CreateShaderResource()
 	create_buffer_SRV(mBuffers.mNormals.Get(),			sizeof(NormalType),		ViewDescriptorIndex::RaytraceNormalsSRV);
 	create_buffer_SRV(mBuffers.mUVs.Get(),				sizeof(UVType),			ViewDescriptorIndex::RaytraceUVsSRV);
 	create_buffer_SRV(mBuffers.mLights.Get(),			sizeof(Light),			ViewDescriptorIndex::RaytraceLightsSRV);
-}
-
-void Scene::CleanupShaderResource()
-{
-	gRenderer.ReleaseResources();
 }

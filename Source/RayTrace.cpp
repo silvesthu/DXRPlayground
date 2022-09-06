@@ -6,9 +6,9 @@ void gRaytrace()
 	DXGI_SWAP_CHAIN_DESC1 swap_chain_desc;
 	gSwapChain->GetDesc1(&swap_chain_desc);
 
-	if (gUseDXRRayQueryShader)
+	if (gRenderer.mUseRayQuery)
 	{
-		gRenderer.Setup(gDXRRayQueryShader.mData);
+		gRenderer.Setup(gRenderer.mRuntime.mRayQueryShader.mData);
 		gCommandList->Dispatch(swap_chain_desc.Width / 8, swap_chain_desc.Height / 8, 1);
 		return;
 	}

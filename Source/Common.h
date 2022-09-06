@@ -217,8 +217,6 @@ extern uint64_t                       		gFenceLastSignaledValue;
 
 extern IDXGISwapChain3* 					gSwapChain;
 extern HANDLE                       		gSwapChainWaitableObject;
-extern ID3D12Resource*						gBackBufferRenderTargetResource[];
-extern D3D12_CPU_DESCRIPTOR_HANDLE			gBackBufferRenderTargetRTV[];
 
 // Application
 struct ShaderTable
@@ -343,7 +341,6 @@ struct Texture
 	void Initialize();
 	void Update();
 	void InitializeUpload();
-	void ReleaseResources();
 
 	ComPtr<ID3D12Resource> mResource;
 	ComPtr<ID3D12Resource> mUploadResource;
@@ -383,14 +380,6 @@ extern ComPtr<ID3D12StateObject>			gDXRStateObject;
 
 extern ShaderTable							gDXRShaderTable;
 
-extern bool									gUseDXRRayQueryShader;
-extern Shader								gDXRRayQueryShader;
-
-extern Shader								gDiffTexture2DShader;
-extern Shader								gDiffTexture3DShader;
-
-extern Shader								gCompositeShader;
-
 struct FrameContext
 {
 	ComPtr<ID3D12CommandAllocator>			mCommandAllocator;
@@ -421,16 +410,31 @@ struct Renderer
 {
 	struct Runtime : RuntimeBase<Runtime>
 	{
-		Texture								mScreenColorTexture = Texture().Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(ViewDescriptorIndex::ScreenColorUAV).Name("Renderer.ScreenColorTexture");
-		Texture								mScreenDebugTexture = Texture().Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(ViewDescriptorIndex::ScreenDebugUAV).Name("Renderer.ScreenDebugTexture");
+		Shader								mRayQueryShader				= Shader().FileName("Shader/Raytracing.hlsl").CSName("RayQueryCS");
+		Shader								mDiffTexture2DShader		= Shader().FileName("Shader/DiffTexture.hlsl").CSName("DiffTexture2DShader");
+		Shader								mDiffTexture3DShader		= Shader().FileName("Shader/DiffTexture.hlsl").CSName("DiffTexture3DShader");
+		Shader								mCompositeShader			= Shader().FileName("Shader/Composite.hlsl").VSName("ScreenspaceTriangleVS").PSName("CompositePS");
+
+		Shader								mSentinelShader				= Shader();
+		std::span<Shader>					mShaders					= std::span<Shader>(&mRayQueryShader, &mSentinelShader);
+
+		Texture								mScreenColorTexture			= Texture().Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(ViewDescriptorIndex::ScreenColorUAV).Name("Renderer.ScreenColorTexture");
+		Texture								mScreenDebugTexture			= Texture().Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(ViewDescriptorIndex::ScreenDebugUAV).Name("Renderer.ScreenDebugTexture");
 
 		Texture								mSentinelTexture;
-		std::span<Texture> mTextures		= std::span<Texture>(&mScreenColorTexture, &mSentinelTexture);
+		std::span<Texture>					mTextures					= std::span<Texture>(&mScreenColorTexture, &mSentinelTexture);
+
+		ComPtr<ID3D12Resource>				mBackBuffers[NUM_BACK_BUFFERS] = {};
+		D3D12_CPU_DESCRIPTOR_HANDLE			mBufferBufferRTVs[NUM_BACK_BUFFERS] = {};
 	};
 	Runtime mRuntime;
 
-	void									ReleaseResources();
+	void									Initialize();
+	void									Finalize();
 	void									ImGuiShowTextures();
+	void									ResetScreen();
+	void									AcquireBackBuffers();
+	void									ReleaseBackBuffers();
 
 	void									Setup(const Shader& inShader)
 	{
@@ -465,11 +469,11 @@ struct Renderer
 			gCommandList->SetComputeRootConstantBufferView((int)RootParameterIndex::Constants, gConstantGPUBuffer->GetGPUVirtualAddress());
 	}
 
-	bool									mReloadShader = false;
-
-	bool									mDumpDisassemblyRayQuery = false;
-
-	bool									mPrintStateObjectDesc = false;
+	bool									mReloadShader							= false;
+	bool									mDumpDisassemblyRayQuery				= false;
+	bool									mPrintStateObjectDesc					= false;
+																					
+	bool									mUseRayQuery							= true;	
 };
 extern Renderer								gRenderer;
 

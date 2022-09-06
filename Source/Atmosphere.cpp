@@ -208,7 +208,7 @@ void Atmosphere::Runtime::Hillaire20::Validate()
 		BarrierScope expected_scope(gCommandList, inExpected.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		BarrierScope output_scope(gCommandList, inOutput.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
-		Shader& shader = inExpected.mDepth == 1 ? gDiffTexture2DShader : gDiffTexture3DShader;
+		Shader& shader = inExpected.mDepth == 1 ? gRenderer.mRuntime.mDiffTexture2DShader : gRenderer.mRuntime.mDiffTexture3DShader;
 		gRenderer.Setup(shader);
 
 		gAssert(inComputed.mUAVIndex != ViewDescriptorIndex::Count);

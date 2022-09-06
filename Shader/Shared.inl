@@ -277,6 +277,23 @@ struct Light
 	float						mRadius							CONSTANT_DEFAULT(0);
 };
 
+struct RayState
+{
+	enum
+	{
+		None			= 0,
+		Done			= 1,
+		FirstHit		= 1 << 1,
+	};
+
+	void						Set(uint inBits) { mBits |= inBits; }
+	void						Unset(uint inBits) { mBits &= ~inBits; }
+	void						Reset(uint inBits) { mBits = inBits; }
+	bool						IsSet(uint inBits) { return (mBits & inBits) != 0; }
+
+	uint						mBits;
+};
+
 struct RayPayload
 {
 	float3						mThroughput;					// [0, 1]		Accumulated throughput
@@ -286,7 +303,7 @@ struct RayPayload
 	float3						mReflectionDirection;
 
 	uint						mRandomState;
-	bool						mDone;
+	RayState					mState;
 
 	// Certain layout might cause driver crash on PSO generation
 	// See https://github.com/silvesthu/DirectX-Graphics-Samples/commit/9822cb8142629515f3768d2c36ff6695dba04838
@@ -409,6 +426,10 @@ struct Constants
 	float						mSunZenith						CONSTANT_DEFAULT(MATH_PI / 4.0f);
 	float						mTime							CONSTANT_DEFAULT(0);
 
+	uint						mLightCount						CONSTANT_DEFAULT(0);
+	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 	float4						mSunDirection					CONSTANT_DEFAULT(float4(1.0f, 0.0f, 0.0f, 0.0f));
 
 	DebugMode					mDebugMode						CONSTANT_DEFAULT(DebugMode::None);

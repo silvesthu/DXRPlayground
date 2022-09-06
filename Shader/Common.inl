@@ -37,6 +37,7 @@ float RandomFloat01(inout uint state)
 {
     return float(wang_hash(state)) / 4294967296.0;
 }
+
 float3 RandomUnitVector(inout uint state)
 {
     float z = RandomFloat01(state) * 2.0f - 1.0f;
@@ -114,18 +115,21 @@ float PhaseFunction_Isotropic()
     return 1.0 / (4.0 * MATH_PI);
 }
 
-// http://www.pbr-book.org/3ed-2018/Monte_Carlo_Integration/Importance_Sampling.html#PowerHeuristic
-float MIS_PowerHeuristic(int nf, float fPdf, int ng, float gPdf, float power)
+namespace MIS
 {
-    float f = nf * fPdf;
-    float g = ng * gPdf;
-    return pow(f, power) / (pow(f, power) + pow(g, power));
-}
+    // http://www.pbr-book.org/3ed-2018/Monte_Carlo_Integration/Importance_Sampling.html#PowerHeuristic
+    float PowerHeuristic(int nf, float fPdf, int ng, float gPdf, float power)
+    {
+        float f = nf * fPdf;
+        float g = ng * gPdf;
+        return pow(f, power) / (pow(f, power) + pow(g, power));
+    }
 
-// http://www.pbr-book.org/3ed-2018/Monte_Carlo_Integration/Importance_Sampling.html#BalanceHeuristic
-float MIS_BalanceHeuristic(int nf, float fPdf, int ng, float gPdf)
-{
-    return MIS_PowerHeuristic(nf, fPdf, ng, gPdf, 1.0);
+    // http://www.pbr-book.org/3ed-2018/Monte_Carlo_Integration/Importance_Sampling.html#BalanceHeuristic
+    float BalanceHeuristic(int nf, float fPdf, int ng, float gPdf)
+    {
+        return PowerHeuristic(nf, fPdf, ng, gPdf, 1.0);
+    }
 }
 
 float G_SmithGGX(float inNoL, float inNoV, float inA2)

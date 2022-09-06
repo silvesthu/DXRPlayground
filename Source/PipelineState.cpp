@@ -320,7 +320,7 @@ static bool sCreateCSPipelineState(const char* inShaderFileName, const char* inC
 	return true;
 }
 
-bool sCreatePipelineState(Shader& ioSystemShader)
+static bool sCreatePipelineState(Shader& ioSystemShader)
 {
 	if (ioSystemShader.mCSName != nullptr)
 		return sCreateCSPipelineState(ioSystemShader.mFileName, ioSystemShader.mCSName, ioSystemShader);
@@ -329,7 +329,7 @@ bool sCreatePipelineState(Shader& ioSystemShader)
 }
 
 // From https://github.com/microsoft/DirectX-Graphics-Samples/blob/e5ea2ac7430ce39e6f6d619fd85ae32581931589/Samples/Desktop/D3D12Raytracing/src/D3D12RaytracingHelloWorld/DirectXRaytracingHelper.h#L172
-void sPrintStateObjectDesc(const D3D12_STATE_OBJECT_DESC* desc)
+static void sPrintStateObjectDesc(const D3D12_STATE_OBJECT_DESC* desc)
 {
 	std::wstringstream wstr;
 	wstr << L"\n";
@@ -446,12 +446,10 @@ void gCreatePipelineState()
 	{
 		bool succeed = true;
 
-		succeed &= sCreatePipelineState(gCompositeShader);
-
-		succeed &= sCreatePipelineState(gDXRRayQueryShader);
-
-		succeed &= sCreatePipelineState(gDiffTexture2DShader);
-		succeed &= sCreatePipelineState(gDiffTexture3DShader);
+		succeed &= sCreatePipelineState(gRenderer.mRuntime.mCompositeShader);
+		succeed &= sCreatePipelineState(gRenderer.mRuntime.mRayQueryShader);
+		succeed &= sCreatePipelineState(gRenderer.mRuntime.mDiffTexture2DShader);
+		succeed &= sCreatePipelineState(gRenderer.mRuntime.mDiffTexture3DShader);
 
 		for (auto&& shaders : gAtmosphere.mRuntime.mShadersSet)
 			for (auto&& shader : shaders)
@@ -490,7 +488,6 @@ void gCreatePipelineState()
 	std::array<D3D12_STATE_SUBOBJECT, 64> subobjects;
 	glm::uint32 index = 0;
 
-	gTrace("Shader compiled.\n");
 	DXILLibrary dxilLibrary(blob, entry_points, ARRAYSIZE(entry_points));
 	subobjects[index++] = dxilLibrary.mStateSubobject;
 
@@ -498,7 +495,7 @@ void gCreatePipelineState()
 	HitGroup default_hit_group(nullptr, kDefaultClosestHitShader, kDefaultHitGroup);
 	subobjects[index++] = default_hit_group.mStateSubobject;
 
-	// Local root signatures and association
+	// Local root signatures and association (not necessary here)
 	D3D12_ROOT_SIGNATURE_DESC local_signature_desc = {};
 	local_signature_desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
 	LocalRootSignature local_root_signature(local_signature_desc);
@@ -518,7 +515,7 @@ void gCreatePipelineState()
 	subobjects[index++] = pipeline_config.mStateSubobject;
 
 	// Global root signature - grab from RayQuery version
-	gDXRGlobalRootSignature = gDXRRayQueryShader.mData.mRootSignature;
+	gDXRGlobalRootSignature = gRenderer.mRuntime.mRayQueryShader.mData.mRootSignature;
 	GlobalRootSignature global_root_signature(gDXRGlobalRootSignature);
 	subobjects[index++] = global_root_signature.mStateSubobject;
 
@@ -537,11 +534,4 @@ void gCleanupPipelineState()
 {
 	gDXRStateObject = nullptr;
 	gDXRGlobalRootSignature = nullptr;
-
-	gDXRRayQueryShader.Reset();
-
-	gDiffTexture2DShader.Reset();
-	gDiffTexture3DShader.Reset();
-
-	gCompositeShader.Reset();
 }

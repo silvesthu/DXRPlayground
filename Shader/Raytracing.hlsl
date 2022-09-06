@@ -12,10 +12,11 @@
 #include "AtmosphereIntegration.inl"
 #include "CloudIntegration.inl"
 
+
 [shader("miss")]
 void DefaultMiss(inout RayPayload payload)
 {
-	payload.mDone = true;
+	payload.mState.Set(RayState::Done);
 
     float3 sky_luminance = GetSkyLuminance();
 
@@ -29,14 +30,7 @@ void DefaultMiss(inout RayPayload payload)
 }
 
 HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attributes)
-{
-	StructuredBuffer<InstanceData> InstanceDatas = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RaytraceInstanceDataSRV];
-	StructuredBuffer<uint> Indices = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RaytraceIndicesSRV];
-	StructuredBuffer<float3> Vertices = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RaytraceVerticesSRV ];
-	StructuredBuffer<float3> Normals = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RaytraceNormalsSRV];
-	StructuredBuffer<float2> UVs = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RaytraceUVsSRV];
-	StructuredBuffer<Light> LightDataBuffer = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RaytraceLightsSRV];
-	
+{	
 	HitInfo hit_info = (HitInfo)0;
 	hit_info.mDone = true;
 
@@ -62,7 +56,7 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	// Handle front face only
 	if (dot(normal, -sGetWorldRayDirection()) < 0)
 	{
-		bool flip_normal = true;
+		bool flip_normal = false;
 		if (flip_normal)
 			normal = -normal;
 		else
@@ -111,9 +105,9 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
             		hit_info.mReflectionDirection = normalize(direction.x * axis[0] + direction.y * axis[1] + direction.z * axis[2]);
 
             		// pdf - exact distribution - should cancel out
-            		float cosine = dot(normal, hit_info.mReflectionDirection);
-            		hit_info.mScatteringPDF = cosine <= 0 ? 0 : cosine / MATH_PI;
-            		hit_info.mSamplingPDF = cosine <= 0 ? 0 : cosine / MATH_PI;
+            		float NdotL = dot(normal, hit_info.mReflectionDirection);
+					hit_info.mScatteringPDF = NdotL <= 0 ? 0 : NdotL / MATH_PI;
+            		hit_info.mSamplingPDF = NdotL <= 0 ? 0 : NdotL / MATH_PI;
                     hit_info.mAlbedo = InstanceDatas[sGetInstanceID()].mAlbedo;
             		hit_info.mDone = false;
 	            }
@@ -149,27 +143,30 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 
             		// TODO: Better to calculate in tangent space?
             		float3 V = -sGetWorldRayDirection();
-            		float HoV = dot(H, V);
-            		float3 L = 2.0 * HoV * H - V;
-            		float NoH = dot(normal, H);
-            		float NoV = dot(normal, V);
-            		float HoL = dot(H, L);
-            		float NoL = dot(normal, L);
+            		float HdotV = dot(H, V);
+            		float3 L = 2.0 * HdotV * H - V;
+            		float NdotH = dot(normal, H);
+            		float NdotV = dot(normal, V);
+            		float HdotL = dot(H, L);
+            		float NdotL = dot(normal, L);
 
-            		float G = G_SmithGGX(NoL, NoV, a2);
-                    float3 F = F_Schlick(InstanceDatas[sGetInstanceID()].mReflectance, HoV);
+            		float G = G_SmithGGX(NdotL, NdotV, a2);
+                    float3 F = F_Schlick(InstanceDatas[sGetInstanceID()].mReflectance, HdotV);
 
             		hit_info.mReflectionDirection = L;
-            		hit_info.mAlbedo = G * F / (4.0f * NoV);
+            		hit_info.mAlbedo = G * F / (4.0f * NdotV);
             		hit_info.mScatteringPDF = 1.0;
-            		hit_info.mSamplingPDF = NoH / (4.0f * abs(HoL));
+            		hit_info.mSamplingPDF = NdotH / (4.0f * abs(HdotL));
             		hit_info.mDone = false;
                 }
                 break;
 			default:
                 break;
         }
-    }
+		
+		//if (!payload.mState.IsSet(RayState::FirstHit))
+		//	hit_info.mEmission = 0;
+	}
 
 	// Debug - Global
 	{
@@ -228,7 +225,7 @@ void DefaultClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionA
 	HitInfo hit_info = HitInternal(payload, attributes);
 
 	// State
-	payload.mDone = hit_info.mDone;
+	payload.mState.Set(hit_info.mDone ? RayState::Done : RayState::None);
 
 	// Geometry
 	payload.mPosition = hit_info.mPosition;
@@ -259,6 +256,7 @@ void TraceRay()
 	RayPayload payload = (RayPayload)0;
 	payload.mThroughput = 1; // Camera gather all the light
 	payload.mRandomState = uint(uint(sGetDispatchRaysIndex().x) * uint(1973) + uint(sGetDispatchRaysIndex().y) * uint(9277) + uint(mConstants.mAccumulationFrameCount) * uint(26699)) | uint(1); // From https://www.shadertoy.com/view/tsBBWW
+	payload.mState.Reset(RayState::FirstHit);
 
 #ifdef ENABLE_RAY_QUERY
 	// Note that RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH will give first hit for "Any Hit". The result may not be the closest one
@@ -309,13 +307,11 @@ void TraceRay()
 		);
 #endif // ENABLE_RAY_QUERY
 
-		if (payload.mDone)
+		if (payload.mState.IsSet(RayState::Done))
 			break;
 
-		ray.Origin = payload.mPosition;
-		ray.Direction = payload.mReflectionDirection;
-
 		// Russian Roulette
+		// [TODO] Make a test scene for comparison
 		// http://www.pbr-book.org/3ed-2018/Monte_Carlo_Integration/Russian_Roulette_and_Splitting.html
 		// https://computergraphics.stackexchange.com/questions/2316/is-russian-roulette-really-the-answer
 		if (recursion >= mConstants.mRecursionCountMax)
@@ -338,6 +334,11 @@ void TraceRay()
 			else
 				break;
 		}
+		
+		ray.Origin = payload.mPosition;
+		ray.Direction = payload.mReflectionDirection;
+		
+		payload.mState.Unset(RayState::FirstHit);
 
 		recursion++;
 	}
