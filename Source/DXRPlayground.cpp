@@ -88,11 +88,18 @@ static void sWaitForIdle();
 static void sWaitForLastSubmittedFrame();
 static void sWaitForFrameContext();
 static void sUpdate();
+static void sLoadShader() { gRenderer.mReloadShader = true; }
 static void sLoadCamera();
 static void sLoadScene();
+static void sDumpLuminance()
+{
+	gDumpTextureProxy.mResource = gRenderer.mRuntime.mScreenColorTexture.mResource;
+	gDumpTextureProxy.mName = "Luminance";
+	gDumpTexture = &gDumpTextureProxy;
+}
 static void sRender();
 static LRESULT WINAPI sWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-
+bool sSelected[1024] = {};
 static void sUpdate()
 {
 	// Rotate Camera
@@ -154,6 +161,18 @@ static void sUpdate()
 			gConstants.mCameraPosition -= up * move_speed;
 		if (ImGui::IsKeyDown('E'))
 			gConstants.mCameraPosition += up * move_speed;
+
+		if (ImGui::IsKeyPressed(VK_F5))
+			sLoadShader();
+
+		if (ImGui::IsKeyPressed(VK_F6))
+			sLoadCamera();
+
+		if (ImGui::IsKeyPressed(VK_F9))
+			sDumpLuminance();
+
+		if (ImGui::IsKeyPressed(VK_F10))
+			gOpenDumpFolder();
 	}
 
 	// Frustum
@@ -171,13 +190,6 @@ static void sUpdate()
 	{
 		if (ImGui::Begin("DXR Playground"))
 		{
-			// Floating items
-			{
-				gRenderer.ImGuiShowTextures();
-				gAtmosphere.ImGuiShowTextures();
-				gCloud.ImGuiShowTextures();
-			}
-
 			ImGui::Text("Frame %d | Time %.3f s | Average %.3f ms (FPS %.1f) | %dx%d",
 				gConstants.mAccumulationFrameCount,
 				gConstants.mTime,
@@ -187,22 +199,21 @@ static void sUpdate()
 				gDisplaySettings.mRenderResolution.y);
 
 			{
-				if (ImGui::Button("Reload Shader (F5)") || ImGui::IsKeyPressed(VK_F5))
-					gRenderer.mReloadShader = true;
+				if (ImGui::Button("Reload Shader (F5)"))
+					sLoadShader();
 
 				ImGui::SameLine();
 
-				if (ImGui::Button("Reload Camera (F6)") || ImGui::IsKeyPressed(VK_F6))
+				if (ImGui::Button("Reload Camera (F6)"))
 					sLoadCamera();
 
+				if (ImGui::Button("Dump Luminance (F9)"))
+					sDumpLuminance();
+
 				ImGui::SameLine();
 
-				if (ImGui::Button("Dump Luminance (F9)") || ImGui::IsKeyPressed(VK_F9))
-				{
-					gDumpTextureProxy.mResource = gRenderer.mRuntime.mScreenColorTexture.mResource;
-					gDumpTextureProxy.mName = "Luminance";
-					gDumpTexture = &gDumpTextureProxy;
-				}
+				if (ImGui::Button("Open Dump Folder (F10)"))
+					gOpenDumpFolder();
 				
 				ImGui::Checkbox("Use RayQuery", &gRenderer.mUseRayQuery);
 			}
@@ -284,63 +295,12 @@ static void sUpdate()
 				ImGui::TreePop();
 			}
 
-			if (ImGui::TreeNodeEx("Instance"))
-			{
-				for (int i = 0; i < static_cast<int>(DebugInstanceMode::Count); i++)
-				{
-					const auto& name = nameof::nameof_enum(static_cast<DebugInstanceMode>(i));
-					if (name[0] == '_')
-					{
-						ImGui::NewLine();
-						continue;
-					}
-
-					if (i != 0)
-						ImGui::SameLine();
-
-					ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mDebugInstanceMode), i);
-				}
-
-				ImGui::SliderInt("DebugInstanceIndex", &gConstants.mDebugInstanceIndex, -1, gScene.GetInstanceCount() - 1);
-				gConstants.mDebugInstanceIndex = glm::clamp(gConstants.mDebugInstanceIndex, -1, gScene.GetInstanceCount() - 1);
-
-				ImGui::TreePop();
-			}
-
 			if (ImGui::TreeNodeEx("Scene"))
 			{
 				for (int i = 0; i < static_cast<int>(ScenePresetType::COUNT); i++)
 				{
 					if (kScenePresets[i].mPath == nullptr || std::filesystem::exists(kScenePresets[i].mPath))
 						ImGui::RadioButton(kScenePresets[i].mName, reinterpret_cast<int*>(&sCurrentScene), i);
-				}
-
-				if (ImGui::TreeNodeEx("Instances", ImGuiTreeNodeFlags_DefaultOpen))
-				{
-					int column_count = 3;
-					if (ImGui::BeginTable("InstancesTable", column_count, ImGuiTableFlags_ScrollX | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
-					{
-						ImGui::TableNextRow();
-						ImGui::TableSetColumnIndex(0); ImGui::Text("Name");
-						ImGui::TableSetColumnIndex(1); ImGui::Text("Position");
-
-						for (int row = 0; row < gScene.GetInstanceCount(); row++)
-						{
-							ImGui::TableNextRow();
-
-							const InstanceInfo& instance_info = gScene.GetInstanceInfo(row);
-							const InstanceData& instance_data = gScene.GetInstanceData(row);
-
-							ImGui::TableSetColumnIndex(0);
-							ImGui::Text(instance_info.mName.c_str());
-
-							ImGui::TableSetColumnIndex(1);
-							ImGui::Text("%f %f %f", instance_data.mTransform[3][0], instance_data.mTransform[3][1], instance_data.mTransform[3][2]);
-						}
-						ImGui::EndTable();
-					}
-
-					ImGui::TreePop();
 				}
 
 				ImGui::TreePop();
@@ -398,6 +358,79 @@ static void sUpdate()
 					resize(1920, 1080);
 
 				ImGui::TreePop();
+			}
+
+			// Floating items
+			{
+				gRenderer.ImGuiShowTextures();
+				gAtmosphere.ImGuiShowTextures();
+				gCloud.ImGuiShowTextures();
+
+				if (ImGui::Begin("Instances"))
+				{
+					for (int i = 0; i < static_cast<int>(DebugInstanceMode::Count); i++)
+					{
+						const auto& name = nameof::nameof_enum(static_cast<DebugInstanceMode>(i));
+						if (name[0] == '_')
+						{
+							ImGui::NewLine();
+							continue;
+						}
+
+						if (i != 0)
+							ImGui::SameLine();
+
+						ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mDebugInstanceMode), i);
+					}
+
+					static const int kColumnCount = 7;
+					if (ImGui::BeginTable("Table", kColumnCount, ImGuiTableFlags_ScrollX | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
+					{
+						ImGui::TableNextRow(ImGuiTableRowFlags_Headers);
+
+						ImGui::TableSetColumnIndex(0); ImGui::Text("Name");
+						ImGui::TableSetColumnIndex(1); ImGui::Text("Position");
+						ImGui::TableSetColumnIndex(2); ImGui::Text("MaterialType");
+						ImGui::TableSetColumnIndex(3); ImGui::Text("Albedo");
+						ImGui::TableSetColumnIndex(4); ImGui::Text("Reflectance");
+						ImGui::TableSetColumnIndex(5); ImGui::Text("Emission");
+						ImGui::TableSetColumnIndex(6); ImGui::Text("RoughnessAlpha");
+
+						for (int row = 0; row < gScene.GetInstanceCount(); row++)
+						{
+							ImGui::TableNextRow();
+
+							const InstanceInfo& instance_info = gScene.GetInstanceInfo(row);
+							const InstanceData& instance_data = gScene.GetInstanceData(row);
+
+							ImGui::TableSetColumnIndex(0);
+							if (ImGui::Selectable(instance_info.mName.c_str(), row == gConstants.mDebugInstanceIndex, ImGuiSelectableFlags_SpanAllColumns))
+								gConstants.mDebugInstanceIndex = row;
+
+							ImGui::TableSetColumnIndex(1);
+							ImGui::Text("%f %f %f", instance_data.mTransform[3][0], instance_data.mTransform[3][1], instance_data.mTransform[3][2]);
+
+							ImGui::TableSetColumnIndex(2);
+							ImGui::Text("%s%s", NAMEOF_ENUM(instance_data.mMaterialType).data(), instance_data.mTwoSided ? " (TwoSided)" : "");
+
+							ImGui::TableSetColumnIndex(3);
+							ImGui::Text("%f %f %f", instance_data.mAlbedo.x, instance_data.mAlbedo.y, instance_data.mAlbedo.z);
+
+							ImGui::TableSetColumnIndex(4);
+							ImGui::Text("%f %f %f", instance_data.mReflectance.x, instance_data.mReflectance.y, instance_data.mReflectance.z);
+
+							ImGui::TableSetColumnIndex(5);
+							ImGui::Text("%f %f %f", instance_data.mEmission.x, instance_data.mEmission.y, instance_data.mEmission.z);
+
+							ImGui::TableSetColumnIndex(6);
+							ImGui::Text("%f", instance_data.mRoughnessAlpha);
+						}
+						ImGui::EndTable();
+					}
+
+					gConstants.mDebugInstanceIndex = glm::clamp(gConstants.mDebugInstanceIndex, -1, gScene.GetInstanceCount() - 1);
+				}
+				ImGui::End();
 			}
 		}
 		ImGui::End();
@@ -718,16 +751,11 @@ void sRender()
 			DirectX::ScratchImage image;
 			DirectX::CaptureTexture(gCommandQueue, gDumpTexture->mResource.Get(), false, image, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COMMON);
 
-			gDump([&](const std::filesystem::path& inDirectory)
-			{
-				std::filesystem::path path = inDirectory;
-				path += gDumpTexture->mName;
-				path += ".dds";
-				DirectX::SaveToDDSFile(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::DDS_FLAGS_NONE, path.c_str());
+			std::filesystem::path path = gCreateDumpFolder();
+			path += gDumpTexture->mName;
+			path += ".dds";
+			DirectX::SaveToDDSFile(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::DDS_FLAGS_NONE, path.c_str());
 
-				return path;
-			}, true);
-			
 			gDumpTexture = nullptr;
 		}
 	}

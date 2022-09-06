@@ -1,6 +1,6 @@
 <scene version="3.0.0">
 	<default name="integrator" value="path" />
-	<default name="spp" value="64" />
+	<default name="spp" value="256" />
 	<default name="resx" value="1280" />
 	<default name="resy" value="720" />	
 	<default name="max_depth" value="65" />
@@ -20,7 +20,7 @@
 			<integer name="height" value="$resy" />
 			<string name="file_format" value="openexr" />
 			<string name="pixel_format" value="rgb" />
-			<rfilter type="tent" />
+			<rfilter type="box" />
 		</film>
 	</sensor>
 	<bsdf type="twosided" id="LeftWallBSDF">
@@ -71,7 +71,7 @@
 	</shape>
 	<shape type="rectangle" id="Ceiling">
 		<transform name="to_world">
-			<matrix value="-1 7.64274e-015 -1.74846e-007 0 8.74228e-008 8.74228e-008 -2 2 0 -1 -4.37114e-008 0 0 0 0 1" />
+			<matrix value="-1 0 0 0 0 0 -2 2 0 -1 0 0 0 0 0 1" />
 		</transform>
 		<ref id="CeilingBSDF" />
 	</shape>
@@ -107,7 +107,7 @@
 	</shape>
 	<shape type="rectangle" id="Light">
 		<transform name="to_world">
-			<matrix value="0.235 -1.66103e-008 -7.80685e-009 -0.005 -2.05444e-008 3.90343e-009 -0.0893 1.98 2.05444e-008 0.19 8.30516e-009 -0.03 0 0 0 1" />
+			<matrix value="0.235 0 0 -0.005 0 0 -0.0893 1.98 0 0.19 0 -0.03 0 0 0 1" />
 		</transform>
 		<ref id="LightBSDF" />
 		<emitter type="area">

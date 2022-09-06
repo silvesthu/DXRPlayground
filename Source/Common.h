@@ -82,21 +82,23 @@ inline void gTrace(const T& data)
 	OutputDebugStringA(str.c_str());
 }
 
-inline void gDump(std::function<std::filesystem::path(const std::filesystem::path& inDirectory)> inWriteFileCallback, bool inOpenFile)
+inline std::filesystem::path gCreateDumpFolder()
 {
 	std::filesystem::path directory = ".\\Dump\\";
 	std::filesystem::create_directory(directory);
 
-	std::filesystem::path path = inWriteFileCallback(directory);
+	return directory;
+}
 
-	if (inOpenFile)
-	{
-		std::filesystem::path command = "explorer ";
-		command += std::filesystem::current_path();
-		command += "\\";
-		command += path;
-		system(command.string().c_str());
-	}
+inline void gOpenDumpFolder()
+{
+	std::filesystem::path dump_folder = gCreateDumpFolder();
+
+	std::filesystem::path command = "explorer ";
+	command += std::filesystem::current_path();
+	command += "\\";
+	command += dump_folder;
+	system(command.string().c_str());
 }
 
 #define gAssert assert

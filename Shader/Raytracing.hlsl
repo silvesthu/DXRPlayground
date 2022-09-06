@@ -172,33 +172,26 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 
 	// Debug - Global
 	{
-		bool terminate = true;
 		switch (mConstants.mDebugMode)
 		{
-		case DebugMode::Barycentrics: 			hit_info.mEmission = barycentrics; break;
-		case DebugMode::Vertex: 				hit_info.mEmission = vertex; break;
-		case DebugMode::Normal: 				hit_info.mEmission = normal * 0.5 + 0.5; break;
-		case DebugMode::UV:						hit_info.mEmission = float3(uv, 0.0); break;
-		case DebugMode::Albedo: 				hit_info.mEmission = InstanceDatas[sGetInstanceID()].mAlbedo; break;
-		case DebugMode::Reflectance: 			hit_info.mEmission = InstanceDatas[sGetInstanceID()].mReflectance; break;
-		case DebugMode::Emission: 				hit_info.mEmission = InstanceDatas[sGetInstanceID()].mEmission; break;
-		case DebugMode::RoughnessAlpha: 		hit_info.mEmission = InstanceDatas[sGetInstanceID()].mRoughnessAlpha; break;
-		case DebugMode::Transmittance:			hit_info.mEmission = transmittance; break;
-		case DebugMode::InScattering:			hit_info.mEmission = in_scattering; break;
-		case DebugMode::RecursionCount:			terminate = false; break;
-		case DebugMode::RussianRouletteCount:	terminate = false; break;
-		default:								terminate = false; break;
-		}
-
-		if (terminate)
-		{
-			hit_info.mDone = true;
-			return hit_info;
+		case DebugMode::Barycentrics: 			hit_info.mEmission = barycentrics; hit_info.mDone = true; break;
+		case DebugMode::Vertex: 				hit_info.mEmission = vertex; hit_info.mDone = true; break;
+		case DebugMode::Normal: 				hit_info.mEmission = normal * 0.5 + 0.5; hit_info.mDone = true; break;
+		case DebugMode::UV:						hit_info.mEmission = float3(uv, 0.0); hit_info.mDone = true; break;
+		case DebugMode::Albedo: 				hit_info.mEmission = InstanceDatas[sGetInstanceID()].mAlbedo; hit_info.mDone = true; break;
+		case DebugMode::Reflectance: 			hit_info.mEmission = InstanceDatas[sGetInstanceID()].mReflectance; hit_info.mDone = true; break;
+		case DebugMode::Emission: 				hit_info.mEmission = InstanceDatas[sGetInstanceID()].mEmission; hit_info.mDone = true; break;
+		case DebugMode::RoughnessAlpha: 		hit_info.mEmission = InstanceDatas[sGetInstanceID()].mRoughnessAlpha; hit_info.mDone = true; break;
+		case DebugMode::Transmittance:			hit_info.mEmission = transmittance; hit_info.mDone = true; break;
+		case DebugMode::InScattering:			hit_info.mEmission = in_scattering; hit_info.mDone = true; break;
+		case DebugMode::RecursionCount:			hit_info.mDone = false; break;
+		case DebugMode::RussianRouletteCount:	hit_info.mDone = false; break;
+		default:								hit_info.mDone = false; break;
 		}
 	}
 
 	// Debug - Per instance
-    if (mConstants.mDebugInstanceIndex == -1 || mConstants.mDebugInstanceIndex == sGetInstanceID())
+    if (mConstants.mDebugInstanceIndex == sGetInstanceID())
 	{
 		switch (mConstants.mDebugInstanceMode)
 		{

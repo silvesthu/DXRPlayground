@@ -109,19 +109,14 @@ static IDxcBlob* sCompileShader(const char* inFilename, const char* inEntryPoint
 		gValidate(utils->GetBlobAsUtf8(disassemble, &blob_8));
 		std::string str(static_cast<LPCSTR>(blob_8->GetBufferPointer()), blob_8->GetBufferSize());
 
-		gDump([&](const std::filesystem::path& inDirectory)
-		{
-			static int counter = 0;
-			std::filesystem::path path = inDirectory;
-			path += "RayQueryCS_";
-			path += std::to_string(counter++);
-			path += ".txt";
-			std::ofstream stream(path);
-			stream << str;
-			stream.close();
-
-			return path;
-		}, true);
+		static int counter = 0;
+		std::filesystem::path path = gCreateDumpFolder();
+		path += "RayQueryCS_";
+		path += std::to_string(counter++);
+		path += ".txt";
+		std::ofstream stream(path);
+		stream << str;
+		stream.close();
 
 		gRenderer.mDumpDisassemblyRayQuery = false;
 	}
