@@ -192,6 +192,7 @@ enum class DebugInstanceMode : uint
 enum class LightType : uint
 {
 	Sphere,
+	Rectangle,
 
 	Count,
 };
@@ -242,7 +243,8 @@ struct InstanceData
 	// [TODO] Split material
 
 	MaterialType				mMaterialType					CONSTANT_DEFAULT(MaterialType::Diffuse);
-	float3						GENERATE_PAD_NAME				CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	uint						mTwoSided						CONSTANT_DEFAULT(0);
+	float2						GENERATE_PAD_NAME				CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 
     float3						mAlbedo							CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	float						mOpacity						CONSTANT_DEFAULT(1.0f);

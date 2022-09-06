@@ -2,13 +2,14 @@
 
 struct HitInfo
 {
-    float3 mAlbedo;
+    float3 mBSDF;
+    float mNdotL;
+
     float3 mEmission;
 
     float3 mPosition;
     float3 mReflectionDirection;
 
-    float mScatteringPDF;
     float mSamplingPDF;
 
 	// Participating Media along the ray

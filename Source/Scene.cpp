@@ -218,6 +218,7 @@ bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransfor
 			default: break;
 			}
 			instance_data.mMaterialType = type;
+			instance_data.mTwoSided = false;
 			instance_data.mAlbedo = glm::vec3(material.diffuse[0], material.diffuse[1], material.diffuse[2]);
 			instance_data.mOpacity = 1.0f;
 			instance_data.mEmission = glm::vec3(material.emission[0], material.emission[1], material.emission[2]);
@@ -280,15 +281,18 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 	{
 		std::string_view id = bsdf->Attribute("id");
 
+		MaterialData material;
+
 		tinyxml2::XMLElement* local_bsdf = bsdf;
 		std::string_view local_type = bsdf->Attribute("type");
 		if (local_type == "twosided")
 		{
 			local_bsdf = local_bsdf->FirstChildElement("bsdf");
 			local_type = local_bsdf->Attribute("type");
-		}
 
-		MaterialData material;
+			material.mTwoSided = true;
+		}
+		
 		if (local_type == "diffuse")
 		{
 			material.mMaterialType = MaterialType::Diffuse;
@@ -447,9 +451,15 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 						"%f, %f, %f",
 						&instance_data.mEmission.x, &instance_data.mEmission.y, &instance_data.mEmission.z) == 3);
 
-					gAssert(primitive == &mPrimitives.mSphere);
+					// [Hack]
+					instance_data.mTwoSided = false;
+
 					Light light;
-					light.mType = LightType::Sphere;
+					light.mType = LightType::Count;
+					if (primitive == &mPrimitives.mSphere)
+						light.mType = LightType::Sphere;
+					if (primitive == &mPrimitives.mRectangle)
+						light.mType = LightType::Rectangle;
 					light.mPosition = matrix[3];
 					light.mRadius = matrix[0][0];
 					ioSceneContent.mLights.push_back(light);
