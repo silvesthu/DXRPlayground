@@ -1,13 +1,9 @@
 #include "Constant.h"
 #include "Shared.inl"
 #include "Binding.h"
-
-#ifndef SHADER_PROFILE_LIB
-#define ENABLE_RAY_QUERY
-#endif // SHADER_PROFILE_LIB
-
 #include "Common.inl"
 #include "RayQuery.inl"
+#include "Material.inl"
 #include "Planet.inl"
 #include "AtmosphereIntegration.inl"
 #include "CloudIntegration.inl"
@@ -91,83 +87,8 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	hit_info.mDone = !need_next_ray;
 	if (need_next_ray)
 	{
-		{
-			// onb - build_from_w
-			float3 axis[3];
-			axis[2] = normal;
-			float3 a = (abs(axis[2].x) > 0.9) ? float3(0, 1, 0) : float3(1, 0, 0);
-			axis[1] = normalize(cross(axis[2], a));
-			axis[0] = cross(axis[2], axis[1]);
-		
-			// Based on Mitsuba2
-			switch (InstanceDatas[sGetInstanceID()].mMaterialType)
-			{
-				case MaterialType::Diffuse:
-					{
-            			// random
-						float3 direction = RandomCosineDirection(payload.mRandomState);
-
-            			// onb - local
-						hit_info.mReflectionDirection = normalize(direction.x * axis[0] + direction.y * axis[1] + direction.z * axis[2]);
-
-            			// pdf - exact distribution - should cancel out
-						float NdotL = max(dot(normal, hit_info.mReflectionDirection), 0);
-						hit_info.mBSDF = InstanceDatas[sGetInstanceID()].mAlbedo / MATH_PI;
-						hit_info.mNdotL = NdotL;
-						hit_info.mSamplingPDF = NdotL / MATH_PI;
-						hit_info.mDone = false;
-					}
-					break;
-				case MaterialType::RoughConductor:
-					{
-            			// TODO: Check visible normal
-
-						float a = InstanceDatas[sGetInstanceID()].mRoughnessAlpha;
-						float a2 = a * a;
-
-            			// Microfacet
-						float3 H; // Microfacet normal (Half-vector)
-            			{                    	
-							float e0 = RandomFloat01(payload.mRandomState);
-							float e1 = RandomFloat01(payload.mRandomState);
-                    	
-							// 2D Distribution -> GGX Distribution (Polar)
-							float cos_theta = sqrt((1.0 - e0) / ((a2 - 1) * e0 + 1.0));
-							float sin_theta = sqrt(1 - cos_theta * cos_theta);
-							float phi = 2 * MATH_PI * e1;
-
-							// Polar -> Cartesian
-							H.x = sin_theta * cos(phi);
-							H.y = sin_theta * sin(phi);
-							H.z = cos_theta;
-
-                    		// Tangent -> World
-							H = normalize(H.x * axis[0] + H.y * axis[1] + H.z * axis[2]);
-						}
-
-            			// TODO: Better to calculate in tangent space?
-						float3 V = -sGetWorldRayDirection();
-						float HdotV = dot(H, V);
-						float3 L = 2.0 * HdotV * H - V;
-						float NdotH = dot(normal, H);
-						float NdotV = dot(normal, V);
-						float HdotL = dot(H, L);
-						float NdotL = dot(normal, L);
-
-						float G = G_SmithGGX(NdotL, NdotV, a2);
-						float3 F = F_Schlick(InstanceDatas[sGetInstanceID()].mReflectance, HdotV);
-
-						hit_info.mReflectionDirection = L;
-						hit_info.mBSDF = G * F / (4.0f * NdotV * NdotL);
-						hit_info.mNdotL = NdotL;
-						hit_info.mSamplingPDF = NdotH / (4.0f * abs(HdotL));
-						hit_info.mDone = false;
-					}
-					break;
-				default:
-					break;
-			}
-		}
+		float3 light = Material::GenerateSample(normal, payload);
+		Material::Evaluate(light, normal, hit_info);
 	}
 
 	// Debug - Global
@@ -250,7 +171,7 @@ void TraceRay()
 
 	RayPayload payload = (RayPayload)0;
 	payload.mThroughput = 1; // Camera gather all the light
-	payload.mRandomState = uint(uint(sGetDispatchRaysIndex().x) * uint(1973) + uint(sGetDispatchRaysIndex().y) * uint(9277) + uint(mConstants.mAccumulationFrameCount) * uint(26699)) | uint(1); // From https://www.shadertoy.com/view/tsBBWW
+	payload.mRandomState = uint(uint(sGetDispatchRaysIndex().x) * uint(1973) + uint(sGetDispatchRaysIndex().y) * uint(9277) + uint(mConstants.mCurrentFrameIndex) * uint(26699)) | uint(1); // From https://www.shadertoy.com/view/tsBBWW
 	payload.mState.Reset(RayState::FirstHit);
 
 #ifdef ENABLE_RAY_QUERY
@@ -344,7 +265,7 @@ void TraceRay()
 
 		float3 previous_output = RaytracingOutput[sGetDispatchRaysIndex().xy].xyz;
 		previous_output = max(0, previous_output); // Eliminate nan
-		float3 mixed_output = lerp(previous_output, current_output, 1.0f / (float)(mConstants.mAccumulationFrameCount));
+		float3 mixed_output = lerp(previous_output, current_output, mConstants.mCurrentFrameWeight);
 
 		if (recursion == 0)
 			mixed_output = current_output;

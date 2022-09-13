@@ -252,6 +252,12 @@ struct InstanceData
     float3						mReflectance					CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	float						mRoughnessAlpha					CONSTANT_DEFAULT(0.0f);
 
+	float3						mEta							CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+
+	float3						mK								CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+
     float3						mEmission						CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
@@ -441,11 +447,11 @@ struct Constants
 
 	RecursionMode				mRecursionMode					CONSTANT_DEFAULT(RecursionMode::RussianRoulette);
 	uint						mRecursionCountMax				CONSTANT_DEFAULT(4);
-	uint						mFrameIndex						CONSTANT_DEFAULT(0);
-	uint						mAccumulationFrameCount			CONSTANT_DEFAULT(1);
+	uint						mCurrentFrameIndex				CONSTANT_DEFAULT(0);
+	float						mCurrentFrameWeight				CONSTANT_DEFAULT(1);
 
 	uint2						mDebugCoord						CONSTANT_DEFAULT(uint2(0, 0));
-	uint						mReset							CONSTANT_DEFAULT(0);
+	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
 	AtmosphereConstants			mAtmosphere;

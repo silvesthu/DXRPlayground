@@ -62,6 +62,17 @@ float3 RandomCosineDirection(inout uint state)
     return float3(x, y, z);
 }
 
+float3x3 GenerateTangentSpace(float3 inNormal)
+{
+    // onb - build_from_w - from Ray Tracing in One Weekend
+    float3x3 matrix;
+    matrix[2] = inNormal;
+    float3 a = (abs(matrix[2].x) > 0.9) ? float3(0, 1, 0) : float3(1, 0, 0);
+    matrix[1] = normalize(cross(matrix[2], a));
+    matrix[0] = cross(matrix[2], matrix[1]);
+    return matrix;
+}
+
 // From https://www.shadertoy.com/view/lsdGzN
 float3 hsv2rgb( in float3 c )
 {
@@ -144,6 +155,36 @@ float G_SmithGGX(float inNoL, float inNoV, float inA2)
 float3 F_Schlick(float3 inR0, float inHoV)
 {
     return inR0 + (1.0 - inR0) * pow(1.0 - inHoV, 5.0);
+}
+
+float3 F_Conductor_Mitsuba(float3 inEta, float3 inK, float inCosTheta)
+{
+    // [Mitsuba3] From fresnel_conductor in fresnel.h
+    // See also https://seblagarde.wordpress.com/2013/04/29/memo-on-fresnel-equations/
+
+    // Modified from "Optics" by K.D. Moeller, University Science Books, 1988
+    float cos_theta_i_2 = inCosTheta * inCosTheta,
+        sin_theta_i_2 = 1.f - cos_theta_i_2,
+        sin_theta_i_4 = sin_theta_i_2 * sin_theta_i_2;
+
+    float3 eta_r = inEta,
+        eta_i = inK;
+
+    float3 temp_1 = eta_r * eta_r - eta_i * eta_i - sin_theta_i_2,
+        a_2_pb_2 = sqrt(temp_1 * temp_1 + 4.f * eta_i * eta_i * eta_r * eta_r),
+        a = sqrt(.5f * (a_2_pb_2 + temp_1));
+
+    float3 term_1 = a_2_pb_2 + cos_theta_i_2,
+        term_2 = 2.f * inCosTheta * a;
+
+    float3 r_s = (term_1 - term_2) / (term_1 + term_2);
+
+    float3 term_3 = a_2_pb_2 * cos_theta_i_2 + sin_theta_i_4,
+        term_4 = term_2 * sin_theta_i_2;
+
+    float3 r_p = r_s * (term_3 - term_4) / (term_3 + term_4);
+
+    return 0.5f * (r_s + r_p);
 }
 
 // [2014][Heitz] Understanding the Masking-Shadowing Function in Microfacet-Based BRDFs

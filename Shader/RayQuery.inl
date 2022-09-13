@@ -1,4 +1,10 @@
+#pragma once
+
 // Adapters for RayQuery
+
+#ifndef SHADER_PROFILE_LIB
+#define ENABLE_RAY_QUERY
+#endif // SHADER_PROFILE_LIB
 
 static uint3 sDispatchRaysIndex;
 uint3 sGetDispatchRaysIndex()

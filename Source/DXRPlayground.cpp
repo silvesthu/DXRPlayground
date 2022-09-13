@@ -191,7 +191,7 @@ static void sUpdate()
 		if (ImGui::Begin("DXR Playground"))
 		{
 			ImGui::Text("Frame %d | Time %.3f s | Average %.3f ms (FPS %.1f) | %dx%d",
-				gConstants.mAccumulationFrameCount,
+				gConstants.mCurrentFrameIndex,
 				gConstants.mTime,
 				1000.0f / ImGui::GetIO().Framerate,
 				ImGui::GetIO().Framerate,
@@ -216,6 +216,18 @@ static void sUpdate()
 					gOpenDumpFolder();
 				
 				ImGui::Checkbox("Use RayQuery", &gRenderer.mUseRayQuery);
+			}
+
+			if (ImGui::TreeNodeEx("Accumulation", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				if (ImGui::Checkbox("Infinity", &gRenderer.mAccumulationFrameInfinity))
+					gRenderer.mAccumulationResetRequested = true;
+
+				if (!gRenderer.mAccumulationFrameInfinity)
+					if (ImGui::SliderInt("Count", reinterpret_cast<int*>(&gRenderer.mAccumulationFrameCount), 1, 16))
+						gRenderer.mAccumulationResetRequested = true;
+
+				ImGui::TreePop();
 			}
 
 			if (ImGui::TreeNodeEx("Camera"))
@@ -444,7 +456,7 @@ static void sUpdate()
 
 			sWaitForLastSubmittedFrame();
 			gScene.RebuildShader();
-			gConstants.mReset = 1;
+			gRenderer.mAccumulationResetRequested = true;
 
 			gAtmosphere.mRuntime.mBruneton17.mRecomputeRequested = true;
 			gCloud.mRecomputeRequested = true;
@@ -645,26 +657,46 @@ void sRender()
 			gConstants.mDebugCoord		= glm::uvec2(static_cast<glm::uint32>(ImGui::GetMousePos().x), (glm::uint32)ImGui::GetMousePos().y);
 		}
 
-		// Accumulation reset check
+		// Accumulation
 		{
 			static Constants sConstantsCopy = gConstants;
 
 			// Whitelist
+			sConstantsCopy.mTime					= gConstants.mTime;
+			sConstantsCopy.mCurrentFrameIndex		= gConstants.mCurrentFrameIndex;
+			sConstantsCopy.mCurrentFrameWeight		= gConstants.mCurrentFrameWeight;
 			sConstantsCopy.mDebugCoord				= gConstants.mDebugCoord;
-			sConstantsCopy.mAccumulationFrameCount	= gConstants.mAccumulationFrameCount;
-			sConstantsCopy.mFrameIndex				= gConstants.mFrameIndex;
-			sConstantsCopy.mTime						= gConstants.mTime;
 
-			if (gConstants.mReset == 0 && memcmp(&sConstantsCopy, &gConstants, sizeof(Constants)) == 0)
-				gConstants.mAccumulationFrameCount++;
+			if (memcmp(&sConstantsCopy, &gConstants, sizeof(Constants)) != 0)
+				gRenderer.mAccumulationResetRequested = true;
+
+			if (gRenderer.mAccumulationResetRequested)
+			{
+				gConstants.mCurrentFrameIndex = 0;
+				gRenderer.mAccumulationDone = false;
+			}
+
+			if (gRenderer.mAccumulationDone)
+				gConstants.mCurrentFrameWeight = 0.0f;
 			else
-				gConstants.mAccumulationFrameCount = 1;
-
-			gConstants.mReset = 0;
+				gConstants.mCurrentFrameWeight = 1.0f / (gConstants.mCurrentFrameIndex + 1);
+			
 			sConstantsCopy = gConstants;
+			gRenderer.mAccumulationResetRequested = false;
 		}
 		
 		memcpy(frame_context.mConstantUploadBufferPointer, &gConstants, sizeof(gConstants));
+
+		{
+			gConstants.mCurrentFrameIndex++;
+
+			glm::uint32 accumulation_frame_count = gRenderer.mAccumulationFrameInfinity ? UINT_MAX : gRenderer.mAccumulationFrameCount;
+
+			if (gConstants.mCurrentFrameIndex == accumulation_frame_count)
+				gRenderer.mAccumulationDone = true;
+
+			gConstants.mCurrentFrameIndex = gMin(gConstants.mCurrentFrameIndex, accumulation_frame_count - 1);
+		}
 
 		gBarrierTransition(gCommandList, gConstantGPUBuffer.Get(), D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, D3D12_RESOURCE_STATE_COPY_DEST);
 		gCommandList->CopyResource(gConstantGPUBuffer.Get(), frame_context.mConstantUploadBuffer.Get());
@@ -741,7 +773,6 @@ void sRender()
 		gCommandQueue->ExecuteCommandLists(1, reinterpret_cast<ID3D12CommandList* const*>(&gCommandList));
 
 		gConstants.mTime += ImGui::GetIO().DeltaTime;
-		gConstants.mFrameIndex++;
 	}
 
 	// Dump Texture

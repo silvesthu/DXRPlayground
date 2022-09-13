@@ -475,7 +475,12 @@ struct Renderer
 	bool									mDumpDisassemblyRayQuery				= false;
 	bool									mPrintStateObjectDesc					= false;
 																					
-	bool									mUseRayQuery							= true;	
+	bool									mUseRayQuery							= true;
+
+	bool									mAccumulationDone						= false;
+	bool									mAccumulationFrameInfinity				= true;
+	glm::uint32								mAccumulationFrameCount					= 1;
+	bool									mAccumulationResetRequested				= false;
 };
 extern Renderer								gRenderer;
 

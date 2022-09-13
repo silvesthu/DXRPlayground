@@ -111,8 +111,7 @@ void Atmosphere::Runtime::Bruneton17::Update(const Profile& inProfile)
 		for (glm::uint scattering_order = 2; scattering_order <= mScatteringOrder; scattering_order++)
 			ComputeMultipleScattering(scattering_order);
 
-		// Reset accumulation
-		gConstants.mReset = true;
+		gRenderer.mAccumulationResetRequested = true;
 	}
 	mRecomputeRequested = false;
 }

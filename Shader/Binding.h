@@ -89,6 +89,7 @@ static RWTexture2D<float4> SkyViewLutTexUAV = ResourceDescriptorHeap[(int)ViewDe
 static RWTexture3D<float4> AtmosphereCameraScatteringVolumeUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Hillaire20AtmosphereCameraScatteringVolumeUAV];
 static RWTexture2D<float4> Wilkie21SkyViewLutTexUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Wilkie21SkyViewUAV];
 static RWTexture2D<float4> RaytracingOutput = ResourceDescriptorHeap[(int)ViewDescriptorIndex::ScreenColorUAV];
+static RWTexture2D<float4> ScreenDebugUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::ScreenDebugUAV];
 
 // Samplers Helper
 #ifdef USE_DYNAMIC_RESOURCE_SAMPLER
