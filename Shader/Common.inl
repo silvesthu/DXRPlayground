@@ -2,13 +2,14 @@
 
 struct HitInfo
 {
-    float3 mAlbedo;
+    float3 mBSDF;
+    float mNdotL;
+
     float3 mEmission;
 
     float3 mPosition;
     float3 mReflectionDirection;
 
-    float mScatteringPDF;
     float mSamplingPDF;
 
 	// Participating Media along the ray
@@ -37,6 +38,7 @@ float RandomFloat01(inout uint state)
 {
     return float(wang_hash(state)) / 4294967296.0;
 }
+
 float3 RandomUnitVector(inout uint state)
 {
     float z = RandomFloat01(state) * 2.0f - 1.0f;
@@ -58,6 +60,17 @@ float3 RandomCosineDirection(inout uint state)
     float y = sin(phi) * sqrt(r2);
 
     return float3(x, y, z);
+}
+
+float3x3 GenerateTangentSpace(float3 inNormal)
+{
+    // onb - build_from_w - from Ray Tracing in One Weekend
+    float3x3 matrix;
+    matrix[2] = inNormal;
+    float3 a = (abs(matrix[2].x) > 0.9) ? float3(0, 1, 0) : float3(1, 0, 0);
+    matrix[1] = normalize(cross(matrix[2], a));
+    matrix[0] = cross(matrix[2], matrix[1]);
+    return matrix;
 }
 
 // From https://www.shadertoy.com/view/lsdGzN
@@ -114,18 +127,21 @@ float PhaseFunction_Isotropic()
     return 1.0 / (4.0 * MATH_PI);
 }
 
-// http://www.pbr-book.org/3ed-2018/Monte_Carlo_Integration/Importance_Sampling.html#PowerHeuristic
-float MIS_PowerHeuristic(int nf, float fPdf, int ng, float gPdf, float power)
+namespace MIS
 {
-    float f = nf * fPdf;
-    float g = ng * gPdf;
-    return pow(f, power) / (pow(f, power) + pow(g, power));
-}
+    // http://www.pbr-book.org/3ed-2018/Monte_Carlo_Integration/Importance_Sampling.html#PowerHeuristic
+    float PowerHeuristic(int nf, float fPdf, int ng, float gPdf, float power)
+    {
+        float f = nf * fPdf;
+        float g = ng * gPdf;
+        return pow(f, power) / (pow(f, power) + pow(g, power));
+    }
 
-// http://www.pbr-book.org/3ed-2018/Monte_Carlo_Integration/Importance_Sampling.html#BalanceHeuristic
-float MIS_BalanceHeuristic(int nf, float fPdf, int ng, float gPdf)
-{
-    return MIS_PowerHeuristic(nf, fPdf, ng, gPdf, 1.0);
+    // http://www.pbr-book.org/3ed-2018/Monte_Carlo_Integration/Importance_Sampling.html#BalanceHeuristic
+    float BalanceHeuristic(int nf, float fPdf, int ng, float gPdf)
+    {
+        return PowerHeuristic(nf, fPdf, ng, gPdf, 1.0);
+    }
 }
 
 float G_SmithGGX(float inNoL, float inNoV, float inA2)
@@ -139,6 +155,36 @@ float G_SmithGGX(float inNoL, float inNoV, float inA2)
 float3 F_Schlick(float3 inR0, float inHoV)
 {
     return inR0 + (1.0 - inR0) * pow(1.0 - inHoV, 5.0);
+}
+
+float3 F_Conductor_Mitsuba(float3 inEta, float3 inK, float inCosTheta)
+{
+    // [Mitsuba3] From fresnel_conductor in fresnel.h
+    // See also https://seblagarde.wordpress.com/2013/04/29/memo-on-fresnel-equations/
+
+    // Modified from "Optics" by K.D. Moeller, University Science Books, 1988
+    float cos_theta_i_2 = inCosTheta * inCosTheta,
+        sin_theta_i_2 = 1.f - cos_theta_i_2,
+        sin_theta_i_4 = sin_theta_i_2 * sin_theta_i_2;
+
+    float3 eta_r = inEta,
+        eta_i = inK;
+
+    float3 temp_1 = eta_r * eta_r - eta_i * eta_i - sin_theta_i_2,
+        a_2_pb_2 = sqrt(temp_1 * temp_1 + 4.f * eta_i * eta_i * eta_r * eta_r),
+        a = sqrt(.5f * (a_2_pb_2 + temp_1));
+
+    float3 term_1 = a_2_pb_2 + cos_theta_i_2,
+        term_2 = 2.f * inCosTheta * a;
+
+    float3 r_s = (term_1 - term_2) / (term_1 + term_2);
+
+    float3 term_3 = a_2_pb_2 * cos_theta_i_2 + sin_theta_i_4,
+        term_4 = term_2 * sin_theta_i_2;
+
+    float3 r_p = r_s * (term_3 - term_4) / (term_3 + term_4);
+
+    return 0.5f * (r_s + r_p);
 }
 
 // [2014][Heitz] Understanding the Masking-Shadowing Function in Microfacet-Based BRDFs

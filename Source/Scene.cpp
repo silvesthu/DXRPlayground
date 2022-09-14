@@ -218,6 +218,7 @@ bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransfor
 			default: break;
 			}
 			instance_data.mMaterialType = type;
+			instance_data.mTwoSided = false;
 			instance_data.mAlbedo = glm::vec3(material.diffuse[0], material.diffuse[1], material.diffuse[2]);
 			instance_data.mOpacity = 1.0f;
 			instance_data.mEmission = glm::vec3(material.emission[0], material.emission[1], material.emission[2]);
@@ -280,15 +281,18 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 	{
 		std::string_view id = bsdf->Attribute("id");
 
+		MaterialData material;
+
 		tinyxml2::XMLElement* local_bsdf = bsdf;
 		std::string_view local_type = bsdf->Attribute("type");
 		if (local_type == "twosided")
 		{
 			local_bsdf = local_bsdf->FirstChildElement("bsdf");
 			local_type = local_bsdf->Attribute("type");
-		}
 
-		MaterialData material;
+			material.mTwoSided = true;
+		}
+		
 		if (local_type == "diffuse")
 		{
 			material.mMaterialType = MaterialType::Diffuse;
@@ -301,51 +305,21 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 
 			gAssert(std::string_view(get_child_value(local_bsdf, "distribution")) == "ggx"); // [TODO] Support beckmann?
 
-			gVerify(std::sscanf(get_child_value(local_bsdf, "alpha"), "%f", &material.mRoughnessAlpha) == 1);
+			gVerify(std::sscanf(get_child_value(local_bsdf, "alpha"), 
+				"%f", 
+				&material.mRoughnessAlpha) == 1);
 
-			// [Mitsuba3] From fresnel_conductor in fresnel.h
-			// See also https://seblagarde.wordpress.com/2013/04/29/memo-on-fresnel-equations/
-			// See also "Optics" book
-			auto fresnel_conductor = [](glm::vec3 inEta, glm::vec3 inK, float inCosTheta)
-			{
-				// Modified from "Optics" by K.D. Moeller, University Science Books, 1988
-				float cos_theta_i_2 = inCosTheta * inCosTheta,
-					sin_theta_i_2 = 1.f - cos_theta_i_2,
-					sin_theta_i_4 = sin_theta_i_2 * sin_theta_i_2;
-
-				auto eta_r = inEta,
-					eta_i = inK;
-
-				glm::vec3 temp_1 = eta_r * eta_r - eta_i * eta_i - sin_theta_i_2,
-					a_2_pb_2 = glm::sqrt(temp_1 * temp_1 + 4.f * eta_i * eta_i * eta_r * eta_r),
-					a = glm::sqrt(.5f * (a_2_pb_2 + temp_1));
-
-				glm::vec3 term_1 = a_2_pb_2 + cos_theta_i_2,
-					term_2 = 2.f * inCosTheta * a;
-
-				glm::vec3 r_s = (term_1 - term_2) / (term_1 + term_2);
-
-				glm::vec3 term_3 = a_2_pb_2 * cos_theta_i_2 + sin_theta_i_4,
-					term_4 = term_2 * sin_theta_i_2;
-
-				glm::vec3 r_p = r_s * (term_3 - term_4) / (term_3 + term_4);
-
-				return 0.5f * (r_s + r_p);
-			};
-
-			glm::vec3 specular_reflectance;
 			gVerify(std::sscanf(get_child_value(local_bsdf, "specular_reflectance"), 
 				"%f, %f, %f", 
-				&specular_reflectance.x, &specular_reflectance.y, &specular_reflectance.z) == 3);
-			glm::vec3 eta;
+				&material.mReflectance.x, &material.mReflectance.y, &material.mReflectance.z) == 3);
+			
 			gVerify(std::sscanf(get_child_value(local_bsdf, "eta"), 
 				"%f, %f, %f", 
-				&eta.x, &eta.y, &eta.z) == 3);
-			glm::vec3 k;
+				&material.mEta.x, &material.mEta.y, &material.mEta.z) == 3);
+			
 			gVerify(std::sscanf(get_child_value(local_bsdf, "k"), 
 				"%f, %f, %f", 
-				&k.x, &k.y, &k.z) == 3);
-			material.mReflectance = specular_reflectance * fresnel_conductor(eta, k, 1); // Use F0 for now
+				&material.mK.x, &material.mK.y, &material.mK.z) == 3);
 		}
 
 		materials_by_id[id] = material;
@@ -447,9 +421,15 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 						"%f, %f, %f",
 						&instance_data.mEmission.x, &instance_data.mEmission.y, &instance_data.mEmission.z) == 3);
 
-					gAssert(primitive == &mPrimitives.mSphere);
+					// [Hack]
+					instance_data.mTwoSided = false;
+
 					Light light;
-					light.mType = LightType::Sphere;
+					light.mType = LightType::Count;
+					if (primitive == &mPrimitives.mSphere)
+						light.mType = LightType::Sphere;
+					if (primitive == &mPrimitives.mRectangle)
+						light.mType = LightType::Rectangle;
 					light.mPosition = matrix[3];
 					light.mRadius = matrix[0][0];
 					ioSceneContent.mLights.push_back(light);
@@ -649,7 +629,6 @@ void Scene::Load(const char* inFilename, const glm::mat4x4& inTransform)
 void Scene::Unload()
 {
 	gCleanupShaderTable();
-	CleanupShaderResource();
 	gCleanupPipelineState();
 
 	mPrimitives = {};
@@ -671,17 +650,6 @@ void Scene::Build(ID3D12GraphicsCommandList4* inCommandList)
 	gBarrierUAV(inCommandList, nullptr);
 }
 
-void Scene::RebuildBinding(std::function<void()> inCallback)
-{
-	gCleanupShaderTable();
-
-	if (inCallback)
-		inCallback();
-
-	CreateShaderResource();
-	gCreateShaderTable();
-}
-
 void Scene::RebuildShader()
 {
 	// gCleanupPipelineState(); // Skip cleanup in case rebuild fails
@@ -693,183 +661,35 @@ void Scene::RebuildShader()
 
 void Scene::CreateShaderResource()
 {
-	// Raytrace output (UAV)
+	auto create_acceleration_structure_SRV = [](ID3D12Resource* inResource, ViewDescriptorIndex inViewDescriptorIndex)
 	{
-		DXGI_SWAP_CHAIN_DESC1 swap_chain_desc;
-		gSwapChain->GetDesc1(&swap_chain_desc);
+		D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
+		desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		desc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
+		desc.RaytracingAccelerationStructure.Location = inResource->GetGPUVirtualAddress();
 
-		gRenderer.mRuntime.mScreenColorTexture.Width(swap_chain_desc.Width).Height(swap_chain_desc.Height).Initialize();
-		gRenderer.mRuntime.mScreenDebugTexture.Width(swap_chain_desc.Width).Height(swap_chain_desc.Height).Initialize();
-	}
+		for (int i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
+			gDevice->CreateShaderResourceView(nullptr, &desc, gFrameContexts[i].mViewDescriptorHeap.GetHandle(inViewDescriptorIndex));
+	};
+	create_acceleration_structure_SRV(mTLAS->GetResource(), ViewDescriptorIndex::RaytraceTLASSRV);
 
-	// Composite 
+	auto create_buffer_SRV = [](ID3D12Resource* inResource, int inStride, ViewDescriptorIndex inViewDescriptorIndex)
 	{
-		gDiffTexture2DShader.InitializeDescriptors({});
-		gDiffTexture3DShader.InitializeDescriptors({});
-	}
+		D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};		
+		D3D12_RESOURCE_DESC resource_desc = inResource->GetDesc();
+		desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+		desc.Buffer.NumElements = static_cast<UINT>(resource_desc.Width / inStride);
+		desc.Buffer.StructureByteStride = inStride;
+		desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
 
-	// DXR DescriptorHeap
-	{
-		D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-		desc.NumDescriptors = 64;
-		desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-		desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-		gValidate(gDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&mDXRDescriptorHeap)));
-	}
-
-	// DXR DescriptorTable
-	{
-		D3D12_CPU_DESCRIPTOR_HANDLE handle = mDXRDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-		UINT increment_size = gDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
-		// u0
-		{
-			D3D12_UNORDERED_ACCESS_VIEW_DESC desc = {};
-			desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-			gDevice->CreateUnorderedAccessView(gRenderer.mRuntime.mScreenColorTexture.mResource.Get(), nullptr, &desc, handle);
-
-			handle.ptr += increment_size;
-		}
-
-		// b0
-		{
-			D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
-			desc.BufferLocation = gConstantGPUBuffer->GetGPUVirtualAddress();
-			desc.SizeInBytes = gAlignUp((UINT)sizeof(Constants), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
-			gDevice->CreateConstantBufferView(&desc, handle);
-
-			handle.ptr += increment_size;
-		}
-
-		// t0
-		{
-			D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
-			desc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
-			desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			desc.RaytracingAccelerationStructure.Location = mTLAS->GetGPUVirtualAddress();
-			gDevice->CreateShaderResourceView(nullptr, &desc, handle);
-
-			handle.ptr += increment_size;
-		}
-
-		// t1
-		{
-			D3D12_RESOURCE_DESC resource_desc = mBuffers.mInstanceDatas->GetDesc();
-			D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
-			desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-			desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			desc.Buffer.NumElements = static_cast<UINT>(resource_desc.Width / sizeof(InstanceData));
-			desc.Buffer.StructureByteStride = sizeof(InstanceData);
-			desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
-			gDevice->CreateShaderResourceView(mBuffers.mInstanceDatas.Get(), &desc, handle);
-
-			handle.ptr += increment_size;
-		}
-
-		// t2
-		{
-			D3D12_RESOURCE_DESC resource_desc = mBuffers.mIndices->GetDesc();
-			D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
-			desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-			desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			desc.Buffer.NumElements = static_cast<UINT>(resource_desc.Width / sizeof(IndexType));
-			desc.Buffer.StructureByteStride = sizeof(IndexType);
-			gDevice->CreateShaderResourceView(mBuffers.mIndices.Get(), &desc, handle);
-
-			handle.ptr += increment_size;
-		}
-
-		// t3
-		{
-			D3D12_RESOURCE_DESC resource_desc = mBuffers.mVertices->GetDesc();
-			D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
-			desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-			desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			desc.Buffer.NumElements = static_cast<UINT>(resource_desc.Width / sizeof(VertexType));
-			desc.Buffer.StructureByteStride = sizeof(VertexType);
-			gDevice->CreateShaderResourceView(mBuffers.mVertices.Get(), &desc, handle);
-
-			handle.ptr += increment_size;
-		}
-
-		// t4
-		{
-			D3D12_RESOURCE_DESC resource_desc = mBuffers.mNormals->GetDesc();
-			D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
-			desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-			desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			desc.Buffer.NumElements = static_cast<UINT>(resource_desc.Width / sizeof(NormalType));
-			desc.Buffer.StructureByteStride = sizeof(NormalType);
-			gDevice->CreateShaderResourceView(mBuffers.mNormals.Get(), &desc, handle);
-
-			handle.ptr += increment_size;
-		}
-
-		// t5
-		{
-			D3D12_RESOURCE_DESC resource_desc = mBuffers.mUVs->GetDesc();
-			D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
-			desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-			desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			desc.Buffer.NumElements = static_cast<UINT>(resource_desc.Width / sizeof(UVType));
-			desc.Buffer.StructureByteStride = sizeof(UVType);
-			gDevice->CreateShaderResourceView(mBuffers.mUVs.Get(), &desc, handle);
-
-			handle.ptr += increment_size;
-		}
-
-		// t6
-		{
-			D3D12_RESOURCE_DESC resource_desc = mBuffers.mLights->GetDesc();
-			D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
-			desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-			desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			desc.Buffer.NumElements = static_cast<UINT>(resource_desc.Width / sizeof(UVType));
-			desc.Buffer.StructureByteStride = sizeof(UVType);
-			gDevice->CreateShaderResourceView(mBuffers.mLights.Get(), &desc, handle);
-
-			handle.ptr += increment_size;
-		}
-
-		// t, space2 - Atmosphere
-		for (auto&& texture_set : gAtmosphere.mRuntime.mTexturesSet)
-			for (auto&& texture : texture_set)
-			{
-				if (texture.mResource == nullptr)
-					continue;
-
-				D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
-				srv_desc.Format = texture.mFormat;
-				srv_desc.ViewDimension = texture.mDepth == 1 ? D3D12_SRV_DIMENSION_TEXTURE2D : D3D12_SRV_DIMENSION_TEXTURE3D;
-				srv_desc.Texture2D.MipLevels = static_cast<UINT>(-1);
-				srv_desc.Texture2D.MostDetailedMip = 0;
-				srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-				gDevice->CreateShaderResourceView(texture.mResource.Get(), &srv_desc, handle);
-
-				handle.ptr += increment_size;
-			}
-
-		// t, space3 - Cloud
-		for (auto&& texture : gCloud.mRuntime.mTextures)
-		{
-			if (texture.mResource == nullptr)
-				continue;
-
-			D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
-			srv_desc.Format = texture.mSRVFormat != DXGI_FORMAT_UNKNOWN ? texture.mSRVFormat : texture.mFormat;
-			srv_desc.ViewDimension = texture.mDepth == 1 ? D3D12_SRV_DIMENSION_TEXTURE2D : D3D12_SRV_DIMENSION_TEXTURE3D;
-			srv_desc.Texture2D.MipLevels = static_cast<UINT>(-1);
-			srv_desc.Texture2D.MostDetailedMip = 0;
-			srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			gDevice->CreateShaderResourceView(texture.mResource.Get(), &srv_desc, handle);
-
-			handle.ptr += increment_size;
-		}
-	}
-}
-
-void Scene::CleanupShaderResource()
-{
-	gRenderer.ReleaseResources();
-	mDXRDescriptorHeap = nullptr;
+		for (int i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
+			gDevice->CreateShaderResourceView(inResource, &desc, gFrameContexts[i].mViewDescriptorHeap.GetHandle(inViewDescriptorIndex));
+	};
+	create_buffer_SRV(mBuffers.mInstanceDatas.Get(),	sizeof(InstanceData),	ViewDescriptorIndex::RaytraceInstanceDataSRV);
+	create_buffer_SRV(mBuffers.mIndices.Get(),			sizeof(IndexType),		ViewDescriptorIndex::RaytraceIndicesSRV);
+	create_buffer_SRV(mBuffers.mVertices.Get(),			sizeof(VertexType),		ViewDescriptorIndex::RaytraceVerticesSRV);
+	create_buffer_SRV(mBuffers.mNormals.Get(),			sizeof(NormalType),		ViewDescriptorIndex::RaytraceNormalsSRV);
+	create_buffer_SRV(mBuffers.mUVs.Get(),				sizeof(UVType),			ViewDescriptorIndex::RaytraceUVsSRV);
+	create_buffer_SRV(mBuffers.mLights.Get(),			sizeof(Light),			ViewDescriptorIndex::RaytraceLightsSRV);
 }

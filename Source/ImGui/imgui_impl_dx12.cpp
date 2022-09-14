@@ -45,32 +45,29 @@ static DXGI_FORMAT                  g_RTVFormat = DXGI_FORMAT_UNKNOWN;
 static ID3D12Resource*              g_FontTextureResource = NULL;
 static D3D12_CPU_DESCRIPTOR_HANDLE  g_FontSrvCpuDescHandle = {};
 static D3D12_GPU_DESCRIPTOR_HANDLE  g_FontSrvGpuDescHandle = {};
+static D3D12_CPU_DESCRIPTOR_HANDLE  g_Null2DSrvCpuDescHandle = {};
+static D3D12_GPU_DESCRIPTOR_HANDLE  g_Null2DSrvGpuDescHandle = {};
+static D3D12_CPU_DESCRIPTOR_HANDLE  g_Null3DSrvCpuDescHandle = {};
+static D3D12_GPU_DESCRIPTOR_HANDLE  g_Null3DSrvGpuDescHandle = {};
+
+struct Texture
+{
+    D3D12_RESOURCE_DESC             mDesc = {};
+    float                           mMin = 0;
+    float                           mMax = 1;
+    int                             mDepthIndex = 0;
+    bool                            mAlpha = false;
+    D3D12_CPU_DESCRIPTOR_HANDLE     mCPUHandle;
+    D3D12_GPU_DESCRIPTOR_HANDLE     mGPUHandle;
+};
+
+static const int                    kDescriptorSize = 4096;
+static Texture                      g_Textures[kDescriptorSize];
 
 // DirectX data - Customization
 static ID3D12DescriptorHeap*        g_DescriptorHeap = NULL;
 static int                          g_DescriptorHeapNextIndex = 0;
 static UINT                         g_DescriptorHeapIncrementSize = 0;
-
-// Customization
-float                               g_TextureMin = 0;
-float                               g_TextureMax = 1;
-float                               g_TextureDepth = 0;
-bool                                g_TextureAlpha = false;
-
-namespace ImGui
-{
-	void TextureOption()
-	{
-		ImGui::PushItemWidth(100);
-
-		ImGui::Text("Image Options");
-		ImGui::SliderFloat("Min", &g_TextureMin, 0.0, 1.0f); ImGui::SameLine(); ImGui::SliderFloat("Max", &g_TextureMax, 0.0, 1.0f);
-		ImGui::SliderFloat("Depth Slice", &g_TextureDepth, 0.0, 1.0f);
-		ImGui::Checkbox("Show Alpha", &g_TextureAlpha);
-
-		ImGui::PopItemWidth();
-	}
-}
 
 struct FrameResources
 {
@@ -255,17 +252,31 @@ void ImGui_ImplDX12_RenderDrawData(ImDrawData* draw_data, ID3D12GraphicsCommandL
             {
                 // Apply Scissor, Bind texture, Draw
                 const D3D12_RECT r = { (LONG)(pcmd->ClipRect.x - clip_off.x), (LONG)(pcmd->ClipRect.y - clip_off.y), (LONG)(pcmd->ClipRect.z - clip_off.x), (LONG)(pcmd->ClipRect.w - clip_off.y) };
-                ctx->SetGraphicsRootDescriptorTable(1, *(D3D12_GPU_DESCRIPTOR_HANDLE*)&pcmd->TextureId);
-                ctx->SetGraphicsRootDescriptorTable(2, *(D3D12_GPU_DESCRIPTOR_HANDLE*)&pcmd->TextureId);
+
+                D3D12_GPU_DESCRIPTOR_HANDLE start_handle = g_DescriptorHeap->GetGPUDescriptorHandleForHeapStart();
+                D3D12_GPU_DESCRIPTOR_HANDLE handle = *(D3D12_GPU_DESCRIPTOR_HANDLE*)&pcmd->TextureId;
+                UINT64 index = (handle.ptr - start_handle.ptr) / g_DescriptorHeapIncrementSize;
+                Texture& texture = g_Textures[index];
+
+                if (texture.mDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D)
+                {
+                    ctx->SetGraphicsRootDescriptorTable(1, handle);
+                    ctx->SetGraphicsRootDescriptorTable(2, g_Null3DSrvGpuDescHandle);
+                }
+                else
+                {
+                    ctx->SetGraphicsRootDescriptorTable(1, g_Null2DSrvGpuDescHandle);
+                    ctx->SetGraphicsRootDescriptorTable(2, handle);
+                }
 
 				float constant_buffer[] = { 0, 1, 0, 0 };
 				if (g_FontSrvGpuDescHandle.ptr != (*(D3D12_GPU_DESCRIPTOR_HANDLE*)&pcmd->TextureId).ptr)
 				{
                     // Only apply on draw of texture
-					constant_buffer[0] = g_TextureMin;
-					constant_buffer[1] = g_TextureMax;
-					constant_buffer[2] = g_TextureDepth;
-					constant_buffer[3] = g_TextureAlpha ? 1.0f : 0.0f;
+					constant_buffer[0] = texture.mMin;
+					constant_buffer[1] = texture.mMax;
+					constant_buffer[2] = (texture.mDepthIndex + 0.5f) / texture.mDesc.DepthOrArraySize;
+					constant_buffer[3] = texture.mAlpha ? 1.0f : 0.0f;
 				};
 				ctx->SetGraphicsRoot32BitConstants(3, 4, &constant_buffer, 0);
 
@@ -423,6 +434,13 @@ static void ImGui_ImplDX12_CreateFontsTexture()
         if (g_FontTextureResource != NULL)
             g_FontTextureResource->Release();
         g_FontTextureResource = pTexture;
+
+        g_D3DDevice->CreateShaderResourceView(nullptr, &srvDesc, g_Null2DSrvCpuDescHandle);
+
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
+        srvDesc.Texture3D.MipLevels = desc.MipLevels;
+        srvDesc.Texture3D.MostDetailedMip = 0;
+        g_D3DDevice->CreateShaderResourceView(nullptr, &srvDesc, g_Null3DSrvCpuDescHandle);
     }
 
     // Store our identifier
@@ -565,7 +583,7 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
               return output;\
             }";
 
-        D3DCompile(vertexShader, strlen(vertexShader), NULL, NULL, NULL, "main", "vs_5_1", 0, 0, &g_VertexShaderBlob, NULL);
+        D3DCompile(vertexShader, strlen(vertexShader), NULL, NULL, NULL, "main", "vs_5_1", D3DCOMPILE_ALL_RESOURCES_BOUND, 0, &g_VertexShaderBlob, NULL);
         if (g_VertexShaderBlob == NULL) // NB: Pass ID3D10Blob* pErrorBlob to D3DCompile() to get error showing in (const char*)pErrorBlob->GetBufferPointer(). Make sure to Release() the blob!
             return false;
         psoDesc.VS = { g_VertexShaderBlob->GetBufferPointer(), g_VertexShaderBlob->GetBufferSize() };
@@ -620,7 +638,7 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
         // [Note] This shader is also used to render text
         // [Hack] Show alpha, otherwise discard alpha of Texture3D
 
-        D3DCompile(pixelShader, strlen(pixelShader), NULL, NULL, NULL, "main", "ps_5_1", 0, 0, &g_PixelShaderBlob, NULL);
+        D3DCompile(pixelShader, strlen(pixelShader), NULL, NULL, NULL, "main", "ps_5_1", D3DCOMPILE_ALL_RESOURCES_BOUND, 0, &g_PixelShaderBlob, NULL);
         if (g_PixelShaderBlob == NULL)  // NB: Pass ID3D10Blob* pErrorBlob to D3DCompile() to get error showing in (const char*)pErrorBlob->GetBufferPointer(). Make sure to Release() the blob!
             return false;
         psoDesc.PS = { g_PixelShaderBlob->GetBufferPointer(), g_PixelShaderBlob->GetBufferSize() };
@@ -676,20 +694,46 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
     {
 		D3D12_DESCRIPTOR_HEAP_DESC desc = {};
 		desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-		desc.NumDescriptors = 1000000; // maximum
+        desc.NumDescriptors = kDescriptorSize;
 		desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 		if (g_D3DDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&g_DescriptorHeap)) != S_OK)
 			return false;
 
         g_DescriptorHeapIncrementSize = g_D3DDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        g_DescriptorHeap->SetName(L"g_DescriptorHeap");
     }
 
-    // Allocate font descriptor handle
+    // Allocate descriptor handle
     {
         IM_ASSERT(g_DescriptorHeapNextIndex == 0);
-        g_FontSrvCpuDescHandle = g_DescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-        g_FontSrvGpuDescHandle = g_DescriptorHeap->GetGPUDescriptorHandleForHeapStart();
-        g_DescriptorHeapNextIndex++;
+
+        D3D12_RESOURCE_DESC desc;
+        ZeroMemory(&desc, sizeof(desc));
+        desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        desc.Alignment = 0;
+        desc.Width = 0;
+        desc.Height = 0;
+        desc.DepthOrArraySize = 1;
+        desc.MipLevels = 1;
+        desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        desc.SampleDesc.Count = 1;
+        desc.SampleDesc.Quality = 0;
+        desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+        desc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+        int index = 0;
+        index = ImGui_ImplDX12_AllocateTexture(desc);
+        g_FontSrvCpuDescHandle = g_Textures[index].mCPUHandle;
+        g_FontSrvGpuDescHandle = g_Textures[index].mGPUHandle;
+
+        index = ImGui_ImplDX12_AllocateTexture(desc);
+        g_Null2DSrvCpuDescHandle = g_Textures[index].mCPUHandle;
+        g_Null2DSrvGpuDescHandle = g_Textures[index].mGPUHandle;
+
+        desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
+        index = ImGui_ImplDX12_AllocateTexture(desc);
+        g_Null3DSrvCpuDescHandle = g_Textures[index].mCPUHandle;
+        g_Null3DSrvGpuDescHandle = g_Textures[index].mGPUHandle;
     }
 
     ImGui_ImplDX12_CreateFontsTexture();
@@ -760,12 +804,39 @@ void ImGui_ImplDX12_NewFrame()
         ImGui_ImplDX12_CreateDeviceObjects();
 }
 
-void ImGui_ImplDX12_AllocateDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE& out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE& out_gpu_handle)
+int ImGui_ImplDX12_AllocateTexture(const D3D12_RESOURCE_DESC& inDesc)
 {
-    out_cpu_handle = g_DescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-    out_cpu_handle.ptr += g_DescriptorHeapNextIndex * g_DescriptorHeapIncrementSize;
-    out_gpu_handle = g_DescriptorHeap->GetGPUDescriptorHandleForHeapStart();
-    out_gpu_handle.ptr += g_DescriptorHeapNextIndex * g_DescriptorHeapIncrementSize;
+    Texture& texture = g_Textures[g_DescriptorHeapNextIndex];
+    texture.mDesc = inDesc;
 
-	g_DescriptorHeapNextIndex++;
+    texture.mCPUHandle = g_DescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+    texture.mCPUHandle.ptr += g_DescriptorHeapNextIndex * g_DescriptorHeapIncrementSize;
+    texture.mGPUHandle = g_DescriptorHeap->GetGPUDescriptorHandleForHeapStart();
+    texture.mGPUHandle.ptr += g_DescriptorHeapNextIndex * g_DescriptorHeapIncrementSize;
+
+	return g_DescriptorHeapNextIndex++;
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE& ImGui_ImplDX12_TextureCPUHandle(int inIndex)
+{
+    return g_Textures[inIndex].mCPUHandle;
+}
+
+D3D12_GPU_DESCRIPTOR_HANDLE& ImGui_ImplDX12_TextureGPUHandle(int inIndex)
+{
+    return g_Textures[inIndex].mGPUHandle;
+}
+
+void ImGui_ImplDX12_ShowTextureOption(int inIndex)
+{
+    Texture& texture = g_Textures[inIndex];
+
+    ImGui::PushItemWidth(100);
+
+    ImGui::Text("Image Options");
+    ImGui::SliderFloat("Min", &texture.mMin, 0.0, 1.0f); ImGui::SameLine(); ImGui::SliderFloat("Max", &texture.mMax, 0.0, 1.0f);
+    ImGui::SliderInt("Depth Slice", &texture.mDepthIndex, 0, texture.mDesc.DepthOrArraySize - 1);
+    ImGui::Checkbox("Show Alpha", &texture.mAlpha);
+
+    ImGui::PopItemWidth();
 }

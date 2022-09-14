@@ -1,13 +1,9 @@
 #include "Constant.h"
 #include "Shared.inl"
 #include "Binding.h"
-
-#ifndef SHADER_PROFILE_LIB
-#define ENABLE_RAY_QUERY
-#endif // SHADER_PROFILE_LIB
-
 #include "Common.inl"
 #include "RayQuery.inl"
+#include "Material.inl"
 #include "Planet.inl"
 #include "AtmosphereIntegration.inl"
 #include "CloudIntegration.inl"
@@ -15,7 +11,7 @@
 [shader("miss")]
 void DefaultMiss(inout RayPayload payload)
 {
-	payload.mDone = true;
+	payload.mState.Set(RayState::Done);
 
     float3 sky_luminance = GetSkyLuminance();
 
@@ -29,7 +25,7 @@ void DefaultMiss(inout RayPayload payload)
 }
 
 HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attributes)
-{
+{	
 	HitInfo hit_info = (HitInfo)0;
 	hit_info.mDone = true;
 
@@ -55,8 +51,8 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	// Handle front face only
 	if (dot(normal, -sGetWorldRayDirection()) < 0)
 	{
-		bool flip_normal = true;
-		if (flip_normal)
+		bool two_sided = InstanceDatas[sGetInstanceID()].mTwoSided;
+		if (two_sided)
 			normal = -normal;
 		else
 		{
@@ -67,9 +63,8 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 
 	// Hit position
 	{
-        float3 raw_hit_position = sGetWorldRayOrigin() + sGetWorldRayDirection() * sGetRayTCurrent();
-        hit_info.mPosition = raw_hit_position + normal * 0.001;
-    }
+		hit_info.mPosition = sGetWorldRayHitPosition() + normal * 0.001;
+	}
 
 	// Participating Media
     float3 in_scattering = 0;
@@ -79,120 +74,45 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
         hit_info.mInScattering = in_scattering;
 		hit_info.mTransmittance = transmittance;
 	}
-
-	// Reflection
+	
+	// Emission
 	{
-		// TODO: Revisit. Support tangent ?
-		// onb - build_from_w
-		float3 axis[3];
-		axis[2] = normal;
-		float3 a = (abs(axis[2].x) > 0.9) ? float3(0, 1, 0) : float3(1, 0, 0);
-		axis[1] = normalize(cross(axis[2], a));
-		axis[0] = cross(axis[2], axis[1]);
-		
-		// Based on Mitsuba2
-        switch (InstanceDatas[sGetInstanceID()].mMaterialType)
-        {
-            case MaterialType::Diffuse:
-	            {
-                    hit_info.mEmission = InstanceDatas[sGetInstanceID()].mEmission * (kEmissionBoostScale * kPreExposure);
+		hit_info.mEmission = InstanceDatas[sGetInstanceID()].mEmission * (kEmissionBoostScale * kPreExposure);
+	}
 
-            		// random
-            		float3 direction = RandomCosineDirection(payload.mRandomState);
-
-            		// onb - local
-            		hit_info.mReflectionDirection = normalize(direction.x * axis[0] + direction.y * axis[1] + direction.z * axis[2]);
-
-            		// pdf - exact distribution - should cancel out
-            		float cosine = dot(normal, hit_info.mReflectionDirection);
-            		hit_info.mScatteringPDF = cosine <= 0 ? 0 : cosine / MATH_PI;
-            		hit_info.mSamplingPDF = cosine <= 0 ? 0 : cosine / MATH_PI;
-                    hit_info.mAlbedo = InstanceDatas[sGetInstanceID()].mAlbedo;
-            		hit_info.mDone = false;
-	            }
-                break;
-            case MaterialType::RoughConductor:
-				{
-                    hit_info.mEmission = InstanceDatas[sGetInstanceID()].mEmission * (kEmissionBoostScale * kPreExposure);
-
-            		// TODO: Check visible normal
-
-                    float a = InstanceDatas[sGetInstanceID()].mRoughnessAlpha;
-            		float a2 = a * a;
-
-            		// Microfacet
-            		float3 H; // Microfacet normal (Half-vector)
-            		{                    	
-						float e0 = RandomFloat01(payload.mRandomState);
-                    	float e1 = RandomFloat01(payload.mRandomState);
-                    	
-                    	// 2D Distribution -> GGX Distribution (Polar)
-                    	float cos_theta = sqrt((1.0 - e0) / ((a2 - 1) * e0 + 1.0));
-                    	float sin_theta = sqrt( 1 - cos_theta * cos_theta );
-                    	float phi = 2 * MATH_PI * e1;
-
-                    	// Polar -> Cartesian
-                    	H.x = sin_theta * cos(phi);
-                    	H.y = sin_theta * sin(phi);
-                    	H.z = cos_theta;
-
-                    	// Tangent -> World
-                    	H = normalize(H.x * axis[0] + H.y * axis[1] + H.z * axis[2]);
-            		}
-
-            		// TODO: Better to calculate in tangent space?
-            		float3 V = -sGetWorldRayDirection();
-            		float HoV = dot(H, V);
-            		float3 L = 2.0 * HoV * H - V;
-            		float NoH = dot(normal, H);
-            		float NoV = dot(normal, V);
-            		float HoL = dot(H, L);
-            		float NoL = dot(normal, L);
-
-            		float G = G_SmithGGX(NoL, NoV, a2);
-                    float3 F = F_Schlick(InstanceDatas[sGetInstanceID()].mReflectance, HoV);
-
-            		hit_info.mReflectionDirection = L;
-            		hit_info.mAlbedo = G * F / (4.0f * NoV);
-            		hit_info.mScatteringPDF = 1.0;
-            		hit_info.mSamplingPDF = NoH / (4.0f * abs(HoL));
-            		hit_info.mDone = false;
-                }
-                break;
-			default:
-                break;
-        }
-    }
+	// Reflection / Refraction
+	float3 albedo = InstanceDatas[sGetInstanceID()].mAlbedo;
+	float3 reflectance = InstanceDatas[sGetInstanceID()].mReflectance;
+	bool need_next_ray = any(albedo) || any(reflectance);
+	hit_info.mDone = !need_next_ray;
+	if (need_next_ray)
+	{
+		float3 light = Material::GenerateSample(normal, payload);
+		Material::Evaluate(light, normal, hit_info);
+	}
 
 	// Debug - Global
 	{
-		bool terminate = true;
 		switch (mConstants.mDebugMode)
 		{
-		case DebugMode::Barycentrics: 			hit_info.mEmission = barycentrics; break;
-		case DebugMode::Vertex: 				hit_info.mEmission = vertex; break;
-		case DebugMode::Normal: 				hit_info.mEmission = normal * 0.5 + 0.5; break;
-		case DebugMode::UV:						hit_info.mEmission = float3(uv, 0.0); break;
-		case DebugMode::Albedo: 				hit_info.mEmission = InstanceDatas[sGetInstanceID()].mAlbedo; break;
-		case DebugMode::Reflectance: 			hit_info.mEmission = InstanceDatas[sGetInstanceID()].mReflectance; break;
-		case DebugMode::Emission: 				hit_info.mEmission = InstanceDatas[sGetInstanceID()].mEmission; break;
-		case DebugMode::RoughnessAlpha: 		hit_info.mEmission = InstanceDatas[sGetInstanceID()].mRoughnessAlpha; break;
-		case DebugMode::Transmittance:			hit_info.mEmission = transmittance; break;
-		case DebugMode::InScattering:			hit_info.mEmission = in_scattering; break;
-		case DebugMode::RecursionCount:			terminate = false; break;
-		case DebugMode::RussianRouletteCount:	terminate = false; break;
-		default:								terminate = false; break;
-		}
-
-		if (terminate)
-		{
-			hit_info.mDone = true;
-			return hit_info;
+		case DebugMode::Barycentrics: 			hit_info.mEmission = barycentrics; hit_info.mDone = true; break;
+		case DebugMode::Vertex: 				hit_info.mEmission = vertex; hit_info.mDone = true; break;
+		case DebugMode::Normal: 				hit_info.mEmission = normal * 0.5 + 0.5; hit_info.mDone = true; break;
+		case DebugMode::UV:						hit_info.mEmission = float3(uv, 0.0); hit_info.mDone = true; break;
+		case DebugMode::Albedo: 				hit_info.mEmission = InstanceDatas[sGetInstanceID()].mAlbedo; hit_info.mDone = true; break;
+		case DebugMode::Reflectance: 			hit_info.mEmission = InstanceDatas[sGetInstanceID()].mReflectance; hit_info.mDone = true; break;
+		case DebugMode::Emission: 				hit_info.mEmission = InstanceDatas[sGetInstanceID()].mEmission; hit_info.mDone = true; break;
+		case DebugMode::RoughnessAlpha: 		hit_info.mEmission = InstanceDatas[sGetInstanceID()].mRoughnessAlpha; hit_info.mDone = true; break;
+		case DebugMode::Transmittance:			hit_info.mEmission = transmittance; hit_info.mDone = true; break;
+		case DebugMode::InScattering:			hit_info.mEmission = in_scattering; hit_info.mDone = true; break;
+		case DebugMode::RecursionCount:			hit_info.mDone = false; break;
+		case DebugMode::RussianRouletteCount:	hit_info.mDone = false; break;
+		default:								hit_info.mDone = false; break;
 		}
 	}
 
 	// Debug - Per instance
-    if (mConstants.mDebugInstanceIndex == -1 || mConstants.mDebugInstanceIndex == sGetInstanceID())
+    if (mConstants.mDebugInstanceIndex == sGetInstanceID())
 	{
 		switch (mConstants.mDebugInstanceMode)
 		{
@@ -201,10 +121,10 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 			hit_info.mDone = true; 
 			return hit_info;
 		case DebugInstanceMode::Mirror:
-			hit_info.mAlbedo = 1; 
-            hit_info.mSamplingPDF = 1;
-            hit_info.mScatteringPDF = 1;
-			hit_info.mReflectionDirection = reflect(sGetWorldRayDirection(), normal); 
+			hit_info.mReflectionDirection = reflect(sGetWorldRayDirection(), normal);
+			hit_info.mBSDF = 1; 
+			hit_info.mNdotL = dot(normal, hit_info.mReflectionDirection);
+            hit_info.mSamplingPDF = 1;			
 			hit_info.mDone = false; 
 			return hit_info;
 		default:
@@ -221,15 +141,15 @@ void DefaultClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionA
 	HitInfo hit_info = HitInternal(payload, attributes);
 
 	// State
-	payload.mDone = hit_info.mDone;
+	payload.mState.Set(hit_info.mDone ? RayState::Done : RayState::None);
 
-	// Geometry
-	payload.mPosition = hit_info.mPosition;
-	payload.mReflectionDirection = hit_info.mReflectionDirection;
-
-	// Material
+	// Emission
 	payload.mEmission = payload.mEmission + payload.mThroughput * hit_info.mTransmittance * hit_info.mEmission + hit_info.mInScattering;
-	payload.mThroughput = hit_info.mSamplingPDF <= 0 ? 0 : payload.mThroughput * hit_info.mAlbedo * hit_info.mTransmittance * hit_info.mScatteringPDF / hit_info.mSamplingPDF;
+	
+	// Next bounce
+	payload.mPosition = hit_info.mPosition;	
+	payload.mReflectionDirection = hit_info.mReflectionDirection;
+	payload.mThroughput = hit_info.mSamplingPDF <= 0 ? 0 : (payload.mThroughput * hit_info.mTransmittance * hit_info.mBSDF * hit_info.mNdotL / hit_info.mSamplingPDF);
 }
 
 void TraceRay()
@@ -251,7 +171,8 @@ void TraceRay()
 
 	RayPayload payload = (RayPayload)0;
 	payload.mThroughput = 1; // Camera gather all the light
-	payload.mRandomState = uint(uint(sGetDispatchRaysIndex().x) * uint(1973) + uint(sGetDispatchRaysIndex().y) * uint(9277) + uint(mConstants.mAccumulationFrameCount) * uint(26699)) | uint(1); // From https://www.shadertoy.com/view/tsBBWW
+	payload.mRandomState = uint(uint(sGetDispatchRaysIndex().x) * uint(1973) + uint(sGetDispatchRaysIndex().y) * uint(9277) + uint(mConstants.mCurrentFrameIndex) * uint(26699)) | uint(1); // From https://www.shadertoy.com/view/tsBBWW
+	payload.mState.Reset(RayState::FirstHit);
 
 #ifdef ENABLE_RAY_QUERY
 	// Note that RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH will give first hit for "Any Hit". The result may not be the closest one
@@ -261,6 +182,7 @@ void TraceRay()
 	uint ray_instance_mask = 0xffffffff;
 #endif // ENABLE_RAY_QUERY
 
+	RaytracingAccelerationStructure RaytracingScene = ResourceDescriptorHeap[(int) ViewDescriptorIndex::RaytraceTLASSRV];
 	uint recursion = 0;
 	for (;;)
 	{
@@ -301,13 +223,11 @@ void TraceRay()
 		);
 #endif // ENABLE_RAY_QUERY
 
-		if (payload.mDone)
+		if (payload.mState.IsSet(RayState::Done))
 			break;
 
-		ray.Origin = payload.mPosition;
-		ray.Direction = payload.mReflectionDirection;
-
 		// Russian Roulette
+		// [TODO] Make a test scene for comparison
 		// http://www.pbr-book.org/3ed-2018/Monte_Carlo_Integration/Russian_Roulette_and_Splitting.html
 		// https://computergraphics.stackexchange.com/questions/2316/is-russian-roulette-really-the-answer
 		if (recursion >= mConstants.mRecursionCountMax)
@@ -330,6 +250,11 @@ void TraceRay()
 			else
 				break;
 		}
+		
+		ray.Origin = payload.mPosition;
+		ray.Direction = payload.mReflectionDirection;
+		
+		payload.mState.Unset(RayState::FirstHit);
 
 		recursion++;
 	}
@@ -340,7 +265,7 @@ void TraceRay()
 
 		float3 previous_output = RaytracingOutput[sGetDispatchRaysIndex().xy].xyz;
 		previous_output = max(0, previous_output); // Eliminate nan
-		float3 mixed_output = lerp(previous_output, current_output, 1.0f / (float)(mConstants.mAccumulationFrameCount));
+		float3 mixed_output = lerp(previous_output, current_output, mConstants.mCurrentFrameWeight);
 
 		if (recursion == 0)
 			mixed_output = current_output;
@@ -362,8 +287,9 @@ void DefaultRayGeneration()
 }
 
 #ifdef ENABLE_RAY_QUERY
+[RootSignature(ROOT_SIGNATURE_COMMON)]
 [numthreads(8, 8, 1)]
-void InlineRaytracingCS(	
+void RayQueryCS(
 	uint3 inGroupThreadID : SV_GroupThreadID,
 	uint3 inGroupID : SV_GroupID,
 	uint3 inDispatchThreadID : SV_DispatchThreadID,

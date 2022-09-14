@@ -99,8 +99,8 @@ static IDxcBlob* sCompileShader(const char* inFilename, const char* inEntryPoint
 	IDxcBlob* blob = nullptr;
 	gValidate(operation_result->GetResult(&blob));
 
-	// Dissassemble
-	if (false)
+
+	if (gRenderer.mDumpDisassemblyRayQuery && std::string_view("RayQueryCS") == inEntryPoint)
 	{
 		IDxcBlob* blob_to_dissemble = blob;
 		IDxcBlobEncoding* disassemble = nullptr;
@@ -108,116 +108,20 @@ static IDxcBlob* sCompileShader(const char* inFilename, const char* inEntryPoint
 		compiler->Disassemble(blob_to_dissemble, &disassemble);
 		gValidate(utils->GetBlobAsUtf8(disassemble, &blob_8));
 		std::string str(static_cast<LPCSTR>(blob_8->GetBufferPointer()), blob_8->GetBufferSize());
-		OutputDebugStringA(str.c_str());
+
+		static int counter = 0;
+		std::filesystem::path path = gCreateDumpFolder();
+		path += "RayQueryCS_";
+		path += std::to_string(counter++);
+		path += ".txt";
+		std::ofstream stream(path);
+		stream << str;
+		stream.close();
+
+		gRenderer.mDumpDisassemblyRayQuery = false;
 	}
 
 	return blob;
-}
-
-struct RootSignatureDescriptor
-{
-	D3D12_ROOT_SIGNATURE_DESC mDesc = {};
-	std::vector<D3D12_DESCRIPTOR_RANGE> mDescriptorRanges;
-	std::vector<D3D12_ROOT_PARAMETER> mRootParameters;
-	std::vector<D3D12_STATIC_SAMPLER_DESC> mStaticSamplerDescs;
-};
-
-void GenerateGlobalRootSignatureDescriptor(RootSignatureDescriptor& outDesc)
-{
-	// u0
-	D3D12_DESCRIPTOR_RANGE descriptor_range = {};
-	descriptor_range.BaseShaderRegister = 0;
-	descriptor_range.NumDescriptors = 1;
-	descriptor_range.RegisterSpace = 0;
-	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-	descriptor_range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-	outDesc.mDescriptorRanges.push_back(descriptor_range);
-
-	// b0
-	descriptor_range = {};
-	descriptor_range.BaseShaderRegister = 0;
-	descriptor_range.NumDescriptors = 1;
-	descriptor_range.RegisterSpace = 0;
-	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-	descriptor_range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-	outDesc.mDescriptorRanges.push_back(descriptor_range);
-
-	// t, space0
-	descriptor_range = {};
-	descriptor_range.NumDescriptors = 1;
-	descriptor_range.RegisterSpace = 0;
-	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-	descriptor_range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-	for (int i = 0; i < 7; i++)
-	{
-		descriptor_range.BaseShaderRegister = i;
-		outDesc.mDescriptorRanges.push_back(descriptor_range);
-	}
-
-	// t, space2 - Atmosphere
-	descriptor_range = {};
-	descriptor_range.NumDescriptors = 1;
-	descriptor_range.RegisterSpace = 2;
-	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-	descriptor_range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-	int base_shader_register = 0;
-	for (auto&& texture_set : gAtmosphere.mRuntime.mTexturesSet)
-		for (auto&& texture : texture_set)
-		{
-			(void)texture;
-			descriptor_range.BaseShaderRegister = base_shader_register++;
-			outDesc.mDescriptorRanges.push_back(descriptor_range);
-		}
-
-	// t, space3 - Cloud
-	descriptor_range = {};
-	descriptor_range.NumDescriptors = 1;
-	descriptor_range.RegisterSpace = 3;
-	descriptor_range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-	descriptor_range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-	for (int i = 0; i < gCloud.mRuntime.mTextures.size(); i++)
-	{
-		descriptor_range.BaseShaderRegister = i;
-		outDesc.mDescriptorRanges.push_back(descriptor_range);
-	}
-
-	// Table
-	D3D12_ROOT_PARAMETER root_parameter = {};
-	root_parameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	root_parameter.DescriptorTable.NumDescriptorRanges = static_cast<UINT>(outDesc.mDescriptorRanges.size());
-	root_parameter.DescriptorTable.pDescriptorRanges = outDesc.mDescriptorRanges.data();
-	outDesc.mRootParameters.push_back(root_parameter);
-
-	D3D12_STATIC_SAMPLER_DESC sampler = {};
-	sampler.MipLODBias = 0.f;
-	sampler.MaxAnisotropy = 0;
-	sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
-	sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
-	sampler.MinLOD = 0.f;
-	sampler.MaxLOD = D3D12_FLOAT32_MAX;
-	sampler.RegisterSpace = 0;
-	sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-
-	sampler.ShaderRegister = 0;
-	sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-	sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-	sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-	sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-	outDesc.mStaticSamplerDescs.push_back(sampler);
-
-	sampler.ShaderRegister = 1;
-	sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-	sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-	sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-	sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-	outDesc.mStaticSamplerDescs.push_back(sampler);
-
-	// Descriptor to table
-	outDesc.mDesc.NumParameters = static_cast<UINT>(outDesc.mRootParameters.size());
-	outDesc.mDesc.pParameters = outDesc.mRootParameters.data();
-	outDesc.mDesc.NumStaticSamplers = static_cast<UINT>(outDesc.mStaticSamplerDescs.size());
-	outDesc.mDesc.pStaticSamplers = outDesc.mStaticSamplerDescs.data();
-	outDesc.mDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
 }
 
 ComPtr<ID3D12RootSignature> CreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC & desc)
@@ -344,13 +248,10 @@ struct PipelineConfig : public StateSubobjectHolder<D3D12_RAYTRACING_PIPELINE_CO
 // Global root signature
 struct GlobalRootSignature : public StateSubobjectHolder<ID3D12RootSignature*, D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE>
 {
-	GlobalRootSignature(const D3D12_ROOT_SIGNATURE_DESC& inDesc)
+	GlobalRootSignature(const ComPtr<ID3D12RootSignature>& inRootSignature)
 	{
-		mRootSignature = CreateRootSignature(inDesc);
-		mRootSignature->SetName(L"GlobalRootSignature");
-		mDesc = mRootSignature.Get();
+		mDesc = inRootSignature.Get();
 	}
-	ComPtr<ID3D12RootSignature> mRootSignature;
 };
 
 static bool sCreateVSPSPipelineState(const char* inShaderFileName, const char* inVSName, const char* inPSName, Shader& ioSystemShader)
@@ -361,10 +262,6 @@ static bool sCreateVSPSPipelineState(const char* inShaderFileName, const char* i
 		return false;
 
 	if (FAILED(gDevice->CreateRootSignature(0, ps_blob->GetBufferPointer(), ps_blob->GetBufferSize(), IID_PPV_ARGS(&ioSystemShader.mData.mRootSignature))))
-		return false;
-
-	ComPtr<ID3D12RootSignatureDeserializer> deserializer;
-	if (FAILED(D3D12CreateRootSignatureDeserializer(ps_blob->GetBufferPointer(), ps_blob->GetBufferSize(), IID_PPV_ARGS(&ioSystemShader.mData.mRootSignatureDeserializer))))
 		return false;
 
 	D3D12_RASTERIZER_DESC rasterizer_desc = {};
@@ -405,37 +302,20 @@ static bool sCreateCSPipelineState(const char* inShaderFileName, const char* inC
 	LPVOID root_signature_pointer = cs_blob->GetBufferPointer();
 	SIZE_T root_signature_size = cs_blob->GetBufferSize();
 
-	if (ioSystemShader.mUseGlobalRootSignature)
-		ioSystemShader.mData.mRootSignature = gDXRGlobalRootSignature;
-	else
-	{
-		if (FAILED(gDevice->CreateRootSignature(0, root_signature_pointer, root_signature_size, IID_PPV_ARGS(&ioSystemShader.mData.mRootSignature))))
-			return false;
-
-		ComPtr<ID3D12RootSignatureDeserializer> deserializer;
-		if (FAILED(D3D12CreateRootSignatureDeserializer(cs_blob->GetBufferPointer(), cs_blob->GetBufferSize(), IID_PPV_ARGS(&ioSystemShader.mData.mRootSignatureDeserializer))))
-			return false;
-	}
-
-	D3D12_RASTERIZER_DESC rasterizer_desc = {};
-	rasterizer_desc.FillMode = D3D12_FILL_MODE_SOLID;
-	rasterizer_desc.CullMode = D3D12_CULL_MODE_NONE;
-
-	D3D12_BLEND_DESC blend_desc = {};
-	blend_desc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+	if (FAILED(gDevice->CreateRootSignature(0, root_signature_pointer, root_signature_size, IID_PPV_ARGS(&ioSystemShader.mData.mRootSignature))))
+		return false;
 
 	D3D12_COMPUTE_PIPELINE_STATE_DESC pipeline_state_desc = {};
 	pipeline_state_desc.CS.pShaderBytecode = cs_blob->GetBufferPointer();
 	pipeline_state_desc.CS.BytecodeLength = cs_blob->GetBufferSize();
 	pipeline_state_desc.pRootSignature = ioSystemShader.mData.mRootSignature.Get();
-
 	if (FAILED(gDevice->CreateComputePipelineState(&pipeline_state_desc, IID_PPV_ARGS(&ioSystemShader.mData.mPipelineState))))
 		return false;
 
 	return true;
 }
 
-bool sCreatePipelineState(Shader& ioSystemShader)
+static bool sCreatePipelineState(Shader& ioSystemShader)
 {
 	if (ioSystemShader.mCSName != nullptr)
 		return sCreateCSPipelineState(ioSystemShader.mFileName, ioSystemShader.mCSName, ioSystemShader);
@@ -444,7 +324,7 @@ bool sCreatePipelineState(Shader& ioSystemShader)
 }
 
 // From https://github.com/microsoft/DirectX-Graphics-Samples/blob/e5ea2ac7430ce39e6f6d619fd85ae32581931589/Samples/Desktop/D3D12Raytracing/src/D3D12RaytracingHelloWorld/DirectXRaytracingHelper.h#L172
-void sPrintStateObjectDesc(const D3D12_STATE_OBJECT_DESC* desc)
+static void sPrintStateObjectDesc(const D3D12_STATE_OBJECT_DESC* desc)
 {
 	std::wstringstream wstr;
 	wstr << L"\n";
@@ -557,21 +437,35 @@ void sPrintStateObjectDesc(const D3D12_STATE_OBJECT_DESC* desc)
 
 void gCreatePipelineState()
 {
-	static bool first_run = true;
+	// Create non-lib shaders
+	{
+		bool succeed = true;
+
+		succeed &= sCreatePipelineState(gRenderer.mRuntime.mCompositeShader);
+		succeed &= sCreatePipelineState(gRenderer.mRuntime.mRayQueryShader);
+		succeed &= sCreatePipelineState(gRenderer.mRuntime.mDiffTexture2DShader);
+		succeed &= sCreatePipelineState(gRenderer.mRuntime.mDiffTexture3DShader);
+
+		for (auto&& shaders : gAtmosphere.mRuntime.mShadersSet)
+			for (auto&& shader : shaders)
+				succeed &= sCreatePipelineState(shader);
+
+		for (auto&& shader : gCloud.mRuntime.mShaders)
+			succeed &= sCreatePipelineState(shader);
+	}
 
 	// Create lib shaders
 	const wchar_t* entry_points[] = { kDefaultRayGenerationShader, kDefaultMissShader, kDefaultClosestHitShader };
 	IDxcBlob* blob = sCompileShader("Shader/Raytracing.hlsl", "", "lib_6_6");
 	if (blob == nullptr)
 	{
-		if (first_run)
-			assert(gDXRStateObject != nullptr);
+		assert(gDXRStateObject != nullptr);
 		return;
 	}
 
 	// See D3D12_STATE_SUBOBJECT_TYPE
 	// Note that all pointers should be valid until CreateStateObject
-	
+
 	// Subobjects:
 	//  DXIL library
 	//  Hit group
@@ -589,7 +483,6 @@ void gCreatePipelineState()
 	std::array<D3D12_STATE_SUBOBJECT, 64> subobjects;
 	glm::uint32 index = 0;
 
-	gTrace("Shader compiled.\n");
 	DXILLibrary dxilLibrary(blob, entry_points, ARRAYSIZE(entry_points));
 	subobjects[index++] = dxilLibrary.mStateSubobject;
 
@@ -597,10 +490,10 @@ void gCreatePipelineState()
 	HitGroup default_hit_group(nullptr, kDefaultClosestHitShader, kDefaultHitGroup);
 	subobjects[index++] = default_hit_group.mStateSubobject;
 
-	// Local root signatures and association
-	RootSignatureDescriptor local_root_signature_descriptor;
-	local_root_signature_descriptor.mDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
-	LocalRootSignature local_root_signature(local_root_signature_descriptor.mDesc);
+	// Local root signatures and association (not necessary here)
+	D3D12_ROOT_SIGNATURE_DESC local_signature_desc = {};
+	local_signature_desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
+	LocalRootSignature local_root_signature(local_signature_desc);
 	subobjects[index++] = local_root_signature.mStateSubobject;
 	SubobjectToExportsAssociation export_association(entry_points, ARRAYSIZE(entry_points), &(subobjects[index - 1]));
 	subobjects[index++] = export_association.mStateSubobject;
@@ -616,11 +509,9 @@ void gCreatePipelineState()
 	PipelineConfig pipeline_config(31); // [0, 31] https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_raytracing_pipeline_config
 	subobjects[index++] = pipeline_config.mStateSubobject;
 
-	// Global root signature
-	RootSignatureDescriptor global_root_signature_descriptor;
-	GenerateGlobalRootSignatureDescriptor(global_root_signature_descriptor);
-	GlobalRootSignature global_root_signature(global_root_signature_descriptor.mDesc);
-	gDXRGlobalRootSignature = global_root_signature.mRootSignature;
+	// Global root signature - grab from RayQuery version
+	gDXRGlobalRootSignature = gRenderer.mRuntime.mRayQueryShader.mData.mRootSignature;
+	GlobalRootSignature global_root_signature(gDXRGlobalRootSignature);
 	subobjects[index++] = global_root_signature.mStateSubobject;
 
 	// Create the state object
@@ -628,47 +519,14 @@ void gCreatePipelineState()
 	desc.NumSubobjects = index;
 	desc.pSubobjects = subobjects.data();
 	desc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
-	sPrintStateObjectDesc(&desc);
 	gValidate(gDevice->CreateStateObject(&desc, IID_PPV_ARGS(&gDXRStateObject)));
 
-	// Create non-lib shaders
-	{
-		bool succeed = true;
-
-		succeed &= sCreatePipelineState(gCompositeShader);
-
-		succeed &= sCreatePipelineState(gDXRInlineShader);
-
-		succeed &= sCreatePipelineState(gDiffTexture2DShader);
-		succeed &= sCreatePipelineState(gDiffTexture3DShader);
-
-		for (auto&& shaders : gAtmosphere.mRuntime.mShadersSet)
-			for (auto&& shader : shaders)
-				succeed &= sCreatePipelineState(shader);
-
-		for (auto&& shader : gCloud.mRuntime.mShaders)
-			succeed &= sCreatePipelineState(shader);
-
-		if (!succeed)
-		{
-			if (first_run)
-				assert(gDXRStateObject != nullptr);
-			return;
-		}
-	}
-
-	first_run = false; // disable assert for unsuccessful shader reload
+	if (gRenderer.mPrintStateObjectDesc)
+		sPrintStateObjectDesc(&desc);
 }
 
 void gCleanupPipelineState()
 {
 	gDXRStateObject = nullptr;
 	gDXRGlobalRootSignature = nullptr;
-
-	gDXRInlineShader.Reset();
-
-	gDiffTexture2DShader.Reset();
-	gDiffTexture3DShader.Reset();
-
-	gCompositeShader.Reset();
 }

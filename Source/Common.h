@@ -60,14 +60,19 @@ inline std::string gToLower(const std::string& inString)
 	return result;
 }
 
-inline void gTrace(const char* string)
+inline void gTrace(const char* inString)
 {
-	OutputDebugStringA(string);
+	OutputDebugStringA(inString);
 }
 
-inline void gTrace(const std::string_view& data)
+inline void gTrace(const std::string& inString)
 {
-	OutputDebugStringA(data.data());
+	OutputDebugStringA(inString.c_str());
+}
+
+inline void gTrace(const std::string_view& inString)
+{
+	OutputDebugStringA(inString.data());
 }
 
 template <typename T>
@@ -75,6 +80,25 @@ inline void gTrace(const T& data)
 {
 	std::string str = std::to_string(data) + "\n";
 	OutputDebugStringA(str.c_str());
+}
+
+inline std::filesystem::path gCreateDumpFolder()
+{
+	std::filesystem::path directory = ".\\Dump\\";
+	std::filesystem::create_directory(directory);
+
+	return directory;
+}
+
+inline void gOpenDumpFolder()
+{
+	std::filesystem::path dump_folder = gCreateDumpFolder();
+
+	std::filesystem::path command = "explorer ";
+	command += std::filesystem::current_path();
+	command += "\\";
+	command += dump_folder;
+	system(command.string().c_str());
 }
 
 #define gAssert assert
@@ -195,8 +219,6 @@ extern uint64_t                       		gFenceLastSignaledValue;
 
 extern IDXGISwapChain3* 					gSwapChain;
 extern HANDLE                       		gSwapChainWaitableObject;
-extern ID3D12Resource*						gBackBufferRenderTargetResource[];
-extern D3D12_CPU_DESCRIPTOR_HANDLE			gBackBufferRenderTargetRTV[];
 
 // Application
 struct ShaderTable
@@ -272,7 +294,6 @@ struct Shader
 	SHADER_MEMBER(const char*, VSName, nullptr);
 	SHADER_MEMBER(const char*, PSName, nullptr);
 	SHADER_MEMBER(const char*, CSName, nullptr);
-	SHADER_MEMBER(bool, UseGlobalRootSignature, false);
 
 	struct DescriptorInfo
 	{
@@ -283,17 +304,13 @@ struct Shader
 		glm::uint			mStride = 0;
 	};
 
-	void InitializeDescriptors(const std::vector<DescriptorInfo>& inEntries);
-	void SetupGraphics(ID3D12DescriptorHeap* inHeap, bool inBindless);
-	void SetupCompute(ID3D12DescriptorHeap* inHeap, bool inBindless);
 	void Reset() { mData = {}; }
 
 	struct Data
 	{
-		ComPtr<ID3D12RootSignatureDeserializer>		mRootSignatureDeserializer;
 		ComPtr<ID3D12RootSignature>					mRootSignature;
 		ComPtr<ID3D12PipelineState>					mPipelineState;
-		ComPtr<ID3D12DescriptorHeap>				mViewDescriptorHeap;
+		ComPtr<ID3D12StateObject>					mStateObject;
 	};
 	Data mData;
 };
@@ -326,14 +343,11 @@ struct Texture
 	void Initialize();
 	void Update();
 	void InitializeUpload();
-	void ReleaseResources();
 
 	ComPtr<ID3D12Resource> mResource;
 	ComPtr<ID3D12Resource> mUploadResource;
 
-	bool mImGuiInitialized = false;
-	D3D12_CPU_DESCRIPTOR_HANDLE mImGuiCPUHandle = {};
-	D3D12_GPU_DESCRIPTOR_HANDLE mImGuiGPUHandle = {};
+	int mImGuiTextureIndex = -1;
 
 	int mSubresourceCount = 1; // TODO: Support multiple subresources
 	bool mLoaded = false;
@@ -366,19 +380,7 @@ extern ComPtr<ID3D12Resource>				gConstantGPUBuffer;
 extern ComPtr<ID3D12RootSignature>			gDXRGlobalRootSignature;
 extern ComPtr<ID3D12StateObject>			gDXRStateObject;
 
-extern ComPtr<ID3D12DescriptorHeap>			gUniversalHeap;
-extern SIZE_T								gUniversalHeapHandleIncrementSize;
-extern int									gUniversalHeapHandleIndex;
-
 extern ShaderTable							gDXRShaderTable;
-
-extern bool									gUseDXRInlineShader;
-extern Shader								gDXRInlineShader;
-
-extern Shader								gDiffTexture2DShader;
-extern Shader								gDiffTexture3DShader;
-
-extern Shader								gCompositeShader;
 
 struct FrameContext
 {
@@ -410,23 +412,82 @@ struct Renderer
 {
 	struct Runtime : RuntimeBase<Runtime>
 	{
-		Texture								mScreenColorTexture = Texture().Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(ViewDescriptorIndex::ScreenColorUAV).SRVIndex(ViewDescriptorIndex::ScreenColorSRV).Name("Renderer.ScreenColorTexture");
-		Texture								mScreenDebugTexture = Texture().Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(ViewDescriptorIndex::ScreenDebugUAV).Name("Renderer.ScreenDebugTexture");
+		Shader								mRayQueryShader				= Shader().FileName("Shader/Raytracing.hlsl").CSName("RayQueryCS");
+		Shader								mDiffTexture2DShader		= Shader().FileName("Shader/DiffTexture.hlsl").CSName("DiffTexture2DShader");
+		Shader								mDiffTexture3DShader		= Shader().FileName("Shader/DiffTexture.hlsl").CSName("DiffTexture3DShader");
+		Shader								mCompositeShader			= Shader().FileName("Shader/Composite.hlsl").VSName("ScreenspaceTriangleVS").PSName("CompositePS");
+
+		Shader								mSentinelShader				= Shader();
+		std::span<Shader>					mShaders					= std::span<Shader>(&mRayQueryShader, &mSentinelShader);
+
+		Texture								mScreenColorTexture			= Texture().Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(ViewDescriptorIndex::ScreenColorUAV).Name("Renderer.ScreenColorTexture");
+		Texture								mScreenDebugTexture			= Texture().Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(ViewDescriptorIndex::ScreenDebugUAV).Name("Renderer.ScreenDebugTexture");
 
 		Texture								mSentinelTexture;
-		std::span<Texture> mTextures		= std::span<Texture>(&mScreenColorTexture, &mSentinelTexture);
+		std::span<Texture>					mTextures					= std::span<Texture>(&mScreenColorTexture, &mSentinelTexture);
+
+		ComPtr<ID3D12Resource>				mBackBuffers[NUM_BACK_BUFFERS] = {};
+		D3D12_CPU_DESCRIPTOR_HANDLE			mBufferBufferRTVs[NUM_BACK_BUFFERS] = {};
 	};
 	Runtime mRuntime;
 
-	void									ReleaseResources();
+	void									Initialize();
+	void									Finalize();
 	void									ImGuiShowTextures();
+	void									ResetScreen();
+	void									AcquireBackBuffers();
+	void									ReleaseBackBuffers();
+
+	void									Setup(const Shader& inShader)
+	{
+		Setup(inShader.mData, inShader.mCSName == nullptr);
+	}
+
+	void									Setup(const Shader::Data& inShaderData, bool inGraphics = false)
+	{
+		// Heaps of Dynamic Resources needs to be set before RootSignature
+		// See https://microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_6_DynamicResources.html#setdescriptorheaps-and-setrootsignature
+		ID3D12DescriptorHeap* bindless_heaps[] =
+		{
+			gGetFrameContext().mViewDescriptorHeap.mHeap.Get(),
+			gGetFrameContext().mSamplerDescriptorHeap.mHeap.Get(),
+		};
+		gCommandList->SetDescriptorHeaps(ARRAYSIZE(bindless_heaps), bindless_heaps);
+
+		if (inGraphics)
+			gCommandList->SetGraphicsRootSignature(inShaderData.mRootSignature.Get());
+		else
+			gCommandList->SetComputeRootSignature(inShaderData.mRootSignature.Get());
+
+		if (inShaderData.mStateObject != nullptr)
+			gCommandList->SetPipelineState1(inShaderData.mStateObject.Get());
+		else
+			gCommandList->SetPipelineState(inShaderData.mPipelineState.Get());
+
+		// Root parameters need to be set after RootSignature
+		if (inGraphics)
+			gCommandList->SetGraphicsRootConstantBufferView((int)RootParameterIndex::Constants, gConstantGPUBuffer->GetGPUVirtualAddress());
+		else
+			gCommandList->SetComputeRootConstantBufferView((int)RootParameterIndex::Constants, gConstantGPUBuffer->GetGPUVirtualAddress());
+	}
+
+	bool									mReloadShader							= false;
+	bool									mDumpDisassemblyRayQuery				= false;
+	bool									mPrintStateObjectDesc					= false;
+																					
+	bool									mUseRayQuery							= true;
+
+	bool									mAccumulationDone						= false;
+	bool									mAccumulationFrameInfinity				= true;
+	glm::uint32								mAccumulationFrameCount					= 1;
+	bool									mAccumulationResetRequested				= false;
 };
 extern Renderer								gRenderer;
 
 extern Texture*								gDumpTexture;
 extern Texture								gDumpTextureProxy;
 
-extern Constants					gConstants;
+extern Constants							gConstants;
 
 // String literals
 static const wchar_t*						kDefaultRayGenerationShader	= L"DefaultRayGeneration";

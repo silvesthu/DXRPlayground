@@ -12,7 +12,8 @@
 
 #pragma once
 
-#include <dxgiformat.h>
+// #include <dxgiformat.h>
+#include <d3d12.h>
 
 struct ID3D12Device;
 struct ID3D12GraphicsCommandList;
@@ -32,10 +33,8 @@ IMGUI_IMPL_API void     ImGui_ImplDX12_RenderDrawData(ImDrawData* draw_data, ID3
 IMGUI_IMPL_API void     ImGui_ImplDX12_InvalidateDeviceObjects();
 IMGUI_IMPL_API bool     ImGui_ImplDX12_CreateDeviceObjects();
 
-// Descriptor - Customization
-IMGUI_IMPL_API void		ImGui_ImplDX12_AllocateDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE& out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE& out_gpu_handle);
-
-namespace ImGui
-{
-	void TextureOption();
-}
+// Texture
+IMGUI_IMPL_API int ImGui_ImplDX12_AllocateTexture(const D3D12_RESOURCE_DESC& inDesc);
+IMGUI_IMPL_API D3D12_CPU_DESCRIPTOR_HANDLE& ImGui_ImplDX12_TextureCPUHandle(int inIndex);
+IMGUI_IMPL_API D3D12_GPU_DESCRIPTOR_HANDLE& ImGui_ImplDX12_TextureGPUHandle(int inIndex);
+IMGUI_IMPL_API void ImGui_ImplDX12_ShowTextureOption(int inIndex);

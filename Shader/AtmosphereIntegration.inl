@@ -1,46 +1,5 @@
 #include "Shared.inl"
 
-cbuffer AtmosphereConstantsPerDrawBuffer : register(b1, space2)
-{
-	AtmosphereConstantsPerDraw mAtmospherePerDraw;
-}
-
-RWTexture2D<float4> TransmittanceUAV								: register(u0, space2);
-RWTexture2D<float4> DeltaIrradianceUAV								: register(u1, space2);
-RWTexture2D<float4> IrradianceUAV									: register(u2, space2);
-RWTexture3D<float4> DeltaRayleighScatteringUAV						: register(u3, space2);
-RWTexture3D<float4> DeltaMieScatteringUAV							: register(u4, space2);
-RWTexture3D<float4> ScatteringUAV									: register(u5, space2);
-RWTexture3D<float4> DeltaScatteringDensityUAV						: register(u6, space2);
-RWTexture2D<float4> TransmittanceTexUAV								: register(u7, space2);
-RWTexture2D<float4> MultiScattTexUAV								: register(u8, space2);
-RWTexture2D<float4> SkyViewLutTexUAV								: register(u9, space2);
-RWTexture3D<float4> AtmosphereCameraScatteringVolumeUAV				: register(u10, space2);
-RWTexture2D<float4> Wilkie21SkyViewLutTexUAV						: register(u11, space2);
-
-Texture2D<float4> TransmittanceSRV									: register(t0, space2);
-Texture2D<float4> DeltaIrradianceSRV								: register(t1, space2);
-Texture2D<float4> IrradianceSRV										: register(t2, space2);
-Texture3D<float4> DeltaRayleighScatteringSRV						: register(t3, space2);
-Texture3D<float4> DeltaMieScatteringSRV								: register(t4, space2);
-Texture3D<float4> ScatteringSRV										: register(t5, space2);
-Texture3D<float4> DeltaScatteringDensitySRV							: register(t6, space2);
-Texture2D<float4> TransmittanceTexSRV								: register(t7, space2);
-Texture2D<float4> MultiScattTexSRV									: register(t8, space2);
-Texture2D<float4> SkyViewLutTexSRV									: register(t9, space2);
-Texture3D<float4> AtmosphereCameraScatteringVolumeSRV				: register(t10, space2);
-Texture2D<float4> Wilkie21SkyViewLutTexSRV							: register(t11, space2);
-
-#define AtmosphereRootSignature							\
-"DescriptorTable("										\
-	"  CBV(b0, space = 0)"								\
-	", UAV(u0, space = 2, numDescriptors = 12)"			\
-	", SRV(t0, space = 2, numDescriptors = 12)"			\
-")"														\
-", RootConstants(num32BitConstants=4, b1, space = 2)"	\
-", StaticSampler(s0, filter = FILTER_MIN_MAG_MIP_LINEAR, addressU = TEXTURE_ADDRESS_CLAMP, addressV = TEXTURE_ADDRESS_CLAMP, addressW = TEXTURE_ADDRESS_CLAMP)"	\
-", StaticSampler(s1, filter = FILTER_MIN_MAG_MIP_LINEAR, addressU = TEXTURE_ADDRESS_WRAP, addressV = TEXTURE_ADDRESS_WRAP, addressW = TEXTURE_ADDRESS_WRAP)"
-
 // Altitude -> Density
 float GetLayerDensity(DensityProfileLayer layer, float altitude)
 {

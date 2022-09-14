@@ -12,6 +12,8 @@
 #include "Cloud.h"
 
 #define DX12_ENABLE_DEBUG_LAYER			(1)
+#define DX12_ENABLE_GBV					(0)
+#define DX12_ENABLE_INFO_QUEUE_CALLBACK (0)
 
 static const wchar_t*					kApplicationTitleW = L"DXR Playground";
 
@@ -32,34 +34,28 @@ enum class ScenePresetType
 	None,
 
 	CornellBox,
+	VeachMIS,
 
 	Bruneton17,
 	Bruneton17_Artifact_Mu,
 	Hillaire20,
 
-	VeachMIS,
-	VeachMISMitsuba,
-
 	COUNT,
 };
 
-static ScenePresetType sCurrentScene = ScenePresetType::VeachMISMitsuba;
+static ScenePresetType sCurrentScene = ScenePresetType::CornellBox;
 static ScenePresetType sPreviousScene = sCurrentScene;
 static ScenePreset kScenePresets[(int)ScenePresetType::COUNT] =
 {
 	{ "None",						nullptr,															glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
 
-	{ "CornellBox",					"Asset/Comparison/cornellbox.obj",									glm::vec4(0.0f, 1.0f, 3.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
+	{ "CornellBox",					"Asset/Comparison/benedikt-bitterli/cornell-box/scene_v3.xml",		glm::vec4(0.0f, 0.0f, 0.0f, 0.0f),			glm::vec4(0.0f, 0.0f, 0.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
+	{ "VeachMIS",					"Asset/Comparison/benedikt-bitterli/veach-mis/scene_ggx_v3.xml",	glm::vec4(0.0f, 0.0f, 0.0f, 0.0f),			glm::vec4(0.0f, 0.0f, 0.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
 
 	{ "Bruneton17",					"Asset/primitives/sphere.obj",										glm::vec4(0.0f, 0.0f, 9.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::translate(glm::vec3(0.0f, 1.0f, 0.0f)),			0.0f, glm::pi<float>() / 4.0f,},
 	{ "Bruneton17_Artifact_Mu",		"Asset/primitives/sphere.obj",										glm::vec4(0.0f, 80.0f, 150.0f, 0.0f),		glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::scale(glm::vec3(100.0f, 100.0f, 100.0f)),			0.0f, glm::pi<float>() / 4.0f,},
 	{ "Hillaire20",					nullptr,															glm::vec4(0.0f, 0.5, -1.0f, 0.0f),			glm::vec4(0.0f, 0.0f, 1.0f, 0.0f),		98.8514328f, 	glm::translate(glm::vec3(0.0f, 1.0f, 0.0f)),			0.0f, glm::pi<float>() / 2.0f - 0.45f,},
-
-	{ "VeachMIS",					"Asset/Comparison/veach-mis.obj",									glm::vec4(0.0f, 2.0f, 15.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
-	{ "VeachMISMitsuba",			"Asset/Comparison/benedikt-bitterli/veach-mis/scene_ggx_v3.xml",	glm::vec4(0.0f, 2.0f, 15.0f, 0.0f),			glm::vec4(0.0f, 0.0f, -1.0f, 0.0f),		90.0f,			glm::mat4x4(1.0f),										0.0f, glm::pi<float>() / 4.0f,},
 };
-
-static bool sReloadRequested = false;
 
 struct CameraSettings
 {
@@ -88,17 +84,22 @@ DisplaySettings		gDisplaySettings	= {};
 // Forward declarations of helper functions
 static bool sCreateDeviceD3D(HWND hWnd);
 static void sCleanupDeviceD3D();
-static void sCreateRenderTarget();
-static void sCleanupRenderTarget();
 static void sWaitForIdle();
 static void sWaitForLastSubmittedFrame();
 static void sWaitForFrameContext();
 static void sUpdate();
+static void sLoadShader() { gRenderer.mReloadShader = true; }
 static void sLoadCamera();
 static void sLoadScene();
+static void sDumpLuminance()
+{
+	gDumpTextureProxy.mResource = gRenderer.mRuntime.mScreenColorTexture.mResource;
+	gDumpTextureProxy.mName = "Luminance";
+	gDumpTexture = &gDumpTextureProxy;
+}
 static void sRender();
 static LRESULT WINAPI sWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-
+bool sSelected[1024] = {};
 static void sUpdate()
 {
 	// Rotate Camera
@@ -160,6 +161,18 @@ static void sUpdate()
 			gConstants.mCameraPosition -= up * move_speed;
 		if (ImGui::IsKeyDown('E'))
 			gConstants.mCameraPosition += up * move_speed;
+
+		if (ImGui::IsKeyPressed(VK_F5))
+			sLoadShader();
+
+		if (ImGui::IsKeyPressed(VK_F6))
+			sLoadCamera();
+
+		if (ImGui::IsKeyPressed(VK_F9))
+			sDumpLuminance();
+
+		if (ImGui::IsKeyPressed(VK_F10))
+			gOpenDumpFolder();
 	}
 
 	// Frustum
@@ -177,15 +190,8 @@ static void sUpdate()
 	{
 		if (ImGui::Begin("DXR Playground"))
 		{
-			// Floating items
-			{
-				gRenderer.ImGuiShowTextures();
-				gAtmosphere.ImGuiShowTextures();
-				gCloud.ImGuiShowTextures();
-			}
-
 			ImGui::Text("Frame %d | Time %.3f s | Average %.3f ms (FPS %.1f) | %dx%d",
-				gConstants.mAccumulationFrameCount,
+				gConstants.mCurrentFrameIndex,
 				gConstants.mTime,
 				1000.0f / ImGui::GetIO().Framerate,
 				ImGui::GetIO().Framerate,
@@ -193,24 +199,35 @@ static void sUpdate()
 				gDisplaySettings.mRenderResolution.y);
 
 			{
-				if (ImGui::Button("Reset Camera Transform") || ImGui::IsKeyPressed(VK_F6))
+				if (ImGui::Button("Reload Shader (F5)"))
+					sLoadShader();
+
+				ImGui::SameLine();
+
+				if (ImGui::Button("Reload Camera (F6)"))
 					sLoadCamera();
 
-				ImGui::SameLine();
-
-				if (ImGui::Button("Reload Shader") || ImGui::IsKeyPressed(VK_F5))
-					sReloadRequested = true;
-
-				if (ImGui::Button("Dump Luminance") || ImGui::IsKeyPressed(VK_F9))
-				{
-					gDumpTextureProxy.mResource = gRenderer.mRuntime.mScreenColorTexture.mResource;
-					gDumpTextureProxy.mName = "Luminance";
-					gDumpTexture = &gDumpTextureProxy;
-				}
+				if (ImGui::Button("Dump Luminance (F9)"))
+					sDumpLuminance();
 
 				ImGui::SameLine();
+
+				if (ImGui::Button("Open Dump Folder (F10)"))
+					gOpenDumpFolder();
 				
-				ImGui::Checkbox("Inline Raytracing", &gUseDXRInlineShader);
+				ImGui::Checkbox("Use RayQuery", &gRenderer.mUseRayQuery);
+			}
+
+			if (ImGui::TreeNodeEx("Accumulation", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				if (ImGui::Checkbox("Infinity", &gRenderer.mAccumulationFrameInfinity))
+					gRenderer.mAccumulationResetRequested = true;
+
+				if (!gRenderer.mAccumulationFrameInfinity)
+					if (ImGui::SliderInt("Count", reinterpret_cast<int*>(&gRenderer.mAccumulationFrameCount), 1, 16))
+						gRenderer.mAccumulationResetRequested = true;
+
+				ImGui::TreePop();
 			}
 
 			if (ImGui::TreeNodeEx("Camera"))
@@ -290,29 +307,6 @@ static void sUpdate()
 				ImGui::TreePop();
 			}
 
-			if (ImGui::TreeNodeEx("Instance"))
-			{
-				for (int i = 0; i < static_cast<int>(DebugInstanceMode::Count); i++)
-				{
-					const auto& name = nameof::nameof_enum(static_cast<DebugInstanceMode>(i));
-					if (name[0] == '_')
-					{
-						ImGui::NewLine();
-						continue;
-					}
-
-					if (i != 0)
-						ImGui::SameLine();
-
-					ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mDebugInstanceMode), i);
-				}
-
-				ImGui::SliderInt("DebugInstanceIndex", &gConstants.mDebugInstanceIndex, -1, gScene.GetInstanceCount() - 1);
-				gConstants.mDebugInstanceIndex = glm::clamp(gConstants.mDebugInstanceIndex, -1, gScene.GetInstanceCount() - 1);
-
-				ImGui::TreePop();
-			}
-
 			if (ImGui::TreeNodeEx("Scene"))
 			{
 				for (int i = 0; i < static_cast<int>(ScenePresetType::COUNT); i++)
@@ -321,38 +315,10 @@ static void sUpdate()
 						ImGui::RadioButton(kScenePresets[i].mName, reinterpret_cast<int*>(&sCurrentScene), i);
 				}
 
-				if (ImGui::TreeNodeEx("Instances", ImGuiTreeNodeFlags_DefaultOpen))
-				{
-					int column_count = 3;
-					if (ImGui::BeginTable("InstancesTable", column_count, ImGuiTableFlags_ScrollX | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
-					{
-						ImGui::TableNextRow();
-						ImGui::TableSetColumnIndex(0); ImGui::Text("Name");
-						ImGui::TableSetColumnIndex(1); ImGui::Text("Position");
-
-						for (int row = 0; row < gScene.GetInstanceCount(); row++)
-						{
-							ImGui::TableNextRow();
-
-							const InstanceInfo& instance_info = gScene.GetInstanceInfo(row);
-							const InstanceData& instance_data = gScene.GetInstanceData(row);
-
-							ImGui::TableSetColumnIndex(0);
-							ImGui::Text(instance_info.mName.c_str());
-
-							ImGui::TableSetColumnIndex(1);
-							ImGui::Text("%f %f %f", instance_data.mTransform[3][0], instance_data.mTransform[3][1], instance_data.mTransform[3][2]);
-						}
-						ImGui::EndTable();
-					}
-
-					ImGui::TreePop();
-				}
-
 				ImGui::TreePop();
 			}
 
-			if (ImGui::TreeNodeEx("Atmosphere", ImGuiTreeNodeFlags_DefaultOpen))
+			if (ImGui::TreeNodeEx("Atmosphere"))
 			{
 				gAtmosphere.ImGuiShowMenus();
 				ImGui::TreePop();
@@ -361,6 +327,19 @@ static void sUpdate()
 			if (ImGui::TreeNodeEx("Cloud"))
 			{
 				gCloud.ImGuiShowMenus();
+				ImGui::TreePop();
+			}
+
+			if (ImGui::TreeNodeEx("Shader"))
+			{
+				if (ImGui::Button("Print Disassembly RayQuery"))
+				{
+					gRenderer.mDumpDisassemblyRayQuery = true;
+					gRenderer.mReloadShader = true;
+				}
+
+				ImGui::Checkbox("Print D3D12_STATE_OBJECT_DESC", &gRenderer.mPrintStateObjectDesc);
+
 				ImGui::TreePop();
 			}
 
@@ -392,19 +371,92 @@ static void sUpdate()
 
 				ImGui::TreePop();
 			}
+
+			// Floating items
+			{
+				gRenderer.ImGuiShowTextures();
+				gAtmosphere.ImGuiShowTextures();
+				gCloud.ImGuiShowTextures();
+
+				if (ImGui::Begin("Instances"))
+				{
+					for (int i = 0; i < static_cast<int>(DebugInstanceMode::Count); i++)
+					{
+						const auto& name = nameof::nameof_enum(static_cast<DebugInstanceMode>(i));
+						if (name[0] == '_')
+						{
+							ImGui::NewLine();
+							continue;
+						}
+
+						if (i != 0)
+							ImGui::SameLine();
+
+						ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mDebugInstanceMode), i);
+					}
+
+					static const int kColumnCount = 7;
+					if (ImGui::BeginTable("Table", kColumnCount, ImGuiTableFlags_ScrollX | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
+					{
+						ImGui::TableNextRow(ImGuiTableRowFlags_Headers);
+
+						ImGui::TableSetColumnIndex(0); ImGui::Text("Name");
+						ImGui::TableSetColumnIndex(1); ImGui::Text("Position");
+						ImGui::TableSetColumnIndex(2); ImGui::Text("MaterialType");
+						ImGui::TableSetColumnIndex(3); ImGui::Text("Albedo");
+						ImGui::TableSetColumnIndex(4); ImGui::Text("Reflectance");
+						ImGui::TableSetColumnIndex(5); ImGui::Text("Emission");
+						ImGui::TableSetColumnIndex(6); ImGui::Text("RoughnessAlpha");
+
+						for (int row = 0; row < gScene.GetInstanceCount(); row++)
+						{
+							ImGui::TableNextRow();
+
+							const InstanceInfo& instance_info = gScene.GetInstanceInfo(row);
+							const InstanceData& instance_data = gScene.GetInstanceData(row);
+
+							ImGui::TableSetColumnIndex(0);
+							if (ImGui::Selectable(instance_info.mName.c_str(), row == gConstants.mDebugInstanceIndex, ImGuiSelectableFlags_SpanAllColumns))
+								gConstants.mDebugInstanceIndex = row;
+
+							ImGui::TableSetColumnIndex(1);
+							ImGui::Text("%f %f %f", instance_data.mTransform[3][0], instance_data.mTransform[3][1], instance_data.mTransform[3][2]);
+
+							ImGui::TableSetColumnIndex(2);
+							ImGui::Text("%s%s", NAMEOF_ENUM(instance_data.mMaterialType).data(), instance_data.mTwoSided ? " (TwoSided)" : "");
+
+							ImGui::TableSetColumnIndex(3);
+							ImGui::Text("%f %f %f", instance_data.mAlbedo.x, instance_data.mAlbedo.y, instance_data.mAlbedo.z);
+
+							ImGui::TableSetColumnIndex(4);
+							ImGui::Text("%f %f %f", instance_data.mReflectance.x, instance_data.mReflectance.y, instance_data.mReflectance.z);
+
+							ImGui::TableSetColumnIndex(5);
+							ImGui::Text("%f %f %f", instance_data.mEmission.x, instance_data.mEmission.y, instance_data.mEmission.z);
+
+							ImGui::TableSetColumnIndex(6);
+							ImGui::Text("%f", instance_data.mRoughnessAlpha);
+						}
+						ImGui::EndTable();
+					}
+
+					gConstants.mDebugInstanceIndex = glm::clamp(gConstants.mDebugInstanceIndex, -1, gScene.GetInstanceCount() - 1);
+				}
+				ImGui::End();
+			}
 		}
 		ImGui::End();
 	}
 
 	{
 		// Reload
-		if (sReloadRequested)
+		if (gRenderer.mReloadShader)
 		{
-			sReloadRequested = false;
+			gRenderer.mReloadShader = false;
 
 			sWaitForLastSubmittedFrame();
 			gScene.RebuildShader();
-			gConstants.mReset = 1;
+			gRenderer.mAccumulationResetRequested = true;
 
 			gAtmosphere.mRuntime.mBruneton17.mRecomputeRequested = true;
 			gCloud.mRecomputeRequested = true;
@@ -430,7 +482,6 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 		::UnregisterClass(wc.lpszClassName, wc.hInstance);
 		return 1;
 	}
-	sCreateRenderTarget();
 
 	// Setup Dear ImGui context
 	IMGUI_CHECKVERSION();
@@ -446,6 +497,9 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 	ImGui_ImplWin32_Init(hwnd);
 	ImGui_ImplDX12_Init(gDevice, NUM_FRAMES_IN_FLIGHT, DXGI_FORMAT_R8G8B8A8_UNORM);
 	ImGui_ImplDX12_CreateDeviceObjects();
+
+	// Renderer
+	gRenderer.Initialize();
 	
 	// Load Scene
 	sLoadScene();
@@ -456,15 +510,16 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 
 	// File watch
 	filewatch::FileWatch<std::string> file_watch("Shader/", 
-		[] (const std::string& inPath, const filewatch::Event /*inChangeType*/) 
+		[] (const std::string& inPath, const filewatch::Event inChangeType) 
 		{
+			(void)inChangeType;
 			std::regex pattern(".*\\.(hlsl|h|inl)");
-			if (std::regex_match(inPath, pattern) && inPath.find("Generated") == std::string::npos)
+			if (std::regex_match(inPath, pattern) && inChangeType == filewatch::Event::modified)
 			{
 				std::string msg = "Reload triggered by " + inPath + "\n";
 				gTrace(msg.c_str());
 
-				sReloadRequested = true;
+				gRenderer.mReloadShader = true;
 			}
 		});
 
@@ -511,10 +566,10 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 		ImGui_ImplWin32_Shutdown();
 		ImGui::DestroyContext();
 
-		// Customization - Cleanup
 		gScene.Unload();
 
-		sCleanupRenderTarget();
+		gRenderer.Finalize();
+
 		sCleanupDeviceD3D();
 		::DestroyWindow(hwnd);
 		::UnregisterClass(wc.lpszClassName, wc.hInstance);
@@ -571,8 +626,8 @@ void sRender()
 	sWaitForFrameContext();
 	FrameContext& frame_context = gGetFrameContext();
 	glm::uint32 frame_index = gSwapChain->GetCurrentBackBufferIndex();
-	ID3D12Resource* frame_render_target_resource = gBackBufferRenderTargetResource[frame_index];
-	D3D12_CPU_DESCRIPTOR_HANDLE& frame_render_target_descriptor_handle = gBackBufferRenderTargetRTV[frame_index];
+	ID3D12Resource* back_buffer = gRenderer.mRuntime.mBackBuffers[frame_index].Get();
+	D3D12_CPU_DESCRIPTOR_HANDLE& back_buffer_RTV = gRenderer.mRuntime.mBufferBufferRTVs[frame_index];
 
 	// Frame Begin
 	{
@@ -596,36 +651,52 @@ void sRender()
 		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Upload");
 
 		{
-			gConstants.mEV100 = 
-				glm::log2((gCameraSettings.mExposureControl.mAperture * gCameraSettings.mExposureControl.mAperture) / (1.0f / gCameraSettings.mExposureControl.mInvShutterSpeed) * 100.0f / gCameraSettings.mExposureControl.mSensitivity);
-
-			gConstants.mSunDirection = 
-				glm::vec4(0,1,0,0) * glm::rotate(gConstants.mSunZenith, glm::vec3(0, 0, 1)) * glm::rotate(gConstants.mSunAzimuth + glm::pi<float>() / 2.0f, glm::vec3(0, 1, 0));
-
-			gConstants.mDebugCoord = 
-				glm::uvec2(static_cast<glm::uint32>(ImGui::GetMousePos().x), (glm::uint32)ImGui::GetMousePos().y);
+			gConstants.mEV100			= glm::log2((gCameraSettings.mExposureControl.mAperture * gCameraSettings.mExposureControl.mAperture) / (1.0f / gCameraSettings.mExposureControl.mInvShutterSpeed) * 100.0f / gCameraSettings.mExposureControl.mSensitivity);
+			gConstants.mSunDirection	= glm::vec4(0,1,0,0) * glm::rotate(gConstants.mSunZenith, glm::vec3(0, 0, 1)) * glm::rotate(gConstants.mSunAzimuth + glm::pi<float>() / 2.0f, glm::vec3(0, 1, 0));
+			gConstants.mLightCount		= (glm::uint)gScene.GetSceneContent().mLights.size();
+			gConstants.mDebugCoord		= glm::uvec2(static_cast<glm::uint32>(ImGui::GetMousePos().x), (glm::uint32)ImGui::GetMousePos().y);
 		}
 
-		// Accumulation reset check
+		// Accumulation
 		{
 			static Constants sConstantsCopy = gConstants;
 
 			// Whitelist
+			sConstantsCopy.mTime					= gConstants.mTime;
+			sConstantsCopy.mCurrentFrameIndex		= gConstants.mCurrentFrameIndex;
+			sConstantsCopy.mCurrentFrameWeight		= gConstants.mCurrentFrameWeight;
 			sConstantsCopy.mDebugCoord				= gConstants.mDebugCoord;
-			sConstantsCopy.mAccumulationFrameCount	= gConstants.mAccumulationFrameCount;
-			sConstantsCopy.mFrameIndex				= gConstants.mFrameIndex;
-			sConstantsCopy.mTime						= gConstants.mTime;
 
-			if (gConstants.mReset == 0 && memcmp(&sConstantsCopy, &gConstants, sizeof(Constants)) == 0)
-				gConstants.mAccumulationFrameCount++;
+			if (memcmp(&sConstantsCopy, &gConstants, sizeof(Constants)) != 0)
+				gRenderer.mAccumulationResetRequested = true;
+
+			if (gRenderer.mAccumulationResetRequested)
+			{
+				gConstants.mCurrentFrameIndex = 0;
+				gRenderer.mAccumulationDone = false;
+			}
+
+			if (gRenderer.mAccumulationDone)
+				gConstants.mCurrentFrameWeight = 0.0f;
 			else
-				gConstants.mAccumulationFrameCount = 1;
-
-			gConstants.mReset = 0;
+				gConstants.mCurrentFrameWeight = 1.0f / (gConstants.mCurrentFrameIndex + 1);
+			
 			sConstantsCopy = gConstants;
+			gRenderer.mAccumulationResetRequested = false;
 		}
 		
 		memcpy(frame_context.mConstantUploadBufferPointer, &gConstants, sizeof(gConstants));
+
+		{
+			gConstants.mCurrentFrameIndex++;
+
+			glm::uint32 accumulation_frame_count = gRenderer.mAccumulationFrameInfinity ? UINT_MAX : gRenderer.mAccumulationFrameCount;
+
+			if (gConstants.mCurrentFrameIndex == accumulation_frame_count)
+				gRenderer.mAccumulationDone = true;
+
+			gConstants.mCurrentFrameIndex = gMin(gConstants.mCurrentFrameIndex, accumulation_frame_count - 1);
+		}
 
 		gBarrierTransition(gCommandList, gConstantGPUBuffer.Get(), D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, D3D12_RESOURCE_STATE_COPY_DEST);
 		gCommandList->CopyResource(gConstantGPUBuffer.Get(), frame_context.mConstantUploadBuffer.Get());
@@ -659,10 +730,10 @@ void sRender()
 		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Composite");
 
 		gBarrierUAV(gCommandList, gRenderer.mRuntime.mScreenColorTexture.mResource.Get());
-		gBarrierTransition(gCommandList, frame_render_target_resource, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		gBarrierTransition(gCommandList, back_buffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
 		// Draw
-		D3D12_RESOURCE_DESC desc = frame_render_target_resource->GetDesc();
+		D3D12_RESOURCE_DESC desc = back_buffer->GetDesc();
 		D3D12_VIEWPORT viewport = {};
 		viewport.Width = static_cast<float>(desc.Width);
 		viewport.Height = static_cast<float>(desc.Height);
@@ -677,10 +748,10 @@ void sRender()
 		rect.right = static_cast<LONG>(desc.Width);
 		rect.bottom = static_cast<LONG>(desc.Height);
 		gCommandList->RSSetScissorRects(1, &rect);
-		gCommandList->OMSetRenderTargets(1, &frame_render_target_descriptor_handle, false, nullptr);
+		gCommandList->OMSetRenderTargets(1, &back_buffer_RTV, false, nullptr);
 		gCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-		gCompositeShader.SetupGraphics(nullptr, true);
+		gRenderer.Setup(gRenderer.mRuntime.mCompositeShader);
 		gCommandList->DrawInstanced(3, 1, 0, 0);
 	}
 
@@ -690,19 +761,18 @@ void sRender()
 
 		ImGui::Render();
 
-		gCommandList->OMSetRenderTargets(1, &frame_render_target_descriptor_handle, false, nullptr);
+		gCommandList->OMSetRenderTargets(1, &back_buffer_RTV, false, nullptr);
 
 		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), gCommandList);
 	}
 
 	// Frame End
 	{
-		gBarrierTransition(gCommandList, frame_render_target_resource, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+		gBarrierTransition(gCommandList, back_buffer, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
 		gCommandList->Close();
 		gCommandQueue->ExecuteCommandLists(1, reinterpret_cast<ID3D12CommandList* const*>(&gCommandList));
 
 		gConstants.mTime += ImGui::GetIO().DeltaTime;
-		gConstants.mFrameIndex++;
 	}
 
 	// Dump Texture
@@ -712,11 +782,11 @@ void sRender()
 			DirectX::ScratchImage image;
 			DirectX::CaptureTexture(gCommandQueue, gDumpTexture->mResource.Get(), false, image, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COMMON);
 
-			std::wstring directory = L"TextureDump/";
-			std::filesystem::create_directory(directory);
-			std::wstring path = directory + gToWString(gDumpTexture->mName) + L".dds";
+			std::filesystem::path path = gCreateDumpFolder();
+			path += gDumpTexture->mName;
+			path += ".dds";
 			DirectX::SaveToDDSFile(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::DDS_FLAGS_NONE, path.c_str());
-			
+
 			gDumpTexture = nullptr;
 		}
 	}
@@ -733,6 +803,18 @@ void sRender()
 		gFenceLastSignaledValue = fence_value;
 		frame_context.mFenceValue = fence_value;
 	}
+}
+
+static void sMessageCallback(D3D12_MESSAGE_CATEGORY inCategory, D3D12_MESSAGE_SEVERITY inSeverity, D3D12_MESSAGE_ID inID, LPCSTR inDescription, void* inContext)
+{
+	(void)inContext;
+	std::string message = std::format("{}\n\tD3D12_MESSAGE_CATEGORY = {}\n\tD3D12_MESSAGE_SEVERITY = {}\n\tD3D12_MESSAGE_ID = {}\n", 
+		inDescription,
+		nameof::nameof_enum(inCategory), 
+		nameof::nameof_enum(inSeverity), 
+		nameof::nameof_enum(inID)); // Note NAMEOF_ENUM_RANGE_MAX is not large enough for this
+	gTrace(message);
+	gAssert(false);
 }
 
 // Helper functions
@@ -759,15 +841,15 @@ static bool sCreateDeviceD3D(HWND hWnd)
 	if (DX12_ENABLE_DEBUG_LAYER && GetModuleHandleA("Nvda.Graphics.Interception.dll") == NULL)
 	{
 		ComPtr<ID3D12Debug> dx12Debug = nullptr;
-		ComPtr<ID3D12Debug1> dx12Debug1 = nullptr;
 		if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&dx12Debug))))
-		{
 			dx12Debug->EnableDebugLayer();
+	}
 
-			// GBV don't work well yet
-//  		if (SUCCEEDED(dx12Debug->QueryInterface(IID_PPV_ARGS(&dx12Debug1))))
-//  			dx12Debug1->SetEnableGPUBasedValidation(true);
-		}
+	if (DX12_ENABLE_GBV)
+	{
+		ComPtr<ID3D12Debug1> dx12Debug1 = nullptr;
+		if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&dx12Debug1))))
+			dx12Debug1->SetEnableGPUBasedValidation(true);
 	}
 
 	// Create device with highest feature level as possible
@@ -787,6 +869,17 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		|| options5.RaytracingTier < D3D12_RAYTRACING_TIER_1_1)
 		return false;
 
+	if (DX12_ENABLE_INFO_QUEUE_CALLBACK)
+	{
+		ComPtr<ID3D12InfoQueue1> info_queue;
+		if (SUCCEEDED(gDevice->QueryInterface(IID_PPV_ARGS(&info_queue))))
+		{
+			DWORD cookie = 0;
+			if (FAILED(info_queue->RegisterMessageCallback(sMessageCallback, D3D12_MESSAGE_CALLBACK_FLAG_NONE, nullptr, &cookie)))
+				return false;
+		}
+	}
+
 	// RTV Descriptor Heap
 	{
 		D3D12_DESCRIPTOR_HEAP_DESC desc = {};
@@ -803,7 +896,7 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = gRTVDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
 		for (UINT i = 0; i < NUM_BACK_BUFFERS; i++)
 		{
-			gBackBufferRenderTargetRTV[i] = rtvHandle;
+			gRenderer.mRuntime.mBufferBufferRTVs[i] = rtvHandle;
 			rtvHandle.ptr += rtvDescriptorSize;
 		}
 	}
@@ -816,20 +909,6 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		desc.NodeMask = 1;
 		if (gDevice->CreateCommandQueue(&desc, IID_PPV_ARGS(&gCommandQueue)) != S_OK)
 			return false;
-	}
-
-	// Heap
-	{
-		// DescriptorHeap
-		{
-			D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-			desc.NumDescriptors = 1000000; // Max
-			desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-			desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-			gValidate(gDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&gUniversalHeap)));
-			gUniversalHeap->SetName(L"UniversalHeap");			
-			gUniversalHeapHandleIncrementSize = gDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-		}
 	}
 
 	// Constants
@@ -861,7 +940,7 @@ static bool sCreateDeviceD3D(HWND hWnd)
 			};
 			static_assert(ARRAYSIZE(sampler_descs) == (int)SamplerDescriptorIndex::Count);
 			for (int sampler_index = 0; sampler_index < (int)SamplerDescriptorIndex::Count; sampler_index++)
-				gDevice->CreateSampler(&sampler_descs[sampler_index], gFrameContexts[i].mSamplerDescriptorHeap.GetHandle((SamplerDescriptorIndex)i));
+				gDevice->CreateSampler(&sampler_descs[sampler_index], gFrameContexts[i].mSamplerDescriptorHeap.GetHandle((SamplerDescriptorIndex)sampler_index));
 		}
 
 		// UploadBuffer
@@ -942,7 +1021,6 @@ static void sCleanupDeviceD3D()
 		gFrameContexts[i].Reset();
 
 	gConstantGPUBuffer = nullptr;
-	gUniversalHeap = nullptr;
 	gSafeRelease(gCommandQueue);
 	gSafeRelease(gCommandList);
 	gSafeRelease(gRTVDescriptorHeap);
@@ -956,25 +1034,6 @@ static void sCleanupDeviceD3D()
 		if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgi_debug))))
 			dxgi_debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_FLAGS(DXGI_DEBUG_RLO_DETAIL | DXGI_DEBUG_RLO_IGNORE_INTERNAL));
 	}
-}
-
-static void sCreateRenderTarget()
-{
-	ID3D12Resource* pBackBuffer;
-	for (UINT i = 0; i < NUM_BACK_BUFFERS; i++)
-	{
-		std::wstring name = L"SwapChainBuffer_" + std::to_wstring(i);
-		gSwapChain->GetBuffer(i, IID_PPV_ARGS(&pBackBuffer));
-		pBackBuffer->SetName(name.c_str());
-		gDevice->CreateRenderTargetView(pBackBuffer, nullptr, gBackBufferRenderTargetRTV[i]);
-		gBackBufferRenderTargetResource[i] = pBackBuffer;
-	}
-}
-
-static void sCleanupRenderTarget()
-{
-	for (UINT i = 0; i < NUM_BACK_BUFFERS; i++)
-		gSafeRelease(gBackBufferRenderTargetResource[i]);
 }
 
 static void sWaitForIdle()
@@ -1030,22 +1089,21 @@ static LRESULT WINAPI sWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam
 		if (gDevice != nullptr && wParam != SIZE_MINIMIZED)
 		{
 			sWaitForLastSubmittedFrame();
+			gRenderer.ReleaseBackBuffers();
 
-			gScene.RebuildBinding([&]()
-			{
-				sCleanupRenderTarget();
-				gDisplaySettings.mRenderResolution.x = gMax((UINT)LOWORD(lParam), 8u);
-				gDisplaySettings.mRenderResolution.y = gMax((UINT)HIWORD(lParam), 8u);
-				DXGI_SWAP_CHAIN_DESC1 swap_chain_desc;
-				gSwapChain->GetDesc1(&swap_chain_desc);
-				gSwapChain->ResizeBuffers(
-					swap_chain_desc.BufferCount,
-					gDisplaySettings.mRenderResolution.x,
-					gDisplaySettings.mRenderResolution.y,
-					swap_chain_desc.Format,
-					swap_chain_desc.Flags);
-				sCreateRenderTarget();
-			});
+			gDisplaySettings.mRenderResolution.x = gMax((UINT)LOWORD(lParam), 8u);
+			gDisplaySettings.mRenderResolution.y = gMax((UINT)HIWORD(lParam), 8u);
+			DXGI_SWAP_CHAIN_DESC1 swap_chain_desc;
+			gSwapChain->GetDesc1(&swap_chain_desc);
+			gSwapChain->ResizeBuffers(
+				swap_chain_desc.BufferCount,
+				gDisplaySettings.mRenderResolution.x,
+				gDisplaySettings.mRenderResolution.y,
+				swap_chain_desc.Format,
+				swap_chain_desc.Flags);
+
+			gRenderer.AcquireBackBuffers();
+			gRenderer.ResetScreen();
 		}
 		return 0;
 	case WM_SYSCOMMAND:

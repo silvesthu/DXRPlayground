@@ -20,7 +20,7 @@
 			<integer name="height" value="$resy" />
 			<string name="file_format" value="openexr" />
 			<string name="pixel_format" value="rgb" />
-			<rfilter type="tent" />
+			<rfilter type="box" />
 		</film>
 	</sensor>
 	<bsdf type="twosided" id="DiffuseBSDF">

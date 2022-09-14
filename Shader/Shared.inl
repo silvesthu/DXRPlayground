@@ -52,7 +52,6 @@ enum class ViewDescriptorIndex : uint
 
 	// [Screen]
 	ScreenColorUAV,
-	ScreenColorSRV,
 	ScreenDebugUAV,
 
 	// [Raytrace] - [Input]
@@ -66,21 +65,33 @@ enum class ViewDescriptorIndex : uint
 
 	// [Bruneton17]
 	Bruneton17TransmittanceUAV,
+	Bruneton17TransmittanceSRV,
 	Bruneton17DeltaIrradianceUAV,
+	Bruneton17DeltaIrradianceSRV,
 	Bruneton17IrradianceUAV,
+	Bruneton17IrradianceSRV,
 	Bruneton17DeltaRayleighScatteringUAV,
+	Bruneton17DeltaRayleighScatteringSRV,
 	Bruneton17DeltaMieScatteringUAV,
+	Bruneton17DeltaMieScatteringSRV,
 	Bruneton17ScatteringUAV,
+	Bruneton17ScatteringSRV,
 	Bruneton17DeltaScatteringDensityUAV,
+	Bruneton17DeltaScatteringDensitySRV,
 
 	// [Hillaire20]
 	Hillaire20TransmittanceTexUAV,
+	Hillaire20TransmittanceTexSRV,
 	Hillaire20MultiScattUAV,
+	Hillaire20MultiScattSRV,
 	Hillaire20SkyViewLutUAV,
+	Hillaire20SkyViewLutSRV,
 	Hillaire20AtmosphereCameraScatteringVolumeUAV,
+	Hillaire20AtmosphereCameraScatteringVolumeSRV,
 
 	// [Wilkie21]
 	Wilkie21SkyViewUAV,
+	Wilkie21SkyViewSRV,
 
 	// [Validation] - [Hillaire20]
 	ValidationHillaire20TransmittanceTexExpectedUAV,
@@ -105,10 +116,18 @@ enum class ViewDescriptorIndex : uint
 
 enum class SamplerDescriptorIndex : uint
 {
-	BilinearClamp,
+	BilinearClamp = 0,
 	BilinearWrap,
 
 	Count,
+};
+
+enum class RootParameterIndex : uint
+{
+	Constants = 0,				// ROOT_SIGNATURE_COMMON
+
+	ConstantsDiff = 1,			// ROOT_SIGNATURE_DIFF
+	ConstantsAtmosphere = 1,	// ROOT_SIGNATURE_ATMOSPHERE
 };
 
 enum class DebugMode : uint
@@ -173,6 +192,7 @@ enum class DebugInstanceMode : uint
 enum class LightType : uint
 {
 	Sphere,
+	Rectangle,
 
 	Count,
 };
@@ -223,13 +243,20 @@ struct InstanceData
 	// [TODO] Split material
 
 	MaterialType				mMaterialType					CONSTANT_DEFAULT(MaterialType::Diffuse);
-	float3						GENERATE_PAD_NAME				CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	uint						mTwoSided						CONSTANT_DEFAULT(0);
+	float2						GENERATE_PAD_NAME				CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 
     float3						mAlbedo							CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	float						mOpacity						CONSTANT_DEFAULT(1.0f);
 
     float3						mReflectance					CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	float						mRoughnessAlpha					CONSTANT_DEFAULT(0.0f);
+
+	float3						mEta							CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+
+	float3						mK								CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
     float3						mEmission						CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
@@ -258,6 +285,23 @@ struct Light
 	float						mRadius							CONSTANT_DEFAULT(0);
 };
 
+struct RayState
+{
+	enum
+	{
+		None			= 0,
+		Done			= 1,
+		FirstHit		= 1 << 1,
+	};
+
+	void						Set(uint inBits) { mBits |= inBits; }
+	void						Unset(uint inBits) { mBits &= ~inBits; }
+	void						Reset(uint inBits) { mBits = inBits; }
+	bool						IsSet(uint inBits) { return (mBits & inBits) != 0; }
+
+	uint						mBits;
+};
+
 struct RayPayload
 {
 	float3						mThroughput;					// [0, 1]		Accumulated throughput
@@ -267,7 +311,7 @@ struct RayPayload
 	float3						mReflectionDirection;
 
 	uint						mRandomState;
-	bool						mDone;
+	RayState					mState;
 
 	// Certain layout might cause driver crash on PSO generation
 	// See https://github.com/silvesthu/DirectX-Graphics-Samples/commit/9822cb8142629515f3768d2c36ff6695dba04838
@@ -390,6 +434,10 @@ struct Constants
 	float						mSunZenith						CONSTANT_DEFAULT(MATH_PI / 4.0f);
 	float						mTime							CONSTANT_DEFAULT(0);
 
+	uint						mLightCount						CONSTANT_DEFAULT(0);
+	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 	float4						mSunDirection					CONSTANT_DEFAULT(float4(1.0f, 0.0f, 0.0f, 0.0f));
 
 	DebugMode					mDebugMode						CONSTANT_DEFAULT(DebugMode::None);
@@ -399,23 +447,15 @@ struct Constants
 
 	RecursionMode				mRecursionMode					CONSTANT_DEFAULT(RecursionMode::RussianRoulette);
 	uint						mRecursionCountMax				CONSTANT_DEFAULT(4);
-	uint						mFrameIndex						CONSTANT_DEFAULT(0);
-	uint						mAccumulationFrameCount			CONSTANT_DEFAULT(1);
+	uint						mCurrentFrameIndex				CONSTANT_DEFAULT(0);
+	float						mCurrentFrameWeight				CONSTANT_DEFAULT(1);
 
 	uint2						mDebugCoord						CONSTANT_DEFAULT(uint2(0, 0));
-	uint						mReset							CONSTANT_DEFAULT(0);
+	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
 	AtmosphereConstants			mAtmosphere;
 	CloudConstants				mCloud;
-};
-
-struct AtmosphereConstantsPerDraw
-{
-	uint						mScatteringOrder				CONSTANT_DEFAULT(0);
-	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
-	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
-	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 };
 
 #undef CONSTANT_DEFAULT

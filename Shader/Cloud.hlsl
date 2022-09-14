@@ -2,7 +2,7 @@
 #include "Shared.inl"
 #include "Binding.h"
 
-[RootSignature("RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED)")]
+[RootSignature(ROOT_SIGNATURE_COMMON)]
 [numthreads(8, 8, 1)]
 void CloudShapeNoiseCS(
 	uint3 inGroupThreadID : SV_GroupThreadID,
@@ -20,7 +20,7 @@ void CloudShapeNoiseCS(
 	output_UAV[inDispatchThreadID.xyz] = input;
 }
 
-[RootSignature("RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED)")]
+[RootSignature(ROOT_SIGNATURE_COMMON)]
 [numthreads(8, 8, 1)]
 void CloudErosionNoiseCS(
 	uint3 inGroupThreadID : SV_GroupThreadID,

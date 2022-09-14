@@ -600,7 +600,7 @@ AtmosphereParameters GetAtmosphereParameters()
 	return Parameters;
 }
 
-[RootSignature(AtmosphereRootSignature)]
+[RootSignature(ROOT_SIGNATURE_COMMON)]
 [numthreads(8, 8, 1)]
 void TransLUT(
 	uint3 inGroupThreadID : SV_GroupThreadID,
@@ -663,7 +663,7 @@ void TransLUT(
 groupshared float3 MultiScatAs1SharedMem[64];
 groupshared float3 LSharedMem[64];
 
-[RootSignature(AtmosphereRootSignature)]
+[RootSignature(ROOT_SIGNATURE_COMMON)]
 [numthreads(1, 1, 64)]
 void NewMultiScatCS(
 	uint3 inGroupThreadID : SV_GroupThreadID,
@@ -801,7 +801,7 @@ void NewMultiScatCS(
 	// Debug
 }
 
-[RootSignature(AtmosphereRootSignature)]
+[RootSignature(ROOT_SIGNATURE_COMMON)]
 [numthreads(8, 8, 1)]
 void SkyViewLut(
 	uint3 inGroupThreadID : SV_GroupThreadID,
@@ -878,7 +878,7 @@ void SkyViewLut(
 	// SkyViewLutTexUAV[inDispatchThreadID.xy] = float4(SunDir, 1);
 }
 
-[RootSignature(AtmosphereRootSignature)]
+[RootSignature(ROOT_SIGNATURE_COMMON)]
 [numthreads(8, 8, 1)]
 void CameraVolumes(
 	uint3 inGroupThreadID : SV_GroupThreadID,

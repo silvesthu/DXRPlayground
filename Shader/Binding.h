@@ -1,26 +1,101 @@
 #pragma once
+#include "Shared.inl"
+
+// #define USE_DYNAMIC_RESOURCE_CBV		// 2x slower
+// #define USE_DYNAMIC_RESOURCE_SRV_UAV	// [TODO]
+// #define USE_DYNAMIC_RESOURCE_SAMPLER	// Almost same with 2 samplers
+
+// Common
+#ifdef USE_DYNAMIC_RESOURCE_SAMPLER
+#define ROOT_SIGNATURE_SAMPLER
+#else
+#define ROOT_SIGNATURE_SAMPLER \
+", StaticSampler(s0, filter = FILTER_MIN_MAG_MIP_LINEAR, addressU = TEXTURE_ADDRESS_CLAMP, addressV = TEXTURE_ADDRESS_CLAMP, addressW = TEXTURE_ADDRESS_CLAMP)"	\
+", StaticSampler(s1, filter = FILTER_MIN_MAG_MIP_LINEAR, addressU = TEXTURE_ADDRESS_WRAP, addressV = TEXTURE_ADDRESS_WRAP, addressW = TEXTURE_ADDRESS_WRAP)"
+#endif // USE_DYNAMIC_RESOURCE_SAMPLER
 
 // CBV
-cbuffer                             ConstantsBuffer :           register(b0, space0)
+#ifdef USE_DYNAMIC_RESOURCE_CBV
+// 0.11ms
+// Top SOLs    SM 59.4% | TEX 45.3% | L2 17.9% | VRAM 1.5% | VPC 0.0%
+static ConstantBuffer<Constants> mConstants = ResourceDescriptorHeap[0];
+ConstantBuffer<Constants> mConstantsUnused : register(b0, space0);
+#else
+// 0.05ms
+// Top SOLs    SM 48.8% | TEX 17.5% | L2 0.9% | VRAM 0.4% | VPC 0.0%
+ConstantBuffer<Constants> mConstants : register(b0, space0);
+#endif // USE_DYNAMIC_RESOURCE_CBV
+
+#define ROOT_SIGNATURE_COMMON \
+"RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0)" \
+ROOT_SIGNATURE_SAMPLER
+
+cbuffer RootConstantsDiff : register(b0, space1)
 {
-    Constants mConstants;
+	uint mComputedIndex;
+	uint mExpectedIndex;
+	uint mOutputIndex;
 };
+#define ROOT_SIGNATURE_DIFF \
+"RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0), RootConstants(num32BitConstants=3, b0, space = 1)" \
+ROOT_SIGNATURE_SAMPLER
+
+cbuffer RootConstantsAtmosphere : register(b0, space2)
+{
+	uint mScatteringOrder;
+}
+#define ROOT_SIGNATURE_ATMOSPHERE \
+"RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0), RootConstants(num32BitConstants=1, b0, space = 2)" \
+ROOT_SIGNATURE_SAMPLER
 
 // CBV Helper
-float3 GetSunDirection()            { return mConstants.mSunDirection.xyz; }
+float3 GetSunDirection() { return mConstants.mSunDirection.xyz; }
 
-// SRV
-RaytracingAccelerationStructure     RaytracingScene :           register(t0, space0);
-StructuredBuffer<InstanceData>      InstanceDatas :             register(t1, space0);
-StructuredBuffer<uint>              Indices :                   register(t2, space0);
-StructuredBuffer<float3>            Vertices :                  register(t3, space0);
-StructuredBuffer<float3>            Normals :                   register(t4, space0);
-StructuredBuffer<float2>            UVs :                       register(t5, space0);
-StructuredBuffer<Light>             LightDataBuffer :           register(t6, space0);
+// SRV Helper
+static StructuredBuffer<InstanceData> InstanceDatas = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RaytraceInstanceDataSRV];
+static StructuredBuffer<uint> Indices = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RaytraceIndicesSRV];
+static StructuredBuffer<float3> Vertices = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RaytraceVerticesSRV];
+static StructuredBuffer<float3> Normals = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RaytraceNormalsSRV];
+static StructuredBuffer<float2> UVs = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RaytraceUVsSRV];
+static StructuredBuffer<Light> Lights = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RaytraceLightsSRV];
 
-// UAV
-RWTexture2D<float4>                 RaytracingOutput :          register(u0, space0);
+static Texture2D<float4> TransmittanceSRV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Bruneton17TransmittanceSRV];
+static Texture2D<float4> DeltaIrradianceSRV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Bruneton17DeltaIrradianceSRV];
+static Texture2D<float4> IrradianceSRV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Bruneton17IrradianceSRV];
+static Texture3D<float4> DeltaRayleighScatteringSRV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Bruneton17DeltaRayleighScatteringSRV];
+static Texture3D<float4> DeltaMieScatteringSRV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Bruneton17DeltaMieScatteringSRV];
+static Texture3D<float4> ScatteringSRV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Bruneton17ScatteringSRV];
+static Texture3D<float4> DeltaScatteringDensitySRV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Bruneton17DeltaScatteringDensitySRV];
+static Texture2D<float4> TransmittanceTexSRV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Hillaire20TransmittanceTexSRV];
+static Texture2D<float4> MultiScattTexSRV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Hillaire20MultiScattSRV];
+static Texture2D<float4> SkyViewLutTexSRV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Hillaire20SkyViewLutSRV];
+static Texture3D<float4> AtmosphereCameraScatteringVolumeSRV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Hillaire20AtmosphereCameraScatteringVolumeSRV];
+static Texture2D<float4> Wilkie21SkyViewLutTexSRV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Wilkie21SkyViewSRV];
 
-// Sampler
-SamplerState                        BilinearClampSampler :      register(s0);
-SamplerState                        BilinearWrapSampler :       register(s1);
+static Texture3D<float4> CloudShapeNoiseSRV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::CloudShapeNoise3DSRV];
+static Texture3D<float4> CloudErosionNoiseSRV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::CloudErosionNoise3DSRV];
+
+// UAV Helper
+static RWTexture2D<float4> TransmittanceUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Bruneton17TransmittanceUAV];
+static RWTexture2D<float4> DeltaIrradianceUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Bruneton17DeltaIrradianceUAV];
+static RWTexture2D<float4> IrradianceUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Bruneton17IrradianceUAV];
+static RWTexture3D<float4> DeltaRayleighScatteringUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Bruneton17DeltaRayleighScatteringUAV];
+static RWTexture3D<float4> DeltaMieScatteringUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Bruneton17DeltaMieScatteringUAV];
+static RWTexture3D<float4> ScatteringUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Bruneton17ScatteringUAV];
+static RWTexture3D<float4> DeltaScatteringDensityUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Bruneton17DeltaScatteringDensityUAV];
+static RWTexture2D<float4> TransmittanceTexUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Hillaire20TransmittanceTexUAV];
+static RWTexture2D<float4> MultiScattTexUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Hillaire20MultiScattUAV];
+static RWTexture2D<float4> SkyViewLutTexUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Hillaire20SkyViewLutUAV];
+static RWTexture3D<float4> AtmosphereCameraScatteringVolumeUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Hillaire20AtmosphereCameraScatteringVolumeUAV];
+static RWTexture2D<float4> Wilkie21SkyViewLutTexUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Wilkie21SkyViewUAV];
+static RWTexture2D<float4> RaytracingOutput = ResourceDescriptorHeap[(int)ViewDescriptorIndex::ScreenColorUAV];
+static RWTexture2D<float4> ScreenDebugUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::ScreenDebugUAV];
+
+// Samplers Helper
+#ifdef USE_DYNAMIC_RESOURCE_SAMPLER
+static SamplerState BilinearClampSampler = SamplerDescriptorHeap[(int)SamplerDescriptorIndex::BilinearClamp];
+static SamplerState BilinearWrapSampler = SamplerDescriptorHeap[(int)SamplerDescriptorIndex::BilinearWrap];
+#else
+SamplerState BilinearClampSampler : register(s0);
+SamplerState BilinearWrapSampler : register(s1);
+#endif // USE_DYNAMIC_RESOURCE_SAMPLER
