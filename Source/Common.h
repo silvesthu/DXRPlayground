@@ -7,6 +7,7 @@
 #include <dxcapi.h>
 #include <dxgidebug.h>
 #include <comdef.h>
+#include <shellapi.h>
 #include <wrl.h>	// For ComPtr. See https://github.com/Microsoft/DirectXTK/wiki/ComPtr
 using Microsoft::WRL::ComPtr;
 #include <pix3.h>
@@ -94,11 +95,11 @@ inline void gOpenDumpFolder()
 {
 	std::filesystem::path dump_folder = gCreateDumpFolder();
 
-	std::filesystem::path command = "explorer ";
+	std::filesystem::path command = "";
 	command += std::filesystem::current_path();
 	command += "\\";
 	command += dump_folder;
-	system(command.string().c_str());
+	ShellExecuteA(nullptr, "open", command.string().c_str(), nullptr, nullptr, SW_SHOWDEFAULT);
 }
 
 #define gAssert assert
@@ -280,6 +281,16 @@ struct DescriptorHeap
 		handle.ptr += static_cast<int>(inIndex) * mIncrementSize;
 		return handle;
 	}
+
+	D3D12_GPU_DESCRIPTOR_HANDLE GetGPUHandle(DescriptorIndex inIndex)
+	{
+		gAssert(inIndex < DescriptorIndex::Count);
+
+		D3D12_GPU_DESCRIPTOR_HANDLE handle = {};
+		handle = mGPUHandleStart;
+		handle.ptr += static_cast<int>(inIndex) * mIncrementSize;
+		return handle;
+	}
 };
 
 #define MEMBER(parent_type, type, name, default_value) \
@@ -346,8 +357,6 @@ struct Texture
 
 	ComPtr<ID3D12Resource> mResource;
 	ComPtr<ID3D12Resource> mUploadResource;
-
-	int mImGuiTextureIndex = -1;
 
 	int mSubresourceCount = 1; // TODO: Support multiple subresources
 	bool mLoaded = false;
@@ -420,8 +429,8 @@ struct Renderer
 		Shader								mSentinelShader				= Shader();
 		std::span<Shader>					mShaders					= std::span<Shader>(&mRayQueryShader, &mSentinelShader);
 
-		Texture								mScreenColorTexture			= Texture().Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(ViewDescriptorIndex::ScreenColorUAV).Name("Renderer.ScreenColorTexture");
-		Texture								mScreenDebugTexture			= Texture().Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(ViewDescriptorIndex::ScreenDebugUAV).Name("Renderer.ScreenDebugTexture");
+		Texture								mScreenColorTexture			= Texture().Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(ViewDescriptorIndex::ScreenColorUAV).SRVIndex(ViewDescriptorIndex::ScreenColorSRV).Name("Renderer.ScreenColorTexture");
+		Texture								mScreenDebugTexture			= Texture().Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(ViewDescriptorIndex::ScreenDebugUAV).SRVIndex(ViewDescriptorIndex::ScreenDebugSRV).Name("Renderer.ScreenDebugTexture");
 
 		Texture								mSentinelTexture;
 		std::span<Texture>					mTextures					= std::span<Texture>(&mScreenColorTexture, &mSentinelTexture);

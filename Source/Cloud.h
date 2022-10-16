@@ -66,14 +66,14 @@ public:
 		
 		// Textures
 		Texture mShapeNoise3DTexture			= Texture().Width(128).Height(128).Depth(128).Format(DXGI_FORMAT_R8G8B8A8_UNORM).
-															UAVIndex(ViewDescriptorIndex::CloudShapeNoise3DUAV).SRVIndex(ViewDescriptorIndex::CloudShapeNoise3DSRV).SRVFormat(DXGI_FORMAT_R8G8B8A8_UNORM_SRGB).Name("Cloud.ShapeNoise").UIScale(2.0f);
+															UAVIndex(ViewDescriptorIndex::CloudShapeNoise3DUAV).SRVIndex(ViewDescriptorIndex::CloudShapeNoise3DSRV).SRVFormat(DXGI_FORMAT_R8G8B8A8_UNORM_SRGB).Name("Cloud.ShapeNoise");
 		Texture mErosionNoise3DTexture			= Texture().Width(32).Height(32).Depth(32).Format(DXGI_FORMAT_R8G8B8A8_UNORM).
-															UAVIndex(ViewDescriptorIndex::CloudErosionNoise3DUAV).SRVIndex(ViewDescriptorIndex::CloudErosionNoise3DSRV).SRVFormat(DXGI_FORMAT_R8G8B8A8_UNORM_SRGB).Name("Cloud.ErosionNoise").UIScale(8.0f);
+															UAVIndex(ViewDescriptorIndex::CloudErosionNoise3DUAV).SRVIndex(ViewDescriptorIndex::CloudErosionNoise3DSRV).SRVFormat(DXGI_FORMAT_R8G8B8A8_UNORM_SRGB).Name("Cloud.ErosionNoise");
 
 		Texture mShapeNoise2DTexture			= Texture().Width(16384).Height(128).Format(DXGI_FORMAT_R8G8B8A8_UNORM).
-															UAVIndex(ViewDescriptorIndex::CloudShapeNoise2DUAV).Name("Cloud.ShapeNoise.Input").UIScale(2.0f).Path(L"Asset/TileableVolumeNoise/noiseShapePacked.tga");
+															UAVIndex(ViewDescriptorIndex::CloudShapeNoise2DUAV).SRVIndex(ViewDescriptorIndex::CloudShapeNoise2DSRV).Name("Cloud.ShapeNoise.Input").Path(L"Asset/TileableVolumeNoise/noiseShapePacked.tga");
 		Texture mErosionNoise2DTexture			= Texture().Width(1024).Height(32).Format(DXGI_FORMAT_R8G8B8A8_UNORM).
-															UAVIndex(ViewDescriptorIndex::CloudErosionNoise2DUAV).Name("Cloud.ErosionNoise.Input").UIScale(8.0f).Path(L"Asset/TileableVolumeNoise/noiseErosionPacked.tga");
+															UAVIndex(ViewDescriptorIndex::CloudErosionNoise2DUAV).SRVIndex(ViewDescriptorIndex::CloudErosionNoise2DSRV).Name("Cloud.ErosionNoise.Input").Path(L"Asset/TileableVolumeNoise/noiseErosionPacked.tga");
 		
 		Texture mSentinelTexture				= Texture();
 		std::span<Texture> mTextures			= std::span<Texture>(&mShapeNoise3DTexture, &mSentinelTexture);

@@ -47,12 +47,17 @@ static const float kSolarLM2KW					= 1.0f / kSolarKW2LM;
 // Persistent Descriptor Heap Entries
 enum class ViewDescriptorIndex : uint
 {
+	// [ImGui]
+	ImGui,
+
 	// [Constants]
 	Constants,
 
 	// [Screen]
 	ScreenColorUAV,
+	ScreenColorSRV,
 	ScreenDebugUAV,
+	ScreenDebugSRV,
 
 	// [Raytrace] - [Input]
 	RaytraceTLASSRV,
@@ -95,20 +100,30 @@ enum class ViewDescriptorIndex : uint
 
 	// [Validation] - [Hillaire20]
 	ValidationHillaire20TransmittanceTexExpectedUAV,
+	ValidationHillaire20TransmittanceTexExpectedSRV,
 	ValidationHillaire20MultiScattExpectedUAV,
+	ValidationHillaire20MultiScattExpectedSRV,
 	ValidationHillaire20SkyViewLutExpectedUAV,
+	ValidationHillaire20SkyViewLutExpectedSRV,
 	ValidationHillaire20AtmosphereCameraScatteringVolumeExpectedUAV,
+	ValidationHillaire20AtmosphereCameraScatteringVolumeExpectedSRV,
 	ValidationHillaire20TransmittanceTexDiffUAV,
+	ValidationHillaire20TransmittanceTexDiffSRV,
 	ValidationHillaire20MultiScattDiffUAV,
+	ValidationHillaire20MultiScattDiffSRV,
 	ValidationHillaire20SkyViewLutDiffUAV,
+	ValidationHillaire20SkyViewLutDiffSRV,
 	ValidationHillaire20AtmosphereCameraScatteringVolumeDiffUAV,
+	ValidationHillaire20AtmosphereCameraScatteringVolumeDiffSRV,
 
 	// [Cloud]
 	CloudShapeNoise2DUAV,
+	CloudShapeNoise2DSRV,
 	CloudErosionNoise2DUAV,
+	CloudErosionNoise2DSRV,
 	CloudShapeNoise3DUAV,
-	CloudErosionNoise3DUAV,
 	CloudShapeNoise3DSRV,
+	CloudErosionNoise3DUAV,
 	CloudErosionNoise3DSRV,
 
 	Count,

@@ -1,6 +1,13 @@
 #include "Common.h"
 #include "ImGui/imgui_impl_dx12.h"
 
+#ifdef _MSC_VER
+#pragma comment(lib, "d3d12")
+#pragma comment(lib, "dxgi")		// CreateDeviceD3D()
+#pragma comment(lib, "d3dcompiler") // Automatically link with d3dcompiler.lib as we are using D3DCompile() below.
+#pragma comment(lib, "dxguid")		// For DXGI_DEBUG_ALL
+#endif
+
 // System
 ID3D12Device5*						gDevice = nullptr;
 ID3D12DescriptorHeap*				gRTVDescriptorHeap = nullptr;
@@ -97,7 +104,7 @@ void Texture::Initialize()
 	gSetName(mResource, "", mName);
 
 	// SRV
-	if (mSRVIndex != ViewDescriptorIndex::Count)
+	gAssert(mSRVIndex != ViewDescriptorIndex::Count); // Need SRV for visualization
 	{
 		for (int i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
 		{
@@ -132,29 +139,6 @@ void Texture::Initialize()
 			}
 			gDevice->CreateUnorderedAccessView(mResource.Get(), nullptr, &desc, gFrameContexts[i].mViewDescriptorHeap.GetHandle(mUAVIndex));
 		}
-	}
-	
-	// SRV for ImGui
-	{
-		if (mImGuiTextureIndex == -1)
-			mImGuiTextureIndex = ImGui_ImplDX12_AllocateTexture(resource_desc);
-
-		D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
-		desc.Format = mFormat;
-		if (mDepth == 1)
-		{
-			desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-			desc.Texture2D.MipLevels = (UINT)-1;
-			desc.Texture2D.MostDetailedMip = 0;
-		}
-		else
-		{
-			desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
-			desc.Texture3D.MipLevels = (UINT)-1;
-			desc.Texture3D.MostDetailedMip = 0;
-		}
-		desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		gDevice->CreateShaderResourceView(mResource.Get(), &desc, ImGui_ImplDX12_TextureCPUHandle(mImGuiTextureIndex));
 	}
 
 	// UIScale
@@ -235,7 +219,7 @@ namespace ImGui
 					std::swap(uv0.y, uv1.y);
 
 				float item_ui_scale = inTexture.mUIScale * ui_scale;
-				ImGui::Image(reinterpret_cast<ImTextureID>(ImGui_ImplDX12_TextureGPUHandle(inTexture.mImGuiTextureIndex).ptr), ImVec2(inTexture.mWidth * item_ui_scale, inTexture.mHeight * item_ui_scale), uv0, uv1);
+				ImGui::Image(reinterpret_cast<ImTextureID>(gGetFrameContext().mViewDescriptorHeap.GetGPUHandle(inTexture.mSRVIndex).ptr), ImVec2(inTexture.mWidth * item_ui_scale, inTexture.mHeight * item_ui_scale), uv0, uv1);
 				if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
 				{
 					sTexture = &inTexture;
@@ -269,7 +253,21 @@ namespace ImGui
 
 				ImGui::Separator();
 
-				ImGui_ImplDX12_ShowTextureOption(sTexture->mImGuiTextureIndex);
+				ImGui::PushItemWidth(100);
+
+				static int visualize_depth_index = 0;
+				static bool visualize_show_alpha = false;
+				visualize_depth_index = gMin(visualize_depth_index, int(sTexture->mDepth - 1));
+
+				ImGui::Text("Image Options");
+				ImGui::SliderFloat("Min", &ImGui_ImplDX12_ShaderContants.mMin, 0.0, 1.0f); ImGui::SameLine(); ImGui::SliderFloat("Max", &ImGui_ImplDX12_ShaderContants.mMax, 0.0, 1.0f);
+				ImGui::SliderInt("Depth Slice", &visualize_depth_index, 0, sTexture->mDepth - 1);
+				ImGui::Checkbox("Show Alpha", &visualize_show_alpha);
+
+				ImGui_ImplDX12_ShaderContants.mW = (visualize_depth_index + 0.5f) / sTexture->mDepth;
+				ImGui_ImplDX12_ShaderContants.mAlpha = visualize_show_alpha ? 1.0f : 0.0f;
+
+				ImGui::PopItemWidth();
 
 				ImGui::Separator();
 

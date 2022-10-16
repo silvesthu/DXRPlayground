@@ -91,7 +91,10 @@
     <ClCompile Include="Source\Thirdparty\imgui\imgui_tables.cpp" />
     <ClCompile Include="Source\Thirdparty\imgui\imgui_widgets.cpp" />
     <ClCompile Include="Source\Thirdparty\tinygltf\tiny_gltf.cc" />
-    <ClCompile Include="Source\Thirdparty\tinyobjloader\tiny_obj_loader.cc" />
+    <ClCompile Include="Source\Thirdparty\tinyobjloader\tiny_obj_loader.cc">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4244</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4244</DisableSpecificWarnings>
+    </ClCompile>
     <ClCompile Include="Source\Thirdparty\tinyxml2\tinyxml2.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -205,11 +208,13 @@
     <LinkIncremental>true</LinkIncremental>
     <CopyFileBeforeTargets>Run</CopyFileBeforeTargets>
     <LibraryPath>$(ProjectDir)Source\Thirdparty\DirectXTex\DirectXTex\Bin\Desktop_2022_Win10\x64\$(Configuration);$(LibraryPath)</LibraryPath>
+    <IncludePath>$(ProjectDir)Source\Thirdparty\imgui;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <CopyFileBeforeTargets>Run</CopyFileBeforeTargets>
     <LibraryPath>$(ProjectDir)Source\Thirdparty\DirectXTex\DirectXTex\Bin\Desktop_2022_Win10\x64\$(Configuration);$(LibraryPath)</LibraryPath>
+    <IncludePath>$(ProjectDir)Source\Thirdparty\imgui;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>

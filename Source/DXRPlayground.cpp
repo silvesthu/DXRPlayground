@@ -134,7 +134,6 @@ static void sUpdate()
 	}
 
 	// Move Camera
-	if (!ImGui::IsAnyItemActive())
 	{
 		float frame_speed_scale = ImGui::GetIO().DeltaTime / (1.0f / 60.0f);
 		float move_speed = gCameraSettings.mMoveRotateSpeed.x * frame_speed_scale;
@@ -143,35 +142,35 @@ static void sUpdate()
 		if (ImGui::GetIO().KeyCtrl)
 			move_speed *= 0.1f;
 
-		if (ImGui::IsKeyDown('W'))
+		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_W))
 			gConstants.mCameraPosition += gConstants.mCameraDirection * move_speed;
-		if (ImGui::IsKeyDown('S'))
+		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_S))
 			gConstants.mCameraPosition -= gConstants.mCameraDirection * move_speed;
 
 		glm::vec4 right = glm::vec4(glm::normalize(glm::cross(glm::vec3(gConstants.mCameraDirection), glm::vec3(0, 1, 0))), 0);
 
-		if (ImGui::IsKeyDown('A'))
+		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_A))
 			gConstants.mCameraPosition -= right * move_speed;
-		if (ImGui::IsKeyDown('D'))
+		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_D))
 			gConstants.mCameraPosition += right * move_speed;
 
 		glm::vec4 up = glm::vec4(glm::normalize(glm::cross(glm::vec3(right), glm::vec3(gConstants.mCameraDirection))), 0);
 
-		if (ImGui::IsKeyDown('Q'))
+		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_Q))
 			gConstants.mCameraPosition -= up * move_speed;
-		if (ImGui::IsKeyDown('E'))
+		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_E))
 			gConstants.mCameraPosition += up * move_speed;
 
-		if (ImGui::IsKeyPressed(VK_F5))
+		if (ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_F5))
 			sLoadShader();
 
-		if (ImGui::IsKeyPressed(VK_F6))
+		if (ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_F6))
 			sLoadCamera();
 
-		if (ImGui::IsKeyPressed(VK_F9))
+		if (ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_F9))
 			sDumpLuminance();
 
-		if (ImGui::IsKeyPressed(VK_F10))
+		if (ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_F10))
 			gOpenDumpFolder();
 	}
 
@@ -493,9 +492,15 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 	// Setup Dear ImGui style
 	ImGui::StyleColorsDark();
 
+	ImGui_ImplDX12_CreateShaderResourceViewCallback = [](ID3D12Resource* resource, D3D12_SHADER_RESOURCE_VIEW_DESC& desc)
+	{
+		for (glm::uint i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
+			gDevice->CreateShaderResourceView(resource, &desc, gFrameContexts[i].mViewDescriptorHeap.GetHandle(ViewDescriptorIndex::ImGui));
+	};
+
 	// Setup Platform/Renderer bindings
 	ImGui_ImplWin32_Init(hwnd);
-	ImGui_ImplDX12_Init(gDevice, NUM_FRAMES_IN_FLIGHT, DXGI_FORMAT_R8G8B8A8_UNORM);
+	ImGui_ImplDX12_Init(gDevice, NUM_FRAMES_IN_FLIGHT, DXGI_FORMAT_R8G8B8A8_UNORM, nullptr, {}, {});
 	ImGui_ImplDX12_CreateDeviceObjects();
 
 	// Renderer
@@ -546,7 +551,12 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 			continue;
 		}
 
+		// New frame	
+		gFrameIndex++;
+
 		// Start the Dear ImGui frame
+		ImGui_ImplDX12_FontTextureID = (ImTextureID)gGetFrameContext().mViewDescriptorHeap.GetGPUHandle(ViewDescriptorIndex::ImGui).ptr;
+		ImGui::GetIO().Fonts->SetTexID(ImGui_ImplDX12_FontTextureID);
 		ImGui_ImplDX12_NewFrame();
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
@@ -619,9 +629,6 @@ void sLoadScene()
 
 void sRender()
 {
-	// New frame	
-	gFrameIndex++;
-
 	// Frame Context
 	sWaitForFrameContext();
 	FrameContext& frame_context = gGetFrameContext();
@@ -912,7 +919,7 @@ static bool sCreateDeviceD3D(HWND hWnd)
 	}
 
 	// Constants
-	for (UINT i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
+	for (glm::uint i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
 	{
 		std::wstring name;
 

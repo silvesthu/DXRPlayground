@@ -464,18 +464,19 @@ void gCreatePipelineState()
 	}
 
 	// See D3D12_STATE_SUBOBJECT_TYPE
+	// https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#d3d12_state_subobject_type
 	// Note that all pointers should be valid until CreateStateObject
 
 	// Subobjects:
 	//  DXIL library
 	//  Hit group
-	//  Local root signature and association for each shader
-	//  Shader config and association
+	//  Local root signature and association
+	//  Shader config
 	//  Pipeline config
 	//  Global root signature
 
 	// When add new shader:
-	//  DXIL library (for shader binary)
+	//  DXIL library
 	//  Hit group
 	//  Local root signature and association
 	//  Shader config
