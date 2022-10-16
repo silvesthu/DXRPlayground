@@ -373,7 +373,7 @@ public:
 			bool mRecomputeRequested							= true;
 			bool mRecomputeEveryFrame							= false;
 
-			void Update(const Profile& inProfile);
+			void Render(const Profile& inProfile);
 
 			void ComputeTransmittance();
 			void ComputeDirectIrradiance();
@@ -418,7 +418,7 @@ public:
 
 			bool mSkyViewInLuminance							= false;
 
-			void Update(const Profile& inProfile);
+			void Render(const Profile& inProfile);
 
 			void TransLUT();
 			void NewMultiScatCS();
@@ -457,7 +457,7 @@ public:
 			glm::dvec3 mPragueSolarSpectrum						= glm::dvec3(0.0);
 			glm::dvec3 mPragueTransmittance						= glm::dvec3(0.0);
 
-			void Update(const Profile& inProfile);
+			void Render(const Profile& inProfile);
 		};
 		Wilkie21 mWilkie21;
 
@@ -522,6 +522,7 @@ public:
 	void Initialize();
 	void Finalize();
 	void Update();
+	void Render();
 	void ImGuiShowMenus();
 	void ImGuiShowTextures();
 

@@ -21,6 +21,8 @@ UINT64                       		gFenceLastSignaledValue = 0;
 IDXGISwapChain3*					gSwapChain = nullptr;
 HANDLE                       		gSwapChainWaitableObject = nullptr;
 
+HMODULE								gPIXHandle = nullptr;
+
 // Application
 ComPtr<ID3D12Resource>				gConstantGPUBuffer = nullptr;
 

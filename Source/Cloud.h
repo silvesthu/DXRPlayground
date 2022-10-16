@@ -81,9 +81,9 @@ public:
 	Runtime mRuntime;
 
 	void Initialize();
-	void Precompute();
 	void Finalize();
-	void Update();	
+	void Update();
+	void Render();
 	void ImGuiShowMenus();
 	void ImGuiShowTextures();
 

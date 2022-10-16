@@ -290,6 +290,9 @@ static bool sCreateVSPSPipelineState(const char* inShaderFileName, const char* i
 	if (FAILED(gDevice->CreateGraphicsPipelineState(&pipeline_state_desc, IID_PPV_ARGS(&ioSystemShader.mData.mPipelineState))))
 		return false;
 
+	std::wstring name = gToWString(inVSName) + L"_" + gToWString(inPSName);
+	ioSystemShader.mData.mPipelineState->SetName(name.c_str());
+
 	return true;
 }
 
@@ -311,6 +314,9 @@ static bool sCreateCSPipelineState(const char* inShaderFileName, const char* inC
 	pipeline_state_desc.pRootSignature = ioSystemShader.mData.mRootSignature.Get();
 	if (FAILED(gDevice->CreateComputePipelineState(&pipeline_state_desc, IID_PPV_ARGS(&ioSystemShader.mData.mPipelineState))))
 		return false;
+
+	std::wstring name = gToWString(inCSName);
+	ioSystemShader.mData.mPipelineState->SetName(name.c_str());
 
 	return true;
 }

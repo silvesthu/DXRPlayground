@@ -5,18 +5,10 @@
 void Atmosphere::Update()
 {
 	UpdateProfile();
+}
 
-	switch (mProfile.mMode)
-	{
-	case AtmosphereMode::Bruneton17:			mRuntime.mBruneton17.Update(mProfile); break;
-	case AtmosphereMode::Hillaire20:			mRuntime.mHillaire20.Update(mProfile); break;
-	case AtmosphereMode::Wilkie21:				mRuntime.mWilkie21.Update(mProfile); break;
-	default:									break;
-	}
-
-	if (mProfile.mMode != AtmosphereMode::Wilkie21 && mRuntime.mWilkie21.mSplitScreen != 0)
-		mRuntime.mWilkie21.Update(mProfile);
-
+void Atmosphere::Render()
+{
 	for (auto&& textures : mRuntime.mTexturesSet)
 		for (auto&& texture : textures)
 			texture.Update();
@@ -24,6 +16,17 @@ void Atmosphere::Update()
 	for (auto&& textures : mRuntime.mValidationTexturesSet)
 		for (auto&& texture : textures)
 			texture.Update();
+
+	switch (mProfile.mMode)
+	{
+	case AtmosphereMode::Bruneton17:			mRuntime.mBruneton17.Render(mProfile); break;
+	case AtmosphereMode::Hillaire20:			mRuntime.mHillaire20.Render(mProfile); break;
+	case AtmosphereMode::Wilkie21:				mRuntime.mWilkie21.Render(mProfile); break;
+	default:									break;
+	}
+
+	if (mProfile.mMode != AtmosphereMode::Wilkie21 && mRuntime.mWilkie21.mSplitScreen != 0)
+		mRuntime.mWilkie21.Render(mProfile);
 }
 
 void Atmosphere::UpdateProfile()
@@ -91,7 +94,7 @@ void Atmosphere::UpdateProfile()
 	}
 }
 
-void Atmosphere::Runtime::Bruneton17::Update(const Profile& inProfile)
+void Atmosphere::Runtime::Bruneton17::Render(const Profile& inProfile)
 {
 	// Check if recompute is required
 	static Atmosphere::Profile sAtmosphereProfileCache = inProfile;
@@ -105,11 +108,23 @@ void Atmosphere::Runtime::Bruneton17::Update(const Profile& inProfile)
 	if (mRecomputeRequested || mRecomputeEveryFrame)
 	{
 		ComputeTransmittance();
+		
+		gBarrierUAV(gCommandList, nullptr);
+
 		ComputeDirectIrradiance();
+
+		gBarrierUAV(gCommandList, nullptr);
+
 		ComputeSingleScattering();
 
+		gBarrierUAV(gCommandList, nullptr);
+
 		for (glm::uint scattering_order = 2; scattering_order <= mScatteringOrder; scattering_order++)
+		{
 			ComputeMultipleScattering(scattering_order);
+
+			gBarrierUAV(gCommandList, nullptr);
+		}
 
 		gRenderer.mAccumulationResetRequested = true;
 	}
@@ -163,14 +178,25 @@ void Atmosphere::Runtime::Bruneton17::ComputeMultipleScattering(glm::uint scatte
 	AccumulateMultipleScattering();
 }
 
-void Atmosphere::Runtime::Hillaire20::Update(const Profile& inProfile)
+void Atmosphere::Runtime::Hillaire20::Render(const Profile& inProfile)
 {
 	(void)inProfile;
 
 	TransLUT();
+
+	gBarrierUAV(gCommandList, nullptr);
+
 	NewMultiScatCS();
+
+	gBarrierUAV(gCommandList, nullptr);
+
 	SkyViewLut();
+
+	gBarrierUAV(gCommandList, nullptr);
+
 	CameraVolumes();
+
+	gBarrierUAV(gCommandList, nullptr);
 
 	Validate();
 }
@@ -636,7 +662,7 @@ struct SkyModel
 };
 SkyModel gArPragueSkyModelGround;
 
-void Atmosphere::Runtime::Wilkie21::Update(const Profile& inProfile)
+void Atmosphere::Runtime::Wilkie21::Render(const Profile& inProfile)
 {
 	if (!mBakeRequested)
 		return;

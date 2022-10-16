@@ -53,4 +53,6 @@ struct ImGui_ImplDX12_ShaderContantsType
 };
 extern ImGui_ImplDX12_ShaderContantsType ImGui_ImplDX12_ShaderContants;
 extern ImTextureID ImGui_ImplDX12_FontTextureID;
+extern ImTextureID ImGui_ImplDX12_NullTexture2D;
+extern ImTextureID ImGui_ImplDX12_NullTexture3D;
 #endif // DXRPLAYGROUND_IMGUI

@@ -48,7 +48,9 @@ static const float kSolarLM2KW					= 1.0f / kSolarKW2LM;
 enum class ViewDescriptorIndex : uint
 {
 	// [ImGui]
-	ImGui,
+	ImGuiFont,
+	ImGuiNull2D,
+	ImGuiNull3D,
 
 	// [Constants]
 	Constants,

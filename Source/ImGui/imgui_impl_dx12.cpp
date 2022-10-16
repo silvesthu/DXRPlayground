@@ -273,11 +273,21 @@ void ImGui_ImplDX12_RenderDrawData(ImDrawData* draw_data, ID3D12GraphicsCommandL
                 const D3D12_RECT r = { (LONG)clip_min.x, (LONG)clip_min.y, (LONG)clip_max.x, (LONG)clip_max.y };
                 D3D12_GPU_DESCRIPTOR_HANDLE texture_handle = {};
                 texture_handle.ptr = (UINT64)pcmd->GetTexID();
-                ctx->SetGraphicsRootDescriptorTable(1, texture_handle);
 #ifdef DXRPLAYGROUND_IMGUI
-                ctx->SetGraphicsRootDescriptorTable(2, texture_handle);
+                bool is_2d = pcmd->GetTexID() == ImGui_ImplDX12_FontTextureID; // [TODO] Store 2d/3d flag in TexID?
+                D3D12_GPU_DESCRIPTOR_HANDLE texture_handle_2d = texture_handle;
+                D3D12_GPU_DESCRIPTOR_HANDLE texture_handle_3d = texture_handle;
+                if (is_2d)
+                    texture_handle_3d.ptr = (UINT64)ImGui_ImplDX12_NullTexture3D;
+                else
+                    texture_handle_2d.ptr = (UINT64)ImGui_ImplDX12_NullTexture2D;
+
+                ctx->SetGraphicsRootDescriptorTable(1, texture_handle_2d);
+                ctx->SetGraphicsRootDescriptorTable(2, texture_handle_3d);
                 static ImGui_ImplDX12_ShaderContantsType ImGui_ImplDX12_ShaderContantsDefault = {};
                 ctx->SetGraphicsRoot32BitConstants(3, sizeof(ImGui_ImplDX12_ShaderContantsType) / 4, pcmd->GetTexID() == ImGui_ImplDX12_FontTextureID ? &ImGui_ImplDX12_ShaderContantsDefault : &ImGui_ImplDX12_ShaderContants, 0);
+#else
+                ctx->SetGraphicsRootDescriptorTable(1, texture_handle);
 #endif // DXRPLAYGROUND_IMGUI
                 ctx->RSSetScissorRects(1, &r);
                 ctx->DrawIndexedInstanced(pcmd->ElemCount, 1, pcmd->IdxOffset + global_idx_offset, pcmd->VtxOffset + global_vtx_offset, 0);
@@ -456,6 +466,8 @@ static void ImGui_ImplDX12_CreateFontsTexture()
 void (*ImGui_ImplDX12_CreateShaderResourceViewCallback)(ID3D12Resource* resource, D3D12_SHADER_RESOURCE_VIEW_DESC& desc) = nullptr;
 ImGui_ImplDX12_ShaderContantsType ImGui_ImplDX12_ShaderContants = {};
 ImTextureID ImGui_ImplDX12_FontTextureID = {};
+ImTextureID ImGui_ImplDX12_NullTexture2D = {};
+ImTextureID ImGui_ImplDX12_NullTexture3D = {};
 #endif // DXRPLAYGROUND_IMGUI
 
 bool    ImGui_ImplDX12_CreateDeviceObjects()
@@ -749,6 +761,10 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
     pixelShaderBlob->Release();
     if (result_pipeline_state != S_OK)
         return false;
+
+#ifdef DXRPLAYGROUND_IMGUI
+    bd->pPipelineState->SetName(L"ImGui");
+#endif // DXRPLAYGROUND_IMGUI
 
     ImGui_ImplDX12_CreateFontsTexture();
 

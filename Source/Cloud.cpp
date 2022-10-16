@@ -10,32 +10,19 @@ void Cloud::Update()
 	constants.mRaymarch			= mProfile.mRaymarch;
 	constants.mGeometry			= mProfile.mGeometry;
 	constants.mShapeNoise		= mProfile.mShapeNoise;
+}
 
+void Cloud::Render()
+{
 	// Texture
 	for (auto&& texture : mRuntime.mTextures)
 		texture.Update();
-}
 
-void Cloud::Initialize()
-{
-	// Texture
-	for (auto&& texture : mRuntime.mTextures)
-		texture.Initialize();
-}
-
-void Cloud::Precompute()
-{
-	if (!mRecomputeRequested)
-		return;
-	mRecomputeRequested = false;
-
-	// Load
+	if (mRecomputeRequested)
 	{
 		{
 			mRuntime.mShapeNoise3DTexture.Update();
-			
-			BarrierScope input_resource_scope(gCommandList, mRuntime.mShapeNoise2DTexture.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-			BarrierScope resource_scope(gCommandList, mRuntime.mShapeNoise3DTexture.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
 			gRenderer.Setup(mRuntime.mShapeNoiseShader);
 			gCommandList->Dispatch(mRuntime.mShapeNoise3DTexture.mWidth / 8, mRuntime.mShapeNoise3DTexture.mHeight / 8, mRuntime.mShapeNoise3DTexture.mDepth);
 		}
@@ -43,12 +30,21 @@ void Cloud::Precompute()
 		{
 			mRuntime.mErosionNoise3DTexture.Update();
 
-			BarrierScope input_resource_scope(gCommandList, mRuntime.mErosionNoise2DTexture.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-			BarrierScope output_resource_scope(gCommandList, mRuntime.mErosionNoise3DTexture.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 			gRenderer.Setup(mRuntime.mErosionNoiseShader);
 			gCommandList->Dispatch(mRuntime.mErosionNoise3DTexture.mWidth / 8, mRuntime.mErosionNoise3DTexture.mHeight / 8, mRuntime.mErosionNoise3DTexture.mDepth);
 		}
+
+		mRecomputeRequested = false;
 	}
+
+	gBarrierUAV(gCommandList, nullptr);
+}
+
+void Cloud::Initialize()
+{
+	// Texture
+	for (auto&& texture : mRuntime.mTextures)
+		texture.Initialize();
 }
 
 void Cloud::Finalize()

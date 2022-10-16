@@ -221,6 +221,8 @@ extern uint64_t                       		gFenceLastSignaledValue;
 extern IDXGISwapChain3* 					gSwapChain;
 extern HANDLE                       		gSwapChainWaitableObject;
 
+extern HMODULE								gPIXHandle;
+
 // Application
 struct ShaderTable
 {
