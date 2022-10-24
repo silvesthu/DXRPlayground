@@ -12,12 +12,14 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Shader\Light.h" />
+    <ClInclude Include="Shader\Material.h" />
     <ClInclude Include="Source\Thirdparty\tinyxml2\tinyxml2.h" />
-    <CopyFileToFolders Include="Shader\AtmosphereIntegration.Wilkie21.inl">
+    <CopyFileToFolders Include="Shader\AtmosphereIntegration.Wilkie21.h">
       <FileType>Document</FileType>
     </CopyFileToFolders>
     <CopyFileToFolders Include="Shader\Constant.h" />
-    <CopyFileToFolders Include="Shader\RayQuery.inl">
+    <CopyFileToFolders Include="Shader\RayQuery.h">
       <FileType>Document</FileType>
     </CopyFileToFolders>
     <CopyFileToFolders Include="Shader\Binding.h" />
@@ -105,44 +107,44 @@
     </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="Shader\Common.inl">
+    <CopyFileToFolders Include="Shader\Common.h">
       <FileType>Document</FileType>
       <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)$(Platform)\$(Configuration)\Shader</DestinationFolders>
       <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)$(Platform)\$(Configuration)\Shader</DestinationFolders>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\Shared.inl">
+    <CopyFileToFolders Include="Shader\Shared.h">
       <FileType>Document</FileType>
       <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)$(Platform)\$(Configuration)\Shader</DestinationFolders>
       <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)$(Platform)\$(Configuration)\Shader</DestinationFolders>
     </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="Shader\AtmosphereIntegration.Raymarch.inl">
+    <CopyFileToFolders Include="Shader\AtmosphereIntegration.Raymarch.h">
       <FileType>Document</FileType>
     </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="Shader\AtmosphereIntegration.inl">
+    <CopyFileToFolders Include="Shader\AtmosphereIntegration.h">
       <FileType>Document</FileType>
     </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="Shader\AtmosphereIntegration.Hillaire20.inl">
+    <CopyFileToFolders Include="Shader\AtmosphereIntegration.Hillaire20.h">
       <FileType>Document</FileType>
     </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="Shader\AtmosphereIntegration.Bruneton17.inl">
+    <CopyFileToFolders Include="Shader\AtmosphereIntegration.Bruneton17.h">
       <FileType>Document</FileType>
     </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="Shader\Planet.inl">
+    <CopyFileToFolders Include="Shader\Planet.h">
       <FileType>Document</FileType>
     </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="Shader\CloudIntegration.inl">
+    <CopyFileToFolders Include="Shader\CloudIntegration.h">
       <FileType>Document</FileType>
     </CopyFileToFolders>
   </ItemGroup>
@@ -164,9 +166,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
-    <CopyFileToFolders Include="Shader\Material.inl">
-      <FileType>Document</FileType>
-    </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="Source\Thirdparty\glm\util\glm.natvis" />

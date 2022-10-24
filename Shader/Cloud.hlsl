@@ -1,5 +1,5 @@
 #include "Constant.h"
-#include "Shared.inl"
+#include "Shared.h"
 #include "Binding.h"
 
 [RootSignature(ROOT_SIGNATURE_COMMON)]

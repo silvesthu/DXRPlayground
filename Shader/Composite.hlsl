@@ -1,5 +1,5 @@
 #include "Constant.h"
-#include "Shared.inl"
+#include "Shared.h"
 #include "Binding.h"
 
 // https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/

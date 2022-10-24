@@ -1,12 +1,12 @@
 #include "Constant.h"
-#include "Shared.inl"
+#include "Shared.h"
 #include "Binding.h"
-#include "Common.inl"
-#include "RayQuery.inl"
-#include "Material.inl"
-#include "Planet.inl"
-#include "AtmosphereIntegration.inl"
-#include "CloudIntegration.inl"
+#include "Common.h"
+#include "Material.h"
+#include "RayQuery.h"
+#include "Planet.h"
+#include "AtmosphereIntegration.h"
+#include "CloudIntegration.h"
 
 [shader("miss")]
 void DefaultMiss(inout RayPayload payload)
@@ -25,19 +25,21 @@ void DefaultMiss(inout RayPayload payload)
 }
 
 HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attributes)
-{	
+{
+	// System value intrinsics https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#system-value-intrinsics
+
 	HitInfo hit_info = (HitInfo)0;
 	hit_info.mDone = true;
 
-	// For more system value intrinsics, see https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html 
 	float3 barycentrics = float3(1.0 - attributes.barycentrics.x - attributes.barycentrics.y, attributes.barycentrics.x, attributes.barycentrics.y);
 
-	// Only support 32bit index, see https://github.com/microsoft/DirectX-Graphics-Samples/blob/master/Samples/Desktop/D3D12Raytracing/src/D3D12RaytracingSimpleLighting/Raytracing.hlsl for reference
+	// Only support 32bit index for simplicity
+	// see https://github.com/microsoft/DirectX-Graphics-Samples/blob/master/Samples/Desktop/D3D12Raytracing/src/D3D12RaytracingSimpleLighting/Raytracing.hlsl for reference
 	uint index_count_per_triangle = 3;
     uint base_index = sGetPrimitiveIndex() * index_count_per_triangle + InstanceDatas[sGetInstanceID()].mIndexOffset;
 	uint3 indices = uint3(Indices[base_index], Indices[base_index + 1], Indices[base_index + 2]);
 
-	// Attributes
+	// Vertex attributes
 	float3 vertices[3] = { Vertices[indices[0]], Vertices[indices[1]], Vertices[indices[2]] };
 	float3 vertex = vertices[0] * barycentrics.x + vertices[1] * barycentrics.y + vertices[2] * barycentrics.z;
 
@@ -48,17 +50,13 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	float2 uvs[3] = { UVs[indices[0]], UVs[indices[1]], UVs[indices[2]] };
 	float2 uv = uvs[0] * barycentrics.x + uvs[1] * barycentrics.y + uvs[2] * barycentrics.z;
 
-	// Handle front face only
+	// Handle back face
 	if (dot(normal, -sGetWorldRayDirection()) < 0)
 	{
-		bool two_sided = InstanceDatas[sGetInstanceID()].mTwoSided;
-		if (two_sided)
+		if (InstanceDatas[sGetInstanceID()].mTwoSided)
 			normal = -normal;
 		else
-		{
-			hit_info.mDone = true;
 			return hit_info;
-		}
 	}
 
 	// Hit position
@@ -66,13 +64,9 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 		hit_info.mPosition = sGetWorldRayHitPosition() + normal * 0.001;
 	}
 
-	// Participating Media
-    float3 in_scattering = 0;
-    float3 transmittance = 0;
-    GetSkyLuminanceToPoint(in_scattering, transmittance);
+	// Participating media
 	{
-        hit_info.mInScattering = in_scattering;
-		hit_info.mTransmittance = transmittance;
+		GetSkyLuminanceToPoint(hit_info.mInScattering, hit_info.mTransmittance);
 	}
 	
 	// Emission
@@ -81,54 +75,48 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	}
 
 	// Reflection / Refraction
-	float3 albedo = InstanceDatas[sGetInstanceID()].mAlbedo;
-	float3 reflectance = InstanceDatas[sGetInstanceID()].mReflectance;
-	bool need_next_ray = any(albedo) || any(reflectance);
-	hit_info.mDone = !need_next_ray;
-	if (need_next_ray)
+	hit_info.mDone = InstanceDatas[sGetInstanceID()].mMaterialType == MaterialType::Light;
+	if (!hit_info.mDone)
 	{
-		float3 light = Material::GenerateSample(normal, payload);
-		Material::Evaluate(light, normal, hit_info);
+		// NEE
+		float light_pdf = 0.0f;
+		if (mConstants.mLightCount > 0 && RandomFloat01(payload.mRandomState) < 0.5)
+		{
+			
+		}
+		
+		// Generate next sample based on material
+		float3 material_sample = MaterialEvaluation::GenerateSample(normal, payload);
+		float material_pdf = MaterialEvaluation::ComputePDF(material_sample, normal);
+		MaterialEvaluation::Evaluate(material_sample, normal, hit_info);
 	}
 
 	// Debug - Global
+	switch (mConstants.mDebugMode)
 	{
-		switch (mConstants.mDebugMode)
-		{
-		case DebugMode::Barycentrics: 			hit_info.mEmission = barycentrics; hit_info.mDone = true; break;
-		case DebugMode::Vertex: 				hit_info.mEmission = vertex; hit_info.mDone = true; break;
-		case DebugMode::Normal: 				hit_info.mEmission = normal * 0.5 + 0.5; hit_info.mDone = true; break;
-		case DebugMode::UV:						hit_info.mEmission = float3(uv, 0.0); hit_info.mDone = true; break;
-		case DebugMode::Albedo: 				hit_info.mEmission = InstanceDatas[sGetInstanceID()].mAlbedo; hit_info.mDone = true; break;
-		case DebugMode::Reflectance: 			hit_info.mEmission = InstanceDatas[sGetInstanceID()].mReflectance; hit_info.mDone = true; break;
-		case DebugMode::Emission: 				hit_info.mEmission = InstanceDatas[sGetInstanceID()].mEmission; hit_info.mDone = true; break;
-		case DebugMode::RoughnessAlpha: 		hit_info.mEmission = InstanceDatas[sGetInstanceID()].mRoughnessAlpha; hit_info.mDone = true; break;
-		case DebugMode::Transmittance:			hit_info.mEmission = transmittance; hit_info.mDone = true; break;
-		case DebugMode::InScattering:			hit_info.mEmission = in_scattering; hit_info.mDone = true; break;
-		case DebugMode::RecursionCount:			hit_info.mDone = false; break;
-		case DebugMode::RussianRouletteCount:	hit_info.mDone = false; break;
-		default:								hit_info.mDone = false; break;
-		}
+	case DebugMode::Barycentrics: 				hit_info.mEmission = barycentrics; hit_info.mDone = true; break;
+	case DebugMode::Vertex: 					hit_info.mEmission = vertex; hit_info.mDone = true; break;
+	case DebugMode::Normal: 					hit_info.mEmission = normal * 0.5 + 0.5; hit_info.mDone = true; break;
+	case DebugMode::UV:							hit_info.mEmission = float3(uv, 0.0); hit_info.mDone = true; break;
+	case DebugMode::Albedo: 					hit_info.mEmission = InstanceDatas[sGetInstanceID()].mAlbedo; hit_info.mDone = true; break;
+	case DebugMode::Reflectance: 				hit_info.mEmission = InstanceDatas[sGetInstanceID()].mReflectance; hit_info.mDone = true; break;
+	case DebugMode::Emission: 					hit_info.mEmission = InstanceDatas[sGetInstanceID()].mEmission; hit_info.mDone = true; break;
+	case DebugMode::RoughnessAlpha: 			hit_info.mEmission = InstanceDatas[sGetInstanceID()].mRoughnessAlpha; hit_info.mDone = true; break;
+	case DebugMode::Transmittance:				hit_info.mEmission = hit_info.mTransmittance; hit_info.mDone = true; break;
+	case DebugMode::InScattering:				hit_info.mEmission = hit_info.mInScattering; hit_info.mDone = true; break;
+	case DebugMode::RecursionCount:				hit_info.mDone = false; break;
+	case DebugMode::RussianRouletteCount:		hit_info.mDone = false; break;
+	default:									hit_info.mDone = false; break;
 	}
 
-	// Debug - Per instance
+	// Debug - Per-instance
     if (mConstants.mDebugInstanceIndex == sGetInstanceID())
 	{
 		switch (mConstants.mDebugInstanceMode)
 		{
-		case DebugInstanceMode::Barycentrics:
-			hit_info.mEmission = barycentrics; 
-			hit_info.mDone = true; 
-			return hit_info;
-		case DebugInstanceMode::Mirror:
-			hit_info.mReflectionDirection = reflect(sGetWorldRayDirection(), normal);
-			hit_info.mBSDF = 1; 
-			hit_info.mNdotL = dot(normal, hit_info.mReflectionDirection);
-            hit_info.mSamplingPDF = 1;			
-			hit_info.mDone = false; 
-			return hit_info;
-		default:
-			break;
+		case DebugInstanceMode::Barycentrics:	hit_info.mEmission = barycentrics; hit_info.mDone = true; break;
+		case DebugInstanceMode::Mirror:			hit_info.mReflectionDirection = reflect(sGetWorldRayDirection(), normal); hit_info.mBSDF = 1; hit_info.mNdotL = dot(normal, hit_info.mReflectionDirection); hit_info.mSamplingPDF = 1; hit_info.mDone = false; break;
+		default: break;
 		}
 	}
 

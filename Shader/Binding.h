@@ -1,5 +1,5 @@
 #pragma once
-#include "Shared.inl"
+#include "Shared.h"
 
 // #define USE_DYNAMIC_RESOURCE_CBV		// 2x slower
 // #define USE_DYNAMIC_RESOURCE_SRV_UAV	// [TODO]

@@ -192,6 +192,12 @@
     <ClInclude Include="Source\Thirdparty\tinyxml2\tinyxml2.h">
       <Filter>Source\Thirdparty\tinyxml2</Filter>
     </ClInclude>
+    <ClInclude Include="Shader\Material.h">
+      <Filter>Shader</Filter>
+    </ClInclude>
+    <ClInclude Include="Shader\Light.h">
+      <Filter>Shader</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\DXRPlayground.cpp">
@@ -265,31 +271,31 @@
     <CopyFileToFolders Include="Shader\Raytracing.hlsl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\Common.inl">
+    <CopyFileToFolders Include="Shader\Common.h">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\Shared.inl">
+    <CopyFileToFolders Include="Shader\Shared.h">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\AtmosphereIntegration.Raymarch.inl">
+    <CopyFileToFolders Include="Shader\AtmosphereIntegration.Raymarch.h">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\AtmosphereIntegration.inl">
+    <CopyFileToFolders Include="Shader\AtmosphereIntegration.h">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\AtmosphereIntegration.Hillaire20.inl">
+    <CopyFileToFolders Include="Shader\AtmosphereIntegration.Hillaire20.h">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\AtmosphereIntegration.Bruneton17.inl">
+    <CopyFileToFolders Include="Shader\AtmosphereIntegration.Bruneton17.h">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\Planet.inl">
+    <CopyFileToFolders Include="Shader\Planet.h">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\CloudIntegration.inl">
+    <CopyFileToFolders Include="Shader\CloudIntegration.h">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\AtmosphereIntegration.Wilkie21.inl">
+    <CopyFileToFolders Include="Shader\AtmosphereIntegration.Wilkie21.h">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
     <CopyFileToFolders Include="Shader\Atmosphere.hlsl">
@@ -304,16 +310,13 @@
     <CopyFileToFolders Include="Shader\Cloud.hlsl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\RayQuery.inl">
+    <CopyFileToFolders Include="Shader\RayQuery.h">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
     <CopyFileToFolders Include="Shader\Binding.h">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
     <CopyFileToFolders Include="Shader\Constant.h">
-      <Filter>Shader</Filter>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\Material.inl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
   </ItemGroup>

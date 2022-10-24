@@ -1,12 +1,13 @@
 #pragma once
 
 #include "Constant.h"
-#include "Shared.inl"
+#include "Shared.h"
 #include "Binding.h"
-#include "Common.inl"
-#include "RayQuery.inl"
+#include "Common.h"
 
-namespace Material
+#include "RayQuery.h"
+
+namespace MaterialEvaluation
 {
 	struct Context
 	{

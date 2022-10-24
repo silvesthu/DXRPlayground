@@ -33,7 +33,7 @@ using Microsoft::WRL::ComPtr;
 #include "Thirdparty/DirectXTex/DirectXTex/d3dx12.h"
 #include "ImGui/imgui_impl_helper.h"
 
-#include "../Shader/Shared.inl"
+#include "../Shader/Shared.h"
 
 // Common helpers
 template <typename T>

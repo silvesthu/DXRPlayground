@@ -188,7 +188,9 @@ enum class RecursionMode : uint
 
 enum class MaterialType : uint
 {
-	Diffuse = 0,
+	Light = 0,
+
+	Diffuse,
 	RoughConductor,
 
 	// [TODO] Support more/unified materials. e.g. RoughPlastic

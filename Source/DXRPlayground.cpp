@@ -141,7 +141,7 @@ static void sUpdateImGui()
 				gRenderer.mAccumulationResetRequested = true;
 
 			if (!gRenderer.mAccumulationFrameInfinity)
-				if (ImGui::SliderInt("Count", reinterpret_cast<int*>(&gRenderer.mAccumulationFrameCount), 1, 16))
+				if (ImGui::SliderInt("Count", reinterpret_cast<int*>(&gRenderer.mAccumulationFrameCount), 1, 64))
 					gRenderer.mAccumulationResetRequested = true;
 
 			ImGui::TreePop();
