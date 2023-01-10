@@ -52,6 +52,8 @@ ROOT_SIGNATURE_SAMPLER
 float3 GetSunDirection() { return mConstants.mSunDirection.xyz; }
 
 // SRV Helper
+static RaytracingAccelerationStructure RaytracingScene = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RaytraceTLASSRV];
+
 static StructuredBuffer<InstanceData> InstanceDatas = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RaytraceInstanceDataSRV];
 static StructuredBuffer<uint> Indices = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RaytraceIndicesSRV];
 static StructuredBuffer<float3> Vertices = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RaytraceVerticesSRV];

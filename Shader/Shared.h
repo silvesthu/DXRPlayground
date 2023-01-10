@@ -464,8 +464,8 @@ struct Constants
 	int							mDebugInstanceIndex				CONSTANT_DEFAULT(-1);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
-	RecursionMode				mRecursionMode					CONSTANT_DEFAULT(RecursionMode::RussianRoulette);
-	uint						mRecursionCountMax				CONSTANT_DEFAULT(4);
+	RecursionMode				mRecursionMode					CONSTANT_DEFAULT(RecursionMode::FixedCount);
+	uint						mRecursionCountMax				CONSTANT_DEFAULT(1);
 	uint						mCurrentFrameIndex				CONSTANT_DEFAULT(0);
 	float						mCurrentFrameWeight				CONSTANT_DEFAULT(1);
 

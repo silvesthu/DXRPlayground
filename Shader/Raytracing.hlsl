@@ -77,14 +77,7 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	// Reflection / Refraction
 	hit_info.mDone = InstanceDatas[sGetInstanceID()].mMaterialType == MaterialType::Light;
 	if (!hit_info.mDone)
-	{
-		// NEE
-		float light_pdf = 0.0f;
-		if (mConstants.mLightCount > 0 && RandomFloat01(payload.mRandomState) < 0.5)
-		{
-			
-		}
-		
+	{		
 		// Generate next sample based on material
 		float3 material_sample = MaterialEvaluation::GenerateSample(normal, payload);
 		float material_pdf = MaterialEvaluation::ComputePDF(material_sample, normal);
@@ -154,8 +147,8 @@ void TraceRay()
 	RayDesc ray;
 	ray.Origin = mConstants.mCameraPosition.xyz;
 	ray.Direction = normalize(mConstants.mCameraDirection.xyz + mConstants.mCameraRightExtend.xyz * d.x + mConstants.mCameraUpExtend.xyz * d.y);
-	ray.TMin = 0.001;				// Near
-	ray.TMax = 100000;				// Far
+	ray.TMin = 0.001;
+	ray.TMax = 100000;
 
 	RayPayload payload = (RayPayload)0;
 	payload.mThroughput = 1; // Camera gather all the light
@@ -170,7 +163,6 @@ void TraceRay()
 	uint ray_instance_mask = 0xffffffff;
 #endif // ENABLE_RAY_QUERY
 
-	RaytracingAccelerationStructure RaytracingScene = ResourceDescriptorHeap[(int) ViewDescriptorIndex::RaytraceTLASSRV];
 	uint recursion = 0;
 	for (;;)
 	{
