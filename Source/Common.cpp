@@ -206,9 +206,6 @@ namespace ImGui
 	{
 		ImGui::Begin("Textures");
 
-		static float ui_scale = 1.0f;
-		static bool flip_y = false;
-
 		if (ImGui::TreeNodeEx(inName.c_str(), inFlags))
 		{
 			static Texture* sTexture = nullptr;
@@ -217,11 +214,12 @@ namespace ImGui
 				ImVec2 uv0 = ImVec2(0, 0);
 				ImVec2 uv1 = ImVec2(1, 1);
 
-				if (flip_y)
-					std::swap(uv0.y, uv1.y);
+				UINT64 handle = gGetFrameContext().mViewDescriptorHeap.GetGPUHandle(inTexture.mSRVIndex).ptr;
+				if (inTexture.mDepth != 1)
+					handle |= ImGui_ImplDX12_ImTextureID_Mask_3D;
 
-				float item_ui_scale = inTexture.mUIScale * ui_scale;
-				ImGui::Image(reinterpret_cast<ImTextureID>(gGetFrameContext().mViewDescriptorHeap.GetGPUHandle(inTexture.mSRVIndex).ptr), ImVec2(inTexture.mWidth * item_ui_scale, inTexture.mHeight * item_ui_scale), uv0, uv1);
+				ImGui::Image(reinterpret_cast<ImTextureID>(handle), ImVec2(inTexture.mWidth * inTexture.mUIScale, inTexture.mHeight * inTexture.mUIScale), uv0, uv1);
+
 				if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
 				{
 					sTexture = &inTexture;
@@ -269,15 +267,6 @@ namespace ImGui
 				ImGui_ImplDX12_ShaderContants.mW = (visualize_depth_index + 0.5f) / sTexture->mDepth;
 				ImGui_ImplDX12_ShaderContants.mAlpha = visualize_show_alpha ? 1.0f : 0.0f;
 
-				ImGui::PopItemWidth();
-
-				ImGui::Separator();
-
-				ImGui::Text("GUI Options (Global)");
-				ImGui::PushItemWidth(100);
-				ImGui::SliderFloat("UI Scale", &ui_scale, 1.0, 4.0f);
-				ImGui::SameLine();
-				ImGui::Checkbox("Flip Y", &flip_y);
 				ImGui::PopItemWidth();
 
 				ImGui::EndPopup();

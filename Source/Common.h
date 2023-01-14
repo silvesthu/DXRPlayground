@@ -272,6 +272,9 @@ struct DescriptorHeap
 		mIncrementSize = gDevice->GetDescriptorHandleIncrementSize(mType);
 		mCPUHandleStart = mHeap->GetCPUDescriptorHandleForHeapStart();
 		mGPUHandleStart = mHeap->GetGPUDescriptorHandleForHeapStart();
+
+		gAssert((mIncrementSize & ImGui_ImplDX12_ImTextureID_Mask_3D) == 0);
+		gAssert((mGPUHandleStart & ImGui_ImplDX12_ImTextureID_Mask_3D) == 0);
 	}
 
 	D3D12_CPU_DESCRIPTOR_HANDLE GetHandle(DescriptorIndex inIndex)

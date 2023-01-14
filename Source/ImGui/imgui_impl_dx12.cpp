@@ -274,13 +274,15 @@ void ImGui_ImplDX12_RenderDrawData(ImDrawData* draw_data, ID3D12GraphicsCommandL
                 D3D12_GPU_DESCRIPTOR_HANDLE texture_handle = {};
                 texture_handle.ptr = (UINT64)pcmd->GetTexID();
 #ifdef DXRPLAYGROUND_IMGUI
-                bool is_2d = pcmd->GetTexID() == ImGui_ImplDX12_FontTextureID; // [TODO] Store 2d/3d flag in TexID?
+                bool is_3d = (texture_handle.ptr & ImGui_ImplDX12_ImTextureID_Mask_3D) != 0;
+                texture_handle.ptr &= ~ImGui_ImplDX12_ImTextureID_Mask_3D;
+
                 D3D12_GPU_DESCRIPTOR_HANDLE texture_handle_2d = texture_handle;
                 D3D12_GPU_DESCRIPTOR_HANDLE texture_handle_3d = texture_handle;
-                if (is_2d)
-                    texture_handle_3d.ptr = (UINT64)ImGui_ImplDX12_NullTexture3D;
-                else
+                if (is_3d)
                     texture_handle_2d.ptr = (UINT64)ImGui_ImplDX12_NullTexture2D;
+                else
+                    texture_handle_3d.ptr = (UINT64)ImGui_ImplDX12_NullTexture3D;
 
                 ctx->SetGraphicsRootDescriptorTable(1, texture_handle_2d);
                 ctx->SetGraphicsRootDescriptorTable(2, texture_handle_3d);

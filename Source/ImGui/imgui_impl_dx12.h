@@ -55,4 +55,8 @@ extern ImGui_ImplDX12_ShaderContantsType ImGui_ImplDX12_ShaderContants;
 extern ImTextureID ImGui_ImplDX12_FontTextureID;
 extern ImTextureID ImGui_ImplDX12_NullTexture2D;
 extern ImTextureID ImGui_ImplDX12_NullTexture3D;
+enum
+{
+    ImGui_ImplDX12_ImTextureID_Mask_3D = 0x1,
+};
 #endif // DXRPLAYGROUND_IMGUI
