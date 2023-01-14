@@ -45,15 +45,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Source\ShaderTable.h">
-      <Filter>Source</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\PipelineState.h">
-      <Filter>Source</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\RayTrace.h">
-      <Filter>Source</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Common.h">
       <Filter>Source</Filter>
     </ClInclude>
@@ -198,18 +189,15 @@
     <ClInclude Include="Shader\Light.h">
       <Filter>Shader</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Renderer.h">
+      <Filter>Source</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\DXRPlayground.cpp">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="Source\ShaderTable.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\PipelineState.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\RayTrace.cpp">
+    <ClCompile Include="Source\Renderer.cpp">
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="Source\Common.cpp">

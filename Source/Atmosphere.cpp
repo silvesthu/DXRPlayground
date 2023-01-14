@@ -1,5 +1,6 @@
 #include "Atmosphere.h"
 #include "Color.h"
+#include "Renderer.h"
 #include "ImGui/imgui_impl_helper.h"
 
 void Atmosphere::Update()

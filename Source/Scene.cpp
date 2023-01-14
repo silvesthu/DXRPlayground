@@ -1,8 +1,6 @@
 #include "Scene.h"
 
 #include "Common.h"
-#include "PipelineState.h"
-#include "ShaderTable.h"
 
 #include "Atmosphere.h"
 #include "Cloud.h"
@@ -488,6 +486,62 @@ void Scene::FillDummyMaterial(InstanceInfo& ioInstanceInfo, InstanceData& ioInst
 	ioInstanceData.mIOR = glm::vec3(1.0f, 1.0f, 1.0f);
 }
 
+void Scene::Load(const char* inFilename, const glm::mat4x4& inTransform)
+{
+	LoadObj("Asset/primitives/cube.obj", glm::mat4x4(1.0f), mPrimitives.mCube);
+	LoadObj("Asset/primitives/rectangle.obj", glm::mat4x4(1.0f), mPrimitives.mRectangle);
+	LoadObj("Asset/primitives/sphere.obj", glm::mat4x4(1.0f), mPrimitives.mSphere);
+
+	mSceneContent = {}; // Reset
+
+	std::string filename_lower;
+	if (inFilename != nullptr)
+		filename_lower = inFilename;
+	filename_lower = gToLower(filename_lower);
+	
+	bool loaded = false;
+	bool try_load = std::filesystem::exists(filename_lower); 
+	
+	if (!loaded && try_load && filename_lower.ends_with(".obj"))
+		loaded |= LoadObj(filename_lower, inTransform, mSceneContent);
+
+	if (!loaded && try_load && filename_lower.ends_with(".xml"))
+		loaded |= LoadMitsuba(filename_lower, mSceneContent);
+	
+	if (mSceneContent.mInstanceDatas.empty())
+		loaded |= LoadDummy(mSceneContent);
+
+	assert(loaded);
+
+	if (mSceneContent.mLights.empty())
+		mSceneContent.mLights.push_back({});
+
+	InitializeBuffers();
+	InitializeAccelerationStructures();
+	InitializeShaderResourceViews();
+}
+
+void Scene::Unload()
+{
+	mPrimitives = {};
+	mSceneContent = {};
+	mBlases = {};
+	mTLAS = {};
+	mBuffers = {};
+}
+
+void Scene::Build(ID3D12GraphicsCommandList4* inCommandList)
+{
+	for (auto&& blas : mBlases)
+		blas->Build(inCommandList);
+
+	gBarrierUAV(inCommandList, nullptr);
+
+	mTLAS->Build(inCommandList);
+
+	gBarrierUAV(inCommandList, nullptr);
+}
+
 void Scene::InitializeBuffers()
 {
 	D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(0);
@@ -507,7 +561,7 @@ void Scene::InitializeBuffers()
 	}
 
 	{
-		desc.Width =  sizeof(VertexType) * mSceneContent.mVertices.size();
+		desc.Width = sizeof(VertexType) * mSceneContent.mVertices.size();
 		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mBuffers.mVertices)));
 		gSetName(mBuffers.mVertices, "Scene", ".mBuffers.mVertices");
 
@@ -588,78 +642,7 @@ void Scene::InitializeAccelerationStructures()
 	mTLAS->Initialize("Default", instance_descs);
 }
 
-void Scene::Load(const char* inFilename, const glm::mat4x4& inTransform)
-{
-	LoadObj("Asset/primitives/cube.obj", glm::mat4x4(1.0f), mPrimitives.mCube);
-	LoadObj("Asset/primitives/rectangle.obj", glm::mat4x4(1.0f), mPrimitives.mRectangle);
-	LoadObj("Asset/primitives/sphere.obj", glm::mat4x4(1.0f), mPrimitives.mSphere);
-
-	mSceneContent = {}; // Reset
-
-	std::string filename_lower;
-	if (inFilename != nullptr)
-		filename_lower = inFilename;
-	filename_lower = gToLower(filename_lower);
-	
-	bool loaded = false;
-	bool try_load = std::filesystem::exists(filename_lower); 
-	
-	if (!loaded && try_load && filename_lower.ends_with(".obj"))
-		loaded |= LoadObj(filename_lower, inTransform, mSceneContent);
-
-	if (!loaded && try_load && filename_lower.ends_with(".xml"))
-		loaded |= LoadMitsuba(filename_lower, mSceneContent);
-	
-	if (mSceneContent.mInstanceDatas.empty())
-		loaded |= LoadDummy(mSceneContent);
-
-	assert(loaded);
-
-	if (mSceneContent.mLights.empty())
-		mSceneContent.mLights.push_back({});
-
-	InitializeBuffers();
-	InitializeAccelerationStructures();
-
-	gCreatePipelineState();
-	CreateShaderResource();
-	gCreateShaderTable();
-}
-
-void Scene::Unload()
-{
-	gCleanupShaderTable();
-	gCleanupPipelineState();
-
-	mPrimitives = {};
-	mSceneContent = {};
-	mBlases = {};
-	mTLAS = {};
-	mBuffers = {};
-}
-
-void Scene::Build(ID3D12GraphicsCommandList4* inCommandList)
-{
-	for (auto&& blas : mBlases)
-		blas->Build(inCommandList);
-
-	gBarrierUAV(inCommandList, nullptr);
-
-	mTLAS->Build(inCommandList);
-
-	gBarrierUAV(inCommandList, nullptr);
-}
-
-void Scene::RebuildShader()
-{
-	// gCleanupPipelineState(); // Skip cleanup in case rebuild fails
-	gCreatePipelineState();
-
-	gCleanupShaderTable();
-	gCreateShaderTable();
-}
-
-void Scene::CreateShaderResource()
+void Scene::InitializeShaderResourceViews()
 {
 	auto create_acceleration_structure_SRV = [](ID3D12Resource* inResource, ViewDescriptorIndex inViewDescriptorIndex)
 	{

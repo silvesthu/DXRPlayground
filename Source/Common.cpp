@@ -26,62 +26,10 @@ HMODULE								gPIXHandle = nullptr;
 // Application
 ComPtr<ID3D12Resource>				gConstantGPUBuffer = nullptr;
 
-ComPtr<ID3D12RootSignature>			gDXRGlobalRootSignature = nullptr;
-ComPtr<ID3D12StateObject>			gDXRStateObject = nullptr;
-ShaderTable							gDXRShaderTable = {};
-
 // Frame
 FrameContext						gFrameContexts[NUM_FRAMES_IN_FLIGHT] = {};
 glm::uint32							gFrameIndex = 0;
 Constants							gConstants = {};
-
-// Renderer
-void Renderer::Initialize()
-{
-	AcquireBackBuffers();
-
-	ResetScreen();
-}
-
-void Renderer::Finalize()
-{
-	ReleaseBackBuffers();
-
-	mRuntime.Reset();
-}
-
-void Renderer::ImGuiShowTextures()
-{
-	ImGui::Textures(mRuntime.mTextures, "Renderer", ImGuiTreeNodeFlags_None);
-}
-
-void Renderer::ResetScreen()
-{
-	DXGI_SWAP_CHAIN_DESC1 swap_chain_desc;
-	gSwapChain->GetDesc1(&swap_chain_desc);
-
-	gRenderer.mRuntime.mScreenColorTexture.Width(swap_chain_desc.Width).Height(swap_chain_desc.Height).Initialize();
-	gRenderer.mRuntime.mScreenDebugTexture.Width(swap_chain_desc.Width).Height(swap_chain_desc.Height).Initialize();
-}
-
-void Renderer::AcquireBackBuffers()
-{
-	for (int i = 0; i < NUM_BACK_BUFFERS; i++)
-	{
-		gSwapChain->GetBuffer(i, IID_PPV_ARGS(mRuntime.mBackBuffers[i].GetAddressOf()));
-		std::wstring name = L"BackBuffer_" + std::to_wstring(i);
-		mRuntime.mBackBuffers[i]->SetName(name.c_str());
-		gDevice->CreateRenderTargetView(mRuntime.mBackBuffers[i].Get(), nullptr, mRuntime.mBufferBufferRTVs[i]);
-	}
-}
-
-void Renderer::ReleaseBackBuffers()
-{
-	for (int i = 0; i < NUM_BACK_BUFFERS; i++)
-		mRuntime.mBackBuffers[i] = nullptr;
-}
-
-Renderer							gRenderer;
 
 // Capture
 Texture*							gDumpTexture = nullptr;

@@ -1,15 +1,15 @@
 ﻿#include "Common.h"
 
-#include "Thirdparty/filewatch/FileWatch.hpp"
-#include "ImGui/imgui_impl_win32.h"
-#include "ImGui/imgui_impl_dx12.h"
-
+#include "Renderer.h"
 #include "Color.h"
 #include "Scene.h"
-#include "RayTrace.h"
 
 #include "Atmosphere.h"
 #include "Cloud.h"
+
+#include "Thirdparty/filewatch/FileWatch.hpp"
+#include "ImGui/imgui_impl_win32.h"
+#include "ImGui/imgui_impl_dx12.h"
 
 #define DX12_ENABLE_DEBUG_LAYER			(1)
 #define DX12_ENABLE_GBV					(1)
@@ -131,8 +131,6 @@ static void sUpdateImGui()
 
 			if (ImGui::Button("Open Dump Folder (F10)"))
 				gOpenDumpFolder();
-
-			ImGui::Checkbox("Use RayQuery", &gRenderer.mUseRayQuery);
 		}
 
 		if (ImGui::TreeNodeEx("Accumulation", ImGuiTreeNodeFlags_DefaultOpen))
@@ -459,7 +457,10 @@ static void sUpdate()
 		gRenderer.mReloadShader = false;
 
 		sWaitForLastSubmittedFrame();
-		gScene.RebuildShader();
+
+		gRenderer.FinalizeShaders();
+		gRenderer.InitializeShaders();
+
 		gRenderer.mAccumulationResetRequested = true;
 
 		gAtmosphere.mRuntime.mBruneton17.mRecomputeRequested = true;
@@ -755,7 +756,11 @@ void sRender()
 	{
 		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Raytrace");
 
-		gRaytrace();
+		DXGI_SWAP_CHAIN_DESC1 swap_chain_desc;
+		gSwapChain->GetDesc1(&swap_chain_desc);
+
+		gRenderer.Setup(gRenderer.mRuntime.mRayQueryShader.mData);
+		gCommandList->Dispatch(swap_chain_desc.Width / 8, swap_chain_desc.Height / 8, 1);
 	}
 
 	// Composite
@@ -1133,7 +1138,7 @@ static LRESULT WINAPI sWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam
 		if (gDevice != nullptr && wParam != SIZE_MINIMIZED)
 		{
 			sWaitForLastSubmittedFrame();
-			gRenderer.ReleaseBackBuffers();
+			gRenderer.FinalizeScreenSizeTextures();
 
 			gDisplaySettings.mRenderResolution.x = gMax((UINT)LOWORD(lParam), 8u);
 			gDisplaySettings.mRenderResolution.y = gMax((UINT)HIWORD(lParam), 8u);
@@ -1146,8 +1151,7 @@ static LRESULT WINAPI sWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam
 				swap_chain_desc.Format,
 				swap_chain_desc.Flags);
 
-			gRenderer.AcquireBackBuffers();
-			gRenderer.ResetScreen();
+			gRenderer.InitializeScreenSizeTextures();
 		}
 		return 0;
 	case WM_SYSCOMMAND:

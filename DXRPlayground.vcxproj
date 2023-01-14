@@ -14,6 +14,7 @@
   <ItemGroup>
     <ClInclude Include="Shader\Light.h" />
     <ClInclude Include="Shader\Material.h" />
+    <ClInclude Include="Source\Renderer.h" />
     <ClInclude Include="Source\Thirdparty\tinyxml2\tinyxml2.h" />
     <CopyFileToFolders Include="Shader\AtmosphereIntegration.Wilkie21.h">
       <FileType>Document</FileType>
@@ -30,10 +31,7 @@
     <ClInclude Include="Source\ImGui\imgui_impl_dx12.h" />
     <ClInclude Include="Source\ImGui\imgui_impl_helper.h" />
     <ClInclude Include="Source\ImGui\imgui_impl_win32.h" />
-    <ClInclude Include="Source\PipelineState.h" />
-    <ClInclude Include="Source\RayTrace.h" />
     <ClInclude Include="Source\Scene.h" />
-    <ClInclude Include="Source\ShaderTable.h" />
     <ClInclude Include="Source\Thirdparty\ArHosekSkyModel\ArHosekSkyModel.h" />
     <ClInclude Include="Source\Thirdparty\ArHosekSkyModel\ArHosekSkyModelData_CIEXYZ.h" />
     <ClInclude Include="Source\Thirdparty\ArHosekSkyModel\ArHosekSkyModelData_RGB.h" />
@@ -81,10 +79,8 @@
     <ClCompile Include="Source\ImGui\imgui_impl_dx12.cpp" />
     <ClCompile Include="Source\ImGui\imgui_impl_helper.cpp" />
     <ClCompile Include="Source\ImGui\imgui_impl_win32.cpp" />
-    <ClCompile Include="Source\PipelineState.cpp" />
-    <ClCompile Include="Source\RayTrace.cpp" />
+    <ClCompile Include="Source\Renderer.cpp" />
     <ClCompile Include="Source\Scene.cpp" />
-    <ClCompile Include="Source\ShaderTable.cpp" />
     <ClCompile Include="Source\Thirdparty\ArHosekSkyModel\ArHosekSkyModel.cpp" />
     <ClCompile Include="Source\Thirdparty\ArPragueSkyModelGround\ArPragueSkyModelGround.cpp" />
     <ClCompile Include="Source\Thirdparty\imgui\imgui.cpp" />
