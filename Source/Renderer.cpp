@@ -13,14 +13,11 @@ static IDxcBlob* sCompileShader(const char* inFilename, const char* inEntryPoint
 	shader_stream << shader_file.rdbuf();
 	std::string shader_string = shader_stream.str();
 
-	// GetProcAddress to eliminate dependency on .lib. Make updating .dll easier.
-	DxcCreateInstanceProc DxcCreateInstance = nullptr;
-	if (DxcCreateInstance == nullptr)
-	{
-		HMODULE dll = LoadLibraryW(L"dxcompiler.dll");
-		assert(dll != nullptr);
-		DxcCreateInstance = reinterpret_cast<DxcCreateInstanceProc>(GetProcAddress(dll, "DxcCreateInstance"));
-	}
+	// LoadLibraryW + GetProcAddress to eliminate dependency on .lib. Make updating .dll easier.
+	HMODULE dll = LoadLibraryW(L"dxcompiler.dll");
+	if (dll == NULL)
+		return nullptr;
+	DxcCreateInstanceProc DxcCreateInstance = reinterpret_cast<DxcCreateInstanceProc>(GetProcAddress(dll, "DxcCreateInstance"));
 
 	// See https://simoncoenen.com/blog/programming/graphics/DxcRevised.html
 	ComPtr<IDxcUtils> utils;
@@ -88,8 +85,7 @@ static IDxcBlob* sCompileShader(const char* inFilename, const char* inEntryPoint
 		gValidate(operation_result->GetErrorBuffer(&blob));
 		// We can use the library to get our preferred encoding.
 		gValidate(utils->GetBlobAsUtf8(blob, &blob_8));
-		std::string str(static_cast<LPCSTR>(blob_8->GetBufferPointer()), blob_8->GetBufferSize());
-		str += '\n';
+		std::string str((char*)blob_8->GetBufferPointer(), blob_8->GetBufferSize() - 1);
 		gTrace(str.c_str());
 		blob->Release();
 		blob_8->Release();
@@ -106,7 +102,7 @@ static IDxcBlob* sCompileShader(const char* inFilename, const char* inEntryPoint
 		IDxcBlobUtf8* blob_8 = nullptr;
 		compiler->Disassemble(blob_to_dissemble, &disassemble);
 		gValidate(utils->GetBlobAsUtf8(disassemble, &blob_8));
-		std::string str(static_cast<LPCSTR>(blob_8->GetBufferPointer()), blob_8->GetBufferSize());
+		std::string str((char*)blob_8->GetBufferPointer(), blob_8->GetBufferSize() - 1);
 
 		static int counter = 0;
 		std::filesystem::path path = gCreateDumpFolder();
@@ -121,24 +117,6 @@ static IDxcBlob* sCompileShader(const char* inFilename, const char* inEntryPoint
 	}
 
 	return blob;
-}
-
-ComPtr<ID3D12RootSignature> CreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC & desc)
-{
-	ComPtr<ID3DBlob> signature_blob;
-	ComPtr<ID3DBlob> error_blob;
-	HRESULT hr = D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1, &signature_blob, &error_blob);
-	if (FAILED(hr))
-	{
-		std::string str((char*)error_blob->GetBufferPointer(), error_blob->GetBufferSize());
-		gTrace(str.c_str());
-		assert(false);
-		return nullptr;
-	}
-	ComPtr<ID3D12RootSignature> root_signature;
-	if (FAILED(gDevice->CreateRootSignature(0, signature_blob->GetBufferPointer(), signature_blob->GetBufferSize(), IID_PPV_ARGS(&root_signature))))
-		assert(false);
-	return root_signature;
 }
 
 static bool sCreateVSPSPipelineState(const char* inShaderFileName, const char* inVSName, const char* inPSName, Shader& ioSystemShader)

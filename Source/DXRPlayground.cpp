@@ -253,8 +253,6 @@ static void sUpdateImGui()
 				gRenderer.mReloadShader = true;
 			}
 
-			ImGui::Checkbox("Print D3D12_STATE_OBJECT_DESC", &gRenderer.mPrintStateObjectDesc);
-
 			ImGui::TreePop();
 		}
 

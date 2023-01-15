@@ -71,7 +71,6 @@ struct Renderer
 
 	bool									mReloadShader = false;
 	bool									mDumpDisassemblyRayQuery = false;
-	bool									mPrintStateObjectDesc = false;
 
 	bool									mAccumulationDone = false;
 	bool									mAccumulationFrameInfinity = false;
