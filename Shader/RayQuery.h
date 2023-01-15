@@ -95,8 +95,3 @@ uint sGetInstanceID()
 	return InstanceID();
 #endif // ENABLE_RAY_QUERY
 }
-
-float3 sGetWorldRayHitPosition()
-{
-	return sGetWorldRayOrigin() + sGetWorldRayDirection() * sGetRayTCurrent();
-}

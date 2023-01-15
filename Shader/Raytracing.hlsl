@@ -8,7 +8,11 @@
 #include "AtmosphereIntegration.h"
 #include "CloudIntegration.h"
 
-[shader("miss")]
+float3 sGetWorldRayHitPosition()
+{
+	return sGetWorldRayOrigin() + sGetWorldRayDirection() * sGetRayTCurrent();
+}
+
 void DefaultMiss(inout RayPayload payload)
 {
 	payload.mState.Set(RayState::Done);
@@ -116,7 +120,6 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	return hit_info;
 }
 
-[shader("closesthit")]
 void DefaultClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attributes)
 {
 	HitInfo hit_info = HitInternal(payload, attributes);
@@ -155,18 +158,15 @@ void TraceRay()
 	payload.mRandomState = uint(uint(sGetDispatchRaysIndex().x) * uint(1973) + uint(sGetDispatchRaysIndex().y) * uint(9277) + uint(mConstants.mCurrentFrameIndex) * uint(26699)) | uint(1); // From https://www.shadertoy.com/view/tsBBWW
 	payload.mState.Reset(RayState::FirstHit);
 
-#ifdef ENABLE_RAY_QUERY
 	// Note that RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH will give first hit for "Any Hit". The result may not be the closest one
 	// https://docs.microsoft.com/en-us/windows/win32/direct3d12/ray_flag
 	RayQuery<RAY_FLAG_CULL_NON_OPAQUE | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> query;
 	uint additional_ray_flags = 0;
 	uint ray_instance_mask = 0xffffffff;
-#endif // ENABLE_RAY_QUERY
 
 	uint recursion = 0;
 	for (;;)
 	{
-#ifdef ENABLE_RAY_QUERY
 		sWorldRayOrigin 		= ray.Origin;
 		sWorldRayDirection		= ray.Direction;
 
@@ -190,18 +190,6 @@ void TraceRay()
 		{
 			DefaultMiss(payload);
 		}
-#else
-		TraceRay(
-			RaytracingScene, 		// RaytracingAccelerationStructure
-			0,						// RayFlags 
-			0xFF,					// InstanceInclusionMask
-			0,						// RayContributionToHitGroupIndex, 4bits
-			0,						// MultiplierForGeometryContributionToHitGroupIndex, 16bits
-			0,						// MissShaderIndex
-			ray,					// RayDesc
-			payload					// payload_t
-		);
-#endif // ENABLE_RAY_QUERY
 
 		if (payload.mState.IsSet(RayState::Done))
 			break;
@@ -260,13 +248,6 @@ void TraceRay()
 	}
 }
 
-[shader("raygeneration")]
-void DefaultRayGeneration()
-{
-	TraceRay();
-}
-
-#ifdef ENABLE_RAY_QUERY
 [RootSignature(ROOT_SIGNATURE_COMMON)]
 [numthreads(8, 8, 1)]
 void RayQueryCS(
@@ -283,4 +264,3 @@ void RayQueryCS(
 
 	TraceRay();
 }
-#endif // ENABLE_RAY_QUERY
