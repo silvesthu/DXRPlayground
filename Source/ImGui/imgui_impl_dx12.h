@@ -48,7 +48,7 @@ struct ImGui_ImplDX12_ShaderContantsType
 {
     float mMin = 0.0f;
     float mMax = 1.0f;
-    float mW = 0.0f;
+    float mSlice = 0.0f;
     float mAlpha = 0.0f;
 };
 extern ImGui_ImplDX12_ShaderContantsType ImGui_ImplDX12_ShaderContants;

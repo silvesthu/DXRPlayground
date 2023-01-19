@@ -613,7 +613,7 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
             {\
                 float mMin;     \
                 float mMax;     \
-                float mW;       \
+                float mSlice;   \
                 float mAlpha;   \
             };"
 #endif // DXRPLAYGROUND_IMGUI
@@ -666,7 +666,7 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
             {\
                 float mMin;     \
                 float mMax;     \
-                float mW;       \
+                float mSlice;   \
                 float mAlpha;   \
             };"
             "struct PS_INPUT\
@@ -682,7 +682,10 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
             float4 main(PS_INPUT input) : SV_Target\
             {\
                 float4 out_col = input.col * texture0.Sample(sampler0, input.uv); \
-                out_col += input.col * texture1.Sample(sampler0, float3(input.uv, mW)); \
+                uint width, height, depth; \
+                texture1.GetDimensions(width, height, depth); \
+                float w = (mSlice + 0.5) / depth; \
+                out_col += input.col * texture1.Sample(sampler0, float3(input.uv, w)); \
                 if (mAlpha != 0) out_col.xyz = out_col.aaa; \
                 out_col = (out_col - mMin) / max(mMax - mMin, 1e-6); \
                 return out_col; \

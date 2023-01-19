@@ -203,16 +203,15 @@ namespace ImGui
 
 				ImGui::PushItemWidth(100);
 
-				static int visualize_depth_index = 0;
+				static int visualize_slice = 0;
 				static bool visualize_show_alpha = false;
-				visualize_depth_index = gMin(visualize_depth_index, int(sTexture->mDepth - 1));
 
 				ImGui::Text("Image Options");
 				ImGui::SliderFloat("Min", &ImGui_ImplDX12_ShaderContants.mMin, 0.0, 1.0f); ImGui::SameLine(); ImGui::SliderFloat("Max", &ImGui_ImplDX12_ShaderContants.mMax, 0.0, 1.0f);
-				ImGui::SliderInt("Depth Slice", &visualize_depth_index, 0, sTexture->mDepth - 1);
+				ImGui::SliderInt("Depth Slice", &visualize_slice, 0, sTexture->mDepth - 1);
 				ImGui::Checkbox("Show Alpha", &visualize_show_alpha);
 
-				ImGui_ImplDX12_ShaderContants.mW = (visualize_depth_index + 0.5f) / sTexture->mDepth;
+				ImGui_ImplDX12_ShaderContants.mSlice = visualize_slice * 1.0f;
 				ImGui_ImplDX12_ShaderContants.mAlpha = visualize_show_alpha ? 1.0f : 0.0f;
 
 				ImGui::PopItemWidth();
