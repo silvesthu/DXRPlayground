@@ -32,6 +32,7 @@ using Microsoft::WRL::ComPtr;
 #include "Thirdparty/DirectXTex/DirectXTex/DirectXTex.h"
 #include "Thirdparty/DirectXTex/DirectXTex/d3dx12.h"
 #include "ImGui/imgui_impl_helper.h"
+#include "ImGui/imgui_impl_dx12.h"
 
 #include "../Shader/Shared.h"
 
@@ -274,7 +275,7 @@ struct DescriptorHeap
 		mGPUHandleStart = mHeap->GetGPUDescriptorHandleForHeapStart();
 
 		gAssert((mIncrementSize & ImGui_ImplDX12_ImTextureID_Mask_3D) == 0);
-		gAssert((mGPUHandleStart & ImGui_ImplDX12_ImTextureID_Mask_3D) == 0);
+		gAssert((mGPUHandleStart.ptr & ImGui_ImplDX12_ImTextureID_Mask_3D) == 0);
 	}
 
 	D3D12_CPU_DESCRIPTOR_HANDLE GetHandle(DescriptorIndex inIndex)
