@@ -57,7 +57,7 @@ void Cloud::ImGuiShowMenus()
 {
 #define SMALL_BUTTON(func) if (ImGui::SmallButton(NAMEOF(func).c_str())) func(gCloud.mProfile);
 
-	if (ImGui::TreeNodeEx("Control", ImGuiTreeNodeFlags_DefaultOpen))
+	if (ImGui::TreeNodeEx("Mode", ImGuiTreeNodeFlags_DefaultOpen))
 	{
 		for (int i = 0; i < static_cast<int>(CloudMode::Count); i++)
 		{

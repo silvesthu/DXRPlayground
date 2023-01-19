@@ -80,15 +80,14 @@ CameraSettings		gCameraSettings = {};
 struct DisplaySettings
 {
 	glm::ivec2		mRenderResolution	= glm::ivec2(0, 0);
-	bool			mVsync				= false;
+	bool			mVsync				= true;
 };
 DisplaySettings		gDisplaySettings	= {};
 
 // Forward declarations of helper functions
 static bool sCreateDeviceD3D(HWND hWnd);
 static void sCleanupDeviceD3D();
-static void sWaitForIdle();
-static void sWaitForLastSubmittedFrame();
+static void sWaitForGPU();
 static void sWaitForFrameContext();
 static void sUpdate();
 static void sLoadShader() { gRenderer.mReloadShader = true; }
@@ -454,7 +453,7 @@ static void sUpdate()
 	{
 		gRenderer.mReloadShader = false;
 
-		sWaitForLastSubmittedFrame();
+		sWaitForGPU();
 
 		gRenderer.FinalizeShaders();
 		gRenderer.InitializeShaders();
@@ -585,7 +584,7 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 
 	// Shutdown
 	{
-		sWaitForLastSubmittedFrame();
+		sWaitForGPU();
 
 		gAtmosphere.Finalize();
 		gCloud.Finalize();
@@ -672,7 +671,7 @@ void sRender()
 		{
 			sPreviousScene = sCurrentScene;
 
-			sWaitForIdle();
+			sWaitForGPU();
 			sLoadScene();
 
 			gRenderer.mAccumulationResetRequested = true;
@@ -1083,25 +1082,9 @@ static void sCleanupDeviceD3D()
 		FreeLibrary(gPIXHandle);
 }
 
-static void sWaitForIdle()
+static void sWaitForGPU()
 {
 	gIncrementalFence->SetEventOnCompletion(gFenceLastSignaledValue, gIncrementalFenceEvent);
-	WaitForSingleObject(gIncrementalFenceEvent, INFINITE);
-}
-
-static void sWaitForLastSubmittedFrame()
-{
-	FrameContext& frame_context = gGetFrameContext();
-
-	UINT64 fenceValue = frame_context.mFenceValue;
-	if (fenceValue == 0)
-		return; // No fence was signaled
-
-	frame_context.mFenceValue = 0;
-	if (gIncrementalFence->GetCompletedValue() >= fenceValue)
-		return;
-
-	gIncrementalFence->SetEventOnCompletion(fenceValue, gIncrementalFenceEvent);
 	WaitForSingleObject(gIncrementalFenceEvent, INFINITE);
 }
 
@@ -1135,7 +1118,7 @@ static LRESULT WINAPI sWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam
 	case WM_SIZE:
 		if (gDevice != nullptr && wParam != SIZE_MINIMIZED)
 		{
-			sWaitForLastSubmittedFrame();
+			sWaitForGPU();
 			gRenderer.FinalizeScreenSizeTextures();
 
 			gDisplaySettings.mRenderResolution.x = gMax((UINT)LOWORD(lParam), 8u);
