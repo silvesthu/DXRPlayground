@@ -848,7 +848,7 @@ void SkyViewLut(
 	// Move to top atmospehre
 	if (!MoveToTopAtmosphere(WorldPos, WorldDir, Atmosphere.TopRadius))
 	{
-		SkyViewLutTexUAV[inDispatchThreadID.xy] = float4(1, 0, 0, 1);
+		SkyViewLutTexUAV[inDispatchThreadID.xy] = float4(0, 0, 0, 1);
 		return;
 	}
 
