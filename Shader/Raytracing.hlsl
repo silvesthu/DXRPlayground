@@ -91,6 +91,7 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	// Debug - Global
 	switch (mConstants.mDebugMode)
 	{
+	case DebugMode::None:						break;
 	case DebugMode::Barycentrics: 				hit_info.mEmission = barycentrics; hit_info.mDone = true; break;
 	case DebugMode::Vertex: 					hit_info.mEmission = vertex; hit_info.mDone = true; break;
 	case DebugMode::Normal: 					hit_info.mEmission = normal * 0.5 + 0.5; hit_info.mDone = true; break;
@@ -103,7 +104,7 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	case DebugMode::InScattering:				hit_info.mEmission = hit_info.mInScattering; hit_info.mDone = true; break;
 	case DebugMode::RecursionCount:				hit_info.mDone = false; break;
 	case DebugMode::RussianRouletteCount:		hit_info.mDone = false; break;
-	default:									hit_info.mDone = false; break;
+	default:									hit_info.mEmission = 0; hit_info.mDone = true; break;
 	}
 
 	// Debug - Per-instance

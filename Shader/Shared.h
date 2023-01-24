@@ -175,6 +175,10 @@ enum class DebugMode : uint
 	RecursionCount,
 	RussianRouletteCount,
 
+	_Newline4,
+
+	Cloud,
+
 	Count
 };
 
@@ -417,8 +421,8 @@ struct CloudConstants
 	struct Geometry
 	{
 		float					mStrato							CONSTANT_DEFAULT(0);
-		float					mAlto							CONSTANT_DEFAULT(0);
 		float					mCirro							CONSTANT_DEFAULT(0);
+		float					GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 		float					GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 	};
 	Geometry					mGeometry;

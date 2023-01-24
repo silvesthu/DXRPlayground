@@ -29,7 +29,6 @@ public:
 			{
 				// page 73
 				profile.mGeometry.mStrato = 1.5; // km
-				profile.mGeometry.mAlto = 4.0; // km
 				profile.mGeometry.mCirro = 4.0; // km
 			}
 		};

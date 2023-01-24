@@ -104,16 +104,15 @@ static LRESULT WINAPI sWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam
 
 static void sUpdateImGui()
 {
-	if (ImGui::Begin("DXR Playground"))
+	std::string stat = std::format("Frame {} | Time {:.3f} s | Average {:.3f} ms (FPS {:.1f}) | {}x{}###DXRPlayground",
+		gConstants.mCurrentFrameIndex,
+		gConstants.mTime,
+		1000.0f / ImGui::GetIO().Framerate,
+		ImGui::GetIO().Framerate,
+		gDisplaySettings.mRenderResolution.x,
+		gDisplaySettings.mRenderResolution.y);
+	if (ImGui::Begin(stat.c_str()))
 	{
-		ImGui::Text("Frame %d | Time %.3f s | Average %.3f ms (FPS %.1f) | %dx%d",
-			gConstants.mCurrentFrameIndex,
-			gConstants.mTime,
-			1000.0f / ImGui::GetIO().Framerate,
-			ImGui::GetIO().Framerate,
-			gDisplaySettings.mRenderResolution.x,
-			gDisplaySettings.mRenderResolution.y);
-
 		{
 			if (ImGui::Button("Reload Shader (F5)"))
 				sLoadShader();
