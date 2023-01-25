@@ -1,7 +1,8 @@
 packages/
-Asset/ArPragueSkyModelGround/SkyModelDataset.dat
 Dump/
+Asset/ArPragueSkyModelGround/SkyModelDataset.dat
 imgui.ini
+run_mitsuba.bat
 
 # Visual Studio
 .vs/
