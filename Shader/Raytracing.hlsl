@@ -8,26 +8,6 @@
 #include "AtmosphereIntegration.h"
 #include "CloudIntegration.h"
 
-float3 sGetWorldRayHitPosition()
-{
-	return sGetWorldRayOrigin() + sGetWorldRayDirection() * sGetRayTCurrent();
-}
-
-void DefaultMiss(inout RayPayload payload)
-{
-	payload.mState.Set(RayState::Done);
-
-    float3 sky_luminance = GetSkyLuminance();
-
-	float3 cloud_transmittance = 1;
-    float3 cloud_luminance = 0;
-    RaymarchCloud(cloud_transmittance, cloud_luminance);
-	
-    float3 emission = lerp(sky_luminance, cloud_luminance, 1.0 - cloud_transmittance);
-
-	payload.mEmission = payload.mEmission + payload.mThroughput * emission;
-}
-
 HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attributes)
 {
 	// System value intrinsics https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#system-value-intrinsics
@@ -65,7 +45,7 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 
 	// Hit position
 	{
-		hit_info.mPosition = sGetWorldRayHitPosition() + normal * 0.001;
+		hit_info.mPosition = (sGetWorldRayOrigin() + sGetWorldRayDirection() * sGetRayTCurrent()) + normal * 0.001;
 	}
 
 	// Participating media
@@ -121,22 +101,6 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	return hit_info;
 }
 
-void DefaultClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attributes)
-{
-	HitInfo hit_info = HitInternal(payload, attributes);
-
-	// State
-	payload.mState.Set(hit_info.mDone ? RayState::Done : RayState::None);
-
-	// Emission
-	payload.mEmission = payload.mEmission + payload.mThroughput * hit_info.mTransmittance * hit_info.mEmission + hit_info.mInScattering;
-	
-	// Next bounce
-	payload.mPosition = hit_info.mPosition;	
-	payload.mReflectionDirection = hit_info.mReflectionDirection;
-	payload.mThroughput = hit_info.mSamplingPDF <= 0 ? 0 : (payload.mThroughput * hit_info.mTransmittance * hit_info.mBSDF * hit_info.mNdotL / hit_info.mSamplingPDF);
-}
-
 void TraceRay()
 {
 	uint3 launchIndex = sGetDispatchRaysIndex();
@@ -185,11 +149,38 @@ void TraceRay()
 			BuiltInTriangleIntersectionAttributes attributes;
 			attributes.barycentrics = query.CommittedTriangleBarycentrics();
 
-			DefaultClosestHit(payload, attributes);
+			// Hit
+			{
+				HitInfo hit_info = HitInternal(payload, attributes);
+
+				// State
+				payload.mState.Set(hit_info.mDone ? RayState::Done : RayState::None);
+
+				// Emission
+				payload.mEmission = payload.mEmission + payload.mThroughput * hit_info.mTransmittance * hit_info.mEmission + hit_info.mInScattering;
+
+				// Next bounce
+				payload.mPosition = hit_info.mPosition;
+				payload.mReflectionDirection = hit_info.mReflectionDirection;
+				payload.mThroughput = hit_info.mSamplingPDF <= 0 ? 0 : (payload.mThroughput * hit_info.mTransmittance * hit_info.mBSDF * hit_info.mNdotL / hit_info.mSamplingPDF);
+			}
 		}
 		else
 		{
-			DefaultMiss(payload);
+			// Background (Miss)
+			{
+				payload.mState.Set(RayState::Done);
+
+				float3 sky_luminance = GetSkyLuminance();
+
+				float3 cloud_transmittance = 1;
+				float3 cloud_luminance = 0;
+				RaymarchCloud(cloud_transmittance, cloud_luminance);
+
+				float3 emission = lerp(sky_luminance, cloud_luminance, 1.0 - cloud_transmittance);
+
+				payload.mEmission = payload.mEmission + payload.mThroughput * emission;
+			}
 		}
 
 		if (payload.mState.IsSet(RayState::Done))
@@ -201,7 +192,7 @@ void TraceRay()
 		// https://computergraphics.stackexchange.com/questions/2316/is-russian-roulette-really-the-answer
 		if (recursion >= mConstants.mRecursionCountMax)
 		{
-			if (mConstants.mRecursionMode == RecursionMode::RussianRoulette && recursion <= 8)
+			if (mConstants.mRecursionMode == RecursionMode::RussianRoulette && recursion <= 16)
 			{
 				// Probability can be chosen in almost any manner
 				// e.g. Fixed threshold
