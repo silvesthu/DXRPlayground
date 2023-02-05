@@ -43,6 +43,9 @@
     <Filter Include="Source\Thirdparty\tinyxml2">
       <UniqueIdentifier>{97014e42-3f8e-4326-a174-1d2b0fb2d3dd}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\Thirdparty\stb">
+      <UniqueIdentifier>{3b8b57d3-df7a-479e-94cb-dbc9de3cfb59}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Common.h">

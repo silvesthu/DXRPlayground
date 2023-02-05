@@ -23,6 +23,3 @@
 [submodule "Source/Thirdparty/tinyxml2"]
 	path = Source/Thirdparty/tinyxml2
 	url = https://github.com/leethomason/tinyxml2.git
-[submodule "Source/Thirdparty/stb"]
-	path = Source/Thirdparty/stb
-	url = https://github.com/nothings/stb.git
