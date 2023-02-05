@@ -39,6 +39,7 @@ enum class ScenePresetType
 
 	CornellBox,
 	VeachMIS,
+	LivingRoom2,
 
 	Bruneton17,
 	Bruneton17_Artifact_Mu,
@@ -47,13 +48,14 @@ enum class ScenePresetType
 	Count,
 };
 
-static ScenePresetType sCurrentScene = ScenePresetType::VeachMIS;
+static ScenePresetType sCurrentScene = ScenePresetType::LivingRoom2;
 static ScenePresetType sPreviousScene = sCurrentScene;
 static ScenePreset kScenePresets[(int)ScenePresetType::Count] =
 {
 	ScenePreset().Name("None"),
 	ScenePreset().Name("CornellBox").Path("Asset/Comparison/benedikt-bitterli/cornell-box/scene_v3.xml"),
 	ScenePreset().Name("VeachMIS").Path("Asset/Comparison/benedikt-bitterli/veach-mis/scene_ggx_v3.xml"),
+	ScenePreset().Name("LivingRoom2").Path("Asset/Comparison/benedikt-bitterli/living-room-2/scene_v3.xml"),	
 	
 	ScenePreset().Name("Bruneton17").Path("Asset/primitives/sphere.obj").CameraPosition(glm::vec4(0.0f, 0.0f, 9.0f, 0.0f)).CameraDirection(glm::vec4(0.0f, 0.0f, -1.0f, 0.0f)).Transform(glm::translate(glm::vec3(0.0f, 1.0f, 0.0f))).Atmosphere(AtmosphereMode::Bruneton17),
 	ScenePreset().Name("Bruneton17_Artifact_Mu").Path("Asset/primitives/sphere.obj").CameraPosition(glm::vec4(0.0f, 80.0f, 150.0f, 0.0f)).CameraDirection(glm::vec4(0.0f, 0.0f, -1.0f, 0.0f)).Transform(glm::scale(glm::vec3(100.0f, 100.0f, 100.0f))).Atmosphere(AtmosphereMode::Bruneton17),
@@ -306,18 +308,22 @@ static void sUpdateImGui()
 					ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mDebugInstanceMode), i);
 				}
 
-				static const int kColumnCount = 7;
-				if (ImGui::BeginTable("Table", kColumnCount, ImGuiTableFlags_ScrollX | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
+				static const int kColumnCount = 8;
+				if (ImGui::BeginTable("Table", kColumnCount, ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
 				{
-					ImGui::TableNextRow(ImGuiTableRowFlags_Headers);
-
-					ImGui::TableSetColumnIndex(0); ImGui::Text("Name");
-					ImGui::TableSetColumnIndex(1); ImGui::Text("Position");
-					ImGui::TableSetColumnIndex(2); ImGui::Text("MaterialType");
-					ImGui::TableSetColumnIndex(3); ImGui::Text("Albedo");
-					ImGui::TableSetColumnIndex(4); ImGui::Text("Reflectance");
-					ImGui::TableSetColumnIndex(5); ImGui::Text("Emission");
-					ImGui::TableSetColumnIndex(6); ImGui::Text("RoughnessAlpha");
+					{
+						int column_index = 0;
+						ImGui::TableNextRow(ImGuiTableRowFlags_Headers);
+						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("Index");
+						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("Name");
+						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("Position");
+						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("MaterialType");
+						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("Albedo");
+						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("Reflectance");
+						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("Emission");
+						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("RoughnessAlpha");
+						gAssert(column_index == kColumnCount);
+					}
 
 					for (int row = 0; row < gScene.GetInstanceCount(); row++)
 					{
@@ -326,27 +332,45 @@ static void sUpdateImGui()
 						const InstanceInfo& instance_info = gScene.GetInstanceInfo(row);
 						const InstanceData& instance_data = gScene.GetInstanceData(row);
 
-						ImGui::TableSetColumnIndex(0);
-						if (ImGui::Selectable(instance_info.mName.c_str(), row == gConstants.mDebugInstanceIndex, ImGuiSelectableFlags_SpanAllColumns))
+						int column_index = 0;
+
+						ImGui::TableSetColumnIndex(column_index++);
+						if (ImGui::Selectable(std::to_string(row).c_str(), row == gConstants.mDebugInstanceIndex, ImGuiSelectableFlags_SpanAllColumns))
 							gConstants.mDebugInstanceIndex = row;
 
-						ImGui::TableSetColumnIndex(1);
-						ImGui::Text("%f %f %f", instance_data.mTransform[3][0], instance_data.mTransform[3][1], instance_data.mTransform[3][2]);
+						ImGui::TableSetColumnIndex(column_index++);
+						ImGui::Text("%s", instance_info.mName.c_str());
 
-						ImGui::TableSetColumnIndex(2);
+						ImGui::TableSetColumnIndex(column_index++);
+						std::string position = std::format("{:.2f} {:.2f} {:.2f}", instance_data.mTransform[3][0], instance_data.mTransform[3][1], instance_data.mTransform[3][2]);
+						position = glm::dot(glm::vec3(instance_data.mTransform[3]), glm::vec3(instance_data.mTransform[3])) != 0.0f ? position : "";
+						ImGui::Text(position.c_str());
+
+						ImGui::TableSetColumnIndex(column_index++);
 						ImGui::Text("%s%s", NAMEOF_ENUM(instance_data.mMaterialType).data(), instance_data.mTwoSided ? " (TwoSided)" : "");
 
-						ImGui::TableSetColumnIndex(3);
-						ImGui::Text("%f %f %f", instance_data.mAlbedo.x, instance_data.mAlbedo.y, instance_data.mAlbedo.z);
+						ImGui::TableSetColumnIndex(column_index++);
+						std::string albedo = std::format("{:.2f} {:.2f} {:.2f}", instance_data.mAlbedo.x, instance_data.mAlbedo.y, instance_data.mAlbedo.z);
+						albedo = glm::dot(instance_data.mAlbedo, instance_data.mAlbedo) != 0.0f ? albedo : "";
+						albedo = instance_info.mAlbedoTexture.empty() ? albedo : instance_info.mAlbedoTexture.filename().string();
+						ImGui::Text(albedo.c_str());
 
-						ImGui::TableSetColumnIndex(4);
-						ImGui::Text("%f %f %f", instance_data.mReflectance.x, instance_data.mReflectance.y, instance_data.mReflectance.z);
+						ImGui::TableSetColumnIndex(column_index++);
+						std::string reflectance = std::format("{:.2f} {:.2f} {:.2f}", instance_data.mReflectance.x, instance_data.mReflectance.y, instance_data.mReflectance.z);
+						reflectance = glm::dot(instance_data.mReflectance, instance_data.mReflectance) != 0.0f ? reflectance : "";
+						ImGui::Text(reflectance.c_str());
 
-						ImGui::TableSetColumnIndex(5);
-						ImGui::Text("%f %f %f", instance_data.mEmission.x, instance_data.mEmission.y, instance_data.mEmission.z);
+						ImGui::TableSetColumnIndex(column_index++);
+						std::string emission = std::format("{:.2f} {:.2f} {:.2f}", instance_data.mEmission.x, instance_data.mEmission.y, instance_data.mEmission.z);
+						emission = glm::dot(instance_data.mEmission, instance_data.mEmission) != 0.0f ? emission : "";
+						ImGui::Text(emission.c_str());
 
-						ImGui::TableSetColumnIndex(6);
-						ImGui::Text("%f", instance_data.mRoughnessAlpha);
+						ImGui::TableSetColumnIndex(column_index++);
+						std::string roughness_alpha = std::format("{:.2f}", instance_data.mRoughnessAlpha);
+						roughness_alpha = instance_data.mMaterialType != MaterialType::Diffuse ? roughness_alpha : "";
+						ImGui::Text(roughness_alpha.c_str());
+
+						gAssert(column_index == kColumnCount);
 					}
 					ImGui::EndTable();
 				}
@@ -490,8 +514,8 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
-	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
-	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;   // Enable Gamepad Controls
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;   // Enable Gamepad Controls
 
 	// Setup Dear ImGui style
 	ImGui::StyleColorsDark();

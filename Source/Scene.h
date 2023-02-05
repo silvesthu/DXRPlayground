@@ -6,6 +6,9 @@ struct InstanceInfo
 {
 	std::string mName;
 	std::string mMaterialName;
+
+	std::filesystem::path mAlbedoTexture;
+	std::filesystem::path mBumpTexture;
 };
 
 class BLAS final
@@ -116,6 +119,8 @@ private:
 		ComPtr<ID3D12Resource>				mLights;
 	};
 	Buffers									mBuffers;
+
+	std::vector<Texture>					mTextures;
 };
 
 extern Scene gScene;

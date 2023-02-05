@@ -129,6 +129,8 @@ enum class ViewDescriptorIndex : uint
 	CloudErosionNoise3DSRV,
 
 	Count,
+
+	SceneSRVBegin = Count,
 };
 
 enum class SamplerDescriptorIndex : uint
@@ -196,6 +198,8 @@ enum class MaterialType : uint
 
 	Diffuse,
 	RoughConductor,
+
+	Unsupported,
 
 	// [TODO] Support more/unified materials. e.g. RoughPlastic
 
@@ -267,13 +271,14 @@ struct InstanceData
 
 	MaterialType				mMaterialType					CONSTANT_DEFAULT(MaterialType::Diffuse);
 	uint						mTwoSided						CONSTANT_DEFAULT(0);
-	float2						GENERATE_PAD_NAME				CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	float						mOpacity						CONSTANT_DEFAULT(1.0f);
+	float						mRoughnessAlpha					CONSTANT_DEFAULT(0.0f);
 
     float3						mAlbedo							CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
-	float						mOpacity						CONSTANT_DEFAULT(1.0f);
+	uint						mAlbedoTextureIndex				CONSTANT_DEFAULT(0);
 
     float3						mReflectance					CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
-	float						mRoughnessAlpha					CONSTANT_DEFAULT(0.0f);
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
 	float3						mEta							CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
@@ -302,10 +307,16 @@ struct InstanceData
 struct Light
 {
 	LightType					mType							CONSTANT_DEFAULT(LightType::Sphere);
-	float3						GENERATE_PAD_NAME;
+	float3						GENERATE_PAD_NAME				CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 
 	float3						mPosition						CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	float						mRadius							CONSTANT_DEFAULT(0);
+
+	float3						mRight							CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+
+	float3						mUp								CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 };
 
 struct RayState

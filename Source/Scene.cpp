@@ -243,7 +243,7 @@ bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransfor
 
 bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneContent)
 {
-	static auto first_child_element_by_name_attribute = [](tinyxml2::XMLElement* inElement, const char* inName)
+	static auto get_first_child_element_by_name = [](tinyxml2::XMLElement* inElement, const char* inName)
 	{
 		tinyxml2::XMLElement* child = inElement->FirstChildElement();
 		while (child != nullptr)
@@ -260,11 +260,28 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 
 	static auto get_child_value = [](tinyxml2::XMLElement* inElement, const char* inName)
 	{
-		tinyxml2::XMLElement* child = first_child_element_by_name_attribute(inElement, inName);
+		tinyxml2::XMLElement* child = get_first_child_element_by_name(inElement, inName);
 		if (child == nullptr)
-			return ""; // Treat no found the same as attribute with empty string to simplify parsing
+			return std::string_view(); // Treat no found the same as attribute with empty string to simplify parsing
 
-		return child->Attribute("value");
+		return std::string_view(child->Attribute("value"));
+	};
+
+	static auto get_child_texture = [](tinyxml2::XMLElement* inElement, const char* inName)
+	{
+		tinyxml2::XMLElement* child = get_first_child_element_by_name(inElement, inName);
+		if (child == nullptr)
+			return std::string_view();
+
+		return get_child_value(child, "filename");
+	};
+
+	static auto null_to_empty = [](const char* str)
+	{
+		if (str == nullptr)
+			return "";
+
+		return str;
 	};
 
 	tinyxml2::XMLDocument doc;
@@ -272,54 +289,109 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 
 	tinyxml2::XMLElement* scene = doc.FirstChildElement("scene");
 
-	typedef InstanceData MaterialData;
-	std::unordered_map<std::string_view, MaterialData> materials_by_id;
+	struct Material
+	{
+		InstanceInfo mInstanceInfo;
+		InstanceData mInstanceData;
+	};
+
+	std::unordered_map<std::string_view, Material> materials_by_id;
 	tinyxml2::XMLElement* bsdf = scene->FirstChildElement("bsdf");
 	while (bsdf != nullptr)
 	{
-		std::string_view id = bsdf->Attribute("id");
+		Material material;
 
-		MaterialData material;
+		const char* id = bsdf->Attribute("id");
 
 		tinyxml2::XMLElement* local_bsdf = bsdf;
 		std::string_view local_type = bsdf->Attribute("type");
-		if (local_type == "twosided")
-		{
-			local_bsdf = local_bsdf->FirstChildElement("bsdf");
-			local_type = local_bsdf->Attribute("type");
 
-			material.mTwoSided = true;
+		auto process_twosided = [&]()
+		{
+			if (local_type == "twosided")
+			{
+				local_bsdf = local_bsdf->FirstChildElement("bsdf");
+				local_type = local_bsdf->Attribute("type");
+
+				material.mInstanceData.mTwoSided = true;
+
+				return true;
+			}
+
+			return false;
+		};
+
+		auto process_bumpmap = [&]()
+		{
+			if (local_type == "bumpmap")
+			{
+				std::filesystem::path path = inFilename;
+				path.replace_filename(std::filesystem::path(get_child_texture(local_bsdf, "map")));
+				material.mInstanceInfo.mBumpTexture = path;
+
+				local_bsdf = local_bsdf->FirstChildElement("bsdf");
+				local_type = local_bsdf->Attribute("type");
+
+				gAssert(id == nullptr);
+				id = local_bsdf->Attribute("id");
+
+				return true;
+			}
+
+			return false;
+		};
+
+		while (true)
+		{
+			// Process adapters
+			bool changed = false;
+			changed |= process_twosided();
+			changed |= process_bumpmap();
+			if (!changed)
+				break;
 		}
 		
 		if (local_type == "diffuse")
 		{
-			material.mMaterialType = MaterialType::Diffuse;
-			
-			gVerify(std::sscanf(get_child_value(local_bsdf, "reflectance"), "%f, %f, %f", &material.mAlbedo.x, &material.mAlbedo.y, &material.mAlbedo.z) == 3);
+			material.mInstanceData.mMaterialType = MaterialType::Diffuse;
+
+			std::filesystem::path path = inFilename;
+			path.replace_filename(std::filesystem::path(get_child_texture(local_bsdf, "reflectance")));
+			material.mInstanceInfo.mAlbedoTexture = path;
+
+			if (material.mInstanceInfo.mAlbedoTexture.empty())
+				gVerify(std::sscanf(get_child_value(local_bsdf, "reflectance").data(), 
+					"%f, %f, %f", &material.mInstanceData.mAlbedo.x, &material.mInstanceData.mAlbedo.y, &material.mInstanceData.mAlbedo.z) == 3);
 		}
 		else if (local_type == "roughconductor")
 		{
-			material.mMaterialType = MaterialType::RoughConductor;
+			material.mInstanceData.mMaterialType = MaterialType::RoughConductor;
 
 			gAssert(std::string_view(get_child_value(local_bsdf, "distribution")) == "ggx"); // [TODO] Support beckmann?
 
-			gVerify(std::sscanf(get_child_value(local_bsdf, "alpha"), 
+			gVerify(std::sscanf(get_child_value(local_bsdf, "alpha").data(),
 				"%f", 
-				&material.mRoughnessAlpha) == 1);
+				&material.mInstanceData.mRoughnessAlpha) == 1);
 
-			gVerify(std::sscanf(get_child_value(local_bsdf, "specular_reflectance"), 
+			gVerify(std::sscanf(get_child_value(local_bsdf, "specular_reflectance").data(),
 				"%f, %f, %f", 
-				&material.mReflectance.x, &material.mReflectance.y, &material.mReflectance.z) == 3);
-			
-			gVerify(std::sscanf(get_child_value(local_bsdf, "eta"), 
-				"%f, %f, %f", 
-				&material.mEta.x, &material.mEta.y, &material.mEta.z) == 3);
-			
-			gVerify(std::sscanf(get_child_value(local_bsdf, "k"), 
-				"%f, %f, %f", 
-				&material.mK.x, &material.mK.y, &material.mK.z) == 3);
+				&material.mInstanceData.mReflectance.x, &material.mInstanceData.mReflectance.y, &material.mInstanceData.mReflectance.z) == 3);
+
+			gVerify(std::sscanf(get_child_value(local_bsdf, "eta").data(),
+				"%f, %f, %f",
+				&material.mInstanceData.mEta.x, &material.mInstanceData.mEta.y, &material.mInstanceData.mEta.z) == 3);
+
+			gVerify(std::sscanf(get_child_value(local_bsdf, "k").data(),
+				"%f, %f, %f",
+				&material.mInstanceData.mK.x, &material.mInstanceData.mK.y, &material.mInstanceData.mK.z) == 3);
+		}
+		else
+		{
+			material.mInstanceData.mMaterialType = MaterialType::Unsupported;
 		}
 
+		gAssert(id != nullptr);
+		material.mInstanceInfo.mMaterialName = id;
 		materials_by_id[id] = material;
 
 		bsdf = bsdf->NextSiblingElement("bsdf");
@@ -328,16 +400,34 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 	tinyxml2::XMLElement* shape = scene->FirstChildElement("shape");
 	while (shape != nullptr)
 	{
-		std::string_view type = shape->Attribute("type");
-		std::string_view id = shape->Attribute("id");
+		std::string_view type = null_to_empty(shape->Attribute("type"));
+		std::string_view id = null_to_empty(shape->Attribute("id"));
 
 		SceneContent* primitive = nullptr;
+		SceneContent loaded_primitive;
 		if (type == "cube")
+		{
 			primitive = &mPrimitives.mCube;
+			id = id.empty() ? "cube" : id;
+		}
 		else if (type == "rectangle")
+		{
 			primitive = &mPrimitives.mRectangle;
+			id = id.empty() ? "rectangle" : id;
+		}
 		else if (type == "sphere")
+		{
 			primitive = &mPrimitives.mSphere;
+			id = id.empty() ? "sphere" : id;
+		}
+		else if (type == "obj")
+		{
+			std::filesystem::path path = inFilename;
+			path.replace_filename(std::filesystem::path(get_child_value(shape, "filename")));
+			LoadObj(path.string(), glm::mat4x4(1.0f), loaded_primitive);
+			primitive = &loaded_primitive;
+			id = id.empty() ? "obj" : id;
+		}
 
 		if (primitive != nullptr)
 		{
@@ -398,8 +488,8 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 					auto iter = materials_by_id.find(material_id);
 					if (iter != materials_by_id.end())
 					{
-						instance_info.mMaterialName = material_id;
-						instance_data = iter->second;
+						instance_info = iter->second.mInstanceInfo;
+						instance_data = iter->second.mInstanceData;
 						found_material = true;
 					}
 				}
@@ -415,7 +505,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 					std::string_view emitter_type = emitter->Attribute("type");
 					gAssert(emitter_type == "area");
 
-					gVerify(std::sscanf(get_child_value(emitter, "radiance"),
+					gVerify(std::sscanf(get_child_value(emitter, "radiance").data(),
 						"%f, %f, %f",
 						&instance_data.mEmission.x, &instance_data.mEmission.y, &instance_data.mEmission.z) == 3);
 
@@ -452,7 +542,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 	tinyxml2::XMLElement* sensor = scene->FirstChildElement("sensor");
 	if (sensor != nullptr)
 	{
-		tinyxml2::XMLElement* transform = first_child_element_by_name_attribute(sensor, "to_world");
+		tinyxml2::XMLElement* transform = get_first_child_element_by_name(sensor, "to_world");
 		glm::mat4x4 matrix = glm::mat4x4(1.0f);
 		gVerify(std::sscanf(transform->FirstChildElement("matrix")->Attribute("value"),
 			"%f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f",
@@ -463,7 +553,8 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 		ioSceneContent.mCameraTransform = matrix;
 
 		float fov = 90.0f;
-		gVerify(std::sscanf(get_child_value(sensor, "fov"), "%f", &fov) == 1);
+		gVerify(std::sscanf(get_child_value(sensor, "fov").data(), 
+			"%f", &fov) == 1);
 		ioSceneContent.mFov = fov;
 	}
 
@@ -477,7 +568,7 @@ void Scene::FillDummyMaterial(InstanceInfo& ioInstanceInfo, InstanceData& ioInst
 	ioInstanceInfo.mMaterialName = "DummyMaterial";
 
 	ioInstanceData.mMaterialType = MaterialType::Diffuse;
-	ioInstanceData.mAlbedo = glm::vec3(0.18f, 0.18f, 0.18f);
+	ioInstanceData.mAlbedo = glm::vec3(0.0f, 0.0f, 0.0f);
 	ioInstanceData.mOpacity = 1.0f;
 	ioInstanceData.mEmission = glm::vec3(0.0f, 0.0f, 0.0f);
 	ioInstanceData.mReflectance = glm::vec3(0.0f, 0.0f, 0.0f);
@@ -513,8 +604,6 @@ void Scene::Load(const char* inFilename, const glm::mat4x4& inTransform)
 
 	assert(loaded);
 
-	if (mSceneContent.mLights.empty())
-		mSceneContent.mLights.push_back({});
 
 	InitializeBuffers();
 	InitializeAccelerationStructures();
@@ -605,13 +694,16 @@ void Scene::InitializeBuffers()
 	}
 
 	{
-		desc.Width = sizeof(Light) * mSceneContent.mLights.size();
+		std::vector<Light> dummy; dummy.push_back({}); // Avoid zero byte buffer
+		std::vector<Light>& lights = mSceneContent.mLights.empty() ? dummy : mSceneContent.mLights;
+
+		desc.Width = sizeof(Light) * lights.size();
 		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mBuffers.mLights)));
 		gSetName(mBuffers.mLights, "Scene", ".mBuffers.mLights");
 
 		uint8_t* pData = nullptr;
 		mBuffers.mLights->Map(0, nullptr, reinterpret_cast<void**>(&pData));
-		memcpy(pData, mSceneContent.mLights.data(), desc.Width);
+		memcpy(pData, lights.data(), desc.Width);
 		mBuffers.mLights->Unmap(0, nullptr);
 	}
 }
