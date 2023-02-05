@@ -9,6 +9,22 @@
 
 namespace MaterialEvaluation
 {
+	struct Source
+	{
+		static float3 Albedo(HitInfo inHitInfo)
+		{
+			uint albedo_texture_index = InstanceDatas[sGetInstanceID()].mAlbedoTextureIndex;
+			[branch]
+			if (albedo_texture_index != (uint)ViewDescriptorIndex::Invalid)
+			{
+				Texture2D<float4> albedo_texture = ResourceDescriptorHeap[albedo_texture_index];
+				return albedo_texture.SampleLevel(BilinearWrapSampler, inHitInfo.mUV, 0).rgb;
+			}
+
+			return InstanceDatas[sGetInstanceID()].mAlbedo;
+		}
+	};
+
 	struct Context
 	{
 		static Context Generate(float3 inL, float3 inN)
@@ -60,7 +76,7 @@ namespace MaterialEvaluation
 		void Evaluate(Context inContext, inout HitInfo ioHitInfo)
 		{
 			ioHitInfo.mReflectionDirection		= inContext.L;
-			ioHitInfo.mBSDF						= InstanceDatas[sGetInstanceID()].mAlbedo / MATH_PI;
+			ioHitInfo.mBSDF						= MaterialEvaluation::Source::Albedo(ioHitInfo) / MATH_PI;
 			ioHitInfo.mNdotL					= inContext.NdotL;
 			ioHitInfo.mSamplingPDF				= ComputePDF(inContext);
 			ioHitInfo.mDone						= false;

@@ -8,6 +8,7 @@
 #include "Thirdparty/tinyobjloader/tiny_obj_loader.h"
 #include "Thirdparty/tinyxml2/tinyxml2.h"
 #include "Thirdparty/tinygltf/tiny_gltf.h"
+#include "Thirdparty/tinygltf/stb_image.h"
 
 Scene gScene;
 
@@ -139,7 +140,7 @@ bool Scene::LoadDummy(SceneContent& ioSceneContent)
 	return true; 
 }
 
-bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransform, SceneContent& ioSceneContent)
+bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransform, bool inFlipV, SceneContent& ioSceneContent)
 {	
 	tinyobj::ObjReader reader;
 	if (!reader.ParseFromFile(inFilename))
@@ -190,7 +191,7 @@ bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransfor
 				{
 					ioSceneContent.mUVs.push_back(UVType(
 						reader.GetAttrib().texcoords[2 * idx.texcoord_index + 0],
-						reader.GetAttrib().texcoords[2 * idx.texcoord_index + 1]
+						inFlipV ? 1.0f - reader.GetAttrib().texcoords[2 * idx.texcoord_index + 1] : reader.GetAttrib().texcoords[2 * idx.texcoord_index + 1]
 					));
 				}
 			}
@@ -310,10 +311,31 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 		{
 			if (local_type == "twosided")
 			{
+				material.mInstanceData.mTwoSided = true;
+
 				local_bsdf = local_bsdf->FirstChildElement("bsdf");
 				local_type = local_bsdf->Attribute("type");
 
-				material.mInstanceData.mTwoSided = true;
+				return true;
+			}
+
+			return false;
+		};
+
+		auto process_mask = [&]()
+		{
+			if (local_type == "mask")
+			{
+				std::string_view opacity = get_child_value(local_bsdf, "opacity");
+				if (!opacity.empty())
+					gVerify(std::sscanf(opacity.data(),
+						"%f",
+						&material.mInstanceData.mOpacity) == 1);
+
+				// Could be texture
+
+				local_bsdf = local_bsdf->FirstChildElement("bsdf");
+				local_type = local_bsdf->Attribute("type");
 
 				return true;
 			}
@@ -346,6 +368,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 			// Process adapters
 			bool changed = false;
 			changed |= process_twosided();
+			changed |= process_mask();
 			changed |= process_bumpmap();
 			if (!changed)
 				break;
@@ -355,11 +378,13 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 		{
 			material.mInstanceData.mMaterialType = MaterialType::Diffuse;
 
-			std::filesystem::path path = inFilename;
-			path.replace_filename(std::filesystem::path(get_child_texture(local_bsdf, "reflectance")));
-			material.mInstanceInfo.mAlbedoTexture = path;
+			std::string_view reflectance = get_child_texture(local_bsdf, "reflectance");
 
-			if (material.mInstanceInfo.mAlbedoTexture.empty())
+			std::filesystem::path path = inFilename;
+			path.replace_filename(std::filesystem::path(reflectance));
+			material.mInstanceInfo.mAlbedoTexture = reflectance.empty() ? "" : path;
+
+			if (reflectance.empty())
 				gVerify(std::sscanf(get_child_value(local_bsdf, "reflectance").data(), 
 					"%f, %f, %f", &material.mInstanceData.mAlbedo.x, &material.mInstanceData.mAlbedo.y, &material.mInstanceData.mAlbedo.z) == 3);
 		}
@@ -424,7 +449,9 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 		{
 			std::filesystem::path path = inFilename;
 			path.replace_filename(std::filesystem::path(get_child_value(shape, "filename")));
-			LoadObj(path.string(), glm::mat4x4(1.0f), loaded_primitive);
+			// Note that mitsuba apply flip_tex_coords on .obj by default
+			// See flip_tex_coords https://mitsuba.readthedocs.io/en/stable/src/generated/plugins_shapes.html#wavefront-obj-mesh-loader-obj
+			LoadObj(path.string(), glm::mat4x4(1.0f), true, loaded_primitive);
 			primitive = &loaded_primitive;
 			id = id.empty() ? "obj" : id;
 		}
@@ -579,9 +606,9 @@ void Scene::FillDummyMaterial(InstanceInfo& ioInstanceInfo, InstanceData& ioInst
 
 void Scene::Load(const char* inFilename, const glm::mat4x4& inTransform)
 {
-	LoadObj("Asset/primitives/cube.obj", glm::mat4x4(1.0f), mPrimitives.mCube);
-	LoadObj("Asset/primitives/rectangle.obj", glm::mat4x4(1.0f), mPrimitives.mRectangle);
-	LoadObj("Asset/primitives/sphere.obj", glm::mat4x4(1.0f), mPrimitives.mSphere);
+	LoadObj("Asset/primitives/cube.obj", glm::mat4x4(1.0f), false, mPrimitives.mCube);
+	LoadObj("Asset/primitives/rectangle.obj", glm::mat4x4(1.0f), false, mPrimitives.mRectangle);
+	LoadObj("Asset/primitives/sphere.obj", glm::mat4x4(1.0f), false, mPrimitives.mSphere);
 
 	mSceneContent = {}; // Reset
 
@@ -594,7 +621,7 @@ void Scene::Load(const char* inFilename, const glm::mat4x4& inTransform)
 	bool try_load = std::filesystem::exists(filename_lower); 
 	
 	if (!loaded && try_load && filename_lower.ends_with(".obj"))
-		loaded |= LoadObj(filename_lower, inTransform, mSceneContent);
+		loaded |= LoadObj(filename_lower, inTransform, false, mSceneContent);
 
 	if (!loaded && try_load && filename_lower.ends_with(".xml"))
 		loaded |= LoadMitsuba(filename_lower, mSceneContent);
@@ -604,7 +631,7 @@ void Scene::Load(const char* inFilename, const glm::mat4x4& inTransform)
 
 	assert(loaded);
 
-
+	InitializeTextures();
 	InitializeBuffers();
 	InitializeAccelerationStructures();
 	InitializeShaderResourceViews();
@@ -617,18 +644,60 @@ void Scene::Unload()
 	mBlases = {};
 	mTLAS = {};
 	mBuffers = {};
+	mTextures = {};
+	mNextSRVIndex = 0;
 }
 
-void Scene::Build(ID3D12GraphicsCommandList4* inCommandList)
+void Scene::Build()
 {
 	for (auto&& blas : mBlases)
-		blas->Build(inCommandList);
+		blas->Build(gCommandList);
 
-	gBarrierUAV(inCommandList, nullptr);
+	gBarrierUAV(gCommandList, nullptr);
 
-	mTLAS->Build(inCommandList);
+	mTLAS->Build(gCommandList);
 
-	gBarrierUAV(inCommandList, nullptr);
+	gBarrierUAV(gCommandList, nullptr);
+}
+
+void Scene::Render()
+{
+	for (auto&& texture : mTextures)
+		texture.Update();
+}
+
+void Scene::InitializeTextures()
+{
+	std::map<std::string, Texture*> texture_map;
+	for (int i = 0; i < mSceneContent.mInstanceDatas.size(); i++)
+	{
+		InstanceInfo& instance_info = mSceneContent.mInstanceInfos[i];
+		InstanceData& instance_data = mSceneContent.mInstanceDatas[i];
+
+		if (instance_info.mAlbedoTexture.empty())
+			continue;
+
+		auto iter = texture_map.find(instance_info.mAlbedoTexture.string());
+		if (iter != texture_map.end())
+		{
+			instance_data.mAlbedoTextureIndex = (uint)iter->second->mSRVIndex;
+			continue;
+		}
+
+		int x,y,n;
+		stbi_info(instance_info.mAlbedoTexture.string().c_str(), &x, &y, &n);
+		mTextures.push_back({});
+		Texture& texture = mTextures.back();
+		texture.Width(x).Height(y).Format(DXGI_FORMAT_R8G8B8A8_UNORM_SRGB).SRVIndex(ViewDescriptorIndex((uint)ViewDescriptorIndex::SceneAutoSRV + mNextSRVIndex++)).
+			Name(instance_info.mAlbedoTexture.filename().string().c_str()).
+			Path(instance_info.mAlbedoTexture.wstring());
+		texture_map[instance_info.mAlbedoTexture.string()] = &texture;
+
+		instance_data.mAlbedoTextureIndex = (uint)texture.mSRVIndex;
+	}
+
+	for (auto&& texture : mTextures)
+		texture.Initialize();
 }
 
 void Scene::InitializeBuffers()

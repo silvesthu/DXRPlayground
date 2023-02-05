@@ -1,5 +1,6 @@
 #include "Common.h"
 #include "ImGui/imgui_impl_dx12.h"
+#include "Thirdparty/tinygltf/stb_image.h"
 
 #ifdef _MSC_VER
 #pragma comment(lib, "d3d12")
@@ -54,7 +55,7 @@ void Texture::Initialize()
 	gSetName(mResource, "", mName);
 
 	// SRV
-	gAssert(mSRVIndex != ViewDescriptorIndex::Count); // Need SRV for visualization
+	gAssert(mSRVIndex != ViewDescriptorIndex::Invalid); // Need SRV for visualization
 	{
 		for (int i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
 		{
@@ -69,7 +70,7 @@ void Texture::Initialize()
 	}
 
 	// UAV
-	if (mUAVIndex != ViewDescriptorIndex::Count)
+	if (mUAVIndex != ViewDescriptorIndex::Invalid)
 	{
 		for (int i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
 		{
@@ -98,26 +99,45 @@ void Texture::Initialize()
 
 void Texture::Update()
 {
-	// Upload from file
-	if (!mLoaded && mPath != nullptr)
+	if (mLoaded)
+		return;
+
+	// Load file
+	if (!mPath.empty())
 	{
-		// Load file
-		DirectX::ScratchImage scratch_image;
-		HRESULT hr = E_FAIL;
-		if (FAILED(hr))
-			hr = DirectX::LoadFromTGAFile(mPath, nullptr, scratch_image);
-		if (FAILED(hr))
-			hr = DirectX::LoadFromDDSFile(mPath, DirectX::DDS_FLAGS_NONE, nullptr, scratch_image);
-		gAssert(!FAILED(hr));
+		std::filesystem::path extension = mPath.extension();
+		if (extension == ".dds" || extension == ".tga")
+		{
+			DirectX::ScratchImage scratch_image;
+			HRESULT hr = E_FAIL;
+			if (extension == ".tga")
+				hr = DirectX::LoadFromTGAFile(mPath.c_str(), nullptr, scratch_image);
+			if (extension == ".dds")
+				hr = DirectX::LoadFromDDSFile(mPath.c_str(), DirectX::DDS_FLAGS_NONE, nullptr, scratch_image);
+			gAssert(!FAILED(hr));
 
-		// Upload
-		std::vector<D3D12_SUBRESOURCE_DATA> subresources;
-		PrepareUpload(gDevice, scratch_image.GetImages(), scratch_image.GetImageCount(), scratch_image.GetMetadata(), subresources);
-		InitializeUpload();
-		BarrierScope expected_scope(gCommandList, mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
-		UpdateSubresources(gCommandList, mResource.Get(), mUploadResource.Get(), 0, 0, mSubresourceCount, subresources.data());
+			// Upload
+			std::vector<D3D12_SUBRESOURCE_DATA> subresources;
+			PrepareUpload(gDevice, scratch_image.GetImages(), scratch_image.GetImageCount(), scratch_image.GetMetadata(), subresources);
+			InitializeUpload();
+			BarrierScope expected_scope(gCommandList, mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
+			UpdateSubresources(gCommandList, mResource.Get(), mUploadResource.Get(), 0, 0, mSubresourceCount, subresources.data());
 
-		mLoaded = true;
+			mLoaded = true;
+		}
+		else
+		{
+			int x, y, n;
+			unsigned char* data = stbi_load(mPath.string().c_str(), &x, &y, &n, 4);
+
+			mUploadData.resize(GetSubresourceSize());
+			glm::uint8* pixels = reinterpret_cast<glm::uint8*>(mUploadData.data());
+			uint byte_count = x * y * 4;
+			gAssert(byte_count <= mUploadData.size());
+			memcpy(pixels, data, byte_count);
+
+			stbi_image_free(data);
+		}
 	}
 
 	// Upload from raw data
@@ -132,6 +152,8 @@ void Texture::Update()
 		UpdateSubresources(gCommandList, mResource.Get(), mUploadResource.Get(), 0, 0, mSubresourceCount, &subresource);
 
 		mUploadData.clear();
+
+		mLoaded = true;
 	}
 }
 
@@ -176,7 +198,7 @@ namespace ImGui
 
 				ImGui::SameLine();
 				std::string text = "-----------------------------------\n";
-				text += inTexture.mName;
+				text += inTexture.mName + " (" + std::to_string((uint)inTexture.mSRVIndex) + ")";
 				text += "\n";
 				text += std::to_string(inTexture.mWidth) + " x " + std::to_string(inTexture.mHeight) + (inTexture.mDepth == 1 ? "" : " x " + std::to_string(inTexture.mDepth));
 				text += "\n";
@@ -194,7 +216,7 @@ namespace ImGui
 			{
 				gAssert(sTexture != nullptr);
 
-				ImGui::Text(sTexture->mName);
+				ImGui::Text(sTexture->mName.c_str());
 
 				if (ImGui::Button("Dump"))
 					gDumpTexture = sTexture;

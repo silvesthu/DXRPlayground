@@ -52,51 +52,51 @@ ROOT_SIGNATURE_SAMPLER
 float3 GetSunDirection() { return mConstants.mSunDirection.xyz; }
 
 // SRV Helper
-static RaytracingAccelerationStructure RaytracingScene = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RaytraceTLASSRV];
+static RaytracingAccelerationStructure RaytracingScene = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::RaytraceTLASSRV];
 
-static StructuredBuffer<InstanceData> InstanceDatas = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RaytraceInstanceDataSRV];
-static StructuredBuffer<uint> Indices = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RaytraceIndicesSRV];
-static StructuredBuffer<float3> Vertices = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RaytraceVerticesSRV];
-static StructuredBuffer<float3> Normals = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RaytraceNormalsSRV];
-static StructuredBuffer<float2> UVs = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RaytraceUVsSRV];
-static StructuredBuffer<Light> Lights = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RaytraceLightsSRV];
+static StructuredBuffer<InstanceData> InstanceDatas = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::RaytraceInstanceDataSRV];
+static StructuredBuffer<uint> Indices = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::RaytraceIndicesSRV];
+static StructuredBuffer<float3> Vertices = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::RaytraceVerticesSRV];
+static StructuredBuffer<float3> Normals = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::RaytraceNormalsSRV];
+static StructuredBuffer<float2> UVs = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::RaytraceUVsSRV];
+static StructuredBuffer<Light> Lights = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::RaytraceLightsSRV];
 
-static Texture2D<float4> TransmittanceSRV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Bruneton17TransmittanceSRV];
-static Texture2D<float4> DeltaIrradianceSRV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Bruneton17DeltaIrradianceSRV];
-static Texture2D<float4> IrradianceSRV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Bruneton17IrradianceSRV];
-static Texture3D<float4> DeltaRayleighScatteringSRV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Bruneton17DeltaRayleighScatteringSRV];
-static Texture3D<float4> DeltaMieScatteringSRV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Bruneton17DeltaMieScatteringSRV];
-static Texture3D<float4> ScatteringSRV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Bruneton17ScatteringSRV];
-static Texture3D<float4> DeltaScatteringDensitySRV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Bruneton17DeltaScatteringDensitySRV];
-static Texture2D<float4> TransmittanceTexSRV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Hillaire20TransmittanceTexSRV];
-static Texture2D<float4> MultiScattTexSRV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Hillaire20MultiScattSRV];
-static Texture2D<float4> SkyViewLutTexSRV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Hillaire20SkyViewLutSRV];
-static Texture3D<float4> AtmosphereCameraScatteringVolumeSRV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Hillaire20AtmosphereCameraScatteringVolumeSRV];
-static Texture2D<float4> Wilkie21SkyViewLutTexSRV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Wilkie21SkyViewSRV];
+static Texture2D<float4> TransmittanceSRV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Bruneton17TransmittanceSRV];
+static Texture2D<float4> DeltaIrradianceSRV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Bruneton17DeltaIrradianceSRV];
+static Texture2D<float4> IrradianceSRV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Bruneton17IrradianceSRV];
+static Texture3D<float4> DeltaRayleighScatteringSRV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Bruneton17DeltaRayleighScatteringSRV];
+static Texture3D<float4> DeltaMieScatteringSRV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Bruneton17DeltaMieScatteringSRV];
+static Texture3D<float4> ScatteringSRV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Bruneton17ScatteringSRV];
+static Texture3D<float4> DeltaScatteringDensitySRV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Bruneton17DeltaScatteringDensitySRV];
+static Texture2D<float4> TransmittanceTexSRV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Hillaire20TransmittanceTexSRV];
+static Texture2D<float4> MultiScattTexSRV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Hillaire20MultiScattSRV];
+static Texture2D<float4> SkyViewLutTexSRV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Hillaire20SkyViewLutSRV];
+static Texture3D<float4> AtmosphereCameraScatteringVolumeSRV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Hillaire20AtmosphereCameraScatteringVolumeSRV];
+static Texture2D<float4> Wilkie21SkyViewLutTexSRV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Wilkie21SkyViewSRV];
 
-static Texture3D<float4> CloudShapeNoiseSRV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::CloudShapeNoise3DSRV];
-static Texture3D<float4> CloudErosionNoiseSRV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::CloudErosionNoise3DSRV];
+static Texture3D<float4> CloudShapeNoiseSRV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::CloudShapeNoise3DSRV];
+static Texture3D<float4> CloudErosionNoiseSRV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::CloudErosionNoise3DSRV];
 
 // UAV Helper
-static RWTexture2D<float4> TransmittanceUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Bruneton17TransmittanceUAV];
-static RWTexture2D<float4> DeltaIrradianceUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Bruneton17DeltaIrradianceUAV];
-static RWTexture2D<float4> IrradianceUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Bruneton17IrradianceUAV];
-static RWTexture3D<float4> DeltaRayleighScatteringUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Bruneton17DeltaRayleighScatteringUAV];
-static RWTexture3D<float4> DeltaMieScatteringUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Bruneton17DeltaMieScatteringUAV];
-static RWTexture3D<float4> ScatteringUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Bruneton17ScatteringUAV];
-static RWTexture3D<float4> DeltaScatteringDensityUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Bruneton17DeltaScatteringDensityUAV];
-static RWTexture2D<float4> TransmittanceTexUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Hillaire20TransmittanceTexUAV];
-static RWTexture2D<float4> MultiScattTexUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Hillaire20MultiScattUAV];
-static RWTexture2D<float4> SkyViewLutTexUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Hillaire20SkyViewLutUAV];
-static RWTexture3D<float4> AtmosphereCameraScatteringVolumeUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Hillaire20AtmosphereCameraScatteringVolumeUAV];
-static RWTexture2D<float4> Wilkie21SkyViewLutTexUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::Wilkie21SkyViewUAV];
-static RWTexture2D<float4> RaytracingOutput = ResourceDescriptorHeap[(int)ViewDescriptorIndex::ScreenColorUAV];
-static RWTexture2D<float4> ScreenDebugUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::ScreenDebugUAV];
+static RWTexture2D<float4> TransmittanceUAV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Bruneton17TransmittanceUAV];
+static RWTexture2D<float4> DeltaIrradianceUAV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Bruneton17DeltaIrradianceUAV];
+static RWTexture2D<float4> IrradianceUAV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Bruneton17IrradianceUAV];
+static RWTexture3D<float4> DeltaRayleighScatteringUAV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Bruneton17DeltaRayleighScatteringUAV];
+static RWTexture3D<float4> DeltaMieScatteringUAV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Bruneton17DeltaMieScatteringUAV];
+static RWTexture3D<float4> ScatteringUAV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Bruneton17ScatteringUAV];
+static RWTexture3D<float4> DeltaScatteringDensityUAV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Bruneton17DeltaScatteringDensityUAV];
+static RWTexture2D<float4> TransmittanceTexUAV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Hillaire20TransmittanceTexUAV];
+static RWTexture2D<float4> MultiScattTexUAV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Hillaire20MultiScattUAV];
+static RWTexture2D<float4> SkyViewLutTexUAV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Hillaire20SkyViewLutUAV];
+static RWTexture3D<float4> AtmosphereCameraScatteringVolumeUAV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Hillaire20AtmosphereCameraScatteringVolumeUAV];
+static RWTexture2D<float4> Wilkie21SkyViewLutTexUAV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Wilkie21SkyViewUAV];
+static RWTexture2D<float4> RaytracingOutput = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::ScreenColorUAV];
+static RWTexture2D<float4> ScreenDebugUAV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::ScreenDebugUAV];
 
 // Samplers Helper
 #ifdef USE_DYNAMIC_RESOURCE_SAMPLER
-static SamplerState BilinearClampSampler = SamplerDescriptorHeap[(int)SamplerDescriptorIndex::BilinearClamp];
-static SamplerState BilinearWrapSampler = SamplerDescriptorHeap[(int)SamplerDescriptorIndex::BilinearWrap];
+static SamplerState BilinearClampSampler = SamplerDescriptorHeap[(uint)SamplerDescriptorIndex::BilinearClamp];
+static SamplerState BilinearWrapSampler = SamplerDescriptorHeap[(uint)SamplerDescriptorIndex::BilinearWrap];
 #else
 SamplerState BilinearClampSampler : register(s0);
 SamplerState BilinearWrapSampler : register(s1);

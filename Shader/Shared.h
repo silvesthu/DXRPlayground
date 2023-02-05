@@ -47,6 +47,8 @@ static const float kSolarLM2KW					= 1.0f / kSolarKW2LM;
 // Persistent Descriptor Heap Entries
 enum class ViewDescriptorIndex : uint
 {
+	Invalid,
+
 	// [ImGui]
 	ImGuiFont,
 	ImGuiNull2D,
@@ -130,7 +132,8 @@ enum class ViewDescriptorIndex : uint
 
 	Count,
 
-	SceneSRVBegin = Count,
+	SceneAutoSRV = Count,
+	// Indices after this are allocated incrementally by Scene
 };
 
 enum class SamplerDescriptorIndex : uint

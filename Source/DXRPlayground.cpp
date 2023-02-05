@@ -104,7 +104,7 @@ static void sDumpLuminance()
 static void sRender();
 static LRESULT WINAPI sWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
-static void sUpdateImGui()
+static void sPrepareImGui()
 {
 	std::string stat = std::format("Frame {} | Time {:.3f} s | Average {:.3f} ms (FPS {:.1f}) | {}x{}###DXRPlayground",
 		gConstants.mCurrentFrameIndex,
@@ -288,6 +288,7 @@ static void sUpdateImGui()
 		// Floating items
 		{
 			gRenderer.ImGuiShowTextures();
+			gScene.ImGuiShowTextures();
 			gAtmosphere.ImGuiShowTextures();
 			gCloud.ImGuiShowTextures();
 
@@ -308,7 +309,7 @@ static void sUpdateImGui()
 					ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mDebugInstanceMode), i);
 				}
 
-				static const int kColumnCount = 8;
+				static const int kColumnCount = 9;
 				if (ImGui::BeginTable("Table", kColumnCount, ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
 				{
 					{
@@ -322,6 +323,7 @@ static void sUpdateImGui()
 						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("Reflectance");
 						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("Emission");
 						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("RoughnessAlpha");
+						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("Opacity");
 						gAssert(column_index == kColumnCount);
 					}
 
@@ -352,7 +354,7 @@ static void sUpdateImGui()
 						ImGui::TableSetColumnIndex(column_index++);
 						std::string albedo = std::format("{:.2f} {:.2f} {:.2f}", instance_data.mAlbedo.x, instance_data.mAlbedo.y, instance_data.mAlbedo.z);
 						albedo = glm::dot(instance_data.mAlbedo, instance_data.mAlbedo) != 0.0f ? albedo : "";
-						albedo = instance_info.mAlbedoTexture.empty() ? albedo : instance_info.mAlbedoTexture.filename().string();
+						albedo = instance_info.mAlbedoTexture.empty() ? albedo : (instance_info.mAlbedoTexture.filename().string() + " (" + std::to_string(instance_data.mAlbedoTextureIndex) + ")");
 						ImGui::Text(albedo.c_str());
 
 						ImGui::TableSetColumnIndex(column_index++);
@@ -369,6 +371,10 @@ static void sUpdateImGui()
 						std::string roughness_alpha = std::format("{:.2f}", instance_data.mRoughnessAlpha);
 						roughness_alpha = instance_data.mMaterialType != MaterialType::Diffuse ? roughness_alpha : "";
 						ImGui::Text(roughness_alpha.c_str());
+
+						ImGui::TableSetColumnIndex(column_index++);
+						std::string opacity = std::format("{:.2f}", instance_data.mOpacity);
+						ImGui::Text(opacity.c_str());
 
 						gAssert(column_index == kColumnCount);
 					}
@@ -467,9 +473,6 @@ static void sUpdate()
 		glm::vec4 up = glm::vec4(glm::normalize(glm::cross(glm::vec3(right), glm::vec3(gConstants.mCameraDirection))), 0);
 		gConstants.mCameraUpExtend = up * horizontal_tan * (gDisplaySettings.mRenderResolution.y * 1.0f / gDisplaySettings.mRenderResolution.x);
 	}
-
-	// ImGUI
-	sUpdateImGui();
 
 	// Reload
 	if (gRenderer.mReloadShader)
@@ -652,7 +655,7 @@ void sLoadScene()
 
 	gScene.Unload();
 	gScene.Load(kScenePresets[current_scene_index].mPath, kScenePresets[current_scene_index].mTransform);
-	gScene.Build(gCommandList);
+	gScene.Build();
 
 	gConstants.mSunAzimuth = kScenePresets[current_scene_index].mSunAzimuth;
 	gConstants.mSunZenith = kScenePresets[current_scene_index].mSunZenith;
@@ -758,6 +761,13 @@ void sRender()
 		gBarrierTransition(gCommandList, gConstantGPUBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 	}
 
+	// Scene
+	{
+		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Scene");
+
+		gScene.Render();
+	}
+
 	// Atmosphere
 	{
 		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Atmosphere");
@@ -818,6 +828,8 @@ SkipRender:
 	// Draw ImGui
 	{
 		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "ImGui");
+
+		sPrepareImGui(); // Keep this right before render to get latest data
 
 		ImGui::Render();
 

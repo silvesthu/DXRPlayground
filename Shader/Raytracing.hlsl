@@ -15,44 +15,47 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	HitInfo hit_info = (HitInfo)0;
 	hit_info.mDone = true;
 
-	float3 barycentrics = float3(1.0 - attributes.barycentrics.x - attributes.barycentrics.y, attributes.barycentrics.x, attributes.barycentrics.y);
-
-	// Only support 32bit index for simplicity
-	// see https://github.com/microsoft/DirectX-Graphics-Samples/blob/master/Samples/Desktop/D3D12Raytracing/src/D3D12RaytracingSimpleLighting/Raytracing.hlsl for reference
-	uint index_count_per_triangle = 3;
-    uint base_index = sGetPrimitiveIndex() * index_count_per_triangle + InstanceDatas[sGetInstanceID()].mIndexOffset;
-	uint3 indices = uint3(Indices[base_index], Indices[base_index + 1], Indices[base_index + 2]);
-
 	// Vertex attributes
-	float3 vertices[3] = { Vertices[indices[0]], Vertices[indices[1]], Vertices[indices[2]] };
-	float3 vertex = vertices[0] * barycentrics.x + vertices[1] * barycentrics.y + vertices[2] * barycentrics.z;
-
-	float3 normals[3] = { Normals[indices[0]], Normals[indices[1]], Normals[indices[2]] };
-	float3 normal = normalize(normals[0] * barycentrics.x + normals[1] * barycentrics.y + normals[2] * barycentrics.z);
-    normal = normalize(mul((float3x3) InstanceDatas[sGetInstanceID()].mInverseTranspose, normal)); // Allow non-uniform scale
-
-	float2 uvs[3] = { UVs[indices[0]], UVs[indices[1]], UVs[indices[2]] };
-	float2 uv = uvs[0] * barycentrics.x + uvs[1] * barycentrics.y + uvs[2] * barycentrics.z;
-
-	// Handle back face
-	if (dot(normal, -sGetWorldRayDirection()) < 0)
 	{
-		if (InstanceDatas[sGetInstanceID()].mTwoSided)
-			normal = -normal;
-		else
-			return hit_info;
+		hit_info.mBarycentrics = float3(1.0 - attributes.barycentrics.x - attributes.barycentrics.y, attributes.barycentrics.x, attributes.barycentrics.y);
+
+		// Only support 32bit index for simplicity
+		// see https://github.com/microsoft/DirectX-Graphics-Samples/blob/master/Samples/Desktop/D3D12Raytracing/src/D3D12RaytracingSimpleLighting/Raytracing.hlsl for reference
+		uint index_count_per_triangle = 3;
+		uint base_index = sGetPrimitiveIndex() * index_count_per_triangle + InstanceDatas[sGetInstanceID()].mIndexOffset;
+		uint3 indices = uint3(Indices[base_index], Indices[base_index + 1], Indices[base_index + 2]);
+
+		float3 vertices[3] = { Vertices[indices[0]], Vertices[indices[1]], Vertices[indices[2]] };
+		hit_info.mVertexPositionOS = vertices[0] * hit_info.mBarycentrics.x + vertices[1] * hit_info.mBarycentrics.y + vertices[2] * hit_info.mBarycentrics.z;
+
+		float3 normals[3] = { Normals[indices[0]], Normals[indices[1]], Normals[indices[2]] };
+		float3 normal = normalize(normals[0] * hit_info.mBarycentrics.x + normals[1] * hit_info.mBarycentrics.y + normals[2] * hit_info.mBarycentrics.z);
+		hit_info.mVertexNormalOS = normal;
+		hit_info.mVertexNormalWS = normalize(mul((float3x3) InstanceDatas[sGetInstanceID()].mInverseTranspose, normal)); // Allow non-uniform scale
+
+		// Handle back face
+		if (dot(hit_info.mVertexNormalWS, -sGetWorldRayDirection()) < 0)
+		{
+			if (InstanceDatas[sGetInstanceID()].mTwoSided)
+				hit_info.mVertexNormalWS = -hit_info.mVertexNormalWS;
+			else
+				return hit_info;
+		}
+
+		float2 uvs[3] = { UVs[indices[0]], UVs[indices[1]], UVs[indices[2]] };
+		hit_info.mUV = uvs[0] * hit_info.mBarycentrics.x + uvs[1] * hit_info.mBarycentrics.y + uvs[2] * hit_info.mBarycentrics.z;
 	}
 
 	// Hit position
 	{
-		hit_info.mPosition = (sGetWorldRayOrigin() + sGetWorldRayDirection() * sGetRayTCurrent()) + normal * 0.001;
+		hit_info.mHitPositionWS = (sGetWorldRayOrigin() + sGetWorldRayDirection() * sGetRayTCurrent());
 	}
 
 	// Participating media
 	{
 		GetSkyLuminanceToPoint(hit_info.mInScattering, hit_info.mTransmittance);
 	}
-	
+
 	// Emission
 	{
 		hit_info.mEmission = InstanceDatas[sGetInstanceID()].mEmission * (kEmissionBoostScale * kPreExposure);
@@ -61,22 +64,22 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	// Reflection / Refraction
 	hit_info.mDone = InstanceDatas[sGetInstanceID()].mMaterialType == MaterialType::Light;
 	if (!hit_info.mDone)
-	{		
+	{
 		// Generate next sample based on material
-		float3 material_sample = MaterialEvaluation::GenerateSample(normal, payload);
-		float material_pdf = MaterialEvaluation::ComputePDF(material_sample, normal);
-		MaterialEvaluation::Evaluate(material_sample, normal, hit_info);
+		float3 material_sample = MaterialEvaluation::GenerateSample(hit_info.mVertexNormalWS, payload);
+		float material_pdf = MaterialEvaluation::ComputePDF(material_sample, hit_info.mVertexNormalWS);
+		MaterialEvaluation::Evaluate(material_sample, hit_info.mVertexNormalWS, hit_info);
 	}
 
 	// Debug - Global
 	switch (mConstants.mDebugMode)
 	{
 	case DebugMode::None:						break;
-	case DebugMode::Barycentrics: 				hit_info.mEmission = barycentrics; hit_info.mDone = true; break;
-	case DebugMode::Vertex: 					hit_info.mEmission = vertex; hit_info.mDone = true; break;
-	case DebugMode::Normal: 					hit_info.mEmission = normal * 0.5 + 0.5; hit_info.mDone = true; break;
-	case DebugMode::UV:							hit_info.mEmission = float3(uv, 0.0); hit_info.mDone = true; break;
-	case DebugMode::Albedo: 					hit_info.mEmission = InstanceDatas[sGetInstanceID()].mAlbedo; hit_info.mDone = true; break;
+	case DebugMode::Barycentrics: 				hit_info.mEmission = hit_info.mBarycentrics; hit_info.mDone = true; break;
+	case DebugMode::Vertex: 					hit_info.mEmission = hit_info.mVertexPositionOS; hit_info.mDone = true; break;
+	case DebugMode::Normal: 					hit_info.mEmission = hit_info.mVertexNormalWS * 0.5 + 0.5; hit_info.mDone = true; break;
+	case DebugMode::UV:							hit_info.mEmission = float3(hit_info.mUV, 0.0); hit_info.mDone = true; break;
+	case DebugMode::Albedo: 					hit_info.mEmission = MaterialEvaluation::Source::Albedo(hit_info); hit_info.mDone = true; break;
 	case DebugMode::Reflectance: 				hit_info.mEmission = InstanceDatas[sGetInstanceID()].mReflectance; hit_info.mDone = true; break;
 	case DebugMode::Emission: 					hit_info.mEmission = InstanceDatas[sGetInstanceID()].mEmission; hit_info.mDone = true; break;
 	case DebugMode::RoughnessAlpha: 			hit_info.mEmission = InstanceDatas[sGetInstanceID()].mRoughnessAlpha; hit_info.mDone = true; break;
@@ -92,8 +95,8 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	{
 		switch (mConstants.mDebugInstanceMode)
 		{
-		case DebugInstanceMode::Barycentrics:	hit_info.mEmission = barycentrics; hit_info.mDone = true; break;
-		case DebugInstanceMode::Mirror:			hit_info.mReflectionDirection = reflect(sGetWorldRayDirection(), normal); hit_info.mBSDF = 1; hit_info.mNdotL = dot(normal, hit_info.mReflectionDirection); hit_info.mSamplingPDF = 1; hit_info.mDone = false; break;
+		case DebugInstanceMode::Barycentrics:	hit_info.mEmission = hit_info.mBarycentrics; hit_info.mDone = true; break;
+		case DebugInstanceMode::Mirror:			hit_info.mReflectionDirection = reflect(sGetWorldRayDirection(), hit_info.mVertexNormalWS); hit_info.mBSDF = 1; hit_info.mNdotL = dot(hit_info.mVertexNormalWS, hit_info.mReflectionDirection); hit_info.mSamplingPDF = 1; hit_info.mDone = false; break;
 		default: break;
 		}
 	}
@@ -160,7 +163,7 @@ void TraceRay()
 				payload.mEmission = payload.mEmission + payload.mThroughput * hit_info.mTransmittance * hit_info.mEmission + hit_info.mInScattering;
 
 				// Next bounce
-				payload.mPosition = hit_info.mPosition;
+				payload.mPosition = hit_info.mHitPositionWS;
 				payload.mReflectionDirection = hit_info.mReflectionDirection;
 				payload.mThroughput = hit_info.mSamplingPDF <= 0 ? 0 : (payload.mThroughput * hit_info.mTransmittance * hit_info.mBSDF * hit_info.mNdotL / hit_info.mSamplingPDF);
 			}

@@ -77,7 +77,8 @@ public:
 	void Load(const char* inFilename, const glm::mat4x4& inTransform);
 	void Unload();
 
-	void Build(ID3D12GraphicsCommandList4* inCommandList);
+	void Build();
+	void Render();
 
 	const SceneContent& GetSceneContent() const					{ return mSceneContent; }
 
@@ -85,13 +86,16 @@ public:
 	const InstanceInfo& GetInstanceInfo(int inIndex) const		{ return mSceneContent.mInstanceInfos[inIndex]; }
 	const InstanceData& GetInstanceData(int inIndex) const		{ return mSceneContent.mInstanceDatas[inIndex]; }
 
+	void ImGuiShowTextures()									{ ImGui::Textures(mTextures, "Scene", ImGuiTreeNodeFlags_None); }
+
 private:
 	bool LoadDummy(SceneContent& ioContext);
-	bool LoadObj(const std::string& inFilename, const glm::mat4x4& inTransform, SceneContent& ioContext);
+	bool LoadObj(const std::string& inFilename, const glm::mat4x4& inTransform, bool inFlipV, SceneContent& ioContext);
 	bool LoadMitsuba(const std::string& inFilename, SceneContent& ioContext);
 
 	void FillDummyMaterial(InstanceInfo& ioInstanceInfo, InstanceData& ioInstanceData);
 	
+	void InitializeTextures();
 	void InitializeBuffers();
 	void InitializeAccelerationStructures();
 	void InitializeShaderResourceViews();
@@ -103,6 +107,7 @@ private:
 		SceneContent						mSphere;
 	};
 	Primitives								mPrimitives;
+
 	SceneContent							mSceneContent;
 
 	std::vector<BLASRef>					mBlases;
@@ -121,6 +126,7 @@ private:
 	Buffers									mBuffers;
 
 	std::vector<Texture>					mTextures;
+	uint									mNextSRVIndex = 0;
 };
 
 extern Scene gScene;

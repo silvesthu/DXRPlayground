@@ -237,9 +237,9 @@ void Atmosphere::Runtime::Hillaire20::Validate()
 		Shader& shader = inExpected.mDepth == 1 ? gRenderer.mRuntime.mDiffTexture2DShader : gRenderer.mRuntime.mDiffTexture3DShader;
 		gRenderer.Setup(shader);
 
-		gAssert(inComputed.mUAVIndex != ViewDescriptorIndex::Count);
-		gAssert(inExpected.mUAVIndex != ViewDescriptorIndex::Count);
-		gAssert(inOutput.mUAVIndex != ViewDescriptorIndex::Count);
+		gAssert(inComputed.mUAVIndex != ViewDescriptorIndex::Invalid);
+		gAssert(inExpected.mUAVIndex != ViewDescriptorIndex::Invalid);
+		gAssert(inOutput.mUAVIndex != ViewDescriptorIndex::Invalid);
 
 		gCommandList->SetComputeRoot32BitConstant((int)RootParameterIndex::ConstantsDiff, static_cast<UINT>(inComputed.mUAVIndex), 0);
 		gCommandList->SetComputeRoot32BitConstant((int)RootParameterIndex::ConstantsDiff, static_cast<UINT>(inExpected.mUAVIndex), 1);

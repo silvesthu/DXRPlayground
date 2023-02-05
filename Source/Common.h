@@ -280,8 +280,6 @@ struct DescriptorHeap
 
 	D3D12_CPU_DESCRIPTOR_HANDLE GetHandle(DescriptorIndex inIndex)
 	{
-		gAssert(inIndex < DescriptorIndex::Count);
-
 		D3D12_CPU_DESCRIPTOR_HANDLE handle = {};
 		handle = mCPUHandleStart;
 		handle.ptr += static_cast<int>(inIndex) * mIncrementSize;
@@ -290,8 +288,6 @@ struct DescriptorHeap
 
 	D3D12_GPU_DESCRIPTOR_HANDLE GetGPUHandle(DescriptorIndex inIndex)
 	{
-		gAssert(inIndex < DescriptorIndex::Count);
-
 		D3D12_GPU_DESCRIPTOR_HANDLE handle = {};
 		handle = mGPUHandleStart;
 		handle.ptr += static_cast<int>(inIndex) * mIncrementSize;
@@ -340,11 +336,11 @@ struct Texture
 	TEXTURE_MEMBER(glm::uint32, Height, 1);
 	TEXTURE_MEMBER(glm::uint32, Depth, 1);
 	TEXTURE_MEMBER(DXGI_FORMAT, Format, DXGI_FORMAT_R32G32B32A32_FLOAT);
-	TEXTURE_MEMBER(const char*, Name, nullptr);
+	TEXTURE_MEMBER(std::string, Name, "");
 	TEXTURE_MEMBER(float, UIScale, 0.0f);
-	TEXTURE_MEMBER(const wchar_t*, Path, nullptr);
-	TEXTURE_MEMBER(ViewDescriptorIndex, UAVIndex, ViewDescriptorIndex::Count);
-	TEXTURE_MEMBER(ViewDescriptorIndex, SRVIndex, ViewDescriptorIndex::Count);
+	TEXTURE_MEMBER(std::filesystem::path, Path, L"");
+	TEXTURE_MEMBER(ViewDescriptorIndex, UAVIndex, ViewDescriptorIndex::Invalid);
+	TEXTURE_MEMBER(ViewDescriptorIndex, SRVIndex, ViewDescriptorIndex::Invalid);
 	TEXTURE_MEMBER(DXGI_FORMAT, SRVFormat, DXGI_FORMAT_UNKNOWN);
 
 	Texture& Dimension(glm::uvec3 dimension) 

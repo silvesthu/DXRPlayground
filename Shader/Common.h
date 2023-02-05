@@ -7,7 +7,6 @@ struct HitInfo
 
     float3 mEmission;
 
-    float3 mPosition;
     float3 mReflectionDirection;
 
     float mSamplingPDF;
@@ -15,6 +14,14 @@ struct HitInfo
 	// Participating Media along the ray
     float3 mTransmittance;
     float3 mInScattering;
+
+    // [TODO] Refactor HitInfo
+    float3 mHitPositionWS;
+    float3 mBarycentrics;
+    float2 mUV;
+    float3 mVertexPositionOS;
+    float3 mVertexNormalOS;
+    float3 mVertexNormalWS;
 
     bool mDone;
 };
