@@ -7,9 +7,13 @@
 #include "Atmosphere.h"
 #include "Cloud.h"
 
-#include "Thirdparty/filewatch/FileWatch.hpp"
 #include "ImGui/imgui_impl_win32.h"
 #include "ImGui/imgui_impl_dx12.h"
+
+#pragma warning(push)
+#pragma warning(disable: 4068)
+#include "Thirdparty/filewatch/FileWatch.hpp"
+#pragma warning(pop)
 
 #define DX12_ENABLE_DEBUG_LAYER			(1)
 #define DX12_ENABLE_GBV					(1)
