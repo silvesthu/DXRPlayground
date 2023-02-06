@@ -59,6 +59,11 @@ HitInfo HitInternal(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
 	// Emission
 	{
 		hit_info.mEmission = InstanceDatas[sGetInstanceID()].mEmission * (kEmissionBoostScale * kPreExposure);
+
+		// IES
+		//float angle = acos(dot(-sGetWorldRayDirection(), float3(0,-1,0))) / MATH_PI;
+		//float ies = IESSRV.SampleLevel(BilinearClampSampler, float2(angle, 0), 0).x;
+		//hit_info.mEmission *= ies;
 	}
 
 	// Reflection / Refraction
@@ -226,7 +231,7 @@ void TraceRay()
 	{
 		float3 current_output = payload.mEmission;
 
-		float3 previous_output = RaytracingOutput[sGetDispatchRaysIndex().xy].xyz;
+		float3 previous_output = ScreenColorUAV[sGetDispatchRaysIndex().xy].xyz;
 		previous_output = max(0, previous_output); // Eliminate nan
 		float3 mixed_output = lerp(previous_output, current_output, mConstants.mCurrentFrameWeight);
 
@@ -239,7 +244,7 @@ void TraceRay()
 		if (mConstants.mDebugMode == DebugMode::RussianRouletteCount)
 			mixed_output = hsv2rgb(float3(max(0.0, (recursion * 1.0 - mConstants.mRecursionCountMax * 1.0)) / 10.0 /* for visualization only */, 1, 1));
 
-		RaytracingOutput[sGetDispatchRaysIndex().xy] = float4(mixed_output, 1);
+		ScreenColorUAV[sGetDispatchRaysIndex().xy] = float4(mixed_output, 1);
 	}
 }
 
@@ -252,7 +257,7 @@ void RayQueryCS(
 	uint inGroupIndex : SV_GroupIndex)
 {
 	uint2 output_dimensions;
-	RaytracingOutput.GetDimensions(output_dimensions.x, output_dimensions.y);
+	ScreenColorUAV.GetDimensions(output_dimensions.x, output_dimensions.y);
 
 	sDispatchRaysIndex.xyz = inDispatchThreadID.xyz;
 	sDispatchRaysDimensions = uint3(output_dimensions.xy, 1);

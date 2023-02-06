@@ -17,8 +17,13 @@ struct Renderer
 		Texture								mScreenColorTexture = Texture().Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(ViewDescriptorIndex::ScreenColorUAV).SRVIndex(ViewDescriptorIndex::ScreenColorSRV).Name("Renderer.ScreenColorTexture");
 		Texture								mScreenDebugTexture = Texture().Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(ViewDescriptorIndex::ScreenDebugUAV).SRVIndex(ViewDescriptorIndex::ScreenDebugSRV).Name("Renderer.ScreenDebugTexture");
 
+		Texture								mScreenSentinelTexture;
+		std::span<Texture>					mScreenTextures = std::span<Texture>(&mScreenColorTexture, &mScreenSentinelTexture);
+
+		Texture								mIESTexture = Texture().Width(256).Height(16).Format(DXGI_FORMAT_R32_FLOAT).SRVIndex(ViewDescriptorIndex::IESSRV).Name("Renderer.IES").Path(L"Asset/IES/007cfb11e343e2f42e3b476be4ab684e/IES.hdr");
+
 		Texture								mSentinelTexture;
-		std::span<Texture>					mTextures = std::span<Texture>(&mScreenColorTexture, &mSentinelTexture);
+		std::span<Texture>					mTextures = std::span<Texture>(&mIESTexture, &mSentinelTexture);
 
 		ComPtr<ID3D12Resource>				mBackBuffers[NUM_BACK_BUFFERS] = {};
 		D3D12_CPU_DESCRIPTOR_HANDLE			mBufferBufferRTVs[NUM_BACK_BUFFERS] = {};
@@ -27,6 +32,8 @@ struct Renderer
 
 	void									Initialize();
 	void									Finalize();
+
+	void									Render();
 
 	void									ImGuiShowTextures();
 

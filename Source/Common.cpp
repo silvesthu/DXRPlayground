@@ -125,10 +125,29 @@ void Texture::Update()
 
 			mLoaded = true;
 		}
+		else if (extension == ".hdr")
+		{
+			int color_count = (int)(DirectX::BitsPerPixel(mFormat) / DirectX::BitsPerColor(mFormat));
+			gAssert(1 <= color_count && color_count <= 4);
+
+			int x, y, n;
+			float* data = stbi_loadf(mPath.string().c_str(), &x, &y, &n, color_count);
+
+			mUploadData.resize(GetSubresourceSize());
+			glm::uint8* pixels = reinterpret_cast<glm::uint8*>(mUploadData.data());
+			uint byte_count = x * y * 4;
+			gAssert(byte_count <= mUploadData.size());
+			memcpy(pixels, data, byte_count);
+
+			stbi_image_free(data);
+		}
 		else
 		{
+			int color_count = (int)(DirectX::BitsPerPixel(mFormat) / DirectX::BitsPerColor(mFormat));
+			gAssert(1 <= color_count && color_count <= 4);
+
 			int x, y, n;
-			unsigned char* data = stbi_load(mPath.string().c_str(), &x, &y, &n, 4);
+			unsigned char* data = stbi_load(mPath.string().c_str(), &x, &y, &n, color_count);
 
 			mUploadData.resize(GetSubresourceSize());
 			glm::uint8* pixels = reinterpret_cast<glm::uint8*>(mUploadData.data());

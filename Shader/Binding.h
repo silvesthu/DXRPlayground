@@ -61,6 +61,8 @@ static StructuredBuffer<float3> Normals = ResourceDescriptorHeap[(uint)ViewDescr
 static StructuredBuffer<float2> UVs = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::RaytraceUVsSRV];
 static StructuredBuffer<Light> Lights = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::RaytraceLightsSRV];
 
+static Texture2D<float4> IESSRV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::IESSRV];
+
 static Texture2D<float4> TransmittanceSRV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Bruneton17TransmittanceSRV];
 static Texture2D<float4> DeltaIrradianceSRV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Bruneton17DeltaIrradianceSRV];
 static Texture2D<float4> IrradianceSRV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Bruneton17IrradianceSRV];
@@ -90,7 +92,7 @@ static RWTexture2D<float4> MultiScattTexUAV = ResourceDescriptorHeap[(uint)ViewD
 static RWTexture2D<float4> SkyViewLutTexUAV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Hillaire20SkyViewLutUAV];
 static RWTexture3D<float4> AtmosphereCameraScatteringVolumeUAV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Hillaire20AtmosphereCameraScatteringVolumeUAV];
 static RWTexture2D<float4> Wilkie21SkyViewLutTexUAV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Wilkie21SkyViewUAV];
-static RWTexture2D<float4> RaytracingOutput = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::ScreenColorUAV];
+static RWTexture2D<float4> ScreenColorUAV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::ScreenColorUAV];
 static RWTexture2D<float4> ScreenDebugUAV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::ScreenDebugUAV];
 
 // Samplers Helper

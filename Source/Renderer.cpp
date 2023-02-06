@@ -196,8 +196,11 @@ static bool sCreatePipelineState(Shader& ioSystemShader)
 
 void Renderer::Initialize()
 {
-	InitializeScreenSizeTextures();
 	InitializeShaders();
+	InitializeScreenSizeTextures();
+
+	for (auto&& texture : mRuntime.mTextures)
+		texture.Initialize();
 }
 
 void Renderer::Finalize()
@@ -207,8 +210,15 @@ void Renderer::Finalize()
 	mRuntime.Reset();
 }
 
+void Renderer::Render()
+{
+	for (auto&& texture : mRuntime.mTextures)
+		texture.Update();
+}
+
 void Renderer::ImGuiShowTextures()
 {
+	ImGui::Textures(mRuntime.mScreenTextures, "Renderer.Screen", ImGuiTreeNodeFlags_None);
 	ImGui::Textures(mRuntime.mTextures, "Renderer", ImGuiTreeNodeFlags_None);
 }
 
@@ -225,8 +235,8 @@ void Renderer::InitializeScreenSizeTextures()
 	DXGI_SWAP_CHAIN_DESC1 swap_chain_desc;
 	gSwapChain->GetDesc1(&swap_chain_desc);
 
-	gRenderer.mRuntime.mScreenColorTexture.Width(swap_chain_desc.Width).Height(swap_chain_desc.Height).Initialize();
-	gRenderer.mRuntime.mScreenDebugTexture.Width(swap_chain_desc.Width).Height(swap_chain_desc.Height).Initialize();
+	for (auto&& screen_texture : mRuntime.mScreenTextures)
+		screen_texture.Width(swap_chain_desc.Width).Height(swap_chain_desc.Height).Initialize();
 }
 
 void Renderer::FinalizeScreenSizeTextures()

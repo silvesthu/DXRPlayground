@@ -63,6 +63,9 @@ enum class ViewDescriptorIndex : uint
 	ScreenDebugUAV,
 	ScreenDebugSRV,
 
+	// [Misc]
+	IESSRV,
+
 	// [Raytrace] - [Input]
 	RaytraceTLASSRV,
 	RaytraceInstanceDataSRV,

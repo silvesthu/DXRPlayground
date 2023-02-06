@@ -49,10 +49,12 @@ enum class ScenePresetType
 	Bruneton17_Artifact_Mu,
 	Hillaire20,
 
+	IES,
+
 	Count,
 };
 
-static ScenePresetType sCurrentScene = ScenePresetType::LivingRoom2;
+static ScenePresetType sCurrentScene = ScenePresetType::CornellBox;
 static ScenePresetType sPreviousScene = sCurrentScene;
 static ScenePreset kScenePresets[(int)ScenePresetType::Count] =
 {
@@ -64,6 +66,8 @@ static ScenePreset kScenePresets[(int)ScenePresetType::Count] =
 	ScenePreset().Name("Bruneton17").Path("Asset/primitives/sphere.obj").CameraPosition(glm::vec4(0.0f, 0.0f, 9.0f, 0.0f)).CameraDirection(glm::vec4(0.0f, 0.0f, -1.0f, 0.0f)).Transform(glm::translate(glm::vec3(0.0f, 1.0f, 0.0f))).Atmosphere(AtmosphereMode::Bruneton17),
 	ScenePreset().Name("Bruneton17_Artifact_Mu").Path("Asset/primitives/sphere.obj").CameraPosition(glm::vec4(0.0f, 80.0f, 150.0f, 0.0f)).CameraDirection(glm::vec4(0.0f, 0.0f, -1.0f, 0.0f)).Transform(glm::scale(glm::vec3(100.0f, 100.0f, 100.0f))).Atmosphere(AtmosphereMode::Bruneton17),
 	ScenePreset().Name("Hillaire20").CameraPosition(glm::vec4(0.0f, 0.5, -1.0f, 0.0f)).CameraDirection(glm::vec4(0.0f, 0.0f, 1.0f, 0.0f)).HorizontalFovDegree(98.8514328f).Transform(glm::translate(glm::vec3(0.0f, 1.0f, 0.0f))).SunZenith(glm::pi<float>() / 2.0f - 0.45f).Atmosphere(AtmosphereMode::Hillaire20),
+
+	ScenePreset().Name("IES").Path("Asset/IES/007cfb11e343e2f42e3b476be4ab684e/scene_v3.xml"),
 };
 
 struct CameraSettings
@@ -763,6 +767,13 @@ void sRender()
 		gBarrierTransition(gCommandList, gConstantGPUBuffer.Get(), D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, D3D12_RESOURCE_STATE_COPY_DEST);
 		gCommandList->CopyResource(gConstantGPUBuffer.Get(), frame_context.mConstantUploadBuffer.Get());
 		gBarrierTransition(gCommandList, gConstantGPUBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+	}
+
+	// Scene
+	{
+		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Renderer");
+
+		gRenderer.Render();
 	}
 
 	// Scene
