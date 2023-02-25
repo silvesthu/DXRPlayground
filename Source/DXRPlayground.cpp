@@ -54,7 +54,7 @@ enum class ScenePresetType
 	Count,
 };
 
-static ScenePresetType sCurrentScene = ScenePresetType::CornellBox;
+static ScenePresetType sCurrentScene = ScenePresetType::VeachMIS;
 static ScenePresetType sPreviousScene = sCurrentScene;
 static ScenePreset kScenePresets[(int)ScenePresetType::Count] =
 {
@@ -141,14 +141,41 @@ static void sPrepareImGui()
 				gOpenDumpFolder();
 		}
 
+		if (ImGui::TreeNodeEx("Debug", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			ImGui::InputInt2("Coords", (int*)&gConstants.mDebugCoord);
+			ImGui::InputFloat3("Pixel Value", &gGetFrameContext().mDebugReadbackBufferPointer->mPixelValue.x, "%.8f", ImGuiInputTextFlags_ReadOnly);
+
+			if (ImGui::TreeNodeEx("Value Array"))
+			{
+				for (int i = 0; i < Debug::kValueArraySize; i++)
+					ImGui::InputFloat4(std::to_string(i).c_str(), &gGetFrameContext().mDebugReadbackBufferPointer->mValueArray[i].x, "%.8f", ImGuiInputTextFlags_ReadOnly);
+
+				ImGui::TreePop();
+			}
+
+			ImGui::TreePop();
+		}
+
 		if (ImGui::TreeNodeEx("Accumulation", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			if (ImGui::Checkbox("Infinity", &gRenderer.mAccumulationFrameInfinity))
+			if (ImGui::Checkbox("Frame Count -> Infinity", &gRenderer.mAccumulationFrameInfinity))
 				gRenderer.mAccumulationResetRequested = true;
 
 			if (!gRenderer.mAccumulationFrameInfinity)
-				if (ImGui::SliderInt("Count", reinterpret_cast<int*>(&gRenderer.mAccumulationFrameCount), 1, 64))
+				if (ImGui::SliderInt("Frame Count", reinterpret_cast<int*>(&gRenderer.mAccumulationFrameCount), 1, 64))
 					gRenderer.mAccumulationResetRequested = true;
+
+			ImGui::Text("Recursion Mode");
+			for (int i = 0; i < static_cast<int>(RecursionMode::Count); i++)
+			{
+				const auto& name = nameof::nameof_enum(static_cast<RecursionMode>(i));
+				ImGui::SameLine();
+				ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mRecursionMode), i);
+			}
+			ImGui::SliderInt("Recursion Count Max", reinterpret_cast<int*>(&gConstants.mRecursionCountMax), 0, 8);
+
+			ImGui::Checkbox("Use NEE", (bool*)&gConstants.mUseNEE);
 
 			ImGui::TreePop();
 		}
@@ -203,15 +230,6 @@ static void sPrepareImGui()
 
 		if (ImGui::TreeNodeEx("Render"))
 		{
-			ImGui::Text("Recursion Mode");
-			for (int i = 0; i < static_cast<int>(RecursionMode::Count); i++)
-			{
-				const auto& name = nameof::nameof_enum(static_cast<RecursionMode>(i));
-				ImGui::SameLine();
-				ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mRecursionMode), i);
-			}
-			ImGui::SliderInt("Recursion Count Max", reinterpret_cast<int*>(&gConstants.mRecursionCountMax), 0, 8);
-
 			for (int i = 0; i < static_cast<int>(DebugMode::Count); i++)
 			{
 				const auto& name = nameof::nameof_enum(static_cast<DebugMode>(i));
@@ -268,27 +286,20 @@ static void sPrepareImGui()
 		{
 			ImGui::Checkbox("Vsync", &gDisplaySettings.mVsync);
 
-			auto resize = [](int inWidth, int inHeight)
-			{
-				RECT rect = { 0, 0, inWidth, inHeight };
-				AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, false);
-				::SetWindowPos(::GetActiveWindow(), NULL, 0, 0, rect.right - rect.left, rect.bottom - rect.top, SWP_NOMOVE | SWP_NOOWNERZORDER | SWP_NOZORDER);
-			};
-
 			if (ImGui::Button("640 x 480"))
-				resize(640, 480);
+				gRenderer.Resize(640, 480);
 
 			if (ImGui::Button("800 x 600"))
-				resize(800, 600);
+				gRenderer.Resize(800, 600);
 
 			if (ImGui::Button("1280 x 720"))
-				resize(1280, 720);
+				gRenderer.Resize(1280, 720);
 
 			if (ImGui::Button("1280 x 800"))
-				resize(1280, 800);
+				gRenderer.Resize(1280, 800);
 
 			if (ImGui::Button("1920 x 1080"))
-				resize(1920, 1080);
+				gRenderer.Resize(1920, 1080);
 
 			ImGui::TreePop();
 		}
@@ -392,6 +403,62 @@ static void sPrepareImGui()
 				gConstants.mDebugInstanceIndex = glm::clamp(gConstants.mDebugInstanceIndex, -1, gScene.GetInstanceCount() - 1);
 			}
 			ImGui::End();
+
+			if (ImGui::Begin("Lights"))
+			{
+				static const int kColumnCount = 6;
+				if (ImGui::BeginTable("Table", kColumnCount, ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
+				{
+					{
+						int column_index = 0;
+						ImGui::TableNextRow(ImGuiTableRowFlags_Headers);
+						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("Index");
+						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("Name");
+						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("Position");
+						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("HalfExtends");
+						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("Type");
+						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("Emission");
+						gAssert(column_index == kColumnCount);
+					}
+
+					for (int row = 0; row < gScene.GetLightCount(); row++)
+					{
+						ImGui::TableNextRow();
+
+						const Light& light = gScene.GetLight(row);
+						const InstanceInfo& instance_info = gScene.GetInstanceInfo(light.mInstanceID);
+
+						int column_index = 0;
+
+						ImGui::TableSetColumnIndex(column_index++);
+						if (ImGui::Selectable(std::to_string(row).c_str(), row == gConstants.mDebugLightIndex, ImGuiSelectableFlags_SpanAllColumns))
+							gConstants.mDebugLightIndex = row;
+
+						ImGui::TableSetColumnIndex(column_index++);
+						ImGui::Text("%s", instance_info.mName.c_str());
+
+						ImGui::TableSetColumnIndex(column_index++);
+						std::string position = std::format("{:.2f} {:.2f} {:.2f}", light.mPosition.x, light.mPosition.y, light.mPosition.z);
+						ImGui::Text(position.c_str());
+
+						ImGui::TableSetColumnIndex(column_index++);
+						std::string half_extends = std::format("{:.2f} {:.2f}", light.mHalfExtends.x, light.mHalfExtends.y);
+						ImGui::Text(half_extends.c_str());
+
+						ImGui::TableSetColumnIndex(column_index++);
+						ImGui::Text("%s", NAMEOF_ENUM(light.mType).data());
+
+						ImGui::TableSetColumnIndex(column_index++);
+						std::string emission = std::format("{:.2f} {:.2f} {:.2f}", light.mEmission.x, light.mEmission.y, light.mEmission.z);
+						emission = glm::dot(light.mEmission, light.mEmission) != 0.0f ? emission : "";
+						ImGui::Text(emission.c_str());
+
+						gAssert(column_index == kColumnCount);
+					}
+					ImGui::EndTable();
+				}
+			}
+			ImGui::End();
 		}
 	}
 	ImGui::End();
@@ -399,6 +466,34 @@ static void sPrepareImGui()
 
 static void sUpdate()
 {
+	// Resize
+	if (gRenderer.mResizeWidth != 0)
+	{
+		RECT rect = { 0, 0, gRenderer.mResizeWidth, gRenderer.mResizeHeight };
+		AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, false);
+		::SetWindowPos(::GetActiveWindow(), NULL, 0, 0, rect.right - rect.left, rect.bottom - rect.top, SWP_NOMOVE | SWP_NOOWNERZORDER | SWP_NOZORDER);
+
+		gRenderer.mResizeWidth = 0;
+		gRenderer.mResizeHeight = 0;
+
+	}
+
+	// Reload
+	if (gRenderer.mReloadShader)
+	{
+		gRenderer.mReloadShader = false;
+
+		sWaitForGPU();
+
+		gRenderer.FinalizeShaders();
+		gRenderer.InitializeShaders();
+
+		gRenderer.mAccumulationResetRequested = true;
+
+		gAtmosphere.mRuntime.mBruneton17.mRecomputeRequested = true;
+		gCloud.mRecomputeRequested = true;
+	}
+
 	// Rotate Camera
 	{
 		static ImVec2 mouse_prev_position(0, 0);
@@ -469,10 +564,21 @@ static void sUpdate()
 
 		if (ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_F10))
 			gOpenDumpFolder();
+
+		if (!ImGui::IsAnyItemFocused() && ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_UpArrow))
+			gConstants.mDebugCoord -= uint2(0, 1);
+		if (!ImGui::IsAnyItemFocused() && ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_DownArrow))
+			gConstants.mDebugCoord += uint2(0, 1);
+		if (!ImGui::IsAnyItemFocused() && ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_LeftArrow))
+			gConstants.mDebugCoord -= uint2(1, 0);
+		if (!ImGui::IsAnyItemFocused() && ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_RightArrow))
+			gConstants.mDebugCoord += uint2(1, 0);
 	}
 
 	// Frustum
 	{
+		// Right-handed Y-up
+
 		float horizontal_tan = glm::tan(gCameraSettings.mHorizontalFovDegree * 0.5f * glm::pi<float>() / 180.0f);
 
 		glm::vec4 right = glm::vec4(glm::normalize(glm::cross(glm::vec3(gConstants.mCameraDirection), glm::vec3(0, 1, 0))), 0);
@@ -480,22 +586,6 @@ static void sUpdate()
 
 		glm::vec4 up = glm::vec4(glm::normalize(glm::cross(glm::vec3(right), glm::vec3(gConstants.mCameraDirection))), 0);
 		gConstants.mCameraUpExtend = up * horizontal_tan * (gDisplaySettings.mRenderResolution.y * 1.0f / gDisplaySettings.mRenderResolution.x);
-	}
-
-	// Reload
-	if (gRenderer.mReloadShader)
-	{
-		gRenderer.mReloadShader = false;
-
-		sWaitForGPU();
-
-		gRenderer.FinalizeShaders();
-		gRenderer.InitializeShaders();
-
-		gRenderer.mAccumulationResetRequested = true;
-
-		gAtmosphere.mRuntime.mBruneton17.mRecomputeRequested = true;
-		gCloud.mRecomputeRequested = true;
 	}
 
 	gAtmosphere.Update();
@@ -720,7 +810,9 @@ void sRender()
 			gConstants.mEV100			= glm::log2((gCameraSettings.mExposureControl.mAperture * gCameraSettings.mExposureControl.mAperture) / (1.0f / gCameraSettings.mExposureControl.mInvShutterSpeed) * 100.0f / gCameraSettings.mExposureControl.mSensitivity);
 			gConstants.mSunDirection	= glm::vec4(0,1,0,0) * glm::rotate(gConstants.mSunZenith, glm::vec3(0, 0, 1)) * glm::rotate(gConstants.mSunAzimuth + glm::pi<float>() / 2.0f, glm::vec3(0, 1, 0));
 			gConstants.mLightCount		= (glm::uint)gScene.GetSceneContent().mLights.size();
-			gConstants.mDebugCoord		= glm::uvec2(static_cast<glm::uint32>(ImGui::GetMousePos().x), (glm::uint32)ImGui::GetMousePos().y);
+
+			if (ImGui::IsMouseDown(ImGuiMouseButton_Middle))
+				gConstants.mDebugCoord	= glm::uvec2(static_cast<glm::uint32>(ImGui::GetMousePos().x), (glm::uint32)ImGui::GetMousePos().y);
 		}
 
 		// Accumulation
@@ -764,9 +856,9 @@ void sRender()
 			gConstants.mCurrentFrameIndex = gMin(gConstants.mCurrentFrameIndex, accumulation_frame_count - 1);
 		}
 
-		gBarrierTransition(gCommandList, gConstantGPUBuffer.Get(), D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, D3D12_RESOURCE_STATE_COPY_DEST);
-		gCommandList->CopyResource(gConstantGPUBuffer.Get(), frame_context.mConstantUploadBuffer.Get());
-		gBarrierTransition(gCommandList, gConstantGPUBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+		gBarrierTransition(gCommandList, gConstantBuffer.Get(), D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, D3D12_RESOURCE_STATE_COPY_DEST);
+		gCommandList->CopyResource(gConstantBuffer.Get(), frame_context.mConstantUploadBuffer.Get());
+		gBarrierTransition(gCommandList, gConstantBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 	}
 
 	// Scene
@@ -797,6 +889,16 @@ void sRender()
 		gCloud.Render();
 	}
 
+	// Clear
+	{
+		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Clear");
+
+		gRenderer.Setup(gRenderer.mRuntime.mClearShader.mData);
+		gCommandList->Dispatch(Debug::kValueArraySize / 64, 1, 1);
+
+		gBarrierUAV(gCommandList, nullptr);
+	}
+
 	// Raytrace
 	{
 		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Raytrace");
@@ -806,13 +908,14 @@ void sRender()
 
 		gRenderer.Setup(gRenderer.mRuntime.mRayQueryShader.mData);
 		gCommandList->Dispatch(swap_chain_desc.Width / 8, swap_chain_desc.Height / 8, 1);
+
+		gBarrierUAV(gCommandList, nullptr);
 	}
 
 	// Composite
 	{
 		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Composite");
 
-		gBarrierUAV(gCommandList, gRenderer.mRuntime.mScreenColorTexture.mResource.Get());
 		gBarrierTransition(gCommandList, back_buffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
 		// Draw
@@ -836,6 +939,15 @@ void sRender()
 
 		gRenderer.Setup(gRenderer.mRuntime.mCompositeShader);
 		gCommandList->DrawInstanced(3, 1, 0, 0);
+	}
+
+	// Readback
+	{
+		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Readback");
+
+		gBarrierTransition(gCommandList, gDebugBuffer.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_SOURCE);
+		gCommandList->CopyResource(frame_context.mDebugReadbackBuffer.Get(), gDebugBuffer.Get());
+		gBarrierTransition(gCommandList, gDebugBuffer.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COMMON);
 	}
 
 SkipRender:
@@ -878,7 +990,7 @@ SkipRender:
 		}
 	}
 
-	// Swap
+	// Present
 	{
 		if (gDisplaySettings.mVsync)
 			gSwapChain->Present(1, 0);
@@ -936,13 +1048,13 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		ComPtr<ID3D12Debug> dx12Debug = nullptr;
 		if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&dx12Debug))))
 			dx12Debug->EnableDebugLayer();
-	}
 
-	if (DX12_ENABLE_GBV)
-	{
-		ComPtr<ID3D12Debug1> dx12Debug1 = nullptr;
-		if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&dx12Debug1))))
-			dx12Debug1->SetEnableGPUBasedValidation(true);
+		if (DX12_ENABLE_GBV)
+		{
+			ComPtr<ID3D12Debug1> dx12Debug1 = nullptr;
+			if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&dx12Debug1))))
+				dx12Debug1->SetEnableGPUBasedValidation(true);
+		}
 	}
 
 	// Create device with highest feature level as possible
@@ -962,6 +1074,7 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		|| options5.RaytracingTier < D3D12_RAYTRACING_TIER_1_1)
 		return false;
 
+	// InfoQueue callback
 	if (DX12_ENABLE_INFO_QUEUE_CALLBACK)
 	{
 		ComPtr<ID3D12InfoQueue1> info_queue;
@@ -1038,15 +1151,28 @@ static bool sCreateDeviceD3D(HWND hWnd)
 
 		// UploadBuffer
 		{
-			D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(gAlignUp(static_cast<UINT>(sizeof(Constants)), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
+			D3D12_RESOURCE_DESC resource_desc = gGetBufferResourceDesc(gAlignUp(static_cast<UINT>(sizeof(Constants)), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
 			D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
 
-			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gFrameContexts[i].mConstantUploadBuffer)));
-			name = L"FrameContext.ConstantUpload_" + std::to_wstring(i);
+			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gFrameContexts[i].mConstantUploadBuffer)));
+			name = L"FrameContext.ConstantUploadBuffer_" + std::to_wstring(i);
 			gFrameContexts[i].mConstantUploadBuffer->SetName(name.c_str());
 
 			// Persistent map - https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12resource-map#advanced-usage-models
 			gFrameContexts[i].mConstantUploadBuffer->Map(0, nullptr, (void**)&gFrameContexts[i].mConstantUploadBufferPointer);
+		}
+
+		// ReadbackBuffer
+		{
+			D3D12_RESOURCE_DESC resource_desc = gGetBufferResourceDesc(gAlignUp(static_cast<UINT>(sizeof(Debug)), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
+			D3D12_HEAP_PROPERTIES props = gGetReadbackHeapProperties();
+
+			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&gFrameContexts[i].mDebugReadbackBuffer)));
+			name = L"FrameContext.DebugReadbackBuffer_" + std::to_wstring(i);
+			gFrameContexts[i].mDebugReadbackBuffer->SetName(name.c_str());
+
+			// Persistent map - https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12resource-map#advanced-usage-models
+			gFrameContexts[i].mDebugReadbackBuffer->Map(0, nullptr, (void**)&gFrameContexts[i].mDebugReadbackBufferPointer);
 		}
 	}
 
@@ -1057,26 +1183,44 @@ static bool sCreateDeviceD3D(HWND hWnd)
 			D3D12_RESOURCE_DESC resource_desc = gGetBufferResourceDesc(gAlignUp(static_cast<UINT>(sizeof(Constants)), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
 			D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
 
-			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&gConstantGPUBuffer)));
-			std::wstring name = L"Constant_GPU";
-			gConstantGPUBuffer->SetName(name.c_str());
+			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&gConstantBuffer)));
+			std::wstring name = L"ConstantBuffer";
+			gConstantBuffer->SetName(name.c_str());
 
 			D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
 			desc.SizeInBytes = static_cast<UINT>(resource_desc.Width);
-			desc.BufferLocation = gConstantGPUBuffer->GetGPUVirtualAddress();
+			desc.BufferLocation = gConstantBuffer->GetGPUVirtualAddress();
 			for (int i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
-			{
-				D3D12_CPU_DESCRIPTOR_HANDLE handle = gFrameContexts[i].mViewDescriptorHeap.GetHandle(ViewDescriptorIndex::Constants);
-				gDevice->CreateConstantBufferView(&desc, handle);
-			}
+				gDevice->CreateConstantBufferView(&desc, gFrameContexts[i].mViewDescriptorHeap.GetHandle(ViewDescriptorIndex::Constants));
+		}
+
+		{
+			D3D12_RESOURCE_DESC resource_desc = gGetBufferResourceDesc(gAlignUp(static_cast<UINT>(sizeof(Debug)), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
+			D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
+
+			resource_desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+
+			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&gDebugBuffer)));
+			std::wstring name = L"DebugBuffer";
+			gDebugBuffer->SetName(name.c_str());			
+
+			D3D12_UNORDERED_ACCESS_VIEW_DESC desc = {};
+			desc.Format = DXGI_FORMAT_UNKNOWN;
+			desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+			desc.Buffer.NumElements = 1;
+			desc.Buffer.StructureByteStride = sizeof(Debug);
+			desc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
+			for (int i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
+				gDevice->CreateUnorderedAccessView(gDebugBuffer.Get(), nullptr, &desc, gFrameContexts[i].mViewDescriptorHeap.GetHandle(ViewDescriptorIndex::BufferDebugUAV));
 		}
 	}
 
 	gValidate(gDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, gFrameContexts[0].mCommandAllocator.Get(), nullptr, IID_PPV_ARGS(&gCommandList)));
-	gCommandList->SetName(L"CommandList");
+	gCommandList->SetName(L"gCommandList");
 
 	if (gDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&gIncrementalFence)) != S_OK)
 		return false;
+	gIncrementalFence->SetName(L"gIncrementalFence");
 
 	gIncrementalFenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 	if (gIncrementalFenceEvent == nullptr)
@@ -1113,7 +1257,8 @@ static void sCleanupDeviceD3D()
 	for (UINT i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
 		gFrameContexts[i].Reset();
 
-	gConstantGPUBuffer = nullptr;
+	gConstantBuffer = nullptr;
+	gDebugBuffer = nullptr;
 	gSafeRelease(gCommandQueue);
 	gSafeRelease(gCommandList);
 	gSafeRelease(gRTVDescriptorHeap);

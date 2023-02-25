@@ -61,6 +61,8 @@ static StructuredBuffer<float3> Normals = ResourceDescriptorHeap[(uint)ViewDescr
 static StructuredBuffer<float2> UVs = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::RaytraceUVsSRV];
 static StructuredBuffer<Light> Lights = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::RaytraceLightsSRV];
 
+static RWStructuredBuffer<Debug> BufferDebugUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::BufferDebugUAV];
+
 static Texture2D<float4> IESSRV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::IESSRV];
 
 static Texture2D<float4> TransmittanceSRV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Bruneton17TransmittanceSRV];

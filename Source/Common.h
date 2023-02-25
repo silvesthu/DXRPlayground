@@ -191,16 +191,16 @@ inline void gValidate(HRESULT hr)
 }
 
 template <typename T>
-inline void gSetName(ComPtr<T>& inObject, std::wstring inBaseName, std::wstring inName)
+inline void gSetName(ComPtr<T>& inObject, std::wstring inPrefix, std::wstring inName, std::wstring inSuffix)
 {
-	std::wstring new_name = inBaseName + inName;
+	std::wstring new_name = inPrefix + inName + inSuffix;
 	inObject->SetName(new_name.c_str());
 }
 
 template <typename T>
-inline void gSetName(ComPtr<T>& inObject, std::string_view inBaseName, std::string_view inName)
+inline void gSetName(ComPtr<T>& inObject, std::string_view inPrefix, std::string_view inName, std::string_view inSuffix)
 {
-	gSetName(inObject, gToWString(inBaseName), gToWString(inName));
+	gSetName(inObject, gToWString(inPrefix), gToWString(inName), gToWString(inSuffix));
 }
 
 // System
@@ -387,14 +387,18 @@ public:
 	RuntimeBase& operator=(const RuntimeBase&&) = delete;
 };
 
-extern ComPtr<ID3D12Resource>				gConstantGPUBuffer;
+extern ComPtr<ID3D12Resource>				gConstantBuffer;
+extern ComPtr<ID3D12Resource>				gDebugBuffer;
 
 struct FrameContext
 {
 	ComPtr<ID3D12CommandAllocator>			mCommandAllocator;
 
 	ComPtr<ID3D12Resource>					mConstantUploadBuffer;
-	void*									mConstantUploadBufferPointer = nullptr;
+	Constants*								mConstantUploadBufferPointer = nullptr;
+
+	ComPtr<ID3D12Resource>					mDebugReadbackBuffer;
+	Debug*									mDebugReadbackBufferPointer = nullptr;
 
 	glm::uint64								mFenceValue = 0;
 
@@ -406,6 +410,8 @@ struct FrameContext
 		mCommandAllocator					= nullptr;
 		mConstantUploadBuffer				= nullptr;
 		mConstantUploadBufferPointer		= nullptr;
+		mDebugReadbackBuffer				= nullptr;
+		mDebugReadbackBufferPointer			= nullptr;
 		mFenceValue							= 0;
 		mViewDescriptorHeap.Reset();
 		mSamplerDescriptorHeap.Reset();
@@ -479,6 +485,15 @@ inline D3D12_HEAP_PROPERTIES gGetUploadHeapProperties()
 {
 	D3D12_HEAP_PROPERTIES props = {};
 	props.Type = D3D12_HEAP_TYPE_UPLOAD;
+	props.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+	props.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+	return props;
+}
+
+inline D3D12_HEAP_PROPERTIES gGetReadbackHeapProperties()
+{
+	D3D12_HEAP_PROPERTIES props = {};
+	props.Type = D3D12_HEAP_TYPE_READBACK;
 	props.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
 	props.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
 	return props;

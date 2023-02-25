@@ -307,9 +307,6 @@
     <CopyFileToFolders Include="Shader\Binding.h">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\Constant.h">
-      <Filter>Shader</Filter>
-    </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

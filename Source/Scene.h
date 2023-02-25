@@ -86,6 +86,9 @@ public:
 	const InstanceInfo& GetInstanceInfo(int inIndex) const		{ return mSceneContent.mInstanceInfos[inIndex]; }
 	const InstanceData& GetInstanceData(int inIndex) const		{ return mSceneContent.mInstanceDatas[inIndex]; }
 
+	int GetLightCount() const									{ return static_cast<int>(mSceneContent.mLights.size()); }
+	const Light& GetLight(int inIndex) const					{ return mSceneContent.mLights[inIndex]; }
+
 	void ImGuiShowTextures()									{ ImGui::Textures(mTextures, "Scene", ImGuiTreeNodeFlags_None); }
 
 private:

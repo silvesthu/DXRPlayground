@@ -1,6 +1,4 @@
 #pragma once
-
-#include "Constant.h"
 #include "Shared.h"
 #include "Binding.h"
 #include "Common.h"
@@ -11,90 +9,53 @@ namespace MaterialEvaluation
 {
 	struct Source
 	{
-		static float3 Albedo(HitInfo inHitInfo)
+		static float3 Albedo(HitContext inHitContext)
 		{
-			uint albedo_texture_index = InstanceDatas[sGetInstanceID()].mAlbedoTextureIndex;
+			uint albedo_texture_index = InstanceDatas[inHitContext.mInstanceID].mAlbedoTextureIndex;
 			[branch]
 			if (albedo_texture_index != (uint)ViewDescriptorIndex::Invalid)
 			{
 				Texture2D<float4> albedo_texture = ResourceDescriptorHeap[albedo_texture_index];
-				return albedo_texture.SampleLevel(BilinearWrapSampler, inHitInfo.mUV, 0).rgb;
+				return albedo_texture.SampleLevel(BilinearWrapSampler, inHitContext.mUV, 0).rgb;
 			}
 
-			return InstanceDatas[sGetInstanceID()].mAlbedo;
+			return InstanceDatas[inHitContext.mInstanceID].mAlbedo;
 		}
-	};
-
-	struct Context
-	{
-		static Context Generate(float3 inL, float3 inN)
-		{
-			Context context;
-
-			context.L = inL;
-			context.N = inN;
-			context.V = -sGetWorldRayDirection();
-			context.H = normalize((context.L + context.V) / 2.0);
-
-			context.NdotH = dot(context.N, context.H);
-			context.NdotV = dot(context.N, context.V);
-			context.NdotL = dot(context.N, context.L);
-			context.HdotV = dot(context.H, context.V);
-			context.HdotL = dot(context.H, context.L);
-
-			return context;
-		}
-
-		float3 L;
-		float3 N;
-		float3 V;
-		float3 H;
-
-		float NdotH;
-		float NdotV;
-		float NdotL;
-		float HdotV;
-		float HdotL;
 	};
 
 	namespace Lambert
 	{
-		float3 GenerateSample(float3x3 inTangentSpace, inout RayPayload payload)
+		float3 GenerateImportanceSamplingDirection(float3x3 inTangentSpace, HitContext inHitContext, inout PathContext ioPathContext)
 		{
-			float3 direction = RandomCosineDirection(payload.mRandomState);
+			float3 direction = RandomCosineDirection(ioPathContext.mRandomState);
 			return normalize(direction.x * inTangentSpace[0] + direction.y * inTangentSpace[1] + direction.z * inTangentSpace[2]);
 		}
 
-		float ComputePDF(Context inContext)
+		void SampleDirection(HitContext inHitContext, inout MaterialContext ioMaterialContext)
 		{
-			if (inContext.NdotL <= 0)
-				return 0;
-
-			return inContext.NdotL / MATH_PI;
+			ioMaterialContext.mBSDF = MaterialEvaluation::Source::Albedo(inHitContext) / MATH_PI;
+			ioMaterialContext.mBSDFPDF = ioMaterialContext.mNdotL / MATH_PI;
 		}
 
-		void Evaluate(Context inContext, inout HitInfo ioHitInfo)
+		void SampleBSDF(HitContext inHitContext, inout MaterialContext ioMaterialContext)
 		{
-			ioHitInfo.mReflectionDirection		= inContext.L;
-			ioHitInfo.mBSDF						= MaterialEvaluation::Source::Albedo(ioHitInfo) / MATH_PI;
-			ioHitInfo.mNdotL					= inContext.NdotL;
-			ioHitInfo.mSamplingPDF				= ComputePDF(inContext);
-			ioHitInfo.mDone						= false;
+			ioMaterialContext.mBSDF = MaterialEvaluation::Source::Albedo(inHitContext) / MATH_PI;
+			ioMaterialContext.mBSDFPDF = ioMaterialContext.mNdotL / MATH_PI;
 		}
 	};
 
 	namespace RoughConductor
 	{
-		float3 GenerateSample(float3x3 inTangentSpace, inout RayPayload payload)
+		float3 GenerateImportanceSamplingDirection(float3x3 inTangentSpace, HitContext inHitContext, inout PathContext ioPathContext)
 		{
-			float a = InstanceDatas[sGetInstanceID()].mRoughnessAlpha;
+			float a = InstanceDatas[inHitContext.mInstanceID].mRoughnessAlpha;
 			float a2 = a * a;
 
 			// Microfacet
 			float3 H; // Microfacet normal (Half-vector)
 			{
-				float e0 = RandomFloat01(payload.mRandomState);
-				float e1 = RandomFloat01(payload.mRandomState);
+				float e0 = RandomFloat01(ioPathContext.mRandomState);
+				float e1 = RandomFloat01(ioPathContext.mRandomState);
 
 				// 2D Distribution -> GGX Distribution (Polar)
 				float cos_theta = sqrt((1.0 - e0) / ((a2 - 1) * e0 + 1.0));
@@ -115,64 +76,125 @@ namespace MaterialEvaluation
 			return 2.0 * HdotV * H - V;
 		}
 
-		float ComputePDF(Context inContext)
+		void SampleDirection(HitContext inHitContext, inout MaterialContext ioMaterialContext)
 		{
-			if (inContext.NdotL <= 0 || inContext.NdotH <= 0 || inContext.HdotL <= 0)
-				return 0;
+			float D = D_GGX(ioMaterialContext.mNdotH, InstanceDatas[inHitContext.mInstanceID].mRoughnessAlpha);
+			float G = G_SmithGGX(ioMaterialContext.mNdotL, ioMaterialContext.mNdotV, InstanceDatas[inHitContext.mInstanceID].mRoughnessAlpha);
+			float3 F = F_Conductor_Mitsuba(InstanceDatas[inHitContext.mInstanceID].mEta, InstanceDatas[inHitContext.mInstanceID].mK, ioMaterialContext.mHdotV) * InstanceDatas[inHitContext.mInstanceID].mReflectance;
 
-			return inContext.NdotH / (4.0f * inContext.HdotL);
+			ioMaterialContext.mBSDF = D * G * F / (4.0f * ioMaterialContext.mNdotV * ioMaterialContext.mNdotL);
+			ioMaterialContext.mBSDFPDF = (D * ioMaterialContext.mNdotH) / (4.0f * ioMaterialContext.mHdotL);
 		}
 
-		void Evaluate(Context inContext, inout HitInfo ioHitInfo)
+		void SampleBSDF(HitContext inHitContext, inout MaterialContext ioMaterialContext)
 		{
-			float a							= InstanceDatas[sGetInstanceID()].mRoughnessAlpha;
-			float a2						= a * a;
+			float D = D_GGX(ioMaterialContext.mNdotH, InstanceDatas[inHitContext.mInstanceID].mRoughnessAlpha);
+			float G = G_SmithGGX(ioMaterialContext.mNdotL, ioMaterialContext.mNdotV, InstanceDatas[inHitContext.mInstanceID].mRoughnessAlpha);
+			float3 F = F_Conductor_Mitsuba(InstanceDatas[inHitContext.mInstanceID].mEta, InstanceDatas[inHitContext.mInstanceID].mK, ioMaterialContext.mHdotV) * InstanceDatas[inHitContext.mInstanceID].mReflectance;
 
-			float G							= G_SmithGGX(inContext.NdotL, inContext.NdotV, a2);
-			float3 F						= F_Conductor_Mitsuba(InstanceDatas[sGetInstanceID()].mEta, InstanceDatas[sGetInstanceID()].mK, inContext.HdotV);
-			F								*= InstanceDatas[sGetInstanceID()].mReflectance;
+			// [NOTE] Mitsuba3 use Non-height-correlated Smith-GGX, see smith_g1 use in roughconductor.cpp
+			// [NOTE] Mitsuba3 use Visible normal sampling by default which affects both D and pdf of D
 
-			ioHitInfo.mReflectionDirection	= inContext.L;
-			ioHitInfo.mBSDF					= G * F / (4.0f * inContext.NdotV * inContext.NdotL);
-			ioHitInfo.mNdotL				= inContext.NdotL;
-			ioHitInfo.mSamplingPDF			= ComputePDF(inContext);
-			ioHitInfo.mDone					= false;
+			ioMaterialContext.mBSDF = D * G * F / (4.0f * ioMaterialContext.mNdotV * ioMaterialContext.mNdotL);
+			// ioMaterialContext.mBSDF = D * (G * ioMaterialContext.mHdotV) * F / (ioMaterialContext.mNdotV * ioMaterialContext.mNdotH); // Same as in roughconductor.cpp but not match?
+			ioMaterialContext.mBSDFPDF = (D * ioMaterialContext.mNdotH) / (4.0f * ioMaterialContext.mHdotL);
 		}
 	}
 
-	float3 GenerateSample(float3 inNormal, inout RayPayload ioPayload)
+	float3 GenerateImportanceSamplingDirection(float3 inNormal, HitContext inHitContext, inout PathContext ioPathContext)
 	{
+		if (mConstants.mDebugInstanceIndex == inHitContext.mInstanceID && mConstants.mDebugInstanceMode == DebugInstanceMode::Mirror)
+			return reflect(inHitContext.mRayDirectionWS, inNormal);
+
 		float3x3 inTangentSpace = GenerateTangentSpace(inNormal);
 		[branch]
-		switch (InstanceDatas[sGetInstanceID()].mMaterialType)
+		switch (InstanceDatas[inHitContext.mInstanceID].mMaterialType)
 		{
-		case MaterialType::Diffuse:			return Lambert::GenerateSample(inTangentSpace, ioPayload);
-		case MaterialType::RoughConductor:	return RoughConductor::GenerateSample(inTangentSpace, ioPayload);
+		case MaterialType::Diffuse:			return Lambert::GenerateImportanceSamplingDirection(inTangentSpace, inHitContext, ioPathContext);
+		case MaterialType::RoughConductor:	return RoughConductor::GenerateImportanceSamplingDirection(inTangentSpace, inHitContext, ioPathContext);
 		default:							return 0;
 		}
 	}
 
-	float ComputePDF(float3 inLight, float3 inNormal)
+	void SampleDirection(HitContext inHitContext, inout MaterialContext ioMaterialContext)
 	{
-		Context context = Context::Generate(inLight, inNormal);
-		[branch]
-		switch (InstanceDatas[sGetInstanceID()].mMaterialType)
+		if (mConstants.mDebugInstanceIndex == inHitContext.mInstanceID && mConstants.mDebugInstanceMode == DebugInstanceMode::Barycentrics)
 		{
-		case MaterialType::Diffuse:			return Lambert::ComputePDF(context);
-		case MaterialType::RoughConductor:	return RoughConductor::ComputePDF(context);
-		default:							return 0;
+			ioMaterialContext.mBSDF = 0.0f;
+			ioMaterialContext.mBSDFPDF = 1.0f;
+			return;
 		}
-	}
 
-	void Evaluate(float3 inLight, float3 inNormal, inout HitInfo ioHitInfo)
-	{
-		Context context = Context::Generate(inLight, inNormal);
-		[branch]
-		switch (InstanceDatas[sGetInstanceID()].mMaterialType)
+		if (mConstants.mDebugInstanceIndex == inHitContext.mInstanceID && mConstants.mDebugInstanceMode == DebugInstanceMode::Mirror)
 		{
-		case MaterialType::Diffuse:			Lambert::Evaluate(context, ioHitInfo); break;
-		case MaterialType::RoughConductor:	RoughConductor::Evaluate(context, ioHitInfo); break;
+			ioMaterialContext.mBSDF = 1.0f;
+			ioMaterialContext.mBSDFPDF = 1.0f;
+			return;
+		}
+
+		if (!ioMaterialContext.IsValid())
+		{
+			ioMaterialContext.mBSDF = 0.0f;
+			ioMaterialContext.mBSDFPDF = 1.0f;
+			return;
+		}
+
+		[branch]
+		switch (InstanceDatas[inHitContext.mInstanceID].mMaterialType)
+		{
+		case MaterialType::Diffuse:			Lambert::SampleDirection(inHitContext, ioMaterialContext); break;
+		case MaterialType::RoughConductor:	RoughConductor::SampleDirection(inHitContext, ioMaterialContext); break;
 		default:							break;
 		}
+	}
+
+	void SampleBSDF(HitContext inHitContext, inout MaterialContext ioMaterialContext)
+	{
+		if (mConstants.mDebugInstanceIndex == inHitContext.mInstanceID && mConstants.mDebugInstanceMode == DebugInstanceMode::Barycentrics)
+		{
+			ioMaterialContext.mBSDF = 0.0f;
+			ioMaterialContext.mBSDFPDF = 1.0f;
+			return;
+		}
+
+		if (mConstants.mDebugInstanceIndex == inHitContext.mInstanceID && mConstants.mDebugInstanceMode == DebugInstanceMode::Mirror)
+		{
+			ioMaterialContext.mBSDF = 1.0f;
+			ioMaterialContext.mBSDFPDF = 1.0f;
+			return;
+		}
+
+		if (!ioMaterialContext.IsValid())
+		{
+			ioMaterialContext.mBSDF = 0.0f;
+			ioMaterialContext.mBSDFPDF = 1.0f;
+			return;
+		}
+
+		[branch]
+		switch (InstanceDatas[inHitContext.mInstanceID].mMaterialType)
+		{
+		case MaterialType::Diffuse:			Lambert::SampleBSDF(inHitContext, ioMaterialContext); break;
+		case MaterialType::RoughConductor:	RoughConductor::SampleBSDF(inHitContext, ioMaterialContext); break;
+		default:							break;
+		}
+	}
+
+	MaterialContext GenerateContext(float3 inLight, float3 inNormal, float3 inView, HitContext inHitContext)
+	{
+		MaterialContext material_context;
+
+		material_context.mL = inLight;
+		material_context.mN = inNormal;
+		material_context.mV = inView;
+		material_context.mH = normalize((inLight + inView) / 2.0);
+
+		material_context.mNdotH = dot(material_context.mN, material_context.mH);
+		material_context.mNdotV = dot(material_context.mN, material_context.mV);
+		material_context.mNdotL = dot(material_context.mN, material_context.mL);
+		material_context.mHdotV = dot(material_context.mH, material_context.mV);
+		material_context.mHdotL = dot(material_context.mH, material_context.mL);
+
+		return material_context;
 	}
 }

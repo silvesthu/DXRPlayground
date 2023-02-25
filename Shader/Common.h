@@ -1,31 +1,5 @@
 #pragma once
 
-struct HitInfo
-{
-    float3 mBSDF;
-    float mNdotL;
-
-    float3 mEmission;
-
-    float3 mReflectionDirection;
-
-    float mSamplingPDF;
-
-	// Participating Media along the ray
-    float3 mTransmittance;
-    float3 mInScattering;
-
-    // [TODO] Refactor HitInfo
-    float3 mHitPositionWS;
-    float3 mBarycentrics;
-    float2 mUV;
-    float3 mVertexPositionOS;
-    float3 mVertexNormalOS;
-    float3 mVertexNormalWS;
-
-    bool mDone;
-};
-
 float4 remap(float4 x, float4 a, float4 b, float4 c, float4 d)
 {
     return (((x - a) / (b - a)) * (d - c)) + c;
@@ -151,12 +125,31 @@ namespace MIS
     }
 }
 
-float G_SmithGGX(float inNoL, float inNoV, float inA2)
+// [Filament] https://google.github.io/filament/Filament.md.html#materialsystem/specularbrdf/normaldistributionfunction(speculard)
+float D_GGX(float inNoH, float inA)
 {
-    float denomA = inNoV * sqrt(inA2 + (1.0 - inA2) * inNoL * inNoL);
-    float denomB = inNoL * sqrt(inA2 + (1.0 - inA2) * inNoV * inNoV);
+    float a = inNoH * inA;
+    float k = inA / (1.0 - inNoH * inNoH + a * a);
+    return k * k * (1.0 / MATH_PI);
 
-    return 2.0 * inNoL * inNoV / (denomA + denomB);
+    // [Walter 2007] https://www.cs.cornell.edu/~srm/publications/EGSR07-btdf.pdf
+    // [TODO] Check VNDF
+}
+
+// [Schuttejoe 2018] https://schuttejoe.github.io/post/ggximportancesamplingpart1/
+float G_SmithGGX(float inNdotL, float inNdotV, float inA)
+{
+    float a = inA;
+    float a2 = a * a;
+
+    float denomA = inNdotV * sqrt(a2 + (1.0 - a2) * inNdotL * inNdotL);
+    float denomB = inNdotL * sqrt(a2 + (1.0 - a2) * inNdotV * inNdotV);
+
+    return 2.0 * inNdotL * inNdotV / (denomA + denomB);
+
+    // [Heitz 2014] original https://jcgt.org/published/0003/02/03/paper.pdf
+    // [Filament] V_SmithGGXCorrelated. Note that V = G / (4 * NdotL * NdotV) https://google.github.io/filament/Filament.md.html#materialsystem/specularbrdf/geometricshadowing(specularg)
+    // Also some implementation use tangent instead of cosine, and keep the lambda as it is.
 }
 
 float3 F_Schlick(float3 inR0, float inHoV)
@@ -164,11 +157,10 @@ float3 F_Schlick(float3 inR0, float inHoV)
     return inR0 + (1.0 - inR0) * pow(1.0 - inHoV, 5.0);
 }
 
+// [Mitsuba3] fresnel_conductor, fresnel.h
+// See also https://seblagarde.wordpress.com/2013/04/29/memo-on-fresnel-equations/
 float3 F_Conductor_Mitsuba(float3 inEta, float3 inK, float inCosTheta)
 {
-    // [Mitsuba3] From fresnel_conductor in fresnel.h
-    // See also https://seblagarde.wordpress.com/2013/04/29/memo-on-fresnel-equations/
-
     // Modified from "Optics" by K.D. Moeller, University Science Books, 1988
     float cos_theta_i_2 = inCosTheta * inCosTheta,
         sin_theta_i_2 = 1.f - cos_theta_i_2,
@@ -194,12 +186,11 @@ float3 F_Conductor_Mitsuba(float3 inEta, float3 inK, float inCosTheta)
     return 0.5f * (r_s + r_p);
 }
 
-// [2014][Heitz] Understanding the Masking-Shadowing Function in Microfacet-Based BRDFs
-// - https://jcgt.org/published/0003/02/03/
-// - https://google.github.io/filament/Filament.md.html#materialsystem/specularbrdf/geometricshadowing(specularg)
-float Vis_SmithGGXCorrelated(float inNoV, float inNoL, float inA2)
+// https://www.shadertoy.com/view/MsXfz4
+float3 uniformDirectionWithinCone(in float3 d, in float phi, in float sina, in float cosa)
 {
-    float GGXV = inNoL * sqrt(inNoV * inNoV * (1.0 - inA2) + inA2);
-    float GGXL = inNoV * sqrt(inNoL * inNoL * (1.0 - inA2) + inA2);
-    return 0.5 / (GGXV + GGXL);
+    float3 w = normalize(d);
+    float3 u = normalize(cross(w.yzx, w));
+    float3 v = cross(w, u);
+    return (u * cos(phi) + v * sin(phi)) * sina + w * cosa;
 }

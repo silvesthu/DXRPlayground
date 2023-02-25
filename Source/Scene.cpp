@@ -41,11 +41,11 @@ void BLAS::Initialize(const InstanceInfo& inInstanceInfo, const InstanceData& in
 	D3D12_RESOURCE_DESC desc = gGetUAVResourceDesc(info.ScratchDataSizeInBytes);
 
 	gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mScratch)));
-	gSetName(mScratch, inInstanceInfo.mName, "[BLAS].Scratch");
+	gSetName(mScratch, "Scene.", inInstanceInfo.mName, ".[BLAS].Scratch");
 
 	desc = gGetUAVResourceDesc(info.ResultDataMaxSizeInBytes);
 	gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, nullptr, IID_PPV_ARGS(&mDest)));
-	gSetName(mDest, inInstanceInfo.mName, "[BLAS].Dest");
+	gSetName(mDest, "Scene.", inInstanceInfo.mName, ".[BLAS].Dest");
 }
 
 void BLAS::Build(ID3D12GraphicsCommandList4* inCommandList)
@@ -87,21 +87,21 @@ void TLAS::Initialize(const std::string& inName, const std::vector<D3D12_RAYTRAC
 		D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
 		D3D12_RESOURCE_DESC desc = gGetUAVResourceDesc(info.ScratchDataSizeInBytes);
 		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mScratch)));
-		gSetName(mScratch, inName, "[TLAS].Scratch");
+		gSetName(mScratch, "Scene", inName, ".[TLAS].Scratch");
 	}
 
 	{
 		D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
 		D3D12_RESOURCE_DESC desc = gGetUAVResourceDesc(info.ResultDataMaxSizeInBytes);
 		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, nullptr, IID_PPV_ARGS(&mDest)));
-		gSetName(mDest, inName, "[TLAS].Dest");
+		gSetName(mDest, "Scene", inName, ".[TLAS].Dest");
 	}
 
 	{
 		D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
 		D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * inInstanceDescs.size());
 		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mInstanceDescs)));
-		gSetName(mInstanceDescs, inName, "[TLAS].InstanceDescs");
+		gSetName(mInstanceDescs, "Scene", inName, ".[TLAS].InstanceDescs");
 
 		uint8_t* pData = nullptr;
 		mInstanceDescs->Map(0, nullptr, reinterpret_cast<void**>(&pData));
@@ -536,7 +536,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 						"%f, %f, %f",
 						&instance_data.mEmission.x, &instance_data.mEmission.y, &instance_data.mEmission.z) == 3);
 
-					// [Hack]
+					instance_data.mMaterialType = MaterialType::Light;
 					instance_data.mTwoSided = false;
 
 					Light light;
@@ -545,8 +545,12 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 						light.mType = LightType::Sphere;
 					if (primitive == &mPrimitives.mRectangle)
 						light.mType = LightType::Rectangle;
+					light.mHalfExtends = glm::vec2(matrix[0][0], matrix[1][2]);
+					light.mInstanceID = static_cast<uint>(ioSceneContent.mInstanceDatas.size());
 					light.mPosition = matrix[3];
-					light.mRadius = matrix[0][0];
+					light.mRight = normalize(matrix[0]);
+					light.mUp = normalize(matrix[1]);
+					light.mEmission = instance_data.mEmission;
 					ioSceneContent.mLights.push_back(light);
 				}
 			}
@@ -556,7 +560,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 
 			instance_data.mTransform = matrix;
 			instance_data.mInverseTranspose = glm::transpose(glm::inverse(matrix));
-			instance_data.mVertexOffset = 0; // All vertices share same buffer. Only works indices fit in IndexType...
+			instance_data.mVertexOffset = 0; // Currently all vertices share same buffer. Only works indices fit in IndexType...
 			instance_data.mVertexCount = index_count;
 			instance_data.mIndexOffset = index_offset;
 			instance_data.mIndexCount = index_count;
@@ -710,7 +714,7 @@ void Scene::InitializeBuffers()
 	{
 		desc.Width = sizeof(IndexType) * mSceneContent.mIndices.size();
 		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mBuffers.mIndices)));
-		gSetName(mBuffers.mIndices, "Scene", ".mIndexBuffer");
+		gSetName(mBuffers.mIndices, "Scene.", "mBuffers.mIndices", "");
 
 		uint8_t* pData = nullptr;
 		mBuffers.mIndices->Map(0, nullptr, reinterpret_cast<void**>(&pData));
@@ -721,7 +725,7 @@ void Scene::InitializeBuffers()
 	{
 		desc.Width = sizeof(VertexType) * mSceneContent.mVertices.size();
 		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mBuffers.mVertices)));
-		gSetName(mBuffers.mVertices, "Scene", ".mBuffers.mVertices");
+		gSetName(mBuffers.mVertices, "Scene.", "mBuffers.mVertices", "");
 
 		uint8_t* pData = nullptr;
 		mBuffers.mVertices->Map(0, nullptr, reinterpret_cast<void**>(&pData));
@@ -732,7 +736,7 @@ void Scene::InitializeBuffers()
 	{
 		desc.Width = sizeof(NormalType) * mSceneContent.mNormals.size();
 		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mBuffers.mNormals)));
-		gSetName(mBuffers.mNormals, "Scene", ".mBuffers.mNormals");
+		gSetName(mBuffers.mNormals, "Scene.", "mBuffers.mNormals", "");
 
 		uint8_t* pData = nullptr;
 		mBuffers.mNormals->Map(0, nullptr, reinterpret_cast<void**>(&pData));
@@ -743,7 +747,7 @@ void Scene::InitializeBuffers()
 	{
 		desc.Width = sizeof(UVType) * mSceneContent.mUVs.size();
 		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mBuffers.mUVs)));
-		gSetName(mBuffers.mUVs, "Scene", ".mBuffers.mUVs");
+		gSetName(mBuffers.mUVs, "Scene.", "mBuffers.mUVs", "");
 
 		uint8_t* pData = nullptr;
 		mBuffers.mUVs->Map(0, nullptr, reinterpret_cast<void**>(&pData));
@@ -754,7 +758,7 @@ void Scene::InitializeBuffers()
 	{
 		desc.Width = sizeof(InstanceData) * mSceneContent.mInstanceDatas.size();
 		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mBuffers.mInstanceDatas)));
-		gSetName(mBuffers.mInstanceDatas, "Scene", ".mBuffers.mInstanceDatas");
+		gSetName(mBuffers.mInstanceDatas, "Scene.", "mBuffers.mInstanceDatas", "");
 
 		uint8_t* pData = nullptr;
 		mBuffers.mInstanceDatas->Map(0, nullptr, reinterpret_cast<void**>(&pData));
@@ -768,7 +772,7 @@ void Scene::InitializeBuffers()
 
 		desc.Width = sizeof(Light) * lights.size();
 		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mBuffers.mLights)));
-		gSetName(mBuffers.mLights, "Scene", ".mBuffers.mLights");
+		gSetName(mBuffers.mLights, "Scene.", "mBuffers.mLights", "");
 
 		uint8_t* pData = nullptr;
 		mBuffers.mLights->Map(0, nullptr, reinterpret_cast<void**>(&pData));

@@ -35,6 +35,7 @@ using float4x4 = glm::mat4x4;
 #define GENERATE_PAD_NAME CONCAT(mPad_, __LINE__)
 
 static const float MATH_PI						= 3.1415926535897932384626433832795f;
+static const float kEmissionBoostScale			= 1.0e4f;	// Boost emission to keep up with daylight
 static const float kPreExposure					= 1.0e-4f;	// Pre-exposure to improve float point precision
 
 // https://en.wikipedia.org/wiki/Luminous_efficacy
@@ -62,6 +63,9 @@ enum class ViewDescriptorIndex : uint
 	ScreenColorSRV,
 	ScreenDebugUAV,
 	ScreenDebugSRV,
+
+	// [Debug]
+	BufferDebugUAV,
 
 	// [Misc]
 	IESSRV,
@@ -162,7 +166,7 @@ enum class DebugMode : uint
 	_Newline0,
 
 	Barycentrics,
-	Vertex,
+	Position,
 	Normal,
 	UV,
 
@@ -181,7 +185,7 @@ enum class DebugMode : uint
 	_Newline3,
 
 	RecursionCount,
-	RussianRouletteCount,
+	DebugValue,
 
 	_Newline4,
 
@@ -313,15 +317,19 @@ struct InstanceData
 struct Light
 {
 	LightType					mType							CONSTANT_DEFAULT(LightType::Sphere);
-	float3						GENERATE_PAD_NAME				CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	float2						mHalfExtends					CONSTANT_DEFAULT(float2(0.0f, 0.0f));
+	uint						mInstanceID						CONSTANT_DEFAULT(0);
 
 	float3						mPosition						CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
-	float						mRadius							CONSTANT_DEFAULT(0);
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
 	float3						mRight							CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
 	float3						mUp								CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+
+	float3						mEmission						CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 };
 
@@ -329,9 +337,8 @@ struct RayState
 {
 	enum
 	{
-		None			= 0,
-		Done			= 1,
-		FirstHit		= 1 << 1,
+		None					= 0,
+		Done					= 1,
 	};
 
 	void						Set(uint inBits) { mBits |= inBits; }
@@ -342,19 +349,55 @@ struct RayState
 	uint						mBits;
 };
 
-struct RayPayload
+struct PathContext
 {
 	float3						mThroughput;					// [0, 1]		Accumulated throughput
 	float3						mEmission;						// [0, +inf]	Accumulated emission
 
-	float3						mPosition;
-	float3						mReflectionDirection;
-
 	uint						mRandomState;
-	RayState					mState;
+	uint						mRecursionCount;
+};
 
-	// Certain layout might cause driver crash on PSO generation
-	// See https://github.com/silvesthu/DirectX-Graphics-Samples/commit/9822cb8142629515f3768d2c36ff6695dba04838
+struct HitContext
+{
+	uint						mInstanceID;
+	uint						mPrimitiveIndex;
+
+	float3						mRayOriginWS;
+	float3						mRayDirectionWS;
+
+	float3						mHitPositionWS;
+	float3						mBarycentrics;
+	float2						mUV;
+	float3						mVertexPositionOS;
+	float3						mVertexNormalOS;
+	float3						mVertexNormalWS;
+};
+
+struct MaterialContext
+{
+	float3 mL;
+	float3 mN;
+	float3 mV;
+	float3 mH;
+
+	float mNdotH;
+	float mNdotV;
+	float mNdotL;
+	float mHdotV;
+	float mHdotL;
+
+	float3 mBSDF;
+	float mBSDFPDF;
+
+	bool IsValid()
+	{
+		return
+			mNdotV > 0 &&
+			mNdotL > 0 &&
+			mHdotV > 0 &&
+			mHdotL > 0;
+	}
 };
 
 struct DensityProfileLayer
@@ -475,15 +518,16 @@ struct Constants
 	float						mTime							CONSTANT_DEFAULT(0);
 
 	uint						mLightCount						CONSTANT_DEFAULT(0);
+	uint						mUseNEE							CONSTANT_DEFAULT(0);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
-	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+
 	float4						mSunDirection					CONSTANT_DEFAULT(float4(1.0f, 0.0f, 0.0f, 0.0f));
 
 	DebugMode					mDebugMode						CONSTANT_DEFAULT(DebugMode::None);
 	DebugInstanceMode			mDebugInstanceMode				CONSTANT_DEFAULT(DebugInstanceMode::None);
 	int							mDebugInstanceIndex				CONSTANT_DEFAULT(-1);
-	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	int							mDebugLightIndex				CONSTANT_DEFAULT(-1);
 
 	RecursionMode				mRecursionMode					CONSTANT_DEFAULT(RecursionMode::FixedCount);
 	uint						mRecursionCountMax				CONSTANT_DEFAULT(1);
@@ -496,6 +540,14 @@ struct Constants
 
 	AtmosphereConstants			mAtmosphere;
 	CloudConstants				mCloud;
+};
+
+struct Debug
+{
+	static const int			kValueArraySize = 256;
+
+	float4						mPixelValue						CONSTANT_DEFAULT(float4(0.0f, 0.0f, 0.0f, 0.0f));
+	float4						mValueArray[kValueArraySize];
 };
 
 #undef CONSTANT_DEFAULT

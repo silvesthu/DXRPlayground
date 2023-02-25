@@ -25,7 +25,8 @@ HANDLE                       		gSwapChainWaitableObject = nullptr;
 HMODULE								gPIXHandle = nullptr;
 
 // Application
-ComPtr<ID3D12Resource>				gConstantGPUBuffer = nullptr;
+ComPtr<ID3D12Resource>				gConstantBuffer = nullptr;
+ComPtr<ID3D12Resource>				gDebugBuffer = nullptr;
 
 // Frame
 FrameContext						gFrameContexts[NUM_FRAMES_IN_FLIGHT] = {};
@@ -52,7 +53,7 @@ void Texture::Initialize()
 	D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
 
 	gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mResource)));
-	gSetName(mResource, "", mName);
+	gSetName(mResource, "Texture.", mName, "");
 
 	// SRV
 	gAssert(mSRVIndex != ViewDescriptorIndex::Invalid); // Need SRV for visualization

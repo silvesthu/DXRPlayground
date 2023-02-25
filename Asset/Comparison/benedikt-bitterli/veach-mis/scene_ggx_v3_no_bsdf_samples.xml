@@ -8,7 +8,7 @@
 	<integrator type="$integrator">
 		<!-- <integer name="max_depth" value="$max_depth" /> -->
 		<!-- <integer name="emitter_samples" value="0" /> -->
-		<!-- <integer name="bsdf_samples" value="0" /> -->
+		<integer name="bsdf_samples" value="0" />
 	</integrator>
 	<sensor type="perspective">
 		<float name="fov" value="35" />
@@ -35,7 +35,6 @@
 		<bsdf type="roughconductor">
 			<float name="alpha" value="0.01" />
 			<string name="distribution" value="ggx" />
-			<boolean name="sample_visible" value="false" />
 			<rgb name="specular_reflectance" value="0.3, 0.3, 0.3" />
 			<rgb name="eta" value="0.200438, 0.924033, 1.10221" />
 			<rgb name="k" value="3.91295, 2.45285, 2.14219" />
@@ -45,7 +44,6 @@
 		<bsdf type="roughconductor">
 			<float name="alpha" value="0.05" />
 			<string name="distribution" value="ggx" />
-			<boolean name="sample_visible" value="false" />
 			<rgb name="specular_reflectance" value="0.3, 0.3, 0.3" />
 			<rgb name="eta" value="0.200438, 0.924033, 1.10221" />
 			<rgb name="k" value="3.91295, 2.45285, 2.14219" />
@@ -55,7 +53,6 @@
 		<bsdf type="roughconductor">
 			<float name="alpha" value="0.1" />
 			<string name="distribution" value="ggx" />
-			<boolean name="sample_visible" value="false" />
 			<rgb name="specular_reflectance" value="0.3, 0.3, 0.3" />
 			<rgb name="eta" value="0.200438, 0.924033, 1.10221" />
 			<rgb name="k" value="3.91295, 2.45285, 2.14219" />
@@ -70,7 +67,6 @@
 		<bsdf type="roughconductor">
 			<float name="alpha" value="0.25" />
 			<string name="distribution" value="ggx" />
-			<boolean name="sample_visible" value="false" />
 			<rgb name="specular_reflectance" value="0.3, 0.3, 0.3" />
 			<rgb name="eta" value="0.200438, 0.924033, 1.10221" />
 			<rgb name="k" value="3.91295, 2.45285, 2.14219" />

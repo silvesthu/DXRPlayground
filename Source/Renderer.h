@@ -7,6 +7,7 @@ struct Renderer
 	struct Runtime : RuntimeBase<Runtime>
 	{
 		Shader								mRayQueryShader = Shader().FileName("Shader/Raytracing.hlsl").CSName("RayQueryCS");
+		Shader								mClearShader = Shader().FileName("Shader/Composite.hlsl").CSName("ClearCS");
 		Shader								mDiffTexture2DShader = Shader().FileName("Shader/DiffTexture.hlsl").CSName("DiffTexture2DShader");
 		Shader								mDiffTexture3DShader = Shader().FileName("Shader/DiffTexture.hlsl").CSName("DiffTexture3DShader");
 		Shader								mCompositeShader = Shader().FileName("Shader/Composite.hlsl").VSName("ScreenspaceTriangleVS").PSName("CompositePS");
@@ -34,6 +35,12 @@ struct Renderer
 	void									Finalize();
 
 	void									Render();
+
+	void									Resize(int inWidth, int inHeight)
+	{
+		mResizeWidth = inWidth;
+		mResizeHeight = inHeight;
+	}
 
 	void									ImGuiShowTextures();
 
@@ -71,9 +78,9 @@ struct Renderer
 
 		// Root parameters need to be set after RootSignature
 		if (inGraphics)
-			gCommandList->SetGraphicsRootConstantBufferView((int)RootParameterIndex::Constants, gConstantGPUBuffer->GetGPUVirtualAddress());
+			gCommandList->SetGraphicsRootConstantBufferView((int)RootParameterIndex::Constants, gConstantBuffer->GetGPUVirtualAddress());
 		else
-			gCommandList->SetComputeRootConstantBufferView((int)RootParameterIndex::Constants, gConstantGPUBuffer->GetGPUVirtualAddress());
+			gCommandList->SetComputeRootConstantBufferView((int)RootParameterIndex::Constants, gConstantBuffer->GetGPUVirtualAddress());
 	}
 
 	bool									mReloadShader = false;
@@ -83,5 +90,8 @@ struct Renderer
 	bool									mAccumulationFrameInfinity = false;
 	glm::uint32								mAccumulationFrameCount = 64;
 	bool									mAccumulationResetRequested = false;
+
+	int										mResizeWidth = 0;
+	int										mResizeHeight = 0;
 };
 extern Renderer								gRenderer;

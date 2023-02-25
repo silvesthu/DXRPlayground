@@ -19,7 +19,6 @@
     <CopyFileToFolders Include="Shader\AtmosphereIntegration.Wilkie21.h">
       <FileType>Document</FileType>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\Constant.h" />
     <CopyFileToFolders Include="Shader\RayQuery.h">
       <FileType>Document</FileType>
     </CopyFileToFolders>

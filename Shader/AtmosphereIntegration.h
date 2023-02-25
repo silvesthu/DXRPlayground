@@ -209,7 +209,7 @@ float3 GetSkyLuminance()
 	switch (mConstants.mDebugMode)
 	{
 	case DebugMode::Barycentrics: 			return 0;
-	case DebugMode::Vertex: 				return PlanetRayDirection(); // rays are supposed to go infinity
+	case DebugMode::Position: 				return PlanetRayDirection(); // rays are supposed to go infinity
 	case DebugMode::Normal: 				return -PlanetRayDirection();
 	case DebugMode::Albedo: 				return 0;
 	case DebugMode::Reflectance: 			return 0;

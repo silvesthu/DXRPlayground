@@ -247,10 +247,8 @@ void Renderer::FinalizeScreenSizeTextures()
 
 void Renderer::InitializeShaders()
 {
-	sCreatePipelineState(gRenderer.mRuntime.mCompositeShader);
-	sCreatePipelineState(gRenderer.mRuntime.mRayQueryShader);
-	sCreatePipelineState(gRenderer.mRuntime.mDiffTexture2DShader);
-	sCreatePipelineState(gRenderer.mRuntime.mDiffTexture3DShader);
+	for (auto&& shader : gRenderer.mRuntime.mShaders)
+		sCreatePipelineState(shader);
 
 	for (auto&& shaders : gAtmosphere.mRuntime.mShadersSet)
 		for (auto&& shader : shaders)
