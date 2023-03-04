@@ -185,12 +185,3 @@ float3 F_Conductor_Mitsuba(float3 inEta, float3 inK, float inCosTheta)
 
     return 0.5f * (r_s + r_p);
 }
-
-// https://www.shadertoy.com/view/MsXfz4
-float3 uniformDirectionWithinCone(in float3 d, in float phi, in float sina, in float cosa)
-{
-    float3 w = normalize(d);
-    float3 u = normalize(cross(w.yzx, w));
-    float3 v = cross(w, u);
-    return (u * cos(phi) + v * sin(phi)) * sina + w * cosa;
-}
