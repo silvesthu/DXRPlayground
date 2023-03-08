@@ -186,7 +186,7 @@
     <ClInclude Include="Source\Thirdparty\tinyxml2\tinyxml2.h">
       <Filter>Source\Thirdparty\tinyxml2</Filter>
     </ClInclude>
-    <ClInclude Include="Shader\Material.h">
+    <ClInclude Include="Shader\BSDF.h">
       <Filter>Shader</Filter>
     </ClInclude>
     <ClInclude Include="Shader\Light.h">

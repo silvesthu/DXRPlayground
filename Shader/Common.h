@@ -111,17 +111,17 @@ float PhaseFunction_Isotropic()
 namespace MIS
 {
     // http://www.pbr-book.org/3ed-2018/Monte_Carlo_Integration/Importance_Sampling.html#PowerHeuristic
-    float PowerHeuristic(int nf, float fPdf, int ng, float gPdf, float power)
+    float PowerHeuristic(int nf, float fPdf, int ng, float gPdf)
     {
         float f = nf * fPdf;
         float g = ng * gPdf;
-        return pow(f, power) / (pow(f, power) + pow(g, power));
+        return (f * f) / (f * f + g * g);
     }
 
     // http://www.pbr-book.org/3ed-2018/Monte_Carlo_Integration/Importance_Sampling.html#BalanceHeuristic
     float BalanceHeuristic(int nf, float fPdf, int ng, float gPdf)
     {
-        return PowerHeuristic(nf, fPdf, ng, gPdf, 1.0);
+        return (nf * fPdf) / (nf * fPdf + ng * gPdf);
     }
 }
 

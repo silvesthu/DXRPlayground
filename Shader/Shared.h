@@ -194,6 +194,16 @@ enum class DebugMode : uint
 	Count
 };
 
+enum class PixelDebugMode : uint
+{
+	PositionWS,
+
+	LightPDFForBSDF,
+	LightPDFForLight,
+
+	Count
+};
+
 enum class RecursionMode : uint
 {
 	FixedCount = 0,
@@ -202,7 +212,16 @@ enum class RecursionMode : uint
 	Count
 };
 
-enum class MaterialType : uint
+enum class SampleMode : uint
+{
+	SampleBSDF = 0,
+	SampleLight,
+	MIS,
+
+	Count
+};
+
+enum class BSDFType : uint
 {
 	Light = 0,
 
@@ -279,16 +298,16 @@ struct InstanceData
 {
 	// [TODO] Split material
 
-	MaterialType				mMaterialType					CONSTANT_DEFAULT(MaterialType::Diffuse);
+	BSDFType					mBSDFType						CONSTANT_DEFAULT(BSDFType::Diffuse);
 	uint						mTwoSided						CONSTANT_DEFAULT(0);
 	float						mOpacity						CONSTANT_DEFAULT(1.0f);
-	float						mRoughnessAlpha					CONSTANT_DEFAULT(0.0f);
+	uint						mLightID						CONSTANT_DEFAULT(0);
 
     float3						mAlbedo							CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	uint						mAlbedoTextureIndex				CONSTANT_DEFAULT(0);
 
     float3						mReflectance					CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
-	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	float						mRoughnessAlpha					CONSTANT_DEFAULT(0.0f);
 
 	float3						mEta							CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
@@ -354,6 +373,8 @@ struct PathContext
 	float3						mThroughput;					// [0, 1]		Accumulated throughput
 	float3						mEmission;						// [0, +inf]	Accumulated emission
 
+	float						mPrevBSDFPDF;
+
 	uint						mRandomState;
 	uint						mRecursionCount;
 };
@@ -374,7 +395,7 @@ struct HitContext
 	float3						mVertexNormalWS;
 };
 
-struct MaterialContext
+struct BSDFContext
 {
 	float3 mL;
 	float3 mN;
@@ -518,7 +539,7 @@ struct Constants
 	float						mTime							CONSTANT_DEFAULT(0);
 
 	uint						mLightCount						CONSTANT_DEFAULT(0);
-	uint						mUseNEE							CONSTANT_DEFAULT(0);
+	SampleMode					mSampleMode						CONSTANT_DEFAULT(SampleMode::MIS);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
@@ -534,8 +555,8 @@ struct Constants
 	uint						mCurrentFrameIndex				CONSTANT_DEFAULT(0);
 	float						mCurrentFrameWeight				CONSTANT_DEFAULT(1);
 
-	uint2						mDebugCoord						CONSTANT_DEFAULT(uint2(0, 0));
-	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	uint2						mPixelDebugCoord				CONSTANT_DEFAULT(uint2(0, 0));
+	PixelDebugMode				mPixelDebugMode					CONSTANT_DEFAULT(PixelDebugMode::PositionWS);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
 	AtmosphereConstants			mAtmosphere;

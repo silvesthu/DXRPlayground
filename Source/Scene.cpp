@@ -208,15 +208,15 @@ bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransfor
 			const tinyobj::material_t& material = reader.GetMaterials()[shape.mesh.material_ids[0]];
 			instance_info.mMaterialName = material.name;
 
-			MaterialType type = MaterialType::Diffuse;
+			BSDFType type = BSDFType::Diffuse;
 			switch (material.illum)
 			{
 			case 0: [[fallthrough]];
-			case 1: type = MaterialType::Diffuse; break;
-			case 2: type = MaterialType::RoughConductor; break;
+			case 1: type = BSDFType::Diffuse; break;
+			case 2: type = BSDFType::RoughConductor; break;
 			default: break;
 			}
-			instance_data.mMaterialType = type;
+			instance_data.mBSDFType = type;
 			instance_data.mTwoSided = false;
 			instance_data.mAlbedo = glm::vec3(material.diffuse[0], material.diffuse[1], material.diffuse[2]);
 			instance_data.mOpacity = 1.0f;
@@ -290,17 +290,17 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 
 	tinyxml2::XMLElement* scene = doc.FirstChildElement("scene");
 
-	struct Material
+	struct BSDFInstance
 	{
 		InstanceInfo mInstanceInfo;
 		InstanceData mInstanceData;
 	};
 
-	std::unordered_map<std::string_view, Material> materials_by_id;
+	std::unordered_map<std::string_view, BSDFInstance> bsdf_instance_by_id;
 	tinyxml2::XMLElement* bsdf = scene->FirstChildElement("bsdf");
 	while (bsdf != nullptr)
 	{
-		Material material;
+		BSDFInstance bsdf_instance;
 
 		const char* id = bsdf->Attribute("id");
 
@@ -311,7 +311,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 		{
 			if (local_type == "twosided")
 			{
-				material.mInstanceData.mTwoSided = true;
+				bsdf_instance.mInstanceData.mTwoSided = true;
 
 				local_bsdf = local_bsdf->FirstChildElement("bsdf");
 				local_type = local_bsdf->Attribute("type");
@@ -330,7 +330,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 				if (!opacity.empty())
 					gVerify(std::sscanf(opacity.data(),
 						"%f",
-						&material.mInstanceData.mOpacity) == 1);
+						&bsdf_instance.mInstanceData.mOpacity) == 1);
 
 				// Could be texture
 
@@ -349,7 +349,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 			{
 				std::filesystem::path path = inFilename;
 				path.replace_filename(std::filesystem::path(get_child_texture(local_bsdf, "map")));
-				material.mInstanceInfo.mBumpTexture = path;
+				bsdf_instance.mInstanceInfo.mBumpTexture = path;
 
 				local_bsdf = local_bsdf->FirstChildElement("bsdf");
 				local_type = local_bsdf->Attribute("type");
@@ -376,48 +376,48 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 		
 		if (local_type == "diffuse")
 		{
-			material.mInstanceData.mMaterialType = MaterialType::Diffuse;
+			bsdf_instance.mInstanceData.mBSDFType = BSDFType::Diffuse;
 
 			std::string_view reflectance = get_child_texture(local_bsdf, "reflectance");
 
 			std::filesystem::path path = inFilename;
 			path.replace_filename(std::filesystem::path(reflectance));
-			material.mInstanceInfo.mAlbedoTexture = reflectance.empty() ? "" : path;
+			bsdf_instance.mInstanceInfo.mAlbedoTexture = reflectance.empty() ? "" : path;
 
 			if (reflectance.empty())
 				gVerify(std::sscanf(get_child_value(local_bsdf, "reflectance").data(), 
-					"%f, %f, %f", &material.mInstanceData.mAlbedo.x, &material.mInstanceData.mAlbedo.y, &material.mInstanceData.mAlbedo.z) == 3);
+					"%f, %f, %f", &bsdf_instance.mInstanceData.mAlbedo.x, &bsdf_instance.mInstanceData.mAlbedo.y, &bsdf_instance.mInstanceData.mAlbedo.z) == 3);
 		}
 		else if (local_type == "roughconductor")
 		{
-			material.mInstanceData.mMaterialType = MaterialType::RoughConductor;
+			bsdf_instance.mInstanceData.mBSDFType = BSDFType::RoughConductor;
 
 			gAssert(std::string_view(get_child_value(local_bsdf, "distribution")) == "ggx"); // [TODO] Support beckmann?
 
 			gVerify(std::sscanf(get_child_value(local_bsdf, "alpha").data(),
 				"%f", 
-				&material.mInstanceData.mRoughnessAlpha) == 1);
+				&bsdf_instance.mInstanceData.mRoughnessAlpha) == 1);
 
 			gVerify(std::sscanf(get_child_value(local_bsdf, "specular_reflectance").data(),
 				"%f, %f, %f", 
-				&material.mInstanceData.mReflectance.x, &material.mInstanceData.mReflectance.y, &material.mInstanceData.mReflectance.z) == 3);
+				&bsdf_instance.mInstanceData.mReflectance.x, &bsdf_instance.mInstanceData.mReflectance.y, &bsdf_instance.mInstanceData.mReflectance.z) == 3);
 
 			gVerify(std::sscanf(get_child_value(local_bsdf, "eta").data(),
 				"%f, %f, %f",
-				&material.mInstanceData.mEta.x, &material.mInstanceData.mEta.y, &material.mInstanceData.mEta.z) == 3);
+				&bsdf_instance.mInstanceData.mEta.x, &bsdf_instance.mInstanceData.mEta.y, &bsdf_instance.mInstanceData.mEta.z) == 3);
 
 			gVerify(std::sscanf(get_child_value(local_bsdf, "k").data(),
 				"%f, %f, %f",
-				&material.mInstanceData.mK.x, &material.mInstanceData.mK.y, &material.mInstanceData.mK.z) == 3);
+				&bsdf_instance.mInstanceData.mK.x, &bsdf_instance.mInstanceData.mK.y, &bsdf_instance.mInstanceData.mK.z) == 3);
 		}
 		else
 		{
-			material.mInstanceData.mMaterialType = MaterialType::Unsupported;
+			bsdf_instance.mInstanceData.mBSDFType = BSDFType::Unsupported;
 		}
 
 		gAssert(id != nullptr);
-		material.mInstanceInfo.mMaterialName = id;
-		materials_by_id[id] = material;
+		bsdf_instance.mInstanceInfo.mMaterialName = id;
+		bsdf_instance_by_id[id] = bsdf_instance;
 
 		bsdf = bsdf->NextSiblingElement("bsdf");
 	}
@@ -512,8 +512,8 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 				if (ref != nullptr)
 				{
 					std::string_view material_id = ref->Attribute("id");
-					auto iter = materials_by_id.find(material_id);
-					if (iter != materials_by_id.end())
+					auto iter = bsdf_instance_by_id.find(material_id);
+					if (iter != bsdf_instance_by_id.end())
 					{
 						instance_info = iter->second.mInstanceInfo;
 						instance_data = iter->second.mInstanceData;
@@ -536,8 +536,9 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 						"%f, %f, %f",
 						&instance_data.mEmission.x, &instance_data.mEmission.y, &instance_data.mEmission.z) == 3);
 
-					instance_data.mMaterialType = MaterialType::Light;
+					instance_data.mBSDFType = BSDFType::Light;
 					instance_data.mTwoSided = false;
+					instance_data.mLightID = static_cast<uint>(ioSceneContent.mLights.size());
 
 					Light light;
 					light.mType = LightType::Count;
@@ -598,7 +599,7 @@ void Scene::FillDummyMaterial(InstanceInfo& ioInstanceInfo, InstanceData& ioInst
 {
 	ioInstanceInfo.mMaterialName = "DummyMaterial";
 
-	ioInstanceData.mMaterialType = MaterialType::Diffuse;
+	ioInstanceData.mBSDFType = BSDFType::Diffuse;
 	ioInstanceData.mAlbedo = glm::vec3(0.0f, 0.0f, 0.0f);
 	ioInstanceData.mOpacity = 1.0f;
 	ioInstanceData.mEmission = glm::vec3(0.0f, 0.0f, 0.0f);

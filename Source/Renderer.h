@@ -87,7 +87,8 @@ struct Renderer
 	bool									mDumpDisassemblyRayQuery = false;
 
 	bool									mAccumulationDone = false;
-	bool									mAccumulationFrameInfinity = false;
+	bool									mAccumulationFrameUnlimited = false;
+	bool									mAccumulationPaused = false;
 	glm::uint32								mAccumulationFrameCount = 64;
 	bool									mAccumulationResetRequested = false;
 

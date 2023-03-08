@@ -1,0 +1,203 @@
+#pragma once
+#include "Shared.h"
+#include "Binding.h"
+#include "Common.h"
+
+#include "RayQuery.h"
+
+namespace BSDFEvaluation
+{
+	struct Source
+	{
+		static float3 Albedo(HitContext inHitContext)
+		{
+			uint albedo_texture_index = InstanceDatas[inHitContext.mInstanceID].mAlbedoTextureIndex;
+			[branch]
+			if (albedo_texture_index != (uint)ViewDescriptorIndex::Invalid)
+			{
+				Texture2D<float4> albedo_texture = ResourceDescriptorHeap[albedo_texture_index];
+				return albedo_texture.SampleLevel(BilinearWrapSampler, inHitContext.mUV, 0).rgb;
+			}
+
+			return InstanceDatas[inHitContext.mInstanceID].mAlbedo;
+		}
+	};
+
+	namespace Lambert
+	{
+		float3 GenerateImportanceSamplingDirection(float3x3 inTangentSpace, HitContext inHitContext, inout PathContext ioPathContext)
+		{
+			float3 direction = RandomCosineDirection(ioPathContext.mRandomState);
+			return normalize(direction.x * inTangentSpace[0] + direction.y * inTangentSpace[1] + direction.z * inTangentSpace[2]);
+		}
+
+		void SampleDirection(HitContext inHitContext, inout BSDFContext ioBSDFContext)
+		{
+			ioBSDFContext.mBSDF = BSDFEvaluation::Source::Albedo(inHitContext) / MATH_PI;
+			ioBSDFContext.mBSDFPDF = ioBSDFContext.mNdotL / MATH_PI;
+		}
+
+		void SampleBSDF(HitContext inHitContext, inout BSDFContext ioBSDFContext)
+		{
+			ioBSDFContext.mBSDF = BSDFEvaluation::Source::Albedo(inHitContext) / MATH_PI;
+			ioBSDFContext.mBSDFPDF = ioBSDFContext.mNdotL / MATH_PI;
+		}
+	};
+
+	namespace RoughConductor
+	{
+		float3 GenerateImportanceSamplingDirection(float3x3 inTangentSpace, HitContext inHitContext, inout PathContext ioPathContext)
+		{
+			float a = InstanceDatas[inHitContext.mInstanceID].mRoughnessAlpha;
+			float a2 = a * a;
+
+			// Microfacet
+			float3 H; // Microfacet normal (Half-vector)
+			{
+				float e0 = RandomFloat01(ioPathContext.mRandomState);
+				float e1 = RandomFloat01(ioPathContext.mRandomState);
+
+				// 2D Distribution -> GGX Distribution (Polar)
+				float cos_theta = sqrt((1.0 - e0) / ((a2 - 1) * e0 + 1.0));
+				float sin_theta = sqrt(1 - cos_theta * cos_theta);
+				float phi = 2 * MATH_PI * e1;
+
+				// Polar -> Cartesian
+				H.x = sin_theta * cos(phi);
+				H.y = sin_theta * sin(phi);
+				H.z = cos_theta;
+
+				// Tangent -> World
+				H = normalize(H.x * inTangentSpace[0] + H.y * inTangentSpace[1] + H.z * inTangentSpace[2]);
+			}
+
+			float3 V = -sGetWorldRayDirection();
+			float HdotV = dot(H, V);
+			return 2.0 * HdotV * H - V;
+		}
+
+		void SampleDirection(HitContext inHitContext, inout BSDFContext ioBSDFContext)
+		{
+			float D = D_GGX(ioBSDFContext.mNdotH, InstanceDatas[inHitContext.mInstanceID].mRoughnessAlpha);
+			float G = G_SmithGGX(ioBSDFContext.mNdotL, ioBSDFContext.mNdotV, InstanceDatas[inHitContext.mInstanceID].mRoughnessAlpha);
+			float3 F = F_Conductor_Mitsuba(InstanceDatas[inHitContext.mInstanceID].mEta, InstanceDatas[inHitContext.mInstanceID].mK, ioBSDFContext.mHdotV) * InstanceDatas[inHitContext.mInstanceID].mReflectance;
+
+			ioBSDFContext.mBSDF = D * G * F / (4.0f * ioBSDFContext.mNdotV * ioBSDFContext.mNdotL);
+			ioBSDFContext.mBSDFPDF = (D * ioBSDFContext.mNdotH) / (4.0f * ioBSDFContext.mHdotV);
+		}
+
+		void SampleBSDF(HitContext inHitContext, inout BSDFContext ioBSDFContext)
+		{
+			float D = D_GGX(ioBSDFContext.mNdotH, InstanceDatas[inHitContext.mInstanceID].mRoughnessAlpha);
+			float G = G_SmithGGX(ioBSDFContext.mNdotL, ioBSDFContext.mNdotV, InstanceDatas[inHitContext.mInstanceID].mRoughnessAlpha);
+			float3 F = F_Conductor_Mitsuba(InstanceDatas[inHitContext.mInstanceID].mEta, InstanceDatas[inHitContext.mInstanceID].mK, ioBSDFContext.mHdotV) * InstanceDatas[inHitContext.mInstanceID].mReflectance;
+
+			// [NOTE] Mitsuba3 use visible normal sampling by default which affects both BSDF and BSDFPDF
+			// [TODO] Visible normal sampling not compatible with height-correlated visibility term?
+
+			ioBSDFContext.mBSDF = D * G * F / (4.0f * ioBSDFContext.mNdotV * ioBSDFContext.mNdotL);
+			ioBSDFContext.mBSDFPDF = (D * ioBSDFContext.mNdotH) / (4.0f * ioBSDFContext.mHdotV);
+
+			// [NOTE] PBRT3 has wo as V, wi as L
+			// [NOTE] Mitsuba3 has wo as V, wi as L
+			// [NOTE] https://www.shadertoy.com/view/MsXfz4 has wi as V, wo as L
+		}
+	}
+
+	float3 GenerateImportanceSamplingDirection(float3 inNormal, HitContext inHitContext, inout PathContext ioPathContext)
+	{
+		if (mConstants.mDebugInstanceIndex == inHitContext.mInstanceID && mConstants.mDebugInstanceMode == DebugInstanceMode::Mirror)
+			return reflect(inHitContext.mRayDirectionWS, inNormal);
+
+		float3x3 inTangentSpace = GenerateTangentSpace(inNormal);
+		[branch]
+		switch (InstanceDatas[inHitContext.mInstanceID].mBSDFType)
+		{
+		case BSDFType::Diffuse:			return Lambert::GenerateImportanceSamplingDirection(inTangentSpace, inHitContext, ioPathContext);
+		case BSDFType::RoughConductor:	return RoughConductor::GenerateImportanceSamplingDirection(inTangentSpace, inHitContext, ioPathContext);
+		default:						return 0;
+		}
+	}
+
+	void SampleDirection(HitContext inHitContext, inout BSDFContext ioBSDFContext)
+	{
+		if (mConstants.mDebugInstanceIndex == inHitContext.mInstanceID && mConstants.mDebugInstanceMode == DebugInstanceMode::Barycentrics)
+		{
+			ioBSDFContext.mBSDF = 0.0f;
+			ioBSDFContext.mBSDFPDF = 1.0f;
+			return;
+		}
+
+		if (mConstants.mDebugInstanceIndex == inHitContext.mInstanceID && mConstants.mDebugInstanceMode == DebugInstanceMode::Mirror)
+		{
+			ioBSDFContext.mBSDF = 1.0f;
+			ioBSDFContext.mBSDFPDF = 1.0f;
+			return;
+		}
+
+		if (!ioBSDFContext.IsValid())
+		{
+			ioBSDFContext.mBSDF = 0.0f;
+			ioBSDFContext.mBSDFPDF = 1.0f;
+			return;
+		}
+
+		[branch]
+		switch (InstanceDatas[inHitContext.mInstanceID].mBSDFType)
+		{
+		case BSDFType::Diffuse:			Lambert::SampleDirection(inHitContext, ioBSDFContext); break;
+		case BSDFType::RoughConductor:	RoughConductor::SampleDirection(inHitContext, ioBSDFContext); break;
+		default:						break;
+		}
+	}
+
+	void SampleBSDF(HitContext inHitContext, inout BSDFContext ioBSDFContext)
+	{
+		if (mConstants.mDebugInstanceIndex == inHitContext.mInstanceID && mConstants.mDebugInstanceMode == DebugInstanceMode::Barycentrics)
+		{
+			ioBSDFContext.mBSDF = 0.0f;
+			ioBSDFContext.mBSDFPDF = 1.0f;
+			return;
+		}
+
+		if (mConstants.mDebugInstanceIndex == inHitContext.mInstanceID && mConstants.mDebugInstanceMode == DebugInstanceMode::Mirror)
+		{
+			ioBSDFContext.mBSDF = 1.0f;
+			ioBSDFContext.mBSDFPDF = 1.0f;
+			return;
+		}
+
+		if (!ioBSDFContext.IsValid())
+		{
+			ioBSDFContext.mBSDF = 0.0f;
+			ioBSDFContext.mBSDFPDF = 1.0f;
+			return;
+		}
+
+		[branch]
+		switch (InstanceDatas[inHitContext.mInstanceID].mBSDFType)
+		{
+		case BSDFType::Diffuse:			Lambert::SampleBSDF(inHitContext, ioBSDFContext); break;
+		case BSDFType::RoughConductor:	RoughConductor::SampleBSDF(inHitContext, ioBSDFContext); break;
+		default:						break;
+		}
+	}
+
+	BSDFContext GenerateContext(float3 inLight, float3 inNormal, float3 inView, HitContext inHitContext)
+	{
+		BSDFContext bsdf_context;
+
+		bsdf_context.mL = inLight;
+		bsdf_context.mN = inNormal;
+		bsdf_context.mV = inView;
+		bsdf_context.mH = normalize((inLight + inView) / 2.0);
+
+		bsdf_context.mNdotH = dot(bsdf_context.mN, bsdf_context.mH);
+		bsdf_context.mNdotV = dot(bsdf_context.mN, bsdf_context.mV);
+		bsdf_context.mNdotL = dot(bsdf_context.mN, bsdf_context.mL);
+		bsdf_context.mHdotV = dot(bsdf_context.mH, bsdf_context.mV);
+		bsdf_context.mHdotL = dot(bsdf_context.mH, bsdf_context.mL);
+
+		return bsdf_context;
+	}
+}

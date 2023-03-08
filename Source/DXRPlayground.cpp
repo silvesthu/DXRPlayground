@@ -143,10 +143,25 @@ static void sPrepareImGui()
 
 		if (ImGui::TreeNodeEx("Debug", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			ImGui::InputInt2("Coords", (int*)&gConstants.mDebugCoord);
+			ImGui::InputInt2("Coords", (int*)&gConstants.mPixelDebugCoord);
 			ImGui::InputFloat3("Pixel Value", &gGetFrameContext().mDebugReadbackBufferPointer->mPixelValue.x, "%.8f", ImGuiInputTextFlags_ReadOnly);
 
-			if (ImGui::TreeNodeEx("Value Array"))
+			for (int i = 0; i < static_cast<int>(PixelDebugMode::Count); i++)
+			{
+				const auto& name = nameof::nameof_enum(static_cast<PixelDebugMode>(i));
+				if (name[0] == '_')
+				{
+					ImGui::NewLine();
+					continue;
+				}
+
+				if (i != 0)
+					ImGui::SameLine();
+
+				ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mPixelDebugMode), i);
+			}
+
+			if (ImGui::TreeNodeEx("Pixel Debug Value for each hit"))
 			{
 				for (int i = 0; i < Debug::kValueArraySize; i++)
 					ImGui::InputFloat4(std::to_string(i).c_str(), &gGetFrameContext().mDebugReadbackBufferPointer->mValueArray[i].x, "%.8f", ImGuiInputTextFlags_ReadOnly);
@@ -157,12 +172,27 @@ static void sPrepareImGui()
 			ImGui::TreePop();
 		}
 
+		if (ImGui::TreeNodeEx("Sampling", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			ImGui::Text("Sample Mode");
+			for (int i = 0; i < static_cast<int>(SampleMode::Count); i++)
+			{
+				const auto& name = nameof::nameof_enum(static_cast<SampleMode>(i));
+				ImGui::SameLine();
+				ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mSampleMode), i);
+			}
+
+			ImGui::TreePop();
+		}
+
 		if (ImGui::TreeNodeEx("Accumulation", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			if (ImGui::Checkbox("Frame Count -> Infinity", &gRenderer.mAccumulationFrameInfinity))
+			if (ImGui::Checkbox("Frame Count Unlimited", &gRenderer.mAccumulationFrameUnlimited))
 				gRenderer.mAccumulationResetRequested = true;
+			ImGui::SameLine();
+			ImGui::Checkbox("Paused", &gRenderer.mAccumulationPaused);
 
-			if (!gRenderer.mAccumulationFrameInfinity)
+			if (!gRenderer.mAccumulationFrameUnlimited)
 				if (ImGui::SliderInt("Frame Count", reinterpret_cast<int*>(&gRenderer.mAccumulationFrameCount), 1, 64))
 					gRenderer.mAccumulationResetRequested = true;
 
@@ -174,8 +204,6 @@ static void sPrepareImGui()
 				ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mRecursionMode), i);
 			}
 			ImGui::SliderInt("Recursion Count Max", reinterpret_cast<int*>(&gConstants.mRecursionCountMax), 0, 8);
-
-			ImGui::Checkbox("Use NEE", (bool*)&gConstants.mUseNEE);
 
 			ImGui::TreePop();
 		}
@@ -337,7 +365,7 @@ static void sPrepareImGui()
 						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("Index");
 						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("Name");
 						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("Position");
-						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("MaterialType");
+						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("BSDFType");
 						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("Albedo");
 						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("Reflectance");
 						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("Emission");
@@ -368,7 +396,7 @@ static void sPrepareImGui()
 						ImGui::Text(position.c_str());
 
 						ImGui::TableSetColumnIndex(column_index++);
-						ImGui::Text("%s%s", NAMEOF_ENUM(instance_data.mMaterialType).data(), instance_data.mTwoSided ? " (TwoSided)" : "");
+						ImGui::Text("%s%s", NAMEOF_ENUM(instance_data.mBSDFType).data(), instance_data.mTwoSided ? " (TwoSided)" : "");
 
 						ImGui::TableSetColumnIndex(column_index++);
 						std::string albedo = std::format("{:.2f} {:.2f} {:.2f}", instance_data.mAlbedo.x, instance_data.mAlbedo.y, instance_data.mAlbedo.z);
@@ -388,7 +416,7 @@ static void sPrepareImGui()
 
 						ImGui::TableSetColumnIndex(column_index++);
 						std::string roughness_alpha = std::format("{:.2f}", instance_data.mRoughnessAlpha);
-						roughness_alpha = instance_data.mMaterialType != MaterialType::Diffuse ? roughness_alpha : "";
+						roughness_alpha = instance_data.mBSDFType != BSDFType::Diffuse ? roughness_alpha : "";
 						ImGui::Text(roughness_alpha.c_str());
 
 						ImGui::TableSetColumnIndex(column_index++);
@@ -566,13 +594,13 @@ static void sUpdate()
 			gOpenDumpFolder();
 
 		if (!ImGui::IsAnyItemFocused() && ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_UpArrow))
-			gConstants.mDebugCoord -= uint2(0, 1);
+			gConstants.mPixelDebugCoord -= uint2(0, 1);
 		if (!ImGui::IsAnyItemFocused() && ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_DownArrow))
-			gConstants.mDebugCoord += uint2(0, 1);
+			gConstants.mPixelDebugCoord += uint2(0, 1);
 		if (!ImGui::IsAnyItemFocused() && ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_LeftArrow))
-			gConstants.mDebugCoord -= uint2(1, 0);
+			gConstants.mPixelDebugCoord -= uint2(1, 0);
 		if (!ImGui::IsAnyItemFocused() && ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_RightArrow))
-			gConstants.mDebugCoord += uint2(1, 0);
+			gConstants.mPixelDebugCoord += uint2(1, 0);
 	}
 
 	// Frustum
@@ -812,7 +840,7 @@ void sRender()
 			gConstants.mLightCount		= (glm::uint)gScene.GetSceneContent().mLights.size();
 
 			if (ImGui::IsMouseDown(ImGuiMouseButton_Middle))
-				gConstants.mDebugCoord	= glm::uvec2(static_cast<glm::uint32>(ImGui::GetMousePos().x), (glm::uint32)ImGui::GetMousePos().y);
+				gConstants.mPixelDebugCoord	= glm::uvec2(static_cast<glm::uint32>(ImGui::GetMousePos().x), (glm::uint32)ImGui::GetMousePos().y);
 		}
 
 		// Accumulation
@@ -823,7 +851,7 @@ void sRender()
 			sConstantsCopy.mTime					= gConstants.mTime;
 			sConstantsCopy.mCurrentFrameIndex		= gConstants.mCurrentFrameIndex;
 			sConstantsCopy.mCurrentFrameWeight		= gConstants.mCurrentFrameWeight;
-			sConstantsCopy.mDebugCoord				= gConstants.mDebugCoord;
+			sConstantsCopy.mPixelDebugCoord			= gConstants.mPixelDebugCoord;
 
 			if (memcmp(&sConstantsCopy, &gConstants, sizeof(Constants)) != 0)
 				gRenderer.mAccumulationResetRequested = true;
@@ -834,7 +862,7 @@ void sRender()
 				gRenderer.mAccumulationDone = false;
 			}
 
-			if (gRenderer.mAccumulationDone)
+			if (gRenderer.mAccumulationDone || gRenderer.mAccumulationPaused)
 				gConstants.mCurrentFrameWeight = 0.0f;
 			else
 				gConstants.mCurrentFrameWeight = 1.0f / (gConstants.mCurrentFrameIndex + 1);
@@ -846,9 +874,10 @@ void sRender()
 		memcpy(frame_context.mConstantUploadBufferPointer, &gConstants, sizeof(gConstants));
 
 		{
-			gConstants.mCurrentFrameIndex++;
+			if (!gRenderer.mAccumulationPaused)
+				gConstants.mCurrentFrameIndex++;
 
-			glm::uint32 accumulation_frame_count = gRenderer.mAccumulationFrameInfinity ? UINT_MAX : gRenderer.mAccumulationFrameCount;
+			glm::uint32 accumulation_frame_count = gRenderer.mAccumulationFrameUnlimited ? UINT_MAX : gRenderer.mAccumulationFrameCount;
 
 			if (gConstants.mCurrentFrameIndex == accumulation_frame_count)
 				gRenderer.mAccumulationDone = true;

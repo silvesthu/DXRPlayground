@@ -81,7 +81,7 @@ float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 	RWTexture2D<float4> screen_color = ResourceDescriptorHeap[(int)ViewDescriptorIndex::ScreenColorUAV];
 
 	float4 color = screen_color[position.xy];
-	if ((int)position.x == mConstants.mDebugCoord.x && (int)position.y == mConstants.mDebugCoord.y)
+	if ((int)position.x == mConstants.mPixelDebugCoord.x && (int)position.y == mConstants.mPixelDebugCoord.y)
 		BufferDebugUAV[0].mPixelValue = color;
 
 	// For visualization

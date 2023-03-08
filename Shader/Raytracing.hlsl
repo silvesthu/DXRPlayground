@@ -5,7 +5,8 @@
 #include "Shared.h"
 #include "Binding.h"
 #include "Common.h"
-#include "Material.h"
+#include "BSDF.h"
+#include "Light.h"
 #include "RayQuery.h"
 #include "Planet.h"
 #include "AtmosphereIntegration.h"
@@ -16,6 +17,13 @@ void DebugOutput(DebugMode inDebugMode, float3 inValue)
 {
 	if (mConstants.mDebugMode == inDebugMode)
 		sDebugOutput = inValue;
+}
+
+void DebugValue(PixelDebugMode inPixelDebugMode, uint inRecursionCount, float4 inValue)
+{
+	if (mConstants.mPixelDebugMode == inPixelDebugMode)
+		if (sGetDispatchRaysIndex().x == mConstants.mPixelDebugCoord.x && sGetDispatchRaysIndex().y == mConstants.mPixelDebugCoord.y && inRecursionCount < Debug::kValueArraySize)
+			BufferDebugUAV[0].mValueArray[inRecursionCount] = inValue;
 }
 
 void TraceRay()
@@ -37,6 +45,7 @@ void TraceRay()
 
 	PathContext path_context = (PathContext)0;
 	path_context.mThroughput = 1; // Camera gather all the light
+	path_context.mPrevBSDFPDF = 0;
 	path_context.mRandomState = uint(uint(sGetDispatchRaysIndex().x) * uint(1973) + uint(sGetDispatchRaysIndex().y) * uint(9277) + uint(mConstants.mCurrentFrameIndex) * uint(26699)) | uint(1); // From https://www.shadertoy.com/view/tsBBWW
 	path_context.mRecursionCount = 0;
 
@@ -109,8 +118,7 @@ void TraceRay()
 				hit_context.mHitPositionWS = (sGetWorldRayOrigin() + sGetWorldRayDirection() * sGetRayTCurrent());
 
 				// Debug
-				if (sGetDispatchRaysIndex().x == mConstants.mDebugCoord.x && sGetDispatchRaysIndex().y == mConstants.mDebugCoord.y && path_context.mRecursionCount < Debug::kValueArraySize)
-					BufferDebugUAV[0].mValueArray[path_context.mRecursionCount] = float4(hit_context.mHitPositionWS, 0);
+				DebugValue(PixelDebugMode::PositionWS, path_context.mRecursionCount, float4(hit_context.mHitPositionWS, 0));
 			}
 
 			// Participating media
@@ -139,109 +147,109 @@ void TraceRay()
 			}
 
 			// Reflection / Refraction
-			if (InstanceDatas[hit_context.mInstanceID].mMaterialType == MaterialType::Light)
+			if (InstanceDatas[hit_context.mInstanceID].mBSDFType == BSDFType::Light)
 			{
-				if (path_context.mRecursionCount == 0 || !mConstants.mUseNEE)
-					path_context.mEmission += path_context.mThroughput * emission;
+				switch (mConstants.mSampleMode)
+				{
+					case SampleMode::SampleLight:
+					{
+						if (path_context.mRecursionCount == 0)
+							path_context.mEmission += path_context.mThroughput * emission;
+						break;
+					}
+					case SampleMode::MIS:
+					{
+						float mis_weight = 1.0;
+
+						if (path_context.mRecursionCount > 0)
+						{
+							Light light = Lights[InstanceDatas[hit_context.mInstanceID].mLightID];
+
+							float light_sample_pdf = 0;
+							float3 light_sample_direction = 0;
+							LightEvaluation::GenerateSamplingDirection(light, ray.Origin, path_context, light_sample_direction, light_sample_pdf);
+
+							DebugValue(PixelDebugMode::LightPDFForBSDF, path_context.mRecursionCount, float4(light_sample_pdf.xxx, 0));
+
+							float light_pdf = light_sample_pdf * LightEvaluation::GetLightSelectionPDF();
+
+							mis_weight = MIS::PowerHeuristic(1, path_context.mPrevBSDFPDF, 1, light_pdf);
+						}
+
+						path_context.mEmission += path_context.mThroughput * emission * mis_weight;
+						break;
+					}
+					default: 
+					{
+						path_context.mEmission += path_context.mThroughput * emission;
+						break;
+					}
+				}	
 			}
 			else
 			{
 				// Light Sample
-				if (mConstants.mUseNEE && mConstants.mLightCount > 0 && mConstants.mRecursionCountMax > 0)
+				bool sample_light = mConstants.mSampleMode == SampleMode::SampleLight || mConstants.mSampleMode == SampleMode::MIS;
+				if (sample_light && mConstants.mLightCount > 0 && path_context.mRecursionCount < mConstants.mRecursionCountMax) // No RR for light sample
 				{
 					uint light_index = min(RandomFloat01(path_context.mRandomState) * mConstants.mLightCount, mConstants.mLightCount - 1);
-					Light light = Lights[light_index];
+					Light light = Lights[light_index];					
 
-					float light_selection_pdf = 1.0 / mConstants.mLightCount;
 					float light_sample_pdf = 0;
-
-					float3 vector_to_light_position = light.mPosition - hit_context.mHitPositionWS;
-					float3 vector_to_sample_position = vector_to_light_position;
-
-					switch (light.mType)
-					{
-					case LightType::Sphere:
-					{
-						// https://citeseerx.ist.psu.edu/doc/10.1.1.40.6561
-						// https://www.pbr-book.org/3ed-2018/Monte_Carlo_Integration/2D_Sampling_with_Multidimensional_Transformations#UniformConePdf
-
-						float radius_squared = light.mHalfExtends.x * light.mHalfExtends.x;
-						float distance_to_light_position_squared = dot(vector_to_light_position, vector_to_light_position);
-						float distance_to_light_position = sqrt(distance_to_light_position_squared);
-
-						float sin_theta_max_squared = radius_squared / distance_to_light_position_squared;
-						float cos_theta_max = sqrt(1.0 - clamp(sin_theta_max_squared, 0.0, 1.0));
-						float cos_theta = lerp(cos_theta_max, 1.0, RandomFloat01(path_context.mRandomState));
-						float sin_theta_squared = 1.0 - cos_theta * cos_theta;
-						float sin_theta = sqrt(sin_theta_squared);
-
-						float3 direction_to_light_position = normalize(vector_to_light_position);
-						float3x3 tangent_space = GenerateTangentSpace(direction_to_light_position);
-
-						float phi = 2.0 * MATH_PI * RandomFloat01(path_context.mRandomState);
-
-						vector_to_sample_position = (tangent_space[0] * cos(phi) + tangent_space[1] * sin(phi)) * sin_theta + tangent_space[2] * cos_theta;
-						vector_to_sample_position *= 1E6; // long distance
-
-						light_sample_pdf = 1.0 / (2.0 * MATH_PI * (1.0 - cos_theta_max));
-					}
-					break;
-					case LightType::Rectangle:
-					{
-						// [TODO]
-					}
-					break;
-					default:
-						break;
-					}
+					float3 light_sample_direction = 0;
+					LightEvaluation::GenerateSamplingDirection(light, hit_context.mHitPositionWS, path_context, light_sample_direction, light_sample_pdf);
 
 					if (mConstants.mDebugInstanceIndex == hit_context.mInstanceID && mConstants.mDebugInstanceMode == DebugInstanceMode::Mirror)
+						light_sample_direction = -reflect(-hit_context.mRayDirectionWS, hit_context.mVertexNormalWS) * 1E6; // long distance
+
+					DebugValue(PixelDebugMode::LightPDFForLight, path_context.mRecursionCount, float4(light_sample_pdf.xxx, 0));
+
+					float light_pdf = light_sample_pdf * LightEvaluation::GetLightSelectionPDF();
+					if (light_pdf > 0)
 					{
-						vector_to_sample_position = -reflect(-hit_context.mRayDirectionWS, hit_context.mVertexNormalWS) * 1E6; // long distance
-						light_sample_pdf = 1.0;
-					}
+						RayDesc shadow_ray;
+						shadow_ray.Origin = hit_context.mHitPositionWS;
+						shadow_ray.Direction = normalize(light_sample_direction);
+						shadow_ray.TMin = 0.001;
+						shadow_ray.TMax = 1E6; // long distance
 
-					RayDesc shadow_ray;
-					shadow_ray.Origin = hit_context.mHitPositionWS;
-					shadow_ray.Direction = normalize(vector_to_sample_position);
-					shadow_ray.TMin = 0.001;
-					shadow_ray.TMax = length(vector_to_sample_position) + 0.001;
+						RayQuery<RAY_FLAG_CULL_NON_OPAQUE | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> shadow_query;
+						uint additional_shadow_ray_flags = 0;
+						uint shadow_ray_instance_mask = 0xffffffff;
 
-					RayQuery<RAY_FLAG_CULL_NON_OPAQUE | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> shadow_query;
-					uint additional_shadow_ray_flags = 0;
-					uint shadow_ray_instance_mask = 0xffffffff;
+						shadow_query.TraceRayInline(RaytracingScene, additional_shadow_ray_flags, shadow_ray_instance_mask, shadow_ray);
+						shadow_query.Proceed();
 
-					shadow_query.TraceRayInline(RaytracingScene, additional_shadow_ray_flags, shadow_ray_instance_mask, shadow_ray);
-					shadow_query.Proceed();
+						if (shadow_query.CommittedStatus() == COMMITTED_TRIANGLE_HIT && shadow_query.CommittedInstanceID() == light.mInstanceID)
+						{
+							BSDFContext bsdf_context = BSDFEvaluation::GenerateContext(shadow_ray.Direction, hit_context.mVertexNormalWS, -hit_context.mRayDirectionWS, hit_context);
+							BSDFEvaluation::SampleDirection(hit_context, bsdf_context);
 
-					if (shadow_query.CommittedStatus() == COMMITTED_TRIANGLE_HIT && shadow_query.CommittedInstanceID() == light.mInstanceID)
-					{
-						MaterialContext material_context = MaterialEvaluation::GenerateContext(shadow_ray.Direction, hit_context.mVertexNormalWS, -hit_context.mRayDirectionWS, hit_context);
-						MaterialEvaluation::SampleDirection(hit_context, material_context);
+							float3 luminance = light.mEmission * (kEmissionBoostScale * kPreExposure);
+							float3 emission = luminance * bsdf_context.mBSDF * bsdf_context.mNdotL / light_pdf;
 
-						float3 luminance = light.mEmission * (kEmissionBoostScale * kPreExposure);
-						float3 emission = luminance *
-							(light_sample_pdf == 0 ? 0 : 1.0 / light_sample_pdf) *
-							(light_selection_pdf == 0 ? 0 : 1.0 / light_selection_pdf) *
-							material_context.mBSDF * material_context.mNdotL;
+							if (mConstants.mSampleMode == SampleMode::MIS)
+								emission *= MIS::PowerHeuristic(1, light_pdf, 1, bsdf_context.mBSDFPDF);
 
-						path_context.mEmission += path_context.mThroughput * emission;
+							path_context.mEmission += path_context.mThroughput * emission;
+						}
 					}
 				}
 
-				// Material Sample
+				// BSDF Sample
 				{
-					// Generate next sample based on material
-					float3 importance_sampling_direction = MaterialEvaluation::GenerateImportanceSamplingDirection(hit_context.mVertexNormalWS, hit_context, path_context);
-					MaterialContext material_context = MaterialEvaluation::GenerateContext(importance_sampling_direction, hit_context.mVertexNormalWS, -hit_context.mRayDirectionWS, hit_context);
-					MaterialEvaluation::SampleBSDF(hit_context, material_context);
+					// Generate next sample based on BSDF
+					float3 importance_sampling_direction = BSDFEvaluation::GenerateImportanceSamplingDirection(hit_context.mVertexNormalWS, hit_context, path_context);
+					BSDFContext bsdf_context = BSDFEvaluation::GenerateContext(importance_sampling_direction, hit_context.mVertexNormalWS, -hit_context.mRayDirectionWS, hit_context);
+					BSDFEvaluation::SampleBSDF(hit_context, bsdf_context);
 
-					path_context.mEmission += path_context.mThroughput * emission;
-					path_context.mThroughput *= material_context.mBSDFPDF <= 0 ? 0 : (material_context.mBSDF * material_context.mNdotL / material_context.mBSDFPDF);
+					path_context.mEmission += path_context.mThroughput * emission; // Non-light emission
+					path_context.mThroughput *= bsdf_context.mBSDFPDF <= 0 ? 0 : (bsdf_context.mBSDF * bsdf_context.mNdotL / bsdf_context.mBSDFPDF);
+					path_context.mPrevBSDFPDF = bsdf_context.mBSDFPDF;
 
 					// Next bounce
 					ray.Origin = hit_context.mHitPositionWS;
-					ray.Direction = material_context.mL;
+					ray.Direction = bsdf_context.mL;
 					continue_bounce = true;
 				}
 			}
@@ -254,7 +262,7 @@ void TraceRay()
 			case DebugMode::Position: 					path_context.mEmission = hit_context.mHitPositionWS; continue_bounce = false; break;
 			case DebugMode::Normal: 					path_context.mEmission = hit_context.mVertexNormalWS; continue_bounce = false; break;
 			case DebugMode::UV:							path_context.mEmission = float3(hit_context.mUV, 0.0); continue_bounce = false; break;
-			case DebugMode::Albedo: 					path_context.mEmission = MaterialEvaluation::Source::Albedo(hit_context); continue_bounce = false; break;
+			case DebugMode::Albedo: 					path_context.mEmission = BSDFEvaluation::Source::Albedo(hit_context); continue_bounce = false; break;
 			case DebugMode::Reflectance: 				path_context.mEmission = InstanceDatas[hit_context.mInstanceID].mReflectance; continue_bounce = false; break;
 			case DebugMode::Emission: 					path_context.mEmission = InstanceDatas[hit_context.mInstanceID].mEmission; continue_bounce = false; break;
 			case DebugMode::RoughnessAlpha: 			path_context.mEmission = InstanceDatas[hit_context.mInstanceID].mRoughnessAlpha; continue_bounce = false; break;
