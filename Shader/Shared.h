@@ -240,7 +240,7 @@ enum class DebugInstanceMode : uint
 	None = 0,
 
 	Barycentrics,
-	Mirror,
+	Mirror, // [TODO] Need delta for PDF
 
 	Count
 };

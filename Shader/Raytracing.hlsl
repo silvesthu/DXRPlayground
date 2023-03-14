@@ -146,51 +146,34 @@ void TraceRay()
 					emission = hit_context.mBarycentrics;
 			}
 
-			// Reflection / Refraction
+			// Lighting
 			if (InstanceDatas[hit_context.mInstanceID].mBSDFType == BSDFType::Light)
 			{
-				switch (mConstants.mSampleMode)
+				// Direct Lighting
+				if (path_context.mRecursionCount == 0 || mConstants.mLightCount == 0 || mConstants.mSampleMode == SampleMode::SampleBSDF)
 				{
-					case SampleMode::SampleLight:
-					{
-						if (path_context.mRecursionCount == 0)
-							path_context.mEmission += path_context.mThroughput * emission;
-						break;
-					}
-					case SampleMode::MIS:
-					{
-						float mis_weight = 1.0;
+					path_context.mEmission += path_context.mThroughput * emission;
+				}
+				else if (mConstants.mSampleMode == SampleMode::MIS)
+				{
+					Light light = Lights[InstanceDatas[hit_context.mInstanceID].mLightID];
 
-						if (path_context.mRecursionCount > 0)
-						{
-							Light light = Lights[InstanceDatas[hit_context.mInstanceID].mLightID];
+					float light_sample_pdf = 0;
+					float3 light_sample_direction = 0;
+					LightEvaluation::GenerateSamplingDirection(light, ray.Origin, path_context, light_sample_direction, light_sample_pdf);
 
-							float light_sample_pdf = 0;
-							float3 light_sample_direction = 0;
-							LightEvaluation::GenerateSamplingDirection(light, ray.Origin, path_context, light_sample_direction, light_sample_pdf);
+					DebugValue(PixelDebugMode::LightPDFForBSDF, path_context.mRecursionCount, float4(light_sample_pdf.xxx, 0));
 
-							DebugValue(PixelDebugMode::LightPDFForBSDF, path_context.mRecursionCount, float4(light_sample_pdf.xxx, 0));
-
-							float light_pdf = light_sample_pdf * LightEvaluation::GetLightSelectionPDF();
-
-							mis_weight = MIS::PowerHeuristic(1, path_context.mPrevBSDFPDF, 1, light_pdf);
-						}
-
-						path_context.mEmission += path_context.mThroughput * emission * mis_weight;
-						break;
-					}
-					default: 
-					{
-						path_context.mEmission += path_context.mThroughput * emission;
-						break;
-					}
-				}	
+					float light_pdf = light_sample_pdf * LightEvaluation::GetLightSelectionPDF();
+					float mis_weight = MIS::PowerHeuristic(1, path_context.mPrevBSDFPDF, 1, light_pdf);
+					path_context.mEmission += path_context.mThroughput * emission * mis_weight;
+				}
 			}
 			else
 			{
-				// Light Sample
+				// Sample Light
 				bool sample_light = mConstants.mSampleMode == SampleMode::SampleLight || mConstants.mSampleMode == SampleMode::MIS;
-				if (sample_light && mConstants.mLightCount > 0 && path_context.mRecursionCount < mConstants.mRecursionCountMax) // No RR for light sample
+				if (sample_light && mConstants.mLightCount > 0)
 				{
 					uint light_index = min(RandomFloat01(path_context.mRandomState) * mConstants.mLightCount, mConstants.mLightCount - 1);
 					Light light = Lights[light_index];					
@@ -231,12 +214,14 @@ void TraceRay()
 							if (mConstants.mSampleMode == SampleMode::MIS)
 								emission *= MIS::PowerHeuristic(1, light_pdf, 1, bsdf_context.mBSDFPDF);
 
+							// [TODO] What if recursion ends this round. Still ok to apply MIS weight here?
+
 							path_context.mEmission += path_context.mThroughput * emission;
 						}
 					}
 				}
 
-				// BSDF Sample
+				// Sample BSDF
 				{
 					// Generate next sample based on BSDF
 					float3 importance_sampling_direction = BSDFEvaluation::GenerateImportanceSamplingDirection(hit_context.mVertexNormalWS, hit_context, path_context);
