@@ -5,6 +5,7 @@
 #include "Atmosphere.h"
 #include "Cloud.h"
 
+#include "Thirdparty/glm/glm/gtx/matrix_decompose.hpp"
 #include "Thirdparty/tinyobjloader/tiny_obj_loader.h"
 #include "Thirdparty/tinyxml2/tinyxml2.h"
 #include "Thirdparty/tinygltf/tiny_gltf.h"
@@ -208,7 +209,7 @@ bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransfor
 			const tinyobj::material_t& material = reader.GetMaterials()[shape.mesh.material_ids[0]];
 			instance_info.mMaterialName = material.name;
 
-			BSDFType type = BSDFType::Diffuse;
+			BSDFType type = BSDFType::Unsupported;
 			switch (material.illum)
 			{
 			case 0: [[fallthrough]];
@@ -413,6 +414,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 		else
 		{
 			bsdf_instance.mInstanceData.mBSDFType = BSDFType::Unsupported;
+			bsdf_instance.mInstanceData.mAlbedo = glm::vec3(0.5f);
 		}
 
 		gAssert(id != nullptr);
@@ -546,11 +548,20 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 						light.mType = LightType::Sphere;
 					if (primitive == &mPrimitives.mRectangle)
 						light.mType = LightType::Rectangle;
-					light.mHalfExtends = glm::vec2(matrix[0][0], matrix[1][2]);
+
+					glm::vec3 translation;
+					glm::vec3 skew;
+					glm::vec4 perspective;
+					glm::quat rotation;
+					glm::vec3 scale;
+					glm::decompose(matrix, scale, rotation, translation, skew, perspective);
+
+					light.mHalfExtends = glm::vec2(scale.x, scale.y);
 					light.mInstanceID = static_cast<uint>(ioSceneContent.mInstanceDatas.size());
 					light.mPosition = matrix[3];
-					light.mRight = normalize(matrix[0]);
-					light.mUp = normalize(matrix[1]);
+					light.mTangent = normalize(matrix[0]);
+					light.mBitangent = normalize(matrix[1]);
+					light.mNormal = normalize(matrix[2]);
 					light.mEmission = instance_data.mEmission;
 					ioSceneContent.mLights.push_back(light);
 				}

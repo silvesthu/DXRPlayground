@@ -113,6 +113,7 @@ namespace BSDFEvaluation
 		[branch]
 		switch (InstanceDatas[inHitContext.mInstanceID].mBSDFType)
 		{
+		case BSDFType::Unsupported:		// [[fallthrough]];
 		case BSDFType::Diffuse:			return Lambert::GenerateImportanceSamplingDirection(inTangentSpace, inHitContext, ioPathContext);
 		case BSDFType::RoughConductor:	return RoughConductor::GenerateImportanceSamplingDirection(inTangentSpace, inHitContext, ioPathContext);
 		default:						return 0;
@@ -145,6 +146,7 @@ namespace BSDFEvaluation
 		[branch]
 		switch (InstanceDatas[inHitContext.mInstanceID].mBSDFType)
 		{
+		case BSDFType::Unsupported:		// [[fallthrough]];
 		case BSDFType::Diffuse:			Lambert::SampleDirection(inHitContext, ioBSDFContext); break;
 		case BSDFType::RoughConductor:	RoughConductor::SampleDirection(inHitContext, ioBSDFContext); break;
 		default:						break;
@@ -177,6 +179,7 @@ namespace BSDFEvaluation
 		[branch]
 		switch (InstanceDatas[inHitContext.mInstanceID].mBSDFType)
 		{
+		case BSDFType::Unsupported:		// [[fallthrough]];
 		case BSDFType::Diffuse:			Lambert::SampleBSDF(inHitContext, ioBSDFContext); break;
 		case BSDFType::RoughConductor:	RoughConductor::SampleBSDF(inHitContext, ioBSDFContext); break;
 		default:						break;

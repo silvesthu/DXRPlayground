@@ -58,6 +58,7 @@ void TraceRay()
 	for (;;)
 	{
 		bool continue_bounce				= false;
+		float3 light_emission				= 0;
 
 		sWorldRayOrigin 					= ray.Origin;
 		sWorldRayDirection					= ray.Direction;
@@ -165,7 +166,7 @@ void TraceRay()
 					DebugValue(PixelDebugMode::LightPDFForBSDF, path_context.mRecursionCount, float4(light_sample_pdf.xxx, 0));
 
 					float light_pdf = light_sample_pdf * LightEvaluation::GetLightSelectionPDF();
-					float mis_weight = MIS::PowerHeuristic(1, path_context.mPrevBSDFPDF, 1, light_pdf);
+					float mis_weight = max(0.0, MIS::PowerHeuristic(1, path_context.mPrevBSDFPDF, 1, light_pdf));
 					path_context.mEmission += path_context.mThroughput * emission * mis_weight;
 				}
 			}
@@ -212,11 +213,9 @@ void TraceRay()
 							float3 emission = luminance * bsdf_context.mBSDF * bsdf_context.mNdotL / light_pdf;
 
 							if (mConstants.mSampleMode == SampleMode::MIS)
-								emission *= MIS::PowerHeuristic(1, light_pdf, 1, bsdf_context.mBSDFPDF);
+								emission *= max(0.0, MIS::PowerHeuristic(1, light_pdf, 1, bsdf_context.mBSDFPDF));
 
-							// [TODO] What if recursion ends this round. Still ok to apply MIS weight here?
-
-							path_context.mEmission += path_context.mThroughput * emission;
+							light_emission = path_context.mThroughput * emission;
 						}
 					}
 				}
@@ -300,6 +299,7 @@ void TraceRay()
 				break;
 		}
 
+		path_context.mEmission += light_emission; // Keep accumulation from light sample after termination with RR
 		path_context.mRecursionCount++;
 	}
 

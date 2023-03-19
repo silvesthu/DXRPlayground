@@ -27,6 +27,7 @@ using Microsoft::WRL::ComPtr;
 #include <execution>
 #include <optional>
 
+#define GLM_FORCE_SILENT_WARNINGS
 #include "Thirdparty/glm/glm/gtx/transform.hpp"
 #include "Thirdparty/nameof/include/nameof.hpp"
 #include "Thirdparty/DirectXTex/DirectXTex/DirectXTex.h"

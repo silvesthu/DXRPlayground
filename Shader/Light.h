@@ -26,6 +26,9 @@ namespace LightEvaluation
 			// https://citeseerx.ist.psu.edu/doc/10.1.1.40.6561
 			// https://www.pbr-book.org/3ed-2018/Monte_Carlo_Integration/2D_Sampling_with_Multidimensional_Transformations#UniformConePdf
 
+			// Position inside light is not proper handled
+			// See https://www.akalin.com/sampling-visible-sphere
+
 			float radius_squared = inLight.mHalfExtends.x * inLight.mHalfExtends.x;
 			float distance_to_light_position_squared = dot(vector_to_light_position, vector_to_light_position);
 			float distance_to_light_position = sqrt(distance_to_light_position_squared);
@@ -52,7 +55,22 @@ namespace LightEvaluation
 		break;
 		case LightType::Rectangle:
 		{
-			// [TODO]
+			// Seems Mitsuba3 just use uniform sampling on rectangle. See Rectangle::sample_position <- SHape::sample_direction
+			// Alternatively sampling of spherical rectangles / triangles could be used (Sample with solid angle instead of surface area)
+
+			float xi1 = RandomFloat01(ioPathContext.mRandomState);
+			float xi2 = RandomFloat01(ioPathContext.mRandomState);
+
+			vector_to_light_position += inLight.mTangent * inLight.mHalfExtends.x * (xi1 * 2.0 - 1.0);
+			vector_to_light_position += inLight.mBitangent * inLight.mHalfExtends.y * (xi2 * 2.0 - 1.0);
+
+			outDirection = normalize(vector_to_light_position);
+
+			float distance_to_sample_position = length(vector_to_light_position);
+			float surface_area = 4.0 * inLight.mHalfExtends.x * inLight.mHalfExtends.y;
+			float pdf_position = 1.0 / surface_area;
+			float pdf_direction = pdf_position * (distance_to_sample_position * distance_to_sample_position) / max(dot(-outDirection, inLight.mNormal), 0.0);
+			outPDF = pdf_direction;
 		}
 		break;
 		default:

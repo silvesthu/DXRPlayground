@@ -228,9 +228,8 @@ enum class BSDFType : uint
 	Diffuse,
 	RoughConductor,
 
-	Unsupported,
-
 	// [TODO] Support more/unified materials. e.g. RoughPlastic
+	Unsupported,
 
 	Count
 };
@@ -342,10 +341,13 @@ struct Light
 	float3						mPosition						CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
-	float3						mRight							CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	float3						mTangent						CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
-	float3						mUp								CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	float3						mBitangent						CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+
+	float3						mNormal							CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
 	float3						mEmission						CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
