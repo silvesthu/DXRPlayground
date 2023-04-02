@@ -1,9 +1,14 @@
 #pragma once
 
-float4 remap(float4 x, float4 a, float4 b, float4 c, float4 d)
-{
-    return (((x - a) / (b - a)) * (d - c)) + c;
-}
+template <typename T> T fmadd(T inA, T inB, T inC) { return inA * inB + inC; }
+template <typename T> T fmsub(T inA, T inB, T inC) { return inA * inB - inC; }
+template <typename T> T fnmadd(T inA, T inB, T inC) { return -inA * inB + inC; }
+template <typename T> T fnmsub(T inA, T inB, T inC) { return -inA * inB - inC; }
+
+template <typename T> T sqr(T inValue) { return inValue * inValue; }
+template <typename T> T safe_sqrt(T inValue) { return sqrt(max(0, inValue)); }
+
+template <typename T> T remap(T x, T a, T b, T c, T d) { return (((x - a) / (b - a)) * (d - c)) + c; }
 
 // From https://www.shadertoy.com/view/tsBBWW
 uint wang_hash(inout uint seed)
@@ -157,29 +162,85 @@ float3 F_Schlick(float3 inR0, float inHoV)
     return inR0 + (1.0 - inR0) * pow(1.0 - inHoV, 5.0);
 }
 
-// [Mitsuba3] fresnel_conductor, fresnel.h
+// [Mitsuba3] fresnel in fresnel.h
+// Calculates the unpolarized Fresnel reflection coefficient
+// at a planar interface between two dielectrics
+void F_Dielectric_Mitsuba(float inEta, float inCosThetaI, out float outR, out float outCosThetaT, out float outEtaIT, out float outEtaTI)
+{
+    float eta = inEta;
+    float cos_theta_i = inCosThetaI;
+
+    //
+
+    float outside_mask = cos_theta_i >= 0.f;
+
+    float rcp_eta = rcp(eta);
+    float eta_it = select(outside_mask, eta, rcp_eta);
+    float eta_ti = select(outside_mask, rcp_eta, eta);
+
+    /* Using Snell's law, calculate the squared sine of the
+       angle between the surface normal and the transmitted ray */
+    float cos_theta_t_sqr =
+        fnmadd(fnmadd(cos_theta_i, cos_theta_i, 1.f), eta_ti * eta_ti, 1.f);
+
+    /* Find the absolute cosines of the incident/transmitted rays */
+    float cos_theta_i_abs = abs(cos_theta_i);
+    float cos_theta_t_abs = safe_sqrt(cos_theta_t_sqr);
+
+    bool index_matched = (eta == 1.f);
+    bool special_case = index_matched || (cos_theta_i_abs == 0.f);
+
+    float r_sc = select(index_matched, float(0.f), float(1.f));
+
+    /* Amplitudes of reflected waves */
+    float a_s = fnmadd(eta_it, cos_theta_t_abs, cos_theta_i_abs) /
+        fmadd(eta_it, cos_theta_t_abs, cos_theta_i_abs);
+
+    float a_p = fnmadd(eta_it, cos_theta_i_abs, cos_theta_t_abs) /
+        fmadd(eta_it, cos_theta_i_abs, cos_theta_t_abs);
+
+    float r = 0.5f * (sqr(a_s) + sqr(a_p));
+
+    if (special_case)
+        r = r_sc;
+
+    /* Adjust the sign of the transmitted direction */
+    float cos_theta_t = select(cos_theta_i >= 0, -cos_theta_t_abs, cos_theta_t_abs);
+
+    //
+
+    outR = r;
+    outCosThetaT = cos_theta_t;
+    outEtaIT = eta_it;
+    outEtaTI = eta_ti;
+}
+
+// [Mitsuba3] fresnel_conductor in fresnel.h
+// Calculates the unpolarized Fresnel reflection coefficient at a planar
+// interface of a conductor, i.e.a surface with a complex - valued relative index of refraction
 // See also https://seblagarde.wordpress.com/2013/04/29/memo-on-fresnel-equations/
-float3 F_Conductor_Mitsuba(float3 inEta, float3 inK, float inCosTheta)
+// [TODO] can not unify with F_Dielectric_Mitsuba?
+float3 F_Conductor_Mitsuba(float3 inEta, float3 inK, float inCosThetaI)
 {
     // Modified from "Optics" by K.D. Moeller, University Science Books, 1988
-    float cos_theta_i_2 = inCosTheta * inCosTheta,
+    float cos_theta_i_2 = inCosThetaI * inCosThetaI,
         sin_theta_i_2 = 1.f - cos_theta_i_2,
         sin_theta_i_4 = sin_theta_i_2 * sin_theta_i_2;
 
-    float3 eta_r = inEta,
-        eta_i = inK;
+    float3 eta_r = inEta;
+    float3 eta_i = inK;
 
     float3 temp_1 = eta_r * eta_r - eta_i * eta_i - sin_theta_i_2,
         a_2_pb_2 = sqrt(temp_1 * temp_1 + 4.f * eta_i * eta_i * eta_r * eta_r),
         a = sqrt(.5f * (a_2_pb_2 + temp_1));
 
-    float3 term_1 = a_2_pb_2 + cos_theta_i_2,
-        term_2 = 2.f * inCosTheta * a;
+    float3 term_1 = a_2_pb_2 + cos_theta_i_2;
+    float3 term_2 = 2.f * inCosThetaI * a;
 
     float3 r_s = (term_1 - term_2) / (term_1 + term_2);
 
-    float3 term_3 = a_2_pb_2 * cos_theta_i_2 + sin_theta_i_4,
-        term_4 = term_2 * sin_theta_i_2;
+    float3 term_3 = a_2_pb_2 * cos_theta_i_2 + sin_theta_i_4;
+    float3 term_4 = term_2 * sin_theta_i_2;
 
     float3 r_p = r_s * (term_3 - term_4) / (term_3 + term_4);
 

@@ -57,19 +57,20 @@ float3 LuminanceToColor(float3 inLuminance, Constants inConstants)
 float3 ApplySRGBCurve( float3 x )
 {
     // Approximately pow(x, 1.0 / 2.2)
-    return x < 0.0031308 ? 12.92 * x : 1.055 * pow(x, 1.0 / 2.4) - 0.055;
+    return select(x < 0.0031308, 12.92 * x, 1.055 * pow(x, 1.0 / 2.4) - 0.055);
 }
 
+// https://github.com/microsoft/DirectX-Graphics-Samples/blob/master/MiniEngine/Core/Shaders/ColorSpaceUtility.hlsli
 float3 RemoveSRGBCurve( float3 x )
 {
     // Approximately pow(x, 2.2)
-    return x < 0.04045 ? x / 12.92 : pow( (x + 0.055) / 1.055, 2.4 );
+    return select(x < 0.04045, x / 12.92, pow( (x + 0.055) / 1.055, 2.4 ));
 }
 
+// Generate screen space triangle
+// From https://anteru.net/blog/2012/minimal-setup-screen-space-quads-no-buffers-layouts-required/
 float4 ScreenspaceTriangleVS(uint id : SV_VertexID) : SV_POSITION
 {
-	// From https://anteru.net/blog/2012/minimal-setup-screen-space-quads-no-buffers-layouts-required/
-	// Generate screen space triangle
 	float x = float ((id & 2) << 1) - 1.0;
 	float y = 1.0 - float ((id & 1) << 2);
 	return float4 (x, y, 0, 1);

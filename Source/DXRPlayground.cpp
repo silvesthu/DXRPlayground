@@ -42,6 +42,7 @@ enum class ScenePresetType
 	None,
 
 	CornellBox,
+	CornellBoxTeapot,
 	VeachMIS,
 	LivingRoom2,
 
@@ -54,14 +55,15 @@ enum class ScenePresetType
 	Count,
 };
 
-static ScenePresetType sCurrentScene = ScenePresetType::CornellBox;
+static ScenePresetType sCurrentScene = ScenePresetType::CornellBoxTeapot;
 static ScenePresetType sPreviousScene = sCurrentScene;
 static ScenePreset kScenePresets[(int)ScenePresetType::Count] =
 {
 	ScenePreset().Name("None"),
 	ScenePreset().Name("CornellBox").Path("Asset/Comparison/benedikt-bitterli/cornell-box/scene_v3.xml"),
+	ScenePreset().Name("CornellBoxTeapot").Path("Asset/Comparison/benedikt-bitterli/cornell-box-teapot/scene_v3.xml"),
 	ScenePreset().Name("VeachMIS").Path("Asset/Comparison/benedikt-bitterli/veach-mis/scene_ggx_v3.xml"),
-	ScenePreset().Name("LivingRoom2").Path("Asset/Comparison/benedikt-bitterli/living-room-2/scene_v3.xml"),	
+	ScenePreset().Name("LivingRoom2").Path("Asset/Comparison/benedikt-bitterli/living-room-2/scene_v3.xml"),
 	
 	ScenePreset().Name("Bruneton17").Path("Asset/primitives/sphere.obj").CameraPosition(glm::vec4(0.0f, 0.0f, 9.0f, 0.0f)).CameraDirection(glm::vec4(0.0f, 0.0f, -1.0f, 0.0f)).Transform(glm::translate(glm::vec3(0.0f, 1.0f, 0.0f))).Atmosphere(AtmosphereMode::Bruneton17),
 	ScenePreset().Name("Bruneton17_Artifact_Mu").Path("Asset/primitives/sphere.obj").CameraPosition(glm::vec4(0.0f, 80.0f, 150.0f, 0.0f)).CameraDirection(glm::vec4(0.0f, 0.0f, -1.0f, 0.0f)).Transform(glm::scale(glm::vec3(100.0f, 100.0f, 100.0f))).Atmosphere(AtmosphereMode::Bruneton17),
@@ -356,22 +358,28 @@ static void sPrepareImGui()
 					ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mDebugInstanceMode), i);
 				}
 
-				static const int kColumnCount = 9;
-				if (ImGui::BeginTable("Table", kColumnCount, ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
+				const char* columns[] =
 				{
+					"Index",
+					"Name",
+					"Position",
+					"BSDFType",
+					"Albedo",
+					"Reflectance",
+					"Transmittance",
+					"Emission",
+					"RoughnessAlpha",
+					"Opacity",
+				};
+				int column_count = (int)std::size(columns);
+
+				if (ImGui::BeginTable("Table", column_count, ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
+				{
+					ImGui::TableNextRow(ImGuiTableRowFlags_Headers);
+					for (int i = 0; i < column_count; i++)
 					{
-						int column_index = 0;
-						ImGui::TableNextRow(ImGuiTableRowFlags_Headers);
-						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("Index");
-						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("Name");
-						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("Position");
-						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("BSDFType");
-						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("Albedo");
-						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("Reflectance");
-						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("Emission");
-						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("RoughnessAlpha");
-						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("Opacity");
-						gAssert(column_index == kColumnCount);
+						ImGui::TableSetColumnIndex(i);
+						ImGui::Text(columns[i]);
 					}
 
 					for (int row = 0; row < gScene.GetInstanceCount(); row++)
@@ -400,30 +408,35 @@ static void sPrepareImGui()
 
 						ImGui::TableSetColumnIndex(column_index++);
 						std::string albedo = std::format("{:.2f} {:.2f} {:.2f}", instance_data.mAlbedo.x, instance_data.mAlbedo.y, instance_data.mAlbedo.z);
-						albedo = glm::dot(instance_data.mAlbedo, instance_data.mAlbedo) != 0.0f ? albedo : "";
+						albedo = instance_data.mAlbedo != InstanceData().mAlbedo ? albedo : "";
 						albedo = instance_info.mAlbedoTexture.empty() ? albedo : (instance_info.mAlbedoTexture.filename().string() + " (" + std::to_string(instance_data.mAlbedoTextureIndex) + ")");
 						ImGui::Text(albedo.c_str());
 
 						ImGui::TableSetColumnIndex(column_index++);
-						std::string reflectance = std::format("{:.2f} {:.2f} {:.2f}", instance_data.mReflectance.x, instance_data.mReflectance.y, instance_data.mReflectance.z);
-						reflectance = glm::dot(instance_data.mReflectance, instance_data.mReflectance) != 0.0f ? reflectance : "";
+						std::string reflectance = std::format("{:.2f} {:.2f} {:.2f}", instance_data.mSpecularReflectance.x, instance_data.mSpecularReflectance.y, instance_data.mSpecularReflectance.z);
+						reflectance = instance_data.mSpecularReflectance != InstanceData().mSpecularReflectance ? reflectance : "";
 						ImGui::Text(reflectance.c_str());
 
 						ImGui::TableSetColumnIndex(column_index++);
+						std::string transmittance = std::format("{:.2f} {:.2f} {:.2f}", instance_data.mSpecularTransmittance.x, instance_data.mSpecularTransmittance.y, instance_data.mSpecularTransmittance.z);
+						transmittance = instance_data.mSpecularTransmittance != InstanceData().mSpecularTransmittance ? transmittance : "";
+						ImGui::Text(transmittance.c_str());
+
+						ImGui::TableSetColumnIndex(column_index++);
 						std::string emission = std::format("{:.2f} {:.2f} {:.2f}", instance_data.mEmission.x, instance_data.mEmission.y, instance_data.mEmission.z);
-						emission = glm::dot(instance_data.mEmission, instance_data.mEmission) != 0.0f ? emission : "";
+						emission = instance_data.mEmission != InstanceData().mEmission ? emission : "";
 						ImGui::Text(emission.c_str());
 
 						ImGui::TableSetColumnIndex(column_index++);
 						std::string roughness_alpha = std::format("{:.2f}", instance_data.mRoughnessAlpha);
-						roughness_alpha = instance_data.mBSDFType != BSDFType::Diffuse ? roughness_alpha : "";
+						roughness_alpha = instance_data.mRoughnessAlpha != InstanceData().mRoughnessAlpha ? roughness_alpha : "";
 						ImGui::Text(roughness_alpha.c_str());
 
 						ImGui::TableSetColumnIndex(column_index++);
 						std::string opacity = std::format("{:.2f}", instance_data.mOpacity);
 						ImGui::Text(opacity.c_str());
 
-						gAssert(column_index == kColumnCount);
+						gAssert(column_index == column_count);
 					}
 					ImGui::EndTable();
 				}

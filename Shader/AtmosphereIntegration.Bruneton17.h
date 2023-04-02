@@ -281,7 +281,7 @@ void Encode4D(float4 r_mu_mu_s_nu, bool intersects_ground, Texture3D<float4> inT
 	float R_g = mConstants.mAtmosphere.mBottomRadius;			// Ground
 	float H_squared = R_t * R_t - R_g * R_g;		// [NOTE] Avoid precision loss on sqrt(squared)
 	float H = sqrt(H_squared);
-	float rho = SafeSqrt(r * r - mConstants.mAtmosphere.mBottomRadius * mConstants.mAtmosphere.mBottomRadius);
+	float rho = safe_sqrt(r * r - mConstants.mAtmosphere.mBottomRadius * mConstants.mAtmosphere.mBottomRadius);
 
 	// r - Height
 	float u_r = rho / H;
@@ -292,14 +292,14 @@ void Encode4D(float4 r_mu_mu_s_nu, bool intersects_ground, Texture3D<float4> inT
 	float u_mu;
 	if (intersects_ground)
 	{
-		float d = -r_mu - SafeSqrt(discriminant);
+		float d = -r_mu - safe_sqrt(discriminant);
 		float d_min = r - mConstants.mAtmosphere.mBottomRadius;
 		float d_max = rho;
 		u_mu = d_max == d_min ? 0.0 : (d - d_min) / (d_max - d_min);
 	}
 	else
 	{
-		float d = -r_mu + SafeSqrt(discriminant + H_squared);
+		float d = -r_mu + safe_sqrt(discriminant + H_squared);
 		float d_min = mConstants.mAtmosphere.mTopRadius - r;
 		float d_max = rho + H;
 		u_mu = (d - d_min) / (d_max - d_min);

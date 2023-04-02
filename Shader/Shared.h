@@ -201,6 +201,8 @@ enum class PixelDebugMode : uint
 	LightPDFForBSDF,
 	LightPDFForLight,
 
+	Throughput,
+
 	Count
 };
 
@@ -225,11 +227,21 @@ enum class BSDFType : uint
 {
 	Light = 0,
 
-	Diffuse,
-	RoughConductor,
+	// Roughly based on https://mitsuba.readthedocs.io/en/stable/src/generated/plugins_bsdfs.html
 
-	// [TODO] Support more/unified materials. e.g. RoughPlastic
-	Unsupported,
+	Diffuse,				// Lambertian
+	RoughConductor,			// GGX only. [TODO] Support sample_visible. Support anisotropy
+
+	Dielectric,		
+	// ThinDielectric
+	// RoughDielectric	
+	// Plastic	
+	// Roughplastic
+
+	// [TODO]
+	// Mask, // forward-facing Dirac delta distribution
+
+	Unsupported,			// Fallback to Diffuse
 
 	Count
 };
@@ -239,7 +251,7 @@ enum class DebugInstanceMode : uint
 	None = 0,
 
 	Barycentrics,
-	Mirror, // [TODO] Need delta for PDF
+	Mirror, 				// [TODO] Handle as dirac delta properly
 
 	Count
 };
@@ -302,11 +314,17 @@ struct InstanceData
 	float						mOpacity						CONSTANT_DEFAULT(1.0f);
 	uint						mLightID						CONSTANT_DEFAULT(0);
 
+	float						mRoughnessAlpha					CONSTANT_DEFAULT(0.0f);
+	float3						GENERATE_PAD_NAME				CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+
     float3						mAlbedo							CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	uint						mAlbedoTextureIndex				CONSTANT_DEFAULT(0);
 
-    float3						mReflectance					CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
-	float						mRoughnessAlpha					CONSTANT_DEFAULT(0.0f);
+    float3						mSpecularReflectance			CONSTANT_DEFAULT(float3(1.0f, 1.0f, 1.0f));
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+
+	float3						mSpecularTransmittance			CONSTANT_DEFAULT(float3(1.0f, 1.0f, 1.0f));
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
 	float3						mEta							CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
@@ -315,12 +333,6 @@ struct InstanceData
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
     float3						mEmission						CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
-	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
-
-	float3						mTransmittance					CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
-	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
-	
-	float3						mIOR							CONSTANT_DEFAULT(float3(1.0f, 1.0f, 1.0f));
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
 	float4x4					mTransform						CONSTANT_DEFAULT(float4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1));
@@ -376,6 +388,7 @@ struct PathContext
 	float3						mEmission;						// [0, +inf]	Accumulated emission
 
 	float						mPrevBSDFPDF;
+	bool						mPrevDeltaDistribution;
 
 	uint						mRandomState;
 	uint						mRecursionCount;
@@ -410,17 +423,15 @@ struct BSDFContext
 	float mHdotV;
 	float mHdotL;
 
-	float3 mBSDF;
-	float mBSDFPDF;
+	// [NOTE] For Dirac delta distribution, the cosine term is not necessary, or can be defined to be canceled out
+	// Considering it as part of integral to describe illuminance sounds okay, but still not very thorough... 
+	// https://www.pbr-book.org/3ed-2018/Reflection_Models/Specular_Reflection_and_Transmission
+	// https://stackoverflow.com/questions/22431912/path-tracing-why-is-there-no-cosine-term-when-calculating-perfect-mirror-reflec
+	// https://gamedev.net/forums/topic/657520-cosine-term-in-rendering-equation/5159311/?page=2
 
-	bool IsValid()
-	{
-		return
-			mNdotV > 0 &&
-			mNdotL > 0 &&
-			mHdotV > 0 &&
-			mHdotL > 0;
-	}
+	float3 mBSDF;				// Cosine term included for non-Dirac delta distribution
+	float mBSDFPDF;
+	bool mDeltaDistribution;
 };
 
 struct DensityProfileLayer

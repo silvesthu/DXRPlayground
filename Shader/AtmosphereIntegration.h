@@ -21,11 +21,6 @@ float invlerp(float a, float b, float x)
 	return (x - a) / (b - a);
 }
 
-float SafeSqrt(float a)
-{
-	return sqrt(max(a, 0));
-}
-
 float ClampCosine(float x)
 {
 	return clamp(x, -1.0, 1.0);
@@ -47,7 +42,7 @@ float DistanceToTopAtmosphereBoundary(float r, float mu)
 	float R_t = mConstants.mAtmosphere.mTopRadius;
 
 	float discriminant = r * r * (mu * mu - 1.0) + R_t * R_t;
-	return ClampDistance(-r * mu + SafeSqrt(discriminant));
+	return ClampDistance(-r * mu + safe_sqrt(discriminant));
 }
 
 // r, d -> mu
@@ -69,7 +64,7 @@ float DistanceToBottomAtmosphereBoundary(float r, float mu)
 	float R_g = mConstants.mAtmosphere.mBottomRadius;
 
 	float discriminant = r * r * (mu * mu - 1.0) + R_g * R_g;
-	return ClampDistance(-r * mu - SafeSqrt(discriminant));
+	return ClampDistance(-r * mu - safe_sqrt(discriminant));
 }
 
 // r, mu -> d

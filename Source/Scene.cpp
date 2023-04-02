@@ -222,10 +222,9 @@ bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransfor
 			instance_data.mAlbedo = glm::vec3(material.diffuse[0], material.diffuse[1], material.diffuse[2]);
 			instance_data.mOpacity = 1.0f;
 			instance_data.mEmission = glm::vec3(material.emission[0], material.emission[1], material.emission[2]);
-			instance_data.mReflectance = glm::vec3(material.specular[0], material.specular[1], material.specular[2]);
 			instance_data.mRoughnessAlpha = material.roughness; // To match Mitsuba2 and PBRT (remaproughness = false)
-			instance_data.mTransmittance = glm::vec3(material.transmittance[0], material.transmittance[1], material.transmittance[2]);
-			instance_data.mIOR = glm::vec3(material.ior);
+			instance_data.mSpecularReflectance = glm::vec3(material.specular[0], material.specular[1], material.specular[2]);			
+			instance_data.mSpecularTransmittance = glm::vec3(material.transmittance[0], material.transmittance[1], material.transmittance[2]);
 		}
 		
 		instance_info.mName = shape.name;
@@ -374,6 +373,20 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 			if (!changed)
 				break;
 		}
+
+		auto load_specular_reflectance = [&]()
+		{
+			std::sscanf(null_to_empty(get_child_value(local_bsdf, "specular_reflectance").data()),
+				"%f, %f, %f",
+				&bsdf_instance.mInstanceData.mSpecularReflectance.x, &bsdf_instance.mInstanceData.mSpecularReflectance.y, &bsdf_instance.mInstanceData.mSpecularReflectance.z);
+		};
+
+		auto load_specular_transmittance = [&]()
+		{
+			std::sscanf(null_to_empty(get_child_value(local_bsdf, "specular_transmittance").data()),
+				"%f, %f, %f",
+				&bsdf_instance.mInstanceData.mSpecularTransmittance.x, &bsdf_instance.mInstanceData.mSpecularTransmittance.y, &bsdf_instance.mInstanceData.mSpecularTransmittance.z);
+		};
 		
 		if (local_type == "diffuse")
 		{
@@ -399,10 +412,6 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 				"%f", 
 				&bsdf_instance.mInstanceData.mRoughnessAlpha) == 1);
 
-			gVerify(std::sscanf(get_child_value(local_bsdf, "specular_reflectance").data(),
-				"%f, %f, %f", 
-				&bsdf_instance.mInstanceData.mReflectance.x, &bsdf_instance.mInstanceData.mReflectance.y, &bsdf_instance.mInstanceData.mReflectance.z) == 3);
-
 			gVerify(std::sscanf(get_child_value(local_bsdf, "eta").data(),
 				"%f, %f, %f",
 				&bsdf_instance.mInstanceData.mEta.x, &bsdf_instance.mInstanceData.mEta.y, &bsdf_instance.mInstanceData.mEta.z) == 3);
@@ -410,6 +419,27 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 			gVerify(std::sscanf(get_child_value(local_bsdf, "k").data(),
 				"%f, %f, %f",
 				&bsdf_instance.mInstanceData.mK.x, &bsdf_instance.mInstanceData.mK.y, &bsdf_instance.mInstanceData.mK.z) == 3);
+
+			load_specular_reflectance();
+		}
+		else if (local_type == "dielectric")
+		{
+			bsdf_instance.mInstanceData.mBSDFType = BSDFType::Dielectric;
+			
+			float int_ior = 1.0f;
+			gVerify(std::sscanf(get_child_value(local_bsdf, "int_ior").data(),
+				"%f",
+				&int_ior) == 1);
+
+			float ext_ior = 1.0f;
+			gVerify(std::sscanf(get_child_value(local_bsdf, "ext_ior").data(),
+				"%f",
+				&ext_ior) == 1);
+
+			bsdf_instance.mInstanceData.mEta = float3(int_ior / ext_ior);
+
+			load_specular_transmittance();
+			load_specular_reflectance();
 		}
 		else
 		{
@@ -609,15 +639,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 void Scene::FillDummyMaterial(InstanceInfo& ioInstanceInfo, InstanceData& ioInstanceData)
 {
 	ioInstanceInfo.mMaterialName = "DummyMaterial";
-
 	ioInstanceData.mBSDFType = BSDFType::Diffuse;
-	ioInstanceData.mAlbedo = glm::vec3(0.0f, 0.0f, 0.0f);
-	ioInstanceData.mOpacity = 1.0f;
-	ioInstanceData.mEmission = glm::vec3(0.0f, 0.0f, 0.0f);
-	ioInstanceData.mReflectance = glm::vec3(0.0f, 0.0f, 0.0f);
-	ioInstanceData.mRoughnessAlpha = 1.0f;
-	ioInstanceData.mTransmittance = glm::vec3(1.0f, 1.0f, 1.0f);
-	ioInstanceData.mIOR = glm::vec3(1.0f, 1.0f, 1.0f);
 }
 
 void Scene::Load(const char* inFilename, const glm::mat4x4& inTransform)
