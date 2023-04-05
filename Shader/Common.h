@@ -1,5 +1,7 @@
 #pragma once
 
+#include "RayQuery.h"
+
 template <typename T> T fmadd(T inA, T inB, T inC) { return inA * inB + inC; }
 template <typename T> T fmsub(T inA, T inB, T inC) { return inA * inB - inC; }
 template <typename T> T fnmadd(T inA, T inB, T inC) { return -inA * inB + inC; }
@@ -162,9 +164,8 @@ float3 F_Schlick(float3 inR0, float inHoV)
     return inR0 + (1.0 - inR0) * pow(1.0 - inHoV, 5.0);
 }
 
-// [Mitsuba3] fresnel in fresnel.h
-// Calculates the unpolarized Fresnel reflection coefficient
-// at a planar interface between two dielectrics
+// [Mitsuba3] fresnel in fresnel.h for dielectric-dielectric interface, unpolarized
+// Same as formulation on https://en.wikipedia.org/wiki/Fresnel_equations where r = R_eff = 1/2 * (R_s + R_p)
 void F_Dielectric_Mitsuba(float inEta, float inCosThetaI, out float outR, out float outCosThetaT, out float outEtaIT, out float outEtaTI)
 {
     float eta = inEta;
@@ -215,11 +216,9 @@ void F_Dielectric_Mitsuba(float inEta, float inCosThetaI, out float outR, out fl
     outEtaTI = eta_ti;
 }
 
-// [Mitsuba3] fresnel_conductor in fresnel.h
-// Calculates the unpolarized Fresnel reflection coefficient at a planar
-// interface of a conductor, i.e.a surface with a complex - valued relative index of refraction
+// [Mitsuba3] fresnel_conductor in fresnel.h for conductor-dielectric interface, unpolarized
+// Index of refraction of conductor is a complex value (eta, k)
 // See also https://seblagarde.wordpress.com/2013/04/29/memo-on-fresnel-equations/
-// [TODO] can not unify with F_Dielectric_Mitsuba?
 float3 F_Conductor_Mitsuba(float3 inEta, float3 inK, float inCosThetaI)
 {
     // Modified from "Optics" by K.D. Moeller, University Science Books, 1988
@@ -245,4 +244,18 @@ float3 F_Conductor_Mitsuba(float3 inEta, float3 inK, float inCosThetaI)
     float3 r_p = r_s * (term_3 - term_4) / (term_3 + term_4);
 
     return 0.5f * (r_s + r_p);
+}
+
+static float3 sDebugOutput = 0;
+void DebugOutput(DebugMode inDebugMode, float3 inValue)
+{
+    if (mConstants.mDebugMode == inDebugMode)
+        sDebugOutput = inValue;
+}
+
+void DebugValue(PixelDebugMode inPixelDebugMode, uint inRecursionCount, float4 inValue)
+{
+    if (mConstants.mPixelDebugMode == inPixelDebugMode)
+        if (sGetDispatchRaysIndex().x == mConstants.mPixelDebugCoord.x && sGetDispatchRaysIndex().y == mConstants.mPixelDebugCoord.y && inRecursionCount < Debug::kValueArraySize)
+            BufferDebugUAV[0].mValueArray[inRecursionCount] = inValue;
 }

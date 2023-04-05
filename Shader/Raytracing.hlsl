@@ -7,24 +7,9 @@
 #include "Common.h"
 #include "BSDF.h"
 #include "Light.h"
-#include "RayQuery.h"
 #include "Planet.h"
 #include "AtmosphereIntegration.h"
 #include "CloudIntegration.h"
-
-static float3 sDebugOutput = 0;
-void DebugOutput(DebugMode inDebugMode, float3 inValue)
-{
-	if (mConstants.mDebugMode == inDebugMode)
-		sDebugOutput = inValue;
-}
-
-void DebugValue(PixelDebugMode inPixelDebugMode, uint inRecursionCount, float4 inValue)
-{
-	if (mConstants.mPixelDebugMode == inPixelDebugMode)
-		if (sGetDispatchRaysIndex().x == mConstants.mPixelDebugCoord.x && sGetDispatchRaysIndex().y == mConstants.mPixelDebugCoord.y && inRecursionCount < Debug::kValueArraySize)
-			BufferDebugUAV[0].mValueArray[inRecursionCount] = inValue;
-}
 
 void TraceRay()
 {
@@ -115,7 +100,7 @@ void TraceRay()
 				hit_context.mHitPositionWS = (sGetWorldRayOrigin() + sGetWorldRayDirection() * sGetRayTCurrent());
 
 				// Debug
-				DebugValue(PixelDebugMode::PositionWS, path_context.mRecursionCount, float4(hit_context.mHitPositionWS, 0));
+				DebugValue(PixelDebugMode::PositionWS_InstanceID, path_context.mRecursionCount, float4(hit_context.mHitPositionWS, hit_context.mInstanceID));
 			}
 
 			// Participating media
@@ -145,6 +130,8 @@ void TraceRay()
 				if (mConstants.mDebugInstanceIndex == hit_context.mInstanceID && mConstants.mDebugInstanceMode == DebugInstanceMode::Barycentrics)
 					emission = hit_context.mBarycentrics;
 			}
+
+			// DebugValue(PixelDebugMode::Manual, path_context.mRecursionCount, float4(hit_context.mVertexNormalWS, 0));
 
 			// Lighting
 			if (InstanceDatas[hit_context.mInstanceID].mBSDFType == BSDFType::Light)
@@ -228,7 +215,8 @@ void TraceRay()
 					path_context.mPrevBSDFPDF = bsdf_context.mBSDFPDF;
 					path_context.mPrevDeltaDistribution = bsdf_context.mDeltaDistribution;
 
-					DebugValue(PixelDebugMode::Throughput, path_context.mRecursionCount, float4(path_context.mThroughput.x, 0, 0, 0));
+					DebugValue(PixelDebugMode::BSDF_PDF, path_context.mRecursionCount, float4(bsdf_context.mBSDF, bsdf_context.mBSDFPDF));
+					DebugValue(PixelDebugMode::Throughput, path_context.mRecursionCount, float4(path_context.mThroughput, 0));
 
 					// Next bounce
 					ray.Origin = hit_context.mHitPositionWS;
@@ -279,12 +267,12 @@ void TraceRay()
 		// https://computergraphics.stackexchange.com/questions/2316/is-russian-roulette-really-the-answer
 		if (path_context.mRecursionCount >= mConstants.mRecursionCountMax)
 		{
-			if (mConstants.mRecursionMode == RecursionMode::RussianRoulette && path_context.mRecursionCount <= 16)
+			if (mConstants.mRecursionMode == RecursionMode::RussianRoulette)
 			{
 				// Probability can be chosen in almost any manner
 				// e.g. Fixed threshold
 				// e.g. Veach's Efficiency-Optimized Russian roulette is based on average variance and cost
-				// Based on throughput here (basically albedo)
+				// Based on throughput here
 				float3 throughput = path_context.mThroughput;
 				float termination_probability = max(0.25, 1.0 - max(throughput.x, max(throughput.y, throughput.z)));
 

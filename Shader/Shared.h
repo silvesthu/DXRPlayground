@@ -196,12 +196,21 @@ enum class DebugMode : uint
 
 enum class PixelDebugMode : uint
 {
-	PositionWS,
+	PositionWS_InstanceID,
+
+	_Newline1,
+
+	BSDF_PDF,
+	Throughput,
+
+	_Newline2,
 
 	LightPDFForBSDF,
 	LightPDFForLight,
 
-	Throughput,
+	_Newline3,
+
+	Manual,
 
 	Count
 };
@@ -569,7 +578,7 @@ struct Constants
 	float						mCurrentFrameWeight				CONSTANT_DEFAULT(1);
 
 	uint2						mPixelDebugCoord				CONSTANT_DEFAULT(uint2(0, 0));
-	PixelDebugMode				mPixelDebugMode					CONSTANT_DEFAULT(PixelDebugMode::PositionWS);
+	PixelDebugMode				mPixelDebugMode					CONSTANT_DEFAULT(PixelDebugMode::PositionWS_InstanceID);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
 	AtmosphereConstants			mAtmosphere;
@@ -578,7 +587,7 @@ struct Constants
 
 struct Debug
 {
-	static const int			kValueArraySize = 256;
+	static const int			kValueArraySize = 8;
 
 	float4						mPixelValue						CONSTANT_DEFAULT(float4(0.0f, 0.0f, 0.0f, 0.0f));
 	float4						mValueArray[kValueArraySize];

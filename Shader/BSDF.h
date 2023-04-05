@@ -3,8 +3,6 @@
 #include "Binding.h"
 #include "Common.h"
 
-#include "RayQuery.h"
-
 namespace BSDFEvaluation
 {
 	BSDFContext GenerateContext(float3 inLight, float3 inNormal, float3 inView, HitContext inHitContext)
@@ -57,6 +55,8 @@ namespace BSDFEvaluation
 
 			ioBSDFContext.mBSDF = BSDFEvaluation::Source::Albedo(inHitContext) * ioBSDFContext.mNdotL / MATH_PI;
 			ioBSDFContext.mBSDFPDF = ioBSDFContext.mNdotL / MATH_PI;
+
+			// [NOTE] Similar to eval in Mitsuba3
 		}
 
 		void SampleBSDF(HitContext inHitContext, inout BSDFContext ioBSDFContext, inout PathContext ioPathContext)
@@ -65,6 +65,9 @@ namespace BSDFEvaluation
 
 			ioBSDFContext.mBSDF = BSDFEvaluation::Source::Albedo(inHitContext) * ioBSDFContext.mNdotL / MATH_PI;
 			ioBSDFContext.mBSDFPDF = ioBSDFContext.mNdotL / MATH_PI;
+
+			// [NOTE] Similar to sample in Mitsuba3, if combined with GenerateImportanceSamplingDirection
+			//        Mitsuba3 return brdf_weight = ioBSDFContext.mBSDF / ioBSDFContext.mBSDFPDF, that cancel out some terms
 		}
 	};
 
@@ -151,11 +154,6 @@ namespace BSDFEvaluation
 			ioBSDFContext.mBSDFPDF = 0.0;
 		}
 
-		float3 refract1(float3 wi, float cos_theta_t, float eta_ti) 
-		{
-			return float3(-eta_ti * wi.x, -eta_ti * wi.y, cos_theta_t);
-		}
-
 		void SampleBSDF(HitContext inHitContext, inout BSDFContext ioBSDFContext, inout PathContext ioPathContext)
 		{
 			// [NOTE] L and related information are not avaiable yet before selection between reflection and refraction
@@ -166,37 +164,27 @@ namespace BSDFEvaluation
 			float eta_ti;
 			F_Dielectric_Mitsuba(InstanceDatas[inHitContext.mInstanceID].mEta.x, ioBSDFContext.mNdotV, r_i, cos_theta_t, eta_it, eta_ti);
 
-			float n2 = InstanceDatas[inHitContext.mInstanceID].mEta.x;
-			float n1 = 1.0 / n2;
-
-			float cos_i = abs(ioBSDFContext.mNdotV);
-			float cos_t = safe_sqrt(1 - ((n1 * n1) * (1 - cos_i * cos_i) / (n2 * n2)));
-
-			float R_s = (n1 * cos_i - n2 * cos_t) / (n1 * cos_i + n2 * cos_t);
-			R_s *= R_s;
-			float R_p = (n1 * cos_t - n2 * cos_i) / (n1 * cos_t + n2 * cos_i);
-			R_p *= R_p;
-
-			float R_eff = (R_s + R_p) / 2.0;
-
-			r_i = R_eff;
-			eta_ti = ioBSDFContext.mNdotV < 0 ? n2 : n1;
+			// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(ioBSDFContext.mN, 0));
+			// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(r_i, cos_theta_t, eta_it, eta_ti));
 
 			bool selected_r = RandomFloat01(ioPathContext.mRandomState) <= r_i;
 			ioBSDFContext.mN = ioBSDFContext.mNdotV < 0 ? -ioBSDFContext.mN : ioBSDFContext.mN;
 			float3 L = select(selected_r,
 				reflect(-ioBSDFContext.mV, ioBSDFContext.mN),
 				refract(-ioBSDFContext.mV, ioBSDFContext.mN, eta_ti));
-				// refract1(ioBSDFContext.mV, cos_theta_t, eta_ti));
-
-			// [TODO] Check this in Mitsuba
-			// For transmission, radiance must be scaled to account for the solid
-			// angle compression that occurs when crossing the interface.
 
 			ioBSDFContext = GenerateContext(L, ioBSDFContext.mN, ioBSDFContext.mV, inHitContext);
-			ioBSDFContext.mBSDF = select(selected_r, InstanceDatas[inHitContext.mInstanceID].mSpecularReflectance, InstanceDatas[inHitContext.mInstanceID].mSpecularTransmittance);
+			ioBSDFContext.mBSDF = select(selected_r, InstanceDatas[inHitContext.mInstanceID].mSpecularReflectance, InstanceDatas[inHitContext.mInstanceID].mSpecularTransmittance) * select(selected_r, r_i, 1.0 - r_i);
 			ioBSDFContext.mBSDFPDF = select(selected_r, r_i, 1.0 - r_i);
 			ioBSDFContext.mDeltaDistribution = true;
+
+			// [TODO] Look for reference
+			// For transmission, radiance must be scaled to account for the solid
+			// angle compression that occurs when crossing the interface.
+			ioBSDFContext.mBSDF *= select(selected_r, 1.0, eta_ti * eta_ti);
+
+			// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(-ioBSDFContext.mV, selected_r));
+			// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(L, 0));
 		}
 	}
 
@@ -270,5 +258,7 @@ namespace BSDFEvaluation
 		case BSDFType::Dielectric:		Dielectric::SampleBSDF(inHitContext, ioBSDFContext, ioPathContext); break;
 		default:						break;
 		}
+
+		// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(ioBSDFContext.mBSDF, ioBSDFContext.mBSDFPDF));
 	}
 }
