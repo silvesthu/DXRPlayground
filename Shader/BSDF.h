@@ -128,6 +128,8 @@ namespace BSDFEvaluation
 			if (D < 0 || ioBSDFContext.mNdotL < 0 || ioBSDFContext.mNdotV < 0)
 				D = 0;
 
+			// [TODO] Check BSDF again
+
 			ioBSDFContext.mBSDF = D * G * F / (4.0f * ioBSDFContext.mNdotV);
 			ioBSDFContext.mBSDFPDF = (D * ioBSDFContext.mNdotH) / (4.0f * ioBSDFContext.mHdotV);
 

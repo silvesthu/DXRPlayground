@@ -123,6 +123,12 @@ inline std::wstring gToWString(const std::string_view string)
 template <typename T>
 inline T gFromString(const char* inString);
 
+template <typename T>
+inline void gFromString(const char* inString, T& outValue) { if (inString == nullptr) return; outValue = gFromString<T>(inString); }
+
+template <typename T>
+inline std::string gToString(const T& inValue);
+
 template<>
 inline float gFromString(const char* inString)
 {
@@ -149,6 +155,28 @@ inline glm::vec3 gFromString(const char* inString)
 	if (received != 3)
 		received = std::sscanf(inString, "%f %f %f", &v.x, &v.y, &v.z);
 	return v;
+}
+
+template <>
+inline glm::mat4x4 gFromString(const char* inString) 
+{ 
+	glm::mat4x4 matrix = glm::mat4x4(1.0f); 
+	std::sscanf(inString, "%f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f", 
+		&matrix[0][0], &matrix[1][0], &matrix[2][0], &matrix[3][0], 
+		&matrix[0][1], &matrix[1][1], &matrix[2][1], &matrix[3][1], 
+		&matrix[0][2], &matrix[1][2], &matrix[2][2], &matrix[3][2],
+		&matrix[0][3], &matrix[1][3], &matrix[2][3], &matrix[3][3]);
+	return matrix;
+}
+
+template <>
+inline std::string gToString(const glm::mat4x4& inValue) 
+{ 
+	return std::format("{} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {}", 
+		inValue[0][0], inValue[1][0], inValue[2][0], inValue[3][0], 
+		inValue[0][1], inValue[1][1], inValue[2][1], inValue[3][1], 
+		inValue[0][2], inValue[1][2], inValue[2][2], inValue[3][2], 
+		inValue[0][3], inValue[1][3], inValue[2][3], inValue[3][3]);
 }
 
 namespace nameof

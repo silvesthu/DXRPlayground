@@ -43,6 +43,7 @@ enum class ScenePresetType
 
 	CornellBox,
 	CornellBoxTeapot,
+	CornellBoxMonkey,
 	VeachMIS,
 	LivingRoom2,
 
@@ -62,6 +63,7 @@ static ScenePreset kScenePresets[(int)ScenePresetType::Count] =
 	ScenePreset().Name("None"),
 	ScenePreset().Name("CornellBox").Path("Asset/Comparison/benedikt-bitterli/cornell-box/scene_v3.xml"),
 	ScenePreset().Name("CornellBoxTeapot").Path("Asset/Comparison/benedikt-bitterli/cornell-box-teapot/scene_v3.xml"),
+	ScenePreset().Name("CornellMonkey").Path("Asset/Comparison/benedikt-bitterli/cornell-box-monkey/scene_v3.xml"),
 	ScenePreset().Name("VeachMIS").Path("Asset/Comparison/benedikt-bitterli/veach-mis/scene_ggx_v3.xml"),
 	ScenePreset().Name("LivingRoom2").Path("Asset/Comparison/benedikt-bitterli/living-room-2/scene_v3.xml"),
 	
@@ -134,6 +136,20 @@ static void sPrepareImGui()
 			if (ImGui::Button("Reload Camera (F6)"))
 				sLoadCamera();
 
+			ImGui::SameLine();
+
+			if (ImGui::Button("Copy Camera"))
+			{
+				// Matrix for Mitsuba3
+				glm::mat4x4 camera_transform = glm::mat4x4(1.0f);
+				camera_transform[3] = gConstants.mCameraPosition;
+				camera_transform[2] = gConstants.mCameraDirection;
+				camera_transform[1] = glm::normalize(gConstants.mCameraUpExtend);
+				camera_transform[0] = -glm::normalize(gConstants.mCameraRightExtend);
+				ImGui::SetClipboardText(gToString(camera_transform).c_str());
+			}
+		}
+		{
 			if (ImGui::Button("Dump Luminance (F9)"))
 				sDumpLuminance();
 
@@ -205,7 +221,7 @@ static void sPrepareImGui()
 				ImGui::SameLine();
 				ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mRecursionMode), i);
 			}
-			ImGui::SliderInt("Recursion Count Max", reinterpret_cast<int*>(&gConstants.mRecursionCountMax), 0, 8);
+			ImGui::SliderInt("Recursion Count Max", reinterpret_cast<int*>(&gConstants.mRecursionCountMax), 0, 16);
 
 			ImGui::TreePop();
 		}

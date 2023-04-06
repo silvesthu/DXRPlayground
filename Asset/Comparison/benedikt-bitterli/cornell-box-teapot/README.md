@@ -1,1 +1,1 @@
-Cornell Box + Utah Teapot but dielectric
+Cornell Box + Utah Teapot (dielectric)

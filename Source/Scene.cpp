@@ -327,10 +327,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 			if (local_type == "mask")
 			{
 				std::string_view opacity = get_child_value(local_bsdf, "opacity");
-				if (!opacity.empty())
-					gVerify(std::sscanf(opacity.data(),
-						"%f",
-						&bsdf_instance.mInstanceData.mOpacity) == 1);
+				gFromString(opacity.data(), bsdf_instance.mInstanceData.mOpacity);
 
 				// Could be texture
 
@@ -374,19 +371,12 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 				break;
 		}
 
-		auto load_specular_reflectance = [&]()
-		{
-			std::sscanf(null_to_empty(get_child_value(local_bsdf, "specular_reflectance").data()),
-				"%f, %f, %f",
-				&bsdf_instance.mInstanceData.mSpecularReflectance.x, &bsdf_instance.mInstanceData.mSpecularReflectance.y, &bsdf_instance.mInstanceData.mSpecularReflectance.z);
-		};
-
-		auto load_specular_transmittance = [&]()
-		{
-			std::sscanf(null_to_empty(get_child_value(local_bsdf, "specular_transmittance").data()),
-				"%f, %f, %f",
-				&bsdf_instance.mInstanceData.mSpecularTransmittance.x, &bsdf_instance.mInstanceData.mSpecularTransmittance.y, &bsdf_instance.mInstanceData.mSpecularTransmittance.z);
-		};
+		auto load_reflectance				= [&]() { gFromString(get_child_value(local_bsdf, "reflectance").data(),				bsdf_instance.mInstanceData.mAlbedo); };
+		auto load_specular_reflectance		= [&]() { gFromString(get_child_value(local_bsdf, "specular_reflectance").data(),		bsdf_instance.mInstanceData.mSpecularReflectance); };
+		auto load_specular_transmittance	= [&]() { gFromString(get_child_value(local_bsdf, "specular_transmittance").data(),		bsdf_instance.mInstanceData.mSpecularTransmittance); };
+		auto load_alpha						= [&]() { gFromString(get_child_value(local_bsdf, "alpha").data(),						bsdf_instance.mInstanceData.mRoughnessAlpha); };
+		auto load_eta						= [&]() { gFromString(get_child_value(local_bsdf, "eta").data(),						bsdf_instance.mInstanceData.mEta); };
+		auto load_k							= [&]() { gFromString(get_child_value(local_bsdf, "k").data(),							bsdf_instance.mInstanceData.mK); };
 		
 		if (local_type == "diffuse")
 		{
@@ -399,8 +389,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 			bsdf_instance.mInstanceInfo.mAlbedoTexture = reflectance.empty() ? "" : path;
 
 			if (reflectance.empty())
-				gVerify(std::sscanf(get_child_value(local_bsdf, "reflectance").data(), 
-					"%f, %f, %f", &bsdf_instance.mInstanceData.mAlbedo.x, &bsdf_instance.mInstanceData.mAlbedo.y, &bsdf_instance.mInstanceData.mAlbedo.z) == 3);
+				load_reflectance();
 		}
 		else if (local_type == "roughconductor")
 		{
@@ -408,18 +397,9 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 
 			gAssert(std::string_view(get_child_value(local_bsdf, "distribution")) == "ggx"); // [TODO] Support beckmann?
 
-			gVerify(std::sscanf(get_child_value(local_bsdf, "alpha").data(),
-				"%f", 
-				&bsdf_instance.mInstanceData.mRoughnessAlpha) == 1);
-
-			gVerify(std::sscanf(get_child_value(local_bsdf, "eta").data(),
-				"%f, %f, %f",
-				&bsdf_instance.mInstanceData.mEta.x, &bsdf_instance.mInstanceData.mEta.y, &bsdf_instance.mInstanceData.mEta.z) == 3);
-
-			gVerify(std::sscanf(get_child_value(local_bsdf, "k").data(),
-				"%f, %f, %f",
-				&bsdf_instance.mInstanceData.mK.x, &bsdf_instance.mInstanceData.mK.y, &bsdf_instance.mInstanceData.mK.z) == 3);
-
+			load_alpha();
+			load_eta();
+			load_k();
 			load_specular_reflectance();
 		}
 		else if (local_type == "dielectric")
@@ -427,15 +407,9 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 			bsdf_instance.mInstanceData.mBSDFType = BSDFType::Dielectric;
 			
 			float int_ior = 1.0f;
-			gVerify(std::sscanf(get_child_value(local_bsdf, "int_ior").data(),
-				"%f",
-				&int_ior) == 1);
-
+			gFromString(get_child_value(local_bsdf, "int_ior").data(), int_ior);
 			float ext_ior = 1.0f;
-			gVerify(std::sscanf(get_child_value(local_bsdf, "ext_ior").data(),
-				"%f",
-				&ext_ior) == 1);
-
+			gFromString(get_child_value(local_bsdf, "ext_ior").data(), ext_ior);
 			bsdf_instance.mInstanceData.mEta = float3(int_ior / ext_ior);
 
 			load_specular_transmittance();
@@ -509,25 +483,20 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 					gAssert(transform_name == "to_world");
 
 					std::string_view matrix_value = transform->FirstChildElement("matrix")->Attribute("value");
-					gVerify(std::sscanf(matrix_value.data(),
-						"%f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f",
-						&matrix[0][0], &matrix[1][0], &matrix[2][0], &matrix[3][0],
-						&matrix[0][1], &matrix[1][1], &matrix[2][1], &matrix[3][1],
-						&matrix[0][2], &matrix[1][2], &matrix[2][2], &matrix[3][2],
-						&matrix[0][3], &matrix[1][3], &matrix[2][3], &matrix[3][3]) == 16);
+					gFromString(matrix_value.data(), matrix);
 				}
 				else if (tinyxml2::XMLElement* center_element = shape->FirstChildElement("point"))
 				{
 					tinyxml2::XMLElement* radius_element = shape->FirstChildElement("float");
 					gAssert(std::string_view(radius_element->Attribute("name")) == "radius");
 					float radius = 0.0f;
-					gVerify(std::sscanf(radius_element->Attribute("value"), "%f", &radius) == 1);
+					gFromString(radius_element->Attribute("value"), radius);
 
 					gAssert(std::string_view(center_element->Attribute("name")) == "center");
 					glm::vec3 center = glm::vec3(0.0f);
-					gVerify(std::sscanf(center_element->Attribute("x"), "%f", &center[0]) == 1);
-					gVerify(std::sscanf(center_element->Attribute("y"), "%f", &center[1]) == 1);
-					gVerify(std::sscanf(center_element->Attribute("z"), "%f", &center[2]) == 1);
+					gFromString(center_element->Attribute("x"), center[0]);
+					gFromString(center_element->Attribute("y"), center[1]);
+					gFromString(center_element->Attribute("z"), center[2]);
 
 					matrix = glm::translate(matrix, center);
 					matrix = glm::scale(matrix, glm::vec3(radius));
@@ -564,9 +533,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 					std::string_view emitter_type = emitter->Attribute("type");
 					gAssert(emitter_type == "area");
 
-					gVerify(std::sscanf(get_child_value(emitter, "radiance").data(),
-						"%f, %f, %f",
-						&instance_data.mEmission.x, &instance_data.mEmission.y, &instance_data.mEmission.z) == 3);
+					gFromString(get_child_value(emitter, "radiance").data(), instance_data.mEmission);
 
 					instance_data.mBSDFType = BSDFType::Light;
 					instance_data.mTwoSided = false;
@@ -617,17 +584,11 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 	{
 		tinyxml2::XMLElement* transform = get_first_child_element_by_name(sensor, "to_world");
 		glm::mat4x4 matrix = glm::mat4x4(1.0f);
-		gVerify(std::sscanf(transform->FirstChildElement("matrix")->Attribute("value"),
-			"%f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f",
-			&matrix[0][0], &matrix[1][0], &matrix[2][0], &matrix[3][0],
-			&matrix[0][1], &matrix[1][1], &matrix[2][1], &matrix[3][1],
-			&matrix[0][2], &matrix[1][2], &matrix[2][2], &matrix[3][2],
-			&matrix[0][3], &matrix[1][3], &matrix[2][3], &matrix[3][3]) == 16);		
+		gFromString(transform->FirstChildElement("matrix")->Attribute("value"), matrix);
 		ioSceneContent.mCameraTransform = matrix;
 
 		float fov = 90.0f;
-		gVerify(std::sscanf(get_child_value(sensor, "fov").data(), 
-			"%f", &fov) == 1);
+		gFromString(get_child_value(sensor, "fov").data(), fov);
 		ioSceneContent.mFov = fov;
 	}
 
