@@ -133,15 +133,20 @@ namespace MIS
 }
 
 // [Filament] https://google.github.io/filament/Filament.md.html#materialsystem/specularbrdf/normaldistributionfunction(speculard)
-float D_GGX(float inNoH, float inA)
+float D_GGX(float inNdotH, float inA)
 {
-    float a = inNoH * inA;
-    float k = inA / (1.0 - inNoH * inNoH + a * a);
+    float a = inNdotH * inA;
+    float k = inA / (1.0 - inNdotH * inNdotH + a * a);
     return k * k * (1.0 / MATH_PI);
+
+    // [Mitsuba3] MicrofacetDistribution::eval. Anisotropy. m = H. https://github.com/mitsuba-renderer/mitsuba3/blob/master/include/mitsuba/render/microfacet.h#L199
+    // [PBRT3] TrowbridgeReitzDistribution::D. Anisotropy. wh = H. https://www.pbr-book.org/3ed-2018/Reflection_Models/Microfacet_Models
 
     // [Walter 2007] https://www.cs.cornell.edu/~srm/publications/EGSR07-btdf.pdf
     // [TODO] Check VNDF
 }
+
+// [TODO] G_SmithGGX_Lambda, G_SmithGGX_1
 
 // [Schuttejoe 2018] https://schuttejoe.github.io/post/ggximportancesamplingpart1/
 float G_SmithGGX(float inNdotL, float inNdotV, float inA)

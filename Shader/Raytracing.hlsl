@@ -160,7 +160,7 @@ void TraceRay()
 			{
 				// Sample Light
 				bool sample_light = mConstants.mSampleMode == SampleMode::SampleLight || mConstants.mSampleMode == SampleMode::MIS;
-				if (sample_light && mConstants.mLightCount > 0)
+				if (sample_light && mConstants.mLightCount > 0 && !BSDFEvaluation::DiracDeltaDistribution(hit_context))
 				{
 					uint light_index = min(RandomFloat01(path_context.mRandomState) * mConstants.mLightCount, mConstants.mLightCount - 1);
 					Light light = Lights[light_index];					
@@ -190,10 +190,10 @@ void TraceRay()
 						if (shadow_query.CommittedStatus() == COMMITTED_TRIANGLE_HIT && shadow_query.CommittedInstanceID() == light.mInstanceID)
 						{
 							BSDFContext bsdf_context = BSDFEvaluation::GenerateContext(shadow_ray.Direction, hit_context.mVertexNormalWS, -hit_context.mRayDirectionWS, hit_context);
-							BSDFEvaluation::SampleDirection(hit_context, bsdf_context);
+							BSDFEvaluation::Evaluate(hit_context, bsdf_context, path_context);
 
 							float3 luminance = light.mEmission * (kEmissionBoostScale * kPreExposure);
-							float3 emission = luminance * bsdf_context.mBSDF / light_pdf;
+							float3 emission = luminance * bsdf_context.mBSDF * bsdf_context.mNdotL / light_pdf;
 
 							if (mConstants.mSampleMode == SampleMode::MIS)
 								emission *= max(0.0, MIS::PowerHeuristic(1, light_pdf, 1, bsdf_context.mBSDFPDF));
@@ -208,12 +208,12 @@ void TraceRay()
 					// Generate next sample based on BSDF
 					float3 importance_sampling_direction = BSDFEvaluation::GenerateImportanceSamplingDirection(hit_context.mVertexNormalWS, hit_context, path_context);
 					BSDFContext bsdf_context = BSDFEvaluation::GenerateContext(importance_sampling_direction, hit_context.mVertexNormalWS, -hit_context.mRayDirectionWS, hit_context);
-					BSDFEvaluation::SampleBSDF(hit_context, bsdf_context, path_context);
+					BSDFEvaluation::Evaluate(hit_context, bsdf_context, path_context);
 
 					path_context.mEmission += path_context.mThroughput * emission; // Non-light emission
-					path_context.mThroughput *= bsdf_context.mBSDFPDF > 0 ? (bsdf_context.mBSDF / bsdf_context.mBSDFPDF) : 0;
+					path_context.mThroughput *= bsdf_context.mBSDFPDF > 0 ? (bsdf_context.mBSDF * bsdf_context.mNdotL / bsdf_context.mBSDFPDF) : 0;
 					path_context.mPrevBSDFPDF = bsdf_context.mBSDFPDF;
-					path_context.mPrevDeltaDistribution = bsdf_context.mDeltaDistribution;
+					path_context.mPrevDeltaDistribution = BSDFEvaluation::DiracDeltaDistribution(hit_context);
 
 					DebugValue(PixelDebugMode::BSDF_PDF, path_context.mRecursionCount, float4(bsdf_context.mBSDF, bsdf_context.mBSDFPDF));
 					DebugValue(PixelDebugMode::Throughput, path_context.mRecursionCount, float4(path_context.mThroughput, 0));

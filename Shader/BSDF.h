@@ -7,6 +7,9 @@ namespace BSDFEvaluation
 {
 	BSDFContext GenerateContext(float3 inLight, float3 inNormal, float3 inView, HitContext inHitContext)
 	{
+		// [NOTE] All vectors should be in the same space
+		//        [Mitsuba3] Does all calculation in tangent space where N = (0,0,1), then e.g NdotL = L.z
+
 		BSDFContext bsdf_context;
 
 		bsdf_context.mL = inLight;
@@ -20,7 +23,8 @@ namespace BSDFEvaluation
 		bsdf_context.mHdotV = dot(bsdf_context.mH, bsdf_context.mV);
 		bsdf_context.mHdotL = dot(bsdf_context.mH, bsdf_context.mL);
 
-		bsdf_context.mDeltaDistribution = false;
+		bsdf_context.mBSDF = 0;
+		bsdf_context.mBSDFPDF = 0;
 
 		return bsdf_context;
 	}
@@ -49,25 +53,12 @@ namespace BSDFEvaluation
 			return normalize(direction.x * inTangentSpace[0] + direction.y * inTangentSpace[1] + direction.z * inTangentSpace[2]);
 		}
 
-		void SampleDirection(HitContext inHitContext, inout BSDFContext ioBSDFContext)
+		void Evaluate(HitContext inHitContext, inout BSDFContext ioBSDFContext, inout PathContext ioPathContext)
 		{
 			ioBSDFContext.mNdotL = max(0, ioBSDFContext.mNdotL);
 
-			ioBSDFContext.mBSDF = BSDFEvaluation::Source::Albedo(inHitContext) * ioBSDFContext.mNdotL / MATH_PI;
+			ioBSDFContext.mBSDF = BSDFEvaluation::Source::Albedo(inHitContext) / MATH_PI;
 			ioBSDFContext.mBSDFPDF = ioBSDFContext.mNdotL / MATH_PI;
-
-			// [NOTE] Similar to eval in Mitsuba3
-		}
-
-		void SampleBSDF(HitContext inHitContext, inout BSDFContext ioBSDFContext, inout PathContext ioPathContext)
-		{
-			ioBSDFContext.mNdotL = max(0, ioBSDFContext.mNdotL);
-
-			ioBSDFContext.mBSDF = BSDFEvaluation::Source::Albedo(inHitContext) * ioBSDFContext.mNdotL / MATH_PI;
-			ioBSDFContext.mBSDFPDF = ioBSDFContext.mNdotL / MATH_PI;
-
-			// [NOTE] Similar to sample in Mitsuba3, if combined with GenerateImportanceSamplingDirection
-			//        Mitsuba3 return brdf_weight = ioBSDFContext.mBSDF / ioBSDFContext.mBSDFPDF, that cancel out some terms
 		}
 	};
 
@@ -98,44 +89,48 @@ namespace BSDFEvaluation
 				H = normalize(H.x * inTangentSpace[0] + H.y * inTangentSpace[1] + H.z * inTangentSpace[2]);
 			}
 
+			// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(H == inTangentSpace[2], 0));
+
 			float3 V = -sGetWorldRayDirection();
 			float HdotV = dot(H, V);
 			return 2.0 * HdotV * H - V;
 		}
 
-		void SampleDirection(HitContext inHitContext, inout BSDFContext ioBSDFContext)
+		void Evaluate(HitContext inHitContext, inout BSDFContext ioBSDFContext, inout PathContext ioPathContext)
 		{
 			float D = D_GGX(ioBSDFContext.mNdotH, InstanceDatas[inHitContext.mInstanceID].mRoughnessAlpha);
 			float G = G_SmithGGX(ioBSDFContext.mNdotL, ioBSDFContext.mNdotV, InstanceDatas[inHitContext.mInstanceID].mRoughnessAlpha);
 			float3 F = F_Conductor_Mitsuba(InstanceDatas[inHitContext.mInstanceID].mEta, InstanceDatas[inHitContext.mInstanceID].mK, ioBSDFContext.mHdotV) * InstanceDatas[inHitContext.mInstanceID].mSpecularReflectance;
 
-			if (D < 0 || ioBSDFContext.mNdotL < 0 || ioBSDFContext.mNdotV < 0)
-				D = 0;
-
-			ioBSDFContext.mBSDF = D * G * F / (4.0f * ioBSDFContext.mNdotV);
-			ioBSDFContext.mBSDFPDF = (D * ioBSDFContext.mNdotH) / (4.0f * ioBSDFContext.mHdotV);
-		}
-
-		void SampleBSDF(HitContext inHitContext, inout BSDFContext ioBSDFContext, inout PathContext ioPathContext)
-		{
-			float D = D_GGX(ioBSDFContext.mNdotH, InstanceDatas[inHitContext.mInstanceID].mRoughnessAlpha);
-			float G = G_SmithGGX(ioBSDFContext.mNdotL, ioBSDFContext.mNdotV, InstanceDatas[inHitContext.mInstanceID].mRoughnessAlpha);
-			float3 F = F_Conductor_Mitsuba(InstanceDatas[inHitContext.mInstanceID].mEta, InstanceDatas[inHitContext.mInstanceID].mK, ioBSDFContext.mHdotV) * InstanceDatas[inHitContext.mInstanceID].mSpecularReflectance;
-
-			// [NOTE] Mitsuba3 use visible normal sampling by default which affects both BSDF and BSDFPDF
-			// [TODO] Visible normal sampling not compatible with height-correlated visibility term?
+			// [NOTE] Visible normal not supported yet
+			//        [Mitsuba3] use visible normal sampling by default which affects both BSDF and BSDFPDF
+			//        [TODO] Visible normal sampling not compatible with height-correlated visibility term?
 
 			if (D < 0 || ioBSDFContext.mNdotL < 0 || ioBSDFContext.mNdotV < 0)
 				D = 0;
 
-			// [TODO] Check BSDF again
+			// [NOTE] Sample may return BSDF * NdotL / PDF as a whole or in separated terms vary between implementations.
+			//        Also, NdotL needs to be eliminated for Dirac delta distribution.
+			//        [PBRT3] `Sample_f` return BSDF and PDF. Dirac delta distribution (e.g. BSDF_SPECULAR) divide an extra NdotL for BSDF. https://github.com/mmp/pbrt-v3/blob/aaa552a4b9cbf9dccb71450f47b268e0ed6370e2/src/core/reflection.cpp#L410
+			//        [Mitsuba3] `sample` returns as whole. Dirac delta distribution (e.g. ) does not have the NdotL term. https://github.com/mitsuba-renderer/mitsuba3/blob/master/src/bsdfs/roughconductor.cpp#L226
+			//		         [NOTE] In `sample`, assume m_sample_visible = false,
+			//                      BSDF * NdotL / PDF = F * G * ioBSDFContext.mHdotV / (ioBSDFContext.mNdotV * ioBSDFContext.mNdotH) * (D * ioBSDFContext.mNdotH) / (4.0f * ioBSDFContext.mHdotL)
+			//			            HdotV and HdotL does not seems to cancel out at first glance.
+			//                      The thing is, H is the half vector, HdotV = HdotL. (May differs due to floating point arithmetic though)
+			//                      [TODO] Where does the HdotV come from in the first place?
 
-			ioBSDFContext.mBSDF = D * G * F / (4.0f * ioBSDFContext.mNdotV);
-			ioBSDFContext.mBSDFPDF = (D * ioBSDFContext.mNdotH) / (4.0f * ioBSDFContext.mHdotV);
+			// [NOTE] Naming of wi/wo vary between implementations depending on point of view. The result should be same.
+			//		  [PBRT3] has wo as V, wi as L
+			// 		  [Mitsuba3] has wi as V, wo as L
+			//        https://www.shadertoy.com/view/MsXfz4 has wi as V, wo as L
 
-			// [NOTE] PBRT3 has wo as V, wi as L
-			// [NOTE] Mitsuba3 has wo as V, wi as L
-			// [NOTE] https://www.shadertoy.com/view/MsXfz4 has wi as V, wo as L
+			ioBSDFContext.mBSDF = D * G * F / (4.0f * ioBSDFContext.mNdotV * ioBSDFContext.mNdotL);
+			ioBSDFContext.mBSDFPDF	= (D * ioBSDFContext.mNdotH) / (4.0f * ioBSDFContext.mHdotL);
+
+			// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(F, 0));
+			// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(ioBSDFContext.mHdotV, ioBSDFContext.mHdotL, 0, 0));
+ 			// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(ioBSDFContext.mNdotL, ioBSDFContext.mNdotV, 0, ioBSDFContext.mNdotH));
+			// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(D, ioBSDFContext.mBSDFPDF, 0, 0));
 		}
 	}
 
@@ -143,20 +138,10 @@ namespace BSDFEvaluation
 	{
 		float3 GenerateImportanceSamplingDirection(float3x3 inTangentSpace, HitContext inHitContext, inout PathContext ioPathContext)
 		{
-			// Dummy, will generate sampling direction in SampleBSDF
-
+			// Dummy, will generate sampling direction in Evaluate
 			return reflect(inHitContext.mRayDirectionWS, inTangentSpace[2]);
 		}
-
-		void SampleDirection(HitContext inHitContext, inout BSDFContext ioBSDFContext)
-		{
-			// No light sample supported
-
-			ioBSDFContext.mBSDF = 0.0;
-			ioBSDFContext.mBSDFPDF = 0.0;
-		}
-
-		void SampleBSDF(HitContext inHitContext, inout BSDFContext ioBSDFContext, inout PathContext ioPathContext)
+		void Evaluate(HitContext inHitContext, inout BSDFContext ioBSDFContext, inout PathContext ioPathContext)
 		{
 			// [NOTE] L and related information are not avaiable yet before selection between reflection and refraction
 
@@ -178,11 +163,11 @@ namespace BSDFEvaluation
 			ioBSDFContext = GenerateContext(L, ioBSDFContext.mN, ioBSDFContext.mV, inHitContext);
 			ioBSDFContext.mBSDF = select(selected_r, InstanceDatas[inHitContext.mInstanceID].mSpecularReflectance, InstanceDatas[inHitContext.mInstanceID].mSpecularTransmittance) * select(selected_r, r_i, 1.0 - r_i);
 			ioBSDFContext.mBSDFPDF = select(selected_r, r_i, 1.0 - r_i);
-			ioBSDFContext.mDeltaDistribution = true;
 
-			// [TODO] Look for reference
-			// For transmission, radiance must be scaled to account for the solid
-			// angle compression that occurs when crossing the interface.
+			// [NOTE] Account for solid angle compression
+			//        [Mitsuba3] For transmission, radiance must be scaled to account for the solid angle compression that occurs when crossing the interface. // https://github.com/mitsuba-renderer/mitsuba3/blob/master/src/bsdfs/dielectric.cpp#L359
+			//        [PBRT3] Account for non-symmetry with transmission to different medium https://github.com/mmp/pbrt-v3/blob/aaa552a4b9cbf9dccb71450f47b268e0ed6370e2/src/core/reflection.cpp#L163
+			//        [TODO] Read reference
 			ioBSDFContext.mBSDF *= select(selected_r, 1.0, eta_ti * eta_ti);
 
 			// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(-ioBSDFContext.mV, selected_r));
@@ -190,11 +175,55 @@ namespace BSDFEvaluation
 		}
 	}
 
+	namespace DebugEmissive
+	{
+		void Evaluate(HitContext inHitContext, inout BSDFContext ioBSDFContext, inout PathContext ioPathContext)
+		{
+			ioBSDFContext.mBSDF = 0.0f;
+			ioBSDFContext.mBSDFPDF = 0.0f;
+		}
+	}
+
+	namespace DebugMirror
+	{
+		void Evaluate(HitContext inHitContext, inout BSDFContext ioBSDFContext, inout PathContext ioPathContext)
+		{
+			ioBSDFContext = GenerateContext(reflect(-ioBSDFContext.mV, ioBSDFContext.mN), ioBSDFContext.mN, ioBSDFContext.mV, inHitContext);
+			ioBSDFContext.mBSDF = 1.0f;
+			ioBSDFContext.mBSDFPDF = 1.0f;
+		}
+	}
+
+	BSDFType GetBSDFType(HitContext inHitContext)
+	{
+		if (mConstants.mDebugInstanceIndex == inHitContext.mInstanceID)
+		{
+			switch (mConstants.mDebugInstanceMode)
+			{
+			case DebugInstanceMode::Barycentrics: return BSDFType::DebugEmissive;
+			case DebugInstanceMode::Mirror: return BSDFType::DebugMirror;
+			default: break;
+			}
+		}
+
+		return InstanceDatas[inHitContext.mInstanceID].mBSDFType;
+	}
+
+	bool DiracDeltaDistribution(HitContext inHitContext)
+	{
+		switch (GetBSDFType(inHitContext))
+		{
+		case BSDFType::Dielectric:		return true;
+		case BSDFType::DebugMirror:		return true;
+		default:						return false;
+		}
+	}
+
 	float3 GenerateImportanceSamplingDirection(float3 inNormal, HitContext inHitContext, inout PathContext ioPathContext)
 	{
 		float3x3 inTangentSpace = GenerateTangentSpace(inNormal);
 		[branch]
-		switch (InstanceDatas[inHitContext.mInstanceID].mBSDFType)
+		switch (GetBSDFType(inHitContext))
 		{
 		case BSDFType::Unsupported:		// [[fallthrough]];
 		case BSDFType::Diffuse:			return Lambert::GenerateImportanceSamplingDirection(inTangentSpace, inHitContext, ioPathContext);
@@ -204,61 +233,28 @@ namespace BSDFEvaluation
 		}
 	}
 
-	void SampleDirection(HitContext inHitContext, inout BSDFContext ioBSDFContext)
+	void Evaluate(HitContext inHitContext, inout BSDFContext ioBSDFContext, inout PathContext ioPathContext)
 	{
-		if (mConstants.mDebugInstanceIndex == inHitContext.mInstanceID && mConstants.mDebugInstanceMode == DebugInstanceMode::Barycentrics)
-		{
-			ioBSDFContext.mBSDF = 0.0f;
-			ioBSDFContext.mBSDFPDF = 0.0f;
-			return;
-		}
-
-		if (mConstants.mDebugInstanceIndex == inHitContext.mInstanceID && mConstants.mDebugInstanceMode == DebugInstanceMode::Mirror)
-		{
-			ioBSDFContext.mBSDF = 0.0f;
-			ioBSDFContext.mBSDFPDF = 0.0f;
-			ioBSDFContext.mDeltaDistribution = true;
-			return;
-		}
-
 		[branch]
-		switch (InstanceDatas[inHitContext.mInstanceID].mBSDFType)
+		switch (GetBSDFType(inHitContext))
 		{
+		case BSDFType::Diffuse:			Lambert::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
+		case BSDFType::RoughConductor:	RoughConductor::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
+		case BSDFType::Dielectric:		Dielectric::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
+		case BSDFType::DebugEmissive:	DebugEmissive::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
+		case BSDFType::DebugMirror:		DebugMirror::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
 		case BSDFType::Unsupported:		// [[fallthrough]];
-		case BSDFType::Diffuse:			Lambert::SampleDirection(inHitContext, ioBSDFContext); break;
-		case BSDFType::RoughConductor:	RoughConductor::SampleDirection(inHitContext, ioBSDFContext); break;
-		case BSDFType::Dielectric:		Dielectric::SampleDirection(inHitContext, ioBSDFContext); break;
 		default:						break;
 		}
-	}
 
-	void SampleBSDF(HitContext inHitContext, inout BSDFContext ioBSDFContext, inout PathContext ioPathContext)
-	{
-		if (mConstants.mDebugInstanceIndex == inHitContext.mInstanceID && mConstants.mDebugInstanceMode == DebugInstanceMode::Barycentrics)
+		if (DiracDeltaDistribution(inHitContext))
 		{
-			ioBSDFContext.mBSDF = 0.0f;
-			ioBSDFContext.mBSDFPDF = 1.0f;
-			return;
-		}
-
-		if (mConstants.mDebugInstanceIndex == inHitContext.mInstanceID && mConstants.mDebugInstanceMode == DebugInstanceMode::Mirror)
-		{
-			ioBSDFContext = GenerateContext(reflect(-ioBSDFContext.mV, ioBSDFContext.mN), ioBSDFContext.mN, ioBSDFContext.mV, inHitContext);
-
-			ioBSDFContext.mBSDF = 1.0f;
-			ioBSDFContext.mBSDFPDF = 1.0f;
-			ioBSDFContext.mDeltaDistribution = true;
-			return;
-		}
-
-		[branch]
-		switch (InstanceDatas[inHitContext.mInstanceID].mBSDFType)
-		{
-		case BSDFType::Unsupported:		// [[fallthrough]];
-		case BSDFType::Diffuse:			Lambert::SampleBSDF(inHitContext, ioBSDFContext, ioPathContext); break;
-		case BSDFType::RoughConductor:	RoughConductor::SampleBSDF(inHitContext, ioBSDFContext, ioPathContext); break;
-		case BSDFType::Dielectric:		Dielectric::SampleBSDF(inHitContext, ioBSDFContext, ioPathContext); break;
-		default:						break;
+			// [NOTE] For Dirac delta distribution, the cosine term is defined to be canceled out with the one in integration
+			// Considering it as part of integral to describe illuminance sounds okay, but still not very thorough... 
+			// https://www.pbr-book.org/3ed-2018/Reflection_Models/Specular_Reflection_and_Transmission
+			// https://stackoverflow.com/questions/22431912/path-tracing-why-is-there-no-cosine-term-when-calculating-perfect-mirror-reflec
+			// https://gamedev.net/forums/topic/657520-cosine-term-in-rendering-equation/5159311/?page=2
+			ioBSDFContext.mBSDF /= ioBSDFContext.mNdotL;
 		}
 
 		// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(ioBSDFContext.mBSDF, ioBSDFContext.mBSDFPDF));

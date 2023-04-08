@@ -250,6 +250,9 @@ enum class BSDFType : uint
 	// [TODO]
 	// Mask, // forward-facing Dirac delta distribution
 
+	DebugEmissive,
+	DebugMirror,
+
 	Unsupported,			// Fallback to Diffuse
 
 	Count
@@ -432,15 +435,8 @@ struct BSDFContext
 	float mHdotV;
 	float mHdotL;
 
-	// [NOTE] For Dirac delta distribution, the cosine term is not necessary, or can be defined to be canceled out
-	// Considering it as part of integral to describe illuminance sounds okay, but still not very thorough... 
-	// https://www.pbr-book.org/3ed-2018/Reflection_Models/Specular_Reflection_and_Transmission
-	// https://stackoverflow.com/questions/22431912/path-tracing-why-is-there-no-cosine-term-when-calculating-perfect-mirror-reflec
-	// https://gamedev.net/forums/topic/657520-cosine-term-in-rendering-equation/5159311/?page=2
-
-	float3 mBSDF;				// Cosine term included for non-Dirac delta distribution
+	float3 mBSDF;
 	float mBSDFPDF;
-	bool mDeltaDistribution;
 };
 
 struct DensityProfileLayer
