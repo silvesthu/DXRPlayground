@@ -1,6 +1,3 @@
-// [TODO]
-// - MIS
-// - HDRI
 
 #include "Shared.h"
 #include "Binding.h"
@@ -13,13 +10,26 @@
 
 void TraceRay()
 {
+	DebugValueInit();
+
+	// From https://www.shadertoy.com/view/tsBBWW
+	uint random_state = uint(uint(sGetDispatchRaysIndex().x) * uint(1973) + uint(sGetDispatchRaysIndex().y) * uint(9277) + uint(mConstants.mCurrentFrameIndex) * uint(26699)) | uint(1);
+
 	uint3 launchIndex = sGetDispatchRaysIndex();
 	uint3 launchDim = sGetDispatchRaysDimensions();
 
-	float2 crd = float2(launchIndex.xy) + 0.5;
+	float2 crd = float2(launchIndex.xy);
 	float2 dims = float2(launchDim.xy);
 
-	float2 d = ((crd / dims) * 2.f - 1.f); // (0,1) => (-1,1)
+	switch (mConstants.mOffsetMode)
+	{
+	case OffsetMode::HalfPixel:	crd += 0.5;
+	case OffsetMode::Random:	crd += float2(RandomFloat01(random_state), RandomFloat01(random_state));
+	case OffsetMode::NoOffset:	// [[fallthrough]];
+	default: break;
+	}
+
+	float2 d = ((crd / dims) * 2.f - 1.f); // [0,1] => [-1,1]
 	d.y = -d.y;
 	
 	RayDesc ray;
@@ -28,12 +38,13 @@ void TraceRay()
 	ray.TMin = 0.001;
 	ray.TMax = 100000;
 
-	PathContext path_context = (PathContext)0;
-	path_context.mThroughput = 1; // Camera gather all the light
-	path_context.mPrevBSDFPDF = 0;
-	path_context.mPrevDeltaDistribution = false;
-	path_context.mRandomState = uint(uint(sGetDispatchRaysIndex().x) * uint(1973) + uint(sGetDispatchRaysIndex().y) * uint(9277) + uint(mConstants.mCurrentFrameIndex) * uint(26699)) | uint(1); // From https://www.shadertoy.com/view/tsBBWW
-	path_context.mRecursionCount = 0;
+	PathContext path_context					= (PathContext)0;
+	path_context.mThroughput					= 1;
+	path_context.mPrevBSDFPDF					= 0;
+	path_context.mPrevDiracDeltaDistribution	= false;
+	path_context.mEtaScale						= 1;
+	path_context.mRandomState					= random_state;
+	path_context.mRecursionCount				= 0;
 
 	// Note that RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH will give first hit for "Any Hit". The result may not be the closest one
 	// https://docs.microsoft.com/en-us/windows/win32/direct3d12/ray_flag
@@ -46,7 +57,7 @@ void TraceRay()
 		bool continue_bounce				= false;
 		float3 light_emission				= 0;
 
-		sWorldRayOrigin 					= ray.Origin;
+		sWorldRayOrigin						= ray.Origin;
 		sWorldRayDirection					= ray.Direction;
 
 		query.TraceRayInline(RaytracingScene, additional_ray_flags, ray_instance_mask, ray);
@@ -60,10 +71,8 @@ void TraceRay()
 			attributes.barycentrics			= query.CommittedTriangleBarycentrics();
 
 			HitContext hit_context			= (HitContext)0;
-
 			hit_context.mInstanceID			= query.CommittedInstanceID();
 			hit_context.mPrimitiveIndex		= query.CommittedPrimitiveIndex();
-
 			hit_context.mRayOriginWS		= ray.Origin;
 			hit_context.mRayDirectionWS		= ray.Direction;
 
@@ -137,7 +146,7 @@ void TraceRay()
 			if (InstanceDatas[hit_context.mInstanceID].mBSDFType == BSDFType::Light)
 			{
 				// Direct Lighting
-				if (path_context.mRecursionCount == 0 || mConstants.mLightCount == 0 || mConstants.mSampleMode == SampleMode::SampleBSDF || path_context.mPrevDeltaDistribution)
+				if (path_context.mRecursionCount == 0 || mConstants.mLightCount == 0 || mConstants.mSampleMode == SampleMode::SampleBSDF || path_context.mPrevDiracDeltaDistribution)
 				{
 					path_context.mEmission += path_context.mThroughput * emission;
 				}
@@ -149,11 +158,11 @@ void TraceRay()
 					float3 light_sample_direction = 0;
 					LightEvaluation::GenerateSamplingDirection(light, ray.Origin, path_context, light_sample_direction, light_sample_pdf);
 
-					DebugValue(PixelDebugMode::LightPDFForBSDF, path_context.mRecursionCount, float4(light_sample_pdf.x, 0, 0, 0));
-
 					float light_pdf = light_sample_pdf * LightEvaluation::GetLightSelectionPDF();
 					float mis_weight = max(0.0, MIS::PowerHeuristic(1, path_context.mPrevBSDFPDF, 1, light_pdf));
 					path_context.mEmission += path_context.mThroughput * emission * mis_weight;
+
+					DebugValue(PixelDebugMode::MIS_BSDF, path_context.mRecursionCount - 1, float4(path_context.mPrevBSDFPDF, light_pdf, LightEvaluation::GetLightSelectionPDF(), light_sample_pdf));
 				}
 			}
 			else
@@ -163,13 +172,11 @@ void TraceRay()
 				if (sample_light && mConstants.mLightCount > 0 && !BSDFEvaluation::DiracDeltaDistribution(hit_context))
 				{
 					uint light_index = min(RandomFloat01(path_context.mRandomState) * mConstants.mLightCount, mConstants.mLightCount - 1);
-					Light light = Lights[light_index];					
+					Light light = Lights[light_index];
 
 					float light_sample_pdf = 0;
 					float3 light_sample_direction = 0;
 					LightEvaluation::GenerateSamplingDirection(light, hit_context.mHitPositionWS, path_context, light_sample_direction, light_sample_pdf);
-
-					DebugValue(PixelDebugMode::LightPDFForLight, path_context.mRecursionCount, float4(light_sample_pdf.x, 0, 0, 0));
 
 					float light_pdf = light_sample_pdf * LightEvaluation::GetLightSelectionPDF();
 					if (light_pdf > 0)
@@ -198,6 +205,8 @@ void TraceRay()
 							if (mConstants.mSampleMode == SampleMode::MIS)
 								emission *= max(0.0, MIS::PowerHeuristic(1, light_pdf, 1, bsdf_context.mBSDFPDF));
 
+							DebugValue(PixelDebugMode::MIS_Light, path_context.mRecursionCount, float4(bsdf_context.mBSDFPDF, light_pdf, LightEvaluation::GetLightSelectionPDF(), light_sample_pdf));
+
 							light_emission = path_context.mThroughput * emission;
 						}
 					}
@@ -213,10 +222,11 @@ void TraceRay()
 					path_context.mEmission += path_context.mThroughput * emission; // Non-light emission
 					path_context.mThroughput *= bsdf_context.mBSDFPDF > 0 ? (bsdf_context.mBSDF * bsdf_context.mNdotL / bsdf_context.mBSDFPDF) : 0;
 					path_context.mPrevBSDFPDF = bsdf_context.mBSDFPDF;
-					path_context.mPrevDeltaDistribution = BSDFEvaluation::DiracDeltaDistribution(hit_context);
+					path_context.mPrevDiracDeltaDistribution = BSDFEvaluation::DiracDeltaDistribution(hit_context);
+					path_context.mEtaScale *= bsdf_context.mEta;
 
 					DebugValue(PixelDebugMode::BSDF_PDF, path_context.mRecursionCount, float4(bsdf_context.mBSDF, bsdf_context.mBSDFPDF));
-					DebugValue(PixelDebugMode::Throughput, path_context.mRecursionCount, float4(path_context.mThroughput, 0));
+					DebugValue(PixelDebugMode::Throughput_DiracDelta, path_context.mRecursionCount, float4(path_context.mThroughput, path_context.mPrevDiracDeltaDistribution));
 
 					// Next bounce
 					ray.Origin = hit_context.mHitPositionWS;
@@ -261,29 +271,41 @@ void TraceRay()
 		if (!continue_bounce)
 			break;
 
+		float throughput_max = max(path_context.mThroughput.x, max(path_context.mThroughput.y, path_context.mThroughput.z));
+		if (throughput_max <= 0)
+			break;
+
 		// Russian Roulette
 		// [TODO] Make a test scene for comparison
 		// http://www.pbr-book.org/3ed-2018/Monte_Carlo_Integration/Russian_Roulette_and_Splitting.html
 		// https://computergraphics.stackexchange.com/questions/2316/is-russian-roulette-really-the-answer
 		if (path_context.mRecursionCount >= mConstants.mRecursionCountMax)
 		{
+			if (mConstants.mRecursionMode == RecursionMode::FixedCount)
+				break;
+
 			if (mConstants.mRecursionMode == RecursionMode::RussianRoulette)
 			{
 				// Probability can be chosen in almost any manner
 				// e.g. Fixed threshold
 				// e.g. Veach's Efficiency-Optimized Russian roulette is based on average variance and cost
-				// Based on throughput here
-				float3 throughput = path_context.mThroughput;
-				float termination_probability = max(0.25, 1.0 - max(throughput.x, max(throughput.y, throughput.z)));
+				float scale = path_context.mEtaScale * path_context.mEtaScale; // See Dielectric::Evaluate
+				float continue_probablity = min(throughput_max * scale, 0.95);
+				bool continue_by_russian_roulette = RandomFloat01(path_context.mRandomState) < continue_probablity;
 
-				if (RandomFloat01(path_context.mRandomState) < termination_probability)
+				DebugValue(PixelDebugMode::RussianRoulette_Probability_EtaScale, path_context.mRecursionCount, float4(continue_by_russian_roulette, continue_probablity, path_context.mEtaScale, 0));
+
+				if (continue_by_russian_roulette)
+				{
+					// Weight the path to keep result unbiased
+					path_context.mThroughput /= continue_probablity;
+				}
+				else
+				{
+					// Termination by Russian Roulette
 					break;
-
-				// Weight the path to keep result unbiased
-				path_context.mThroughput /= (1 - termination_probability);
+				}
 			}
-			else
-				break;
 		}
 
 		path_context.mEmission += light_emission; // Keep accumulation from light sample after termination with RR

@@ -192,6 +192,14 @@ static void sPrepareImGui()
 
 		if (ImGui::TreeNodeEx("Sampling", ImGuiTreeNodeFlags_DefaultOpen))
 		{
+			ImGui::Text("Offset Mode");
+			for (int i = 0; i < static_cast<int>(OffsetMode::Count); i++)
+			{
+				const auto& name = nameof::nameof_enum(static_cast<OffsetMode>(i));
+				ImGui::SameLine();
+				ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mOffsetMode), i);
+			}
+
 			ImGui::Text("Sample Mode");
 			for (int i = 0; i < static_cast<int>(SampleMode::Count); i++)
 			{
@@ -881,6 +889,7 @@ void sRender()
 			sConstantsCopy.mCurrentFrameIndex		= gConstants.mCurrentFrameIndex;
 			sConstantsCopy.mCurrentFrameWeight		= gConstants.mCurrentFrameWeight;
 			sConstantsCopy.mPixelDebugCoord			= gConstants.mPixelDebugCoord;
+			sConstantsCopy.mPixelDebugMode			= gConstants.mPixelDebugMode;
 
 			if (memcmp(&sConstantsCopy, &gConstants, sizeof(Constants)) != 0)
 				gRenderer.mAccumulationResetRequested = true;

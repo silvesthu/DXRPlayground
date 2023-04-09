@@ -26,6 +26,8 @@ namespace BSDFEvaluation
 		bsdf_context.mBSDF = 0;
 		bsdf_context.mBSDFPDF = 0;
 
+		bsdf_context.mEta = 1;
+
 		return bsdf_context;
 	}
 
@@ -165,10 +167,17 @@ namespace BSDFEvaluation
 			ioBSDFContext.mBSDFPDF = select(selected_r, r_i, 1.0 - r_i);
 
 			// [NOTE] Account for solid angle compression
-			//        [Mitsuba3] For transmission, radiance must be scaled to account for the solid angle compression that occurs when crossing the interface. // https://github.com/mitsuba-renderer/mitsuba3/blob/master/src/bsdfs/dielectric.cpp#L359
-			//        [PBRT3] Account for non-symmetry with transmission to different medium https://github.com/mmp/pbrt-v3/blob/aaa552a4b9cbf9dccb71450f47b268e0ed6370e2/src/core/reflection.cpp#L163
-			//        [TODO] Read reference
+			//        [Mitsuba3] > For transmission, radiance must be scaled to account for the solid angle compression that occurs when crossing the interface. 
+			//                   https://github.com/mitsuba-renderer/mitsuba3/blob/master/src/bsdfs/dielectric.cpp#L359
+			//        [PBRT3] > Account for non-symmetry with transmission to different medium 
+			//	              https://github.com/mmp/pbrt-v3/blob/aaa552a4b9cbf9dccb71450f47b268e0ed6370e2/src/core/reflection.cpp#L163
+			//		          https://www.pbr-book.org/3ed-2018/Light_Transport_III_Bidirectional_Methods/The_Path-Space_Measurement_Equation#x3-Non-symmetryDuetoRefraction
+			// [NOTE] Output eta (inverse) to remove its effect on Russian Roulette. As Russian Roulette depends on throughput, which in turn depends on BSDF.
+			//        The difference is easily observable when Russian Roulette is enabled even for the first iterations.
+			//		  [PBRT3] > It lets us sometimes avoid terminating refracted rays that are about to be refracted back out of a medium and thus have their beta value increased.
+			//                https://github.com/mmp/pbrt-v3/blob/master/src/integrators/path.cpp#L72
 			ioBSDFContext.mBSDF *= select(selected_r, 1.0, eta_ti * eta_ti);
+			ioBSDFContext.mEta = select(selected_r, 1.0, eta_it);
 
 			// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(-ioBSDFContext.mV, selected_r));
 			// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(L, 0));

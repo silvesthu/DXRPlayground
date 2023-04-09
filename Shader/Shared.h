@@ -196,21 +196,25 @@ enum class DebugMode : uint
 
 enum class PixelDebugMode : uint
 {
-	PositionWS_InstanceID,
+	Manual,
 
 	_Newline1,
 
-	BSDF_PDF,
-	Throughput,
+	PositionWS_InstanceID,
 
 	_Newline2,
 
-	LightPDFForBSDF,
-	LightPDFForLight,
+	BSDF_PDF,
+	Throughput_DiracDelta,
 
 	_Newline3,
 
-	Manual,
+	MIS_BSDF,
+	MIS_Light,
+
+	_Newline4,
+
+	RussianRoulette_Probability_EtaScale,
 
 	Count
 };
@@ -219,6 +223,15 @@ enum class RecursionMode : uint
 {
 	FixedCount = 0,
 	RussianRoulette,
+
+	Count
+};
+
+enum class OffsetMode : uint
+{
+	NoOffset = 0,
+	HalfPixel,
+	Random,
 
 	Count
 };
@@ -386,21 +399,23 @@ struct RayState
 		Done					= 1,
 	};
 
-	void						Set(uint inBits) { mBits |= inBits; }
-	void						Unset(uint inBits) { mBits &= ~inBits; }
-	void						Reset(uint inBits) { mBits = inBits; }
-	bool						IsSet(uint inBits) { return (mBits & inBits) != 0; }
+	void						Set(uint inBits)				{ mBits |= inBits; }
+	void						Unset(uint inBits)				{ mBits &= ~inBits; }
+	void						Reset(uint inBits)				{ mBits = inBits; }
+	bool						IsSet(uint inBits)				{ return (mBits & inBits) != 0; }
 
 	uint						mBits;
 };
 
 struct PathContext
 {
-	float3						mThroughput;					// [0, 1]		Accumulated throughput
+	float3						mThroughput;					// [0, 1]		Accumulated throughput, [PBRT3] call it beta https://github.com/mmp/pbrt-v3/blob/master/src/integrators/path.cpp#L68
 	float3						mEmission;						// [0, +inf]	Accumulated emission
 
 	float						mPrevBSDFPDF;
-	bool						mPrevDeltaDistribution;
+	bool						mPrevDiracDeltaDistribution;
+
+	float						mEtaScale;
 
 	uint						mRandomState;
 	uint						mRecursionCount;
@@ -437,6 +452,8 @@ struct BSDFContext
 
 	float3 mBSDF;
 	float mBSDFPDF;
+
+	float mEta;
 };
 
 struct DensityProfileLayer
@@ -557,8 +574,8 @@ struct Constants
 	float						mTime							CONSTANT_DEFAULT(0);
 
 	uint						mLightCount						CONSTANT_DEFAULT(0);
+	OffsetMode					mOffsetMode						CONSTANT_DEFAULT(OffsetMode::HalfPixel);
 	SampleMode					mSampleMode						CONSTANT_DEFAULT(SampleMode::MIS);
-	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
 	float4						mSunDirection					CONSTANT_DEFAULT(float4(1.0f, 0.0f, 0.0f, 0.0f));
@@ -570,11 +587,16 @@ struct Constants
 
 	RecursionMode				mRecursionMode					CONSTANT_DEFAULT(RecursionMode::FixedCount);
 	uint						mRecursionCountMax				CONSTANT_DEFAULT(1);
+	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+
 	uint						mCurrentFrameIndex				CONSTANT_DEFAULT(0);
 	float						mCurrentFrameWeight				CONSTANT_DEFAULT(1);
+	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
 	uint2						mPixelDebugCoord				CONSTANT_DEFAULT(uint2(0, 0));
-	PixelDebugMode				mPixelDebugMode					CONSTANT_DEFAULT(PixelDebugMode::PositionWS_InstanceID);
+	PixelDebugMode				mPixelDebugMode					CONSTANT_DEFAULT(PixelDebugMode::Manual);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
 	AtmosphereConstants			mAtmosphere;
@@ -583,7 +605,7 @@ struct Constants
 
 struct Debug
 {
-	static const int			kValueArraySize = 8;
+	static const int			kValueArraySize = 16;
 
 	float4						mPixelValue						CONSTANT_DEFAULT(float4(0.0f, 0.0f, 0.0f, 0.0f));
 	float4						mValueArray[kValueArraySize];

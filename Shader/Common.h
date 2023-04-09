@@ -258,6 +258,13 @@ void DebugOutput(DebugMode inDebugMode, float3 inValue)
         sDebugOutput = inValue;
 }
 
+void DebugValueInit()
+{
+    if (sGetDispatchRaysIndex().x == mConstants.mPixelDebugCoord.x && sGetDispatchRaysIndex().y == mConstants.mPixelDebugCoord.y)
+        for (int i = 0; i < Debug::kValueArraySize; i++)
+            BufferDebugUAV[0].mValueArray[i] = 0;
+}
+
 void DebugValue(PixelDebugMode inPixelDebugMode, uint inRecursionCount, float4 inValue)
 {
     if (mConstants.mPixelDebugMode == inPixelDebugMode)
