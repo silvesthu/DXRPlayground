@@ -249,13 +249,11 @@ enum class BSDFType : uint
 {
 	Light = 0,
 
-	// Roughly based on https://mitsuba.readthedocs.io/en/stable/src/generated/plugins_bsdfs.html
+	Diffuse,				// Lambertian. https://mitsuba.readthedocs.io/en/stable/src/generated/plugins_bsdfs.html#smooth-diffuse-material-diffuse
+	RoughConductor,			// GGX. [TODO] Support sample_visible. Support anisotropy. https://mitsuba.readthedocs.io/en/stable/src/generated/plugins_bsdfs.html#rough-conductor-material-roughconductor
 
-	Diffuse,				// Lambertian
-	RoughConductor,			// GGX only. [TODO] Support sample_visible. Support anisotropy
-
-	Dielectric,		
-	// ThinDielectric
+	Dielectric,				// https://mitsuba.readthedocs.io/en/stable/src/generated/plugins_bsdfs.html#smooth-dielectric-material-dielectric
+	ThinDielectric,			// https://mitsuba.readthedocs.io/en/stable/src/generated/plugins_bsdfs.html#thin-dielectric-material-thindielectric
 	// RoughDielectric	
 	// Plastic	
 	// Roughplastic

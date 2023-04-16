@@ -184,6 +184,52 @@ namespace BSDFEvaluation
 		}
 	}
 
+	namespace ThinDielectric
+	{
+		float3 GenerateImportanceSamplingDirection(float3x3 inTangentSpace, HitContext inHitContext, inout PathContext ioPathContext)
+		{
+			// Dummy, will generate sampling direction in Evaluate
+			return reflect(inHitContext.mRayDirectionWS, inTangentSpace[2]);
+		}
+		void Evaluate(HitContext inHitContext, inout BSDFContext ioBSDFContext, inout PathContext ioPathContext)
+		{
+			float r_i;
+			float cos_theta_t;
+			float eta_it;
+			float eta_ti;
+			F_Dielectric_Mitsuba(InstanceDatas[inHitContext.mInstanceID].mEta.x, ioBSDFContext.mNdotV, r_i, cos_theta_t, eta_it, eta_ti);
+
+			// [NOTE] Thin Dielectric (other than these, calculation is identical to Dielectric)
+			//		  [Mitsuba3] 
+			{
+				// Account for internal reflections: r' = r + trt + tr^3t + ..
+				// [NOTE] r' = r + trt + tr^3t + .. 
+				//           = r + (1 - r) * r * (1-r) + (1-r) * r^3 * (1-r) + ...
+				//			 = r + (1 - r) ^ 2 * r * \sum_0^\infty r^{2i}
+				//			 = r * 2 / (r+1)
+				r_i *= 2.0f / (1.0f + r_i);
+
+				// No change of direction for transmittion
+				cos_theta_t = ioBSDFContext.mNdotV;
+				eta_it = 1.0f;
+				eta_ti = 1.0f;
+			}
+
+			bool selected_r = RandomFloat01(ioPathContext.mRandomState) <= r_i;
+			ioBSDFContext.mN = ioBSDFContext.mNdotV < 0 ? -ioBSDFContext.mN : ioBSDFContext.mN;
+			float3 L = select(selected_r,
+				reflect(-ioBSDFContext.mV, ioBSDFContext.mN),
+				refract(-ioBSDFContext.mV, ioBSDFContext.mN, eta_ti));
+
+			ioBSDFContext = GenerateContext(L, ioBSDFContext.mN, ioBSDFContext.mV, inHitContext);
+			ioBSDFContext.mBSDF = select(selected_r, InstanceDatas[inHitContext.mInstanceID].mSpecularReflectance, InstanceDatas[inHitContext.mInstanceID].mSpecularTransmittance) * select(selected_r, r_i, 1.0 - r_i);
+			ioBSDFContext.mBSDFPDF = select(selected_r, r_i, 1.0 - r_i);
+			
+			ioBSDFContext.mBSDF *= select(selected_r, 1.0, eta_ti * eta_ti);
+			ioBSDFContext.mEta = select(selected_r, 1.0, eta_it);
+		}
+	}
+
 	namespace DebugEmissive
 	{
 		void Evaluate(HitContext inHitContext, inout BSDFContext ioBSDFContext, inout PathContext ioPathContext)
@@ -223,6 +269,7 @@ namespace BSDFEvaluation
 		switch (GetBSDFType(inHitContext))
 		{
 		case BSDFType::Dielectric:		return true;
+		case BSDFType::ThinDielectric:	return true;
 		case BSDFType::DebugMirror:		return true;
 		default:						return false;
 		}
@@ -238,6 +285,7 @@ namespace BSDFEvaluation
 		case BSDFType::Diffuse:			return Lambert::GenerateImportanceSamplingDirection(inTangentSpace, inHitContext, ioPathContext);
 		case BSDFType::RoughConductor:	return RoughConductor::GenerateImportanceSamplingDirection(inTangentSpace, inHitContext, ioPathContext);
 		case BSDFType::Dielectric:		return Dielectric::GenerateImportanceSamplingDirection(inTangentSpace, inHitContext, ioPathContext);
+		case BSDFType::ThinDielectric:	return ThinDielectric::GenerateImportanceSamplingDirection(inTangentSpace, inHitContext, ioPathContext);
 		default:						return 0;
 		}
 	}
@@ -250,6 +298,7 @@ namespace BSDFEvaluation
 		case BSDFType::Diffuse:			Lambert::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
 		case BSDFType::RoughConductor:	RoughConductor::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
 		case BSDFType::Dielectric:		Dielectric::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
+		case BSDFType::ThinDielectric:	ThinDielectric::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
 		case BSDFType::DebugEmissive:	DebugEmissive::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
 		case BSDFType::DebugMirror:		DebugMirror::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
 		case BSDFType::Unsupported:		// [[fallthrough]];

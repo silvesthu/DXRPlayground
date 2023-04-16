@@ -415,6 +415,19 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 			load_specular_transmittance();
 			load_specular_reflectance();
 		}
+		else if (local_type == "thindielectric")
+		{
+			bsdf_instance.mInstanceData.mBSDFType = BSDFType::ThinDielectric;
+
+			float int_ior = 1.0f;
+			gFromString(get_child_value(local_bsdf, "int_ior").data(), int_ior);
+			float ext_ior = 1.0f;
+			gFromString(get_child_value(local_bsdf, "ext_ior").data(), ext_ior);
+			bsdf_instance.mInstanceData.mEta = float3(int_ior / ext_ior);
+
+			load_specular_transmittance();
+			load_specular_reflectance();
+		}
 		else
 		{
 			bsdf_instance.mInstanceData.mBSDFType = BSDFType::Unsupported;
