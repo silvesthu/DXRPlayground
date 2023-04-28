@@ -374,9 +374,10 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 		auto load_reflectance				= [&]() { gFromString(get_child_value(local_bsdf, "reflectance").data(),				bsdf_instance.mInstanceData.mAlbedo); };
 		auto load_specular_reflectance		= [&]() { gFromString(get_child_value(local_bsdf, "specular_reflectance").data(),		bsdf_instance.mInstanceData.mSpecularReflectance); };
 		auto load_specular_transmittance	= [&]() { gFromString(get_child_value(local_bsdf, "specular_transmittance").data(),		bsdf_instance.mInstanceData.mSpecularTransmittance); };
-		auto load_alpha						= [&]() { gFromString(get_child_value(local_bsdf, "alpha").data(),						bsdf_instance.mInstanceData.mRoughnessAlpha); };
 		auto load_eta						= [&]() { gFromString(get_child_value(local_bsdf, "eta").data(),						bsdf_instance.mInstanceData.mEta); };
 		auto load_k							= [&]() { gFromString(get_child_value(local_bsdf, "k").data(),							bsdf_instance.mInstanceData.mK); };
+		// [TODO] Support anisotropy
+		auto load_alpha						= [&]() { gFromString(get_child_value(local_bsdf, "alpha").data(),						bsdf_instance.mInstanceData.mRoughnessAlpha); };
 		
 		if (local_type == "diffuse")
 		{
@@ -395,11 +396,14 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 		{
 			bsdf_instance.mInstanceData.mBSDFType = BSDFType::RoughConductor;
 
-			gAssert(std::string_view(get_child_value(local_bsdf, "distribution")) == "ggx"); // [TODO] Support beckmann?
-
+			// [TODO] Support beckmann
+			// [TODO] Support sample_visible
+			gAssert(std::string_view(get_child_value(local_bsdf, "distribution")) == "ggx");
 			load_alpha();
+
 			load_eta();
 			load_k();
+
 			load_specular_reflectance();
 		}
 		else if (local_type == "dielectric")
@@ -427,6 +431,24 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 
 			load_specular_transmittance();
 			load_specular_reflectance();
+		}
+		else if (local_type == "roughdielectric")
+		{
+			bsdf_instance.mInstanceData.mBSDFType = BSDFType::RoughDielectric;
+
+			float int_ior = 1.0f;
+			gFromString(get_child_value(local_bsdf, "int_ior").data(), int_ior);
+			float ext_ior = 1.0f;
+			gFromString(get_child_value(local_bsdf, "ext_ior").data(), ext_ior);
+			bsdf_instance.mInstanceData.mEta = float3(int_ior / ext_ior);
+
+			load_specular_transmittance();
+			load_specular_reflectance();
+
+			// [TODO] Support beckmann
+			// [TODO] Support sample_visible
+			gAssert(std::string_view(get_child_value(local_bsdf, "distribution")) == "ggx"); // [TODO] Support beckmann?
+			load_alpha();
 		}
 		else
 		{

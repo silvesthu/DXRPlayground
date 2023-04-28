@@ -249,12 +249,13 @@ enum class BSDFType : uint
 {
 	Light = 0,
 
-	Diffuse,				// Lambertian. https://mitsuba.readthedocs.io/en/stable/src/generated/plugins_bsdfs.html#smooth-diffuse-material-diffuse
-	RoughConductor,			// GGX. [TODO] Support sample_visible. Support anisotropy. https://mitsuba.readthedocs.io/en/stable/src/generated/plugins_bsdfs.html#rough-conductor-material-roughconductor
+	Diffuse,				// https://mitsuba.readthedocs.io/en/stable/src/generated/plugins_bsdfs.html#smooth-diffuse-material-diffuse
+
+	RoughConductor,			// https://mitsuba.readthedocs.io/en/stable/src/generated/plugins_bsdfs.html#rough-conductor-material-roughconductor
 
 	Dielectric,				// https://mitsuba.readthedocs.io/en/stable/src/generated/plugins_bsdfs.html#smooth-dielectric-material-dielectric
 	ThinDielectric,			// https://mitsuba.readthedocs.io/en/stable/src/generated/plugins_bsdfs.html#thin-dielectric-material-thindielectric
-	// RoughDielectric	
+	RoughDielectric,		// https://mitsuba.readthedocs.io/en/stable/src/generated/plugins_bsdfs.html#rough-dielectric-material-roughdielectric
 	// Plastic	
 	// Roughplastic
 
@@ -437,6 +438,8 @@ struct HitContext
 
 struct BSDFContext
 {
+	bool mImportanceSamplingDirection;
+
 	float3 mL;
 	float3 mN;
 	float3 mV;

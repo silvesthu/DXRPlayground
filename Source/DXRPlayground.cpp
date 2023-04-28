@@ -155,8 +155,13 @@ static void sPrepareImGui()
 
 			ImGui::SameLine();
 
-			if (ImGui::Button("Open Dump Folder (F10)"))
+			if (ImGui::Button("Open Dump Folder"))
 				gOpenDumpFolder();
+
+			ImGui::SameLine();
+
+			if (ImGui::Button("Open Scene Folder"))
+				gOpenSceneFolder(kScenePresets[(int)sCurrentScene].mPath);
 		}
 
 		if (ImGui::TreeNodeEx("Debug", ImGuiTreeNodeFlags_DefaultOpen))

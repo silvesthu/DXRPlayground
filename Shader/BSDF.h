@@ -12,6 +12,8 @@ namespace BSDFEvaluation
 
 		BSDFContext bsdf_context;
 
+		bsdf_context.mImportanceSamplingDirection = false;
+
 		bsdf_context.mL = inLight;
 		bsdf_context.mN = inNormal;
 		bsdf_context.mV = inView;
@@ -47,6 +49,44 @@ namespace BSDFEvaluation
 		}
 	};
 
+	namespace Distribution
+	{
+		namespace GGX
+		{
+			float3 GenerateImportanceSamplingDirection(float3x3 inTangentSpace, HitContext inHitContext, inout PathContext ioPathContext)
+			{
+				float a = InstanceDatas[inHitContext.mInstanceID].mRoughnessAlpha;
+				float a2 = a * a;
+
+				// Microfacet
+				float3 H; // Microfacet normal (Half-vector)
+				{
+					float e0 = RandomFloat01(ioPathContext.mRandomState);
+					float e1 = RandomFloat01(ioPathContext.mRandomState);
+
+					// 2D Distribution -> GGX Distribution (Polar)
+					float cos_theta = sqrt((1.0 - e0) / ((a2 - 1) * e0 + 1.0));
+					float sin_theta = sqrt(1 - cos_theta * cos_theta);
+					float phi = 2 * MATH_PI * e1;
+
+					// Polar -> Cartesian
+					H.x = sin_theta * cos(phi);
+					H.y = sin_theta * sin(phi);
+					H.z = cos_theta;
+
+					// Tangent -> World
+					H = normalize(H.x * inTangentSpace[0] + H.y * inTangentSpace[1] + H.z * inTangentSpace[2]);
+				}
+
+				// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(H == inTangentSpace[2], 0));
+
+				float3 V = -sGetWorldRayDirection();
+				float HdotV = dot(H, V);
+				return 2.0 * HdotV * H - V;
+			}
+		}
+	}
+
 	namespace Lambert
 	{
 		float3 GenerateImportanceSamplingDirection(float3x3 inTangentSpace, HitContext inHitContext, inout PathContext ioPathContext)
@@ -68,34 +108,7 @@ namespace BSDFEvaluation
 	{
 		float3 GenerateImportanceSamplingDirection(float3x3 inTangentSpace, HitContext inHitContext, inout PathContext ioPathContext)
 		{
-			float a = InstanceDatas[inHitContext.mInstanceID].mRoughnessAlpha;
-			float a2 = a * a;
-
-			// Microfacet
-			float3 H; // Microfacet normal (Half-vector)
-			{
-				float e0 = RandomFloat01(ioPathContext.mRandomState);
-				float e1 = RandomFloat01(ioPathContext.mRandomState);
-
-				// 2D Distribution -> GGX Distribution (Polar)
-				float cos_theta = sqrt((1.0 - e0) / ((a2 - 1) * e0 + 1.0));
-				float sin_theta = sqrt(1 - cos_theta * cos_theta);
-				float phi = 2 * MATH_PI * e1;
-
-				// Polar -> Cartesian
-				H.x = sin_theta * cos(phi);
-				H.y = sin_theta * sin(phi);
-				H.z = cos_theta;
-
-				// Tangent -> World
-				H = normalize(H.x * inTangentSpace[0] + H.y * inTangentSpace[1] + H.z * inTangentSpace[2]);
-			}
-
-			// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(H == inTangentSpace[2], 0));
-
-			float3 V = -sGetWorldRayDirection();
-			float HdotV = dot(H, V);
-			return 2.0 * HdotV * H - V;
+			return Distribution::GGX::GenerateImportanceSamplingDirection(inTangentSpace, inHitContext, ioPathContext);
 		}
 
 		void Evaluate(HitContext inHitContext, inout BSDFContext ioBSDFContext, inout PathContext ioPathContext)
@@ -118,7 +131,7 @@ namespace BSDFEvaluation
 			//		         [NOTE] In `sample`, assume m_sample_visible = false,
 			//                      BSDF * NdotL / PDF = F * G * ioBSDFContext.mHdotV / (ioBSDFContext.mNdotV * ioBSDFContext.mNdotH) * (D * ioBSDFContext.mNdotH) / (4.0f * ioBSDFContext.mHdotL)
 			//			            HdotV and HdotL does not seems to cancel out at first glance.
-			//                      The thing is, H is the half vector, HdotV = HdotL. (May differs due to floating point arithmetic though)
+			//                      The thing is, H is the half vector, HdotV == HdotL. (May differs due to floating point arithmetic though)
 			//                      [TODO] Where does the HdotV come from in the first place?
 
 			// [NOTE] Naming of wi/wo vary between implementations depending on point of view. The result should be same.
@@ -127,7 +140,7 @@ namespace BSDFEvaluation
 			//        https://www.shadertoy.com/view/MsXfz4 has wi as V, wo as L
 
 			ioBSDFContext.mBSDF = D * G * F / (4.0f * ioBSDFContext.mNdotV * ioBSDFContext.mNdotL);
-			ioBSDFContext.mBSDFPDF	= (D * ioBSDFContext.mNdotH) / (4.0f * ioBSDFContext.mHdotL);
+			ioBSDFContext.mBSDFPDF	= (D * ioBSDFContext.mNdotH) / (4.0f * ioBSDFContext.mHdotL); /* mHdotL == mHdotV */
 
 			// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(F, 0));
 			// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(ioBSDFContext.mHdotV, ioBSDFContext.mHdotL, 0, 0));
@@ -143,6 +156,7 @@ namespace BSDFEvaluation
 			// Dummy, will generate sampling direction in Evaluate
 			return reflect(inHitContext.mRayDirectionWS, inTangentSpace[2]);
 		}
+
 		void Evaluate(HitContext inHitContext, inout BSDFContext ioBSDFContext, inout PathContext ioPathContext)
 		{
 			// [NOTE] L and related information are not avaiable yet before selection between reflection and refraction
@@ -176,7 +190,7 @@ namespace BSDFEvaluation
 			//        The difference is easily observable when Russian Roulette is enabled even for the first iterations.
 			//		  [PBRT3] > It lets us sometimes avoid terminating refracted rays that are about to be refracted back out of a medium and thus have their beta value increased.
 			//                https://github.com/mmp/pbrt-v3/blob/master/src/integrators/path.cpp#L72
-			ioBSDFContext.mBSDF *= select(selected_r, 1.0, eta_ti * eta_ti);
+			ioBSDFContext.mBSDF *= select(selected_r, 1.0, sqr(eta_ti));
 			ioBSDFContext.mEta = select(selected_r, 1.0, eta_it);
 
 			// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(-ioBSDFContext.mV, selected_r));
@@ -191,6 +205,7 @@ namespace BSDFEvaluation
 			// Dummy, will generate sampling direction in Evaluate
 			return reflect(inHitContext.mRayDirectionWS, inTangentSpace[2]);
 		}
+
 		void Evaluate(HitContext inHitContext, inout BSDFContext ioBSDFContext, inout PathContext ioPathContext)
 		{
 			float r_i;
@@ -225,7 +240,82 @@ namespace BSDFEvaluation
 			ioBSDFContext.mBSDF = select(selected_r, InstanceDatas[inHitContext.mInstanceID].mSpecularReflectance, InstanceDatas[inHitContext.mInstanceID].mSpecularTransmittance) * select(selected_r, r_i, 1.0 - r_i);
 			ioBSDFContext.mBSDFPDF = select(selected_r, r_i, 1.0 - r_i);
 			
-			ioBSDFContext.mBSDF *= select(selected_r, 1.0, eta_ti * eta_ti);
+			ioBSDFContext.mBSDF *= select(selected_r, 1.0, sqr(eta_ti));
+			ioBSDFContext.mEta = select(selected_r, 1.0, eta_it);
+		}
+	}
+
+	namespace RoughDielectric
+	{
+		float3 GenerateImportanceSamplingDirection(float3x3 inTangentSpace, HitContext inHitContext, inout PathContext ioPathContext)
+		{
+			return Distribution::GGX::GenerateImportanceSamplingDirection(inTangentSpace, inHitContext, ioPathContext);
+		}
+
+		void Evaluate(HitContext inHitContext, inout BSDFContext ioBSDFContext, inout PathContext ioPathContext)
+		{
+			bool importance_sampling = ioBSDFContext.mImportanceSamplingDirection;
+
+			float r_i;
+			float cos_theta_t;
+			float eta_it;
+			float eta_ti;
+			F_Dielectric_Mitsuba(InstanceDatas[inHitContext.mInstanceID].mEta.x, ioBSDFContext.mHdotV, r_i, cos_theta_t, eta_it, eta_ti);
+
+			// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(ioBSDFContext.mHdotV, 0, 0, r_i));
+
+			// [TODO] Fix sample light...
+
+			bool selected_r = select(ioBSDFContext.mImportanceSamplingDirection, 
+				RandomFloat01(ioPathContext.mRandomState) <= r_i,
+				(ioBSDFContext.mNdotV * ioBSDFContext.mNdotL) > 0);
+			ioBSDFContext.mN = select(selected_r, ioBSDFContext.mN, -ioBSDFContext.mN);
+			ioBSDFContext.mH = select(selected_r, ioBSDFContext.mH, -ioBSDFContext.mH);
+			float3 L = select(selected_r,
+				reflect(-ioBSDFContext.mV, ioBSDFContext.mH),
+				refract(-ioBSDFContext.mV, ioBSDFContext.mH, eta_ti));
+
+			if (importance_sampling)
+			{
+				// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(selected_r, 0, 0, 1));
+			}
+			else
+			{
+				// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(selected_r, 0, 0, -1));
+				// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(L, -1));
+				// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(ioBSDFContext.mH, -1));
+			}
+
+			ioBSDFContext = GenerateContext(L, ioBSDFContext.mN, ioBSDFContext.mV, inHitContext);
+
+			float D = D_GGX(ioBSDFContext.mNdotH, InstanceDatas[inHitContext.mInstanceID].mRoughnessAlpha);
+			float G = G_SmithGGX(ioBSDFContext.mNdotL, ioBSDFContext.mNdotV, InstanceDatas[inHitContext.mInstanceID].mRoughnessAlpha);
+
+			if (D < 0 || ioBSDFContext.mNdotL < 0 || ioBSDFContext.mNdotV < 0)
+				D = 0;
+
+			float3 F = select(selected_r, InstanceDatas[inHitContext.mInstanceID].mSpecularReflectance, InstanceDatas[inHitContext.mInstanceID].mSpecularTransmittance);
+
+			ioBSDFContext.mBSDF = select(selected_r, 
+				D * G * F / (4.0f * ioBSDFContext.mNdotV * ioBSDFContext.mNdotL),
+				D * G * F * (sqr(eta_it) * ioBSDFContext.mHdotV * ioBSDFContext.mHdotL) / (ioBSDFContext.mNdotV * ioBSDFContext.mNdotL * sqr(ioBSDFContext.mHdotV + eta_it * ioBSDFContext.mHdotL)));
+			ioBSDFContext.mBSDF *= select(selected_r, r_i, 1.0 - r_i);
+
+			ioBSDFContext.mBSDFPDF = select(selected_r, 
+				(D * ioBSDFContext.mNdotH) / (4.0f * ioBSDFContext.mHdotL),
+				(D * ioBSDFContext.mNdotH) * (sqr(eta_it) * ioBSDFContext.mHdotL) / sqr(ioBSDFContext.mHdotV + eta_it * ioBSDFContext.mHdotL));
+			ioBSDFContext.mBSDFPDF *= select(selected_r, r_i, 1.0 - r_i);
+
+			if (importance_sampling)
+			{
+				// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(ioBSDFContext.mBSDF, ioBSDFContext.mBSDFPDF));
+			}
+			else
+			{
+				// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(ioBSDFContext.mBSDF, ioBSDFContext.mBSDFPDF));
+			}
+
+			ioBSDFContext.mBSDF *= select(selected_r, 1.0, sqr(eta_ti));
 			ioBSDFContext.mEta = select(selected_r, 1.0, eta_it);
 		}
 	}
@@ -277,6 +367,8 @@ namespace BSDFEvaluation
 
 	float3 GenerateImportanceSamplingDirection(float3 inNormal, HitContext inHitContext, inout PathContext ioPathContext)
 	{
+		// [TODO] Refactor this as sample micro distribution and return H
+
 		float3x3 inTangentSpace = GenerateTangentSpace(inNormal);
 		[branch]
 		switch (GetBSDFType(inHitContext))
@@ -286,8 +378,17 @@ namespace BSDFEvaluation
 		case BSDFType::RoughConductor:	return RoughConductor::GenerateImportanceSamplingDirection(inTangentSpace, inHitContext, ioPathContext);
 		case BSDFType::Dielectric:		return Dielectric::GenerateImportanceSamplingDirection(inTangentSpace, inHitContext, ioPathContext);
 		case BSDFType::ThinDielectric:	return ThinDielectric::GenerateImportanceSamplingDirection(inTangentSpace, inHitContext, ioPathContext);
+		case BSDFType::RoughDielectric:	return RoughDielectric::GenerateImportanceSamplingDirection(inTangentSpace, inHitContext, ioPathContext);
 		default:						return 0;
 		}
+	}
+
+	BSDFContext GenerateImportanceSamplingContext(float3 inNormal, float3 inView, HitContext inHitContext, inout PathContext ioPathContext)
+	{
+		float3 importance_sampling_direction = GenerateImportanceSamplingDirection(inNormal, inHitContext, ioPathContext);
+		BSDFContext bsdf_context = BSDFEvaluation::GenerateContext(importance_sampling_direction, inHitContext.mVertexNormalWS, -inHitContext.mRayDirectionWS, inHitContext);
+		bsdf_context.mImportanceSamplingDirection = true;
+		return bsdf_context;
 	}
 
 	void Evaluate(HitContext inHitContext, inout BSDFContext ioBSDFContext, inout PathContext ioPathContext)
@@ -299,6 +400,7 @@ namespace BSDFEvaluation
 		case BSDFType::RoughConductor:	RoughConductor::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
 		case BSDFType::Dielectric:		Dielectric::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
 		case BSDFType::ThinDielectric:	ThinDielectric::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
+		case BSDFType::RoughDielectric:	RoughDielectric::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
 		case BSDFType::DebugEmissive:	DebugEmissive::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
 		case BSDFType::DebugMirror:		DebugMirror::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
 		case BSDFType::Unsupported:		// [[fallthrough]];

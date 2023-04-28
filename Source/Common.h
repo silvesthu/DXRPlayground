@@ -104,6 +104,17 @@ inline void gOpenDumpFolder()
 	ShellExecuteA(nullptr, "open", command.string().c_str(), nullptr, nullptr, SW_SHOWDEFAULT);
 }
 
+inline void gOpenSceneFolder(const char* inSceneFile)
+{
+	std::filesystem::path command = "";
+	"";
+	command += std::filesystem::current_path();
+	command += "\\";
+	command += inSceneFile;
+	command = command.parent_path();
+	ShellExecuteA(nullptr, "open", command.string().c_str(), nullptr, nullptr, SW_SHOWDEFAULT);
+}
+
 #define gAssert assert
 
 inline void gVerify(bool inExpr)

@@ -167,6 +167,8 @@ void TraceRay()
 			}
 			else
 			{
+				// DebugValue(PixelDebugMode::Manual, path_context.mRecursionCount, float4(0, 0, 0, 1));
+
 				// Sample Light
 				bool sample_light = mConstants.mSampleMode == SampleMode::SampleLight || mConstants.mSampleMode == SampleMode::MIS;
 				if (sample_light && mConstants.mLightCount > 0 && !BSDFEvaluation::DiracDeltaDistribution(hit_context))
@@ -177,6 +179,8 @@ void TraceRay()
 					float light_sample_pdf = 0;
 					float3 light_sample_direction = 0;
 					LightEvaluation::GenerateSamplingDirection(light, hit_context.mHitPositionWS, path_context, light_sample_direction, light_sample_pdf);
+
+					// DebugValue(PixelDebugMode::Manual, path_context.mRecursionCount, float4(0, 0, 0, 1));
 
 					float light_pdf = light_sample_pdf * LightEvaluation::GetLightSelectionPDF();
 					if (light_pdf > 0)
@@ -194,6 +198,8 @@ void TraceRay()
 						shadow_query.TraceRayInline(RaytracingScene, additional_shadow_ray_flags, shadow_ray_instance_mask, shadow_ray);
 						shadow_query.Proceed();
 
+						// DebugValue(PixelDebugMode::Manual, path_context.mRecursionCount, float4(shadow_query.CommittedInstanceID(), light.mInstanceID, 0, 1));
+
 						if (shadow_query.CommittedStatus() == COMMITTED_TRIANGLE_HIT && shadow_query.CommittedInstanceID() == light.mInstanceID)
 						{
 							BSDFContext bsdf_context = BSDFEvaluation::GenerateContext(shadow_ray.Direction, hit_context.mVertexNormalWS, -hit_context.mRayDirectionWS, hit_context);
@@ -208,6 +214,8 @@ void TraceRay()
 							DebugValue(PixelDebugMode::MIS_Light, path_context.mRecursionCount, float4(bsdf_context.mBSDFPDF, light_pdf, LightEvaluation::GetLightSelectionPDF(), light_sample_pdf));
 
 							light_emission = path_context.mThroughput * emission;
+
+							// DebugValue(PixelDebugMode::Manual, path_context.mRecursionCount, float4(light_emission, 1));
 						}
 					}
 				}
@@ -215,8 +223,7 @@ void TraceRay()
 				// Sample BSDF
 				{
 					// Generate next sample based on BSDF
-					float3 importance_sampling_direction = BSDFEvaluation::GenerateImportanceSamplingDirection(hit_context.mVertexNormalWS, hit_context, path_context);
-					BSDFContext bsdf_context = BSDFEvaluation::GenerateContext(importance_sampling_direction, hit_context.mVertexNormalWS, -hit_context.mRayDirectionWS, hit_context);
+					BSDFContext bsdf_context = BSDFEvaluation::GenerateImportanceSamplingContext(hit_context.mVertexNormalWS, -hit_context.mRayDirectionWS, hit_context, path_context);
 					BSDFEvaluation::Evaluate(hit_context, bsdf_context, path_context);
 
 					path_context.mEmission += path_context.mThroughput * emission; // Non-light emission

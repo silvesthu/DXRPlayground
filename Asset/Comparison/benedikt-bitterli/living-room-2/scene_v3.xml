@@ -3,9 +3,11 @@
 	<default name="spp" value="64" />
 	<default name="resy" value="720" />
 	<default name="resx" value="1280" />
-	<default name="max_depth" value="33" />
+	<default name="max_depth" value="-1" />
+	<default name="rr_depth" value="16" />
 	<integrator type="$integrator">
 		<integer name="max_depth" value="$max_depth" />
+		<integer name="rr_depth" value="$rr_depth" />
 	</integrator>
 	<sensor type="perspective">
 		<float name="fov" value="90" />
