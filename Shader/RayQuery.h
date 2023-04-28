@@ -1,5 +1,6 @@
 #pragma once
 
+// [TODO] Remove these
 // Adapters for RayQuery
 
 #ifndef SHADER_PROFILE_LIB

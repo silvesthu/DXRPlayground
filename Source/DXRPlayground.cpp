@@ -56,7 +56,7 @@ enum class ScenePresetType
 	Count,
 };
 
-static ScenePresetType sCurrentScene = ScenePresetType::CornellBoxTeapot;
+static ScenePresetType sCurrentScene = ScenePresetType::VeachMIS;
 static ScenePresetType sPreviousScene = sCurrentScene;
 static ScenePreset kScenePresets[(int)ScenePresetType::Count] =
 {
@@ -168,26 +168,25 @@ static void sPrepareImGui()
 		{
 			ImGui::InputInt2("Coords", (int*)&gConstants.mPixelDebugCoord);
 			ImGui::InputFloat3("Pixel Value", &gGetFrameContext().mDebugReadbackBufferPointer->mPixelValue.x, "%.8f", ImGuiInputTextFlags_ReadOnly);
-
-			for (int i = 0; i < static_cast<int>(PixelDebugMode::Count); i++)
+			if (ImGui::TreeNodeEx("Pixel Debug Value (on each hit)"))
 			{
-				const auto& name = nameof::nameof_enum(static_cast<PixelDebugMode>(i));
-				if (name[0] == '_')
+				for (int i = 0; i < static_cast<int>(PixelDebugMode::Count); i++)
 				{
-					ImGui::NewLine();
-					continue;
+					const auto& name = nameof::nameof_enum(static_cast<PixelDebugMode>(i));
+					if (name[0] == '_')
+					{
+						ImGui::NewLine();
+						continue;
+					}
+
+					if (i != 0)
+						ImGui::SameLine();
+
+					ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mPixelDebugMode), i);
 				}
 
-				if (i != 0)
-					ImGui::SameLine();
-
-				ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mPixelDebugMode), i);
-			}
-
-			if (ImGui::TreeNodeEx("Pixel Debug Value for each hit"))
-			{
 				for (int i = 0; i < Debug::kValueArraySize; i++)
-					ImGui::InputFloat4(std::to_string(i).c_str(), &gGetFrameContext().mDebugReadbackBufferPointer->mValueArray[i].x, "%.8f", ImGuiInputTextFlags_ReadOnly);
+					ImGui::InputFloat4(std::to_string(i).c_str(), &gGetFrameContext().mDebugReadbackBufferPointer->mPixelValueArray[i].x, "%.8f", ImGuiInputTextFlags_ReadOnly);
 
 				ImGui::TreePop();
 			}
@@ -404,6 +403,8 @@ static void sPrepareImGui()
 
 				if (ImGui::BeginTable("Table", column_count, ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
 				{
+					ImGui::TableSetupScrollFreeze(0, 1); // Make top row always visible
+
 					ImGui::TableNextRow(ImGuiTableRowFlags_Headers);
 					for (int i = 0; i < column_count; i++)
 					{
@@ -423,6 +424,9 @@ static void sPrepareImGui()
 						ImGui::TableSetColumnIndex(column_index++);
 						if (ImGui::Selectable(std::to_string(row).c_str(), row == gConstants.mDebugInstanceIndex, ImGuiSelectableFlags_SpanAllColumns))
 							gConstants.mDebugInstanceIndex = row;
+
+						if (row == gGetFrameContext().mDebugReadbackBufferPointer->mPixelInstanceID)
+							ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, ImGui::GetColorU32(ImVec4(0.8f, 0.2f, 0.2f, 0.8f)));
 
 						ImGui::TableSetColumnIndex(column_index++);
 						ImGui::Text("%s", instance_info.mName.c_str());
@@ -479,6 +483,8 @@ static void sPrepareImGui()
 				static const int kColumnCount = 6;
 				if (ImGui::BeginTable("Table", kColumnCount, ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
 				{
+					ImGui::TableSetupScrollFreeze(0, 1); // Make top row always visible
+
 					{
 						int column_index = 0;
 						ImGui::TableNextRow(ImGuiTableRowFlags_Headers);
@@ -503,6 +509,9 @@ static void sPrepareImGui()
 						ImGui::TableSetColumnIndex(column_index++);
 						if (ImGui::Selectable(std::to_string(row).c_str(), row == gConstants.mDebugLightIndex, ImGuiSelectableFlags_SpanAllColumns))
 							gConstants.mDebugLightIndex = row;
+
+						if ((int)light.mInstanceID == gGetFrameContext().mDebugReadbackBufferPointer->mPixelInstanceID)
+							ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, ImGui::GetColorU32(ImVec4(0.8f, 0.2f, 0.2f, 0.8f)));
 
 						ImGui::TableSetColumnIndex(column_index++);
 						ImGui::Text("%s", instance_info.mName.c_str());
@@ -636,13 +645,13 @@ static void sUpdate()
 			gOpenDumpFolder();
 
 		if (!ImGui::IsAnyItemFocused() && ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_UpArrow))
-			gConstants.mPixelDebugCoord -= uint2(0, 1);
+			gConstants.mPixelDebugCoord -= int2(0, 1);
 		if (!ImGui::IsAnyItemFocused() && ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_DownArrow))
-			gConstants.mPixelDebugCoord += uint2(0, 1);
+			gConstants.mPixelDebugCoord += int2(0, 1);
 		if (!ImGui::IsAnyItemFocused() && ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_LeftArrow))
-			gConstants.mPixelDebugCoord -= uint2(1, 0);
+			gConstants.mPixelDebugCoord -= int2(1, 0);
 		if (!ImGui::IsAnyItemFocused() && ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_RightArrow))
-			gConstants.mPixelDebugCoord += uint2(1, 0);
+			gConstants.mPixelDebugCoord += int2(1, 0);
 	}
 
 	// Frustum
@@ -966,7 +975,7 @@ void sRender()
 		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Clear");
 
 		gRenderer.Setup(gRenderer.mRuntime.mClearShader.mData);
-		gCommandList->Dispatch(Debug::kValueArraySize / 64, 1, 1);
+		gCommandList->Dispatch((Debug::kValueArraySize + 63) / 64, 1, 1);
 
 		gBarrierUAV(gCommandList, nullptr);
 	}
@@ -979,7 +988,7 @@ void sRender()
 		gSwapChain->GetDesc1(&swap_chain_desc);
 
 		gRenderer.Setup(gRenderer.mRuntime.mRayQueryShader.mData);
-		gCommandList->Dispatch(swap_chain_desc.Width / 8, swap_chain_desc.Height / 8, 1);
+		gCommandList->Dispatch((swap_chain_desc.Width + 7) / 8, (swap_chain_desc.Height + 7) / 8, 1);
 
 		gBarrierUAV(gCommandList, nullptr);
 	}

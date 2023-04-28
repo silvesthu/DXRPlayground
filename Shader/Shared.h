@@ -12,6 +12,10 @@ using uint2 = glm::uvec2;
 using uint3 = glm::uvec3;
 using uint4 = glm::uvec4;
 
+using int2 = glm::ivec2;
+using int3 = glm::ivec3;
+using int4 = glm::ivec4;
+
 using float2x2 = glm::mat2x2;
 using float2x3 = glm::mat2x3;
 using float2x4 = glm::mat2x4;
@@ -596,7 +600,7 @@ struct Constants
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
-	uint2						mPixelDebugCoord				CONSTANT_DEFAULT(uint2(0, 0));
+	int2						mPixelDebugCoord				CONSTANT_DEFAULT(int2(-1, -1));
 	PixelDebugMode				mPixelDebugMode					CONSTANT_DEFAULT(PixelDebugMode::Manual);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
@@ -609,7 +613,10 @@ struct Debug
 	static const int			kValueArraySize = 16;
 
 	float4						mPixelValue						CONSTANT_DEFAULT(float4(0.0f, 0.0f, 0.0f, 0.0f));
-	float4						mValueArray[kValueArraySize];
+	float4						mPixelValueArray[kValueArraySize];
+
+	int							mPixelInstanceID				CONSTANT_DEFAULT(-1);
+	uint3						GENERATE_PAD_NAME				CONSTANT_DEFAULT(uint3(0, 0, 0));
 };
 
 #undef CONSTANT_DEFAULT

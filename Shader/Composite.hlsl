@@ -116,7 +116,13 @@ void ClearCS(
 	uint inGroupIndex : SV_GroupIndex)
 {
 	if (inDispatchThreadID.x == 0)
+	{
 		BufferDebugUAV[0].mPixelValue = 0;
+		BufferDebugUAV[0].mPixelInstanceID = -1;
+	}
 
-	BufferDebugUAV[0].mValueArray[inDispatchThreadID.x] = 0;
+	if (inDispatchThreadID.x < Debug::kValueArraySize)
+	{
+		BufferDebugUAV[0].mPixelValueArray[inDispatchThreadID.x] = 0;
+	}
 }

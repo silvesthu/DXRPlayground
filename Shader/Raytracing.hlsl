@@ -65,6 +65,8 @@ void TraceRay()
 
 		if (query.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
 		{
+			// System value intrinsics https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#system-value-intrinsics
+
 			sRayTCurrent					= query.CommittedRayT();
 
 			BuiltInTriangleIntersectionAttributes attributes;
@@ -76,7 +78,8 @@ void TraceRay()
 			hit_context.mRayOriginWS		= ray.Origin;
 			hit_context.mRayDirectionWS		= ray.Direction;
 
-			// System value intrinsics https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#system-value-intrinsics
+			if (launchIndex.x == mConstants.mPixelDebugCoord.x && launchIndex.y == mConstants.mPixelDebugCoord.y && path_context.mRecursionCount == 0)
+				BufferDebugUAV[0].mPixelInstanceID = hit_context.mInstanceID;
 
 			// Vertex attributes
 			{
