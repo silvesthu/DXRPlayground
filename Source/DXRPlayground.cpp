@@ -886,7 +886,10 @@ void sRender()
 		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Upload");
 
 		{
-			gConstants.mEV100			= glm::log2((gCameraSettings.mExposureControl.mAperture * gCameraSettings.mExposureControl.mAperture) / (1.0f / gCameraSettings.mExposureControl.mInvShutterSpeed) * 100.0f / gCameraSettings.mExposureControl.mSensitivity);
+			// https://google.github.io/filament/Filament.html#imagingpipeline/physicallybasedcamera/exposurevalue
+			gConstants.mEV100			= glm::log2(
+											(gCameraSettings.mExposureControl.mAperture * gCameraSettings.mExposureControl.mAperture) / 
+											(1.0f / gCameraSettings.mExposureControl.mInvShutterSpeed) * 100.0f / gCameraSettings.mExposureControl.mSensitivity);
 			gConstants.mSunDirection	= glm::vec4(0,1,0,0) * glm::rotate(gConstants.mSunZenith, glm::vec3(0, 0, 1)) * glm::rotate(gConstants.mSunAzimuth + glm::pi<float>() / 2.0f, glm::vec3(0, 1, 0));
 			gConstants.mLightCount		= (glm::uint)gScene.GetSceneContent().mLights.size();
 
