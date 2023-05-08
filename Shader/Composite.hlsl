@@ -20,16 +20,18 @@ float3 LuminanceToColor(float3 inLuminance, Constants inConstants)
 	{
 		// https://google.github.io/filament/Filament.htmdl#physicallybasedcamera
 
-		// Typically 0.65 for real lens, gives a saturation value of 1.2
-		// Use 0.78 here to make the saturation value 1.0 for simplicity, as in UE 4.25
+		// Typically 0.65 for real lens, gives a kLensSaturation of 1.2
+		// Use 0.78 here to make the kLensSaturation 1.0 for simplicity, assuming virtual lens does not lose light, as in UE 4.25
 		// https://google.github.io/filament/Filament.html#imagingpipeline/physicallybasedcamera/exposure
-		// https://www.unrealengine.com/en-US/tech-blog/how-epic-games-is-handling-auto-exposure-in-4-25
-		float kVignettingAttenuation = 0.78f;
-		float kSaturationBasedSpeedConstant = 78.0f;
-		float kISO = 100;
-		float kLensSaturation = kSaturationBasedSpeedConstant / kISO / kVignettingAttenuation;
+		// https://www.unrealengine.com/en-US/tech-blog/how-epic-games-is-handling-auto-exposure-in-4-25 See Lens Transmittance (LensAttenuation)
+		const float kVignettingAttenuation = 0.78f;
+		const float kSaturationBasedSpeedConstant = 78.0f;
+		const float kISO = 100;
+		const float kLensSaturation = kSaturationBasedSpeedConstant / kISO / kVignettingAttenuation;
 
-		float exposure_normalization_factor = 1.0 / (pow(2.0, inConstants.mEV100) * kLensSaturation); // = 1.0 / luminance_max
+		// As kLensSaturation is 1.0, when mEV100 is 0.0 (Aperture = 1.0, Shutter Speed = 1.0, ISO = 100),
+		// this normalization factor becomes 1.0, that is, luminance value is used as it is.
+		float exposure_normalization_factor = 1.0 / (pow(2.0, inConstants.mEV100) * kLensSaturation);
 		normalized_luminance = inLuminance * (exposure_normalization_factor / kPreExposure);
 
 		// [Reference]

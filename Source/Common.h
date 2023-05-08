@@ -138,7 +138,7 @@ template <typename T>
 inline void gFromString(const char* inString, T& outValue) { if (inString == nullptr) return; outValue = gFromString<T>(inString); }
 
 template <typename T>
-inline std::string gToString(const T& inValue);
+inline std::string gToString(const T& inValue) { return std::to_string(inValue); }
 
 template<>
 inline float gFromString(const char* inString)

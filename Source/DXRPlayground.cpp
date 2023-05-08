@@ -265,10 +265,23 @@ static void sPrepareImGui()
 				ImGui::SameLine();
 				if (ImGui::Button(">")) { gCameraSettings.mExposureControl.mInvShutterSpeed *= 2.0f; }
 				ImGui::SameLine();
-				align_right(x); ImGui::SliderFloat("Shutter Speed (1/sec)", &gCameraSettings.mExposureControl.mInvShutterSpeed, 1.0f, 500.0f);
+				std::string format = "%.3f";
+				if (gCameraSettings.mExposureControl.mInvShutterSpeed < 1.0f)
+					format += std::format(" ({:.1f}sec)", 1.0f / gCameraSettings.mExposureControl.mInvShutterSpeed);
+				align_right(x); ImGui::SliderFloat("Shutter Speed (1/sec)", &gCameraSettings.mExposureControl.mInvShutterSpeed, 1.0f, 500.0f, format.c_str());
 			}
 			ImGui::PopID();
-			align_right(); ImGui::SliderFloat("ISO", &gCameraSettings.mExposureControl.mSensitivity, 100.0f, 1000.0f);
+			ImGui::PushID("ISO");
+			{
+				float x = ImGui::GetCursorPosX();
+
+				if (ImGui::Button("<")) { gCameraSettings.mExposureControl.mSensitivity /= 2.0f; }
+				ImGui::SameLine();
+				if (ImGui::Button(">")) { gCameraSettings.mExposureControl.mSensitivity *= 2.0f; }
+				ImGui::SameLine();
+				align_right(x); ImGui::SliderFloat("ISO", &gCameraSettings.mExposureControl.mSensitivity, 100.0f, 3200.0f);
+			}
+			ImGui::PopID();
 
 			if (ImGui::SmallButton("Reset Exposure"))
 				gCameraSettings.ResetExposure();
