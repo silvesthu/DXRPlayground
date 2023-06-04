@@ -42,6 +42,7 @@ enum class ScenePresetType
 	None,
 
 	CornellBox,
+	CornellBoxBSDF,
 	CornellBoxTeapot,
 	CornellBoxMonkey,
 	VeachMIS,
@@ -56,12 +57,13 @@ enum class ScenePresetType
 	Count,
 };
 
-static ScenePresetType sCurrentScene = ScenePresetType::VeachMIS;
+static ScenePresetType sCurrentScene = ScenePresetType::CornellBoxBSDF;
 static ScenePresetType sPreviousScene = sCurrentScene;
 static ScenePreset kScenePresets[(int)ScenePresetType::Count] =
 {
 	ScenePreset().Name("None"),
 	ScenePreset().Name("CornellBox").Path("Asset/Comparison/benedikt-bitterli/cornell-box/scene_v3.xml"),
+	ScenePreset().Name("CornellBoxBSDF").Path("Asset/Comparison/benedikt-bitterli/cornell-box-bsdf/scene_v3.xml"),
 	ScenePreset().Name("CornellBoxTeapot").Path("Asset/Comparison/benedikt-bitterli/cornell-box-teapot/scene_v3.xml"),
 	ScenePreset().Name("CornellMonkey").Path("Asset/Comparison/benedikt-bitterli/cornell-box-monkey/scene_v3.xml"),
 	ScenePreset().Name("VeachMIS").Path("Asset/Comparison/benedikt-bitterli/veach-mis/scene_ggx_v3.xml"),

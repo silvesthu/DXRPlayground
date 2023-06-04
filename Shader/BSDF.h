@@ -5,23 +5,32 @@
 
 namespace BSDFEvaluation
 {
-	BSDFContext GenerateContext(float3 inLight, float3 inNormal, float3 inView, HitContext inHitContext)
+	BSDFContext GenerateContext(BSDFContext::Mode inMode, float3 inLight, float3 inNormal, float3 inView, float inEta, HitContext inHitContext)
 	{
 		// [NOTE] All vectors should be in the same space
 		//        [Mitsuba3] Does all calculation in tangent space where N = (0,0,1), then e.g NdotL = L.z
 
 		BSDFContext bsdf_context;
 
-		bsdf_context.mImportanceSamplingDirection = false;
+		bsdf_context.mMode = inMode;
 
 		bsdf_context.mL = inLight;
 		bsdf_context.mN = inNormal;
 		bsdf_context.mV = inView;
-		bsdf_context.mH = normalize((inLight + inView) / 2.0);
 
-		bsdf_context.mNdotH = dot(bsdf_context.mN, bsdf_context.mH);
+		// Handle TwoSided
+		if (dot(bsdf_context.mN, bsdf_context.mV) < 0 && InstanceDatas[inHitContext.mInstanceID].mTwoSided)
+			bsdf_context.mN = -bsdf_context.mN;
+
+		// // Assume N, H, V on the same side, for BSDF sample only
+		float3 V = bsdf_context.mV;
+		if (inMode == BSDFContext::Mode::BSDFSample)
+			V = dot(bsdf_context.mN, bsdf_context.mV) < 0 ? -V : V;
+		bsdf_context.mH = normalize(V + bsdf_context.mL * inEta);
+
 		bsdf_context.mNdotV = dot(bsdf_context.mN, bsdf_context.mV);
 		bsdf_context.mNdotL = dot(bsdf_context.mN, bsdf_context.mL);
+		bsdf_context.mNdotH = dot(bsdf_context.mN, bsdf_context.mH);
 		bsdf_context.mHdotV = dot(bsdf_context.mH, bsdf_context.mV);
 		bsdf_context.mHdotL = dot(bsdf_context.mH, bsdf_context.mL);
 
@@ -65,8 +74,8 @@ namespace BSDFEvaluation
 					float e1 = RandomFloat01(ioPathContext.mRandomState);
 
 					// 2D Distribution -> GGX Distribution (Polar)
-					float cos_theta = sqrt((1.0 - e0) / ((a2 - 1) * e0 + 1.0));
-					float sin_theta = sqrt(1 - cos_theta * cos_theta);
+					float cos_theta = safe_sqrt((1.0 - e0) / ((a2 - 1) * e0 + 1.0));
+					float sin_theta = safe_sqrt(1 - cos_theta * cos_theta);
 					float phi = 2 * MATH_PI * e1;
 
 					// Polar -> Cartesian
@@ -78,9 +87,8 @@ namespace BSDFEvaluation
 					H = normalize(H.x * inTangentSpace[0] + H.y * inTangentSpace[1] + H.z * inTangentSpace[2]);
 				}
 
-				// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(H == inTangentSpace[2], 0));
-
-				float3 V = -sGetWorldRayDirection();
+				// Assume N, H, V on the same side
+				float3 V = dot(inTangentSpace[2], inHitContext.mRayDirectionWS) < 0 ? -inHitContext.mRayDirectionWS : inHitContext.mRayDirectionWS;
 				float HdotV = dot(H, V);
 				return 2.0 * HdotV * H - V;
 			}
@@ -167,16 +175,17 @@ namespace BSDFEvaluation
 			float eta_ti;
 			F_Dielectric_Mitsuba(InstanceDatas[inHitContext.mInstanceID].mEta.x, ioBSDFContext.mNdotV, r_i, cos_theta_t, eta_it, eta_ti);
 
-			// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(ioBSDFContext.mN, 0));
-			// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(r_i, cos_theta_t, eta_it, eta_ti));
-
 			bool selected_r = RandomFloat01(ioPathContext.mRandomState) <= r_i;
-			ioBSDFContext.mN = ioBSDFContext.mNdotV < 0 ? -ioBSDFContext.mN : ioBSDFContext.mN;
 			float3 L = select(selected_r,
-				reflect(-ioBSDFContext.mV, ioBSDFContext.mN),
-				refract(-ioBSDFContext.mV, ioBSDFContext.mN, eta_ti));
+				reflect(-ioBSDFContext.mV, ioBSDFContext.mNdotV < 0 ? -ioBSDFContext.mN : ioBSDFContext.mN),
+				refract(-ioBSDFContext.mV, ioBSDFContext.mNdotV < 0 ? -ioBSDFContext.mN : ioBSDFContext.mN, eta_ti));
 
-			ioBSDFContext = GenerateContext(L, ioBSDFContext.mN, ioBSDFContext.mV, inHitContext);
+			ioBSDFContext = GenerateContext(ioBSDFContext.mMode, L, ioBSDFContext.mN, ioBSDFContext.mV, select(selected_r, 1.0, eta_it), inHitContext);
+
+			DebugValue(PixelDebugMode::L1, ioPathContext.mRecursionCount, float4(ioBSDFContext.mL, 0));
+			DebugValue(PixelDebugMode::V1, ioPathContext.mRecursionCount, float4(ioBSDFContext.mV, 0));
+			DebugValue(PixelDebugMode::H1, ioPathContext.mRecursionCount, float4(ioBSDFContext.mH, 0));
+
 			ioBSDFContext.mBSDF = select(selected_r, InstanceDatas[inHitContext.mInstanceID].mSpecularReflectance, InstanceDatas[inHitContext.mInstanceID].mSpecularTransmittance) * select(selected_r, r_i, 1.0 - r_i);
 			ioBSDFContext.mBSDFPDF = select(selected_r, r_i, 1.0 - r_i);
 
@@ -231,13 +240,17 @@ namespace BSDFEvaluation
 			}
 
 			bool selected_r = RandomFloat01(ioPathContext.mRandomState) <= r_i;
-			ioBSDFContext.mN = ioBSDFContext.mNdotV < 0 ? -ioBSDFContext.mN : ioBSDFContext.mN;
 			float3 L = select(selected_r,
-				reflect(-ioBSDFContext.mV, ioBSDFContext.mN),
-				refract(-ioBSDFContext.mV, ioBSDFContext.mN, eta_ti));
+				reflect(-ioBSDFContext.mV, ioBSDFContext.mNdotV < 0 ? -ioBSDFContext.mN : ioBSDFContext.mN),
+				refract(-ioBSDFContext.mV, ioBSDFContext.mNdotV < 0 ? -ioBSDFContext.mN : ioBSDFContext.mN, eta_ti));
 
-			ioBSDFContext = GenerateContext(L, ioBSDFContext.mN, ioBSDFContext.mV, inHitContext);
-			ioBSDFContext.mBSDF = select(selected_r, InstanceDatas[inHitContext.mInstanceID].mSpecularReflectance, InstanceDatas[inHitContext.mInstanceID].mSpecularTransmittance) * select(selected_r, r_i, 1.0 - r_i);
+			ioBSDFContext = GenerateContext(ioBSDFContext.mMode, L, ioBSDFContext.mN, ioBSDFContext.mV, select(selected_r, 1.0, eta_it), inHitContext);
+
+			DebugValue(PixelDebugMode::L1, ioPathContext.mRecursionCount, float4(ioBSDFContext.mL, 0));
+			DebugValue(PixelDebugMode::V1, ioPathContext.mRecursionCount, float4(ioBSDFContext.mV, 0));
+			DebugValue(PixelDebugMode::H1, ioPathContext.mRecursionCount, float4(ioBSDFContext.mH, 0));
+
+			ioBSDFContext.mBSDF = abs(select(selected_r, InstanceDatas[inHitContext.mInstanceID].mSpecularReflectance, InstanceDatas[inHitContext.mInstanceID].mSpecularTransmittance)) * select(selected_r, r_i, 1.0 - r_i);
 			ioBSDFContext.mBSDFPDF = select(selected_r, r_i, 1.0 - r_i);
 			
 			ioBSDFContext.mBSDF *= select(selected_r, 1.0, sqr(eta_ti));
@@ -254,59 +267,60 @@ namespace BSDFEvaluation
 
 		void Evaluate(HitContext inHitContext, inout BSDFContext ioBSDFContext, inout PathContext ioPathContext)
 		{
-			bool importance_sampling = ioBSDFContext.mImportanceSamplingDirection;
+			float eta = InstanceDatas[inHitContext.mInstanceID].mEta.x;
 
 			float r_i;
 			float cos_theta_t;
 			float eta_it;
 			float eta_ti;
-			F_Dielectric_Mitsuba(InstanceDatas[inHitContext.mInstanceID].mEta.x, ioBSDFContext.mHdotV, r_i, cos_theta_t, eta_it, eta_ti);
+			F_Dielectric_Mitsuba(InstanceDatas[inHitContext.mInstanceID].mEta.x, ioBSDFContext.mNdotV, r_i, cos_theta_t, eta_it, eta_ti);
+	
+			bool selected_r = false;
 
-			// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(ioBSDFContext.mHdotV, 0, 0, r_i));
-
-			// [TODO] Fix sample light...
-
-			bool selected_r = select(ioBSDFContext.mImportanceSamplingDirection, 
-				RandomFloat01(ioPathContext.mRandomState) <= r_i,
-				(ioBSDFContext.mNdotV * ioBSDFContext.mNdotL) > 0);
-			ioBSDFContext.mN = select(selected_r, ioBSDFContext.mN, -ioBSDFContext.mN);
-			ioBSDFContext.mH = select(selected_r, ioBSDFContext.mH, -ioBSDFContext.mH);
-			float3 L = select(selected_r,
-				reflect(-ioBSDFContext.mV, ioBSDFContext.mH),
-				refract(-ioBSDFContext.mV, ioBSDFContext.mH, eta_ti));
-
-			if (importance_sampling)
+			if (ioBSDFContext.mMode == BSDFContext::Mode::BSDFSample)
 			{
-				// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(selected_r, 0, 0, 1));
+				selected_r = RandomFloat01(ioPathContext.mRandomState) <= r_i;
+
+				float3 L = select(selected_r,
+					reflect(-ioBSDFContext.mV, ioBSDFContext.mNdotV < 0 ? -ioBSDFContext.mH : ioBSDFContext.mH),
+					refract(-ioBSDFContext.mV, ioBSDFContext.mNdotV < 0 ? -ioBSDFContext.mH : ioBSDFContext.mH, eta_ti));
+
+				ioBSDFContext = GenerateContext(ioBSDFContext.mMode, L, ioBSDFContext.mN, ioBSDFContext.mV, select(selected_r, 1.0, eta_it), inHitContext);
+
+				DebugValue(PixelDebugMode::L1, ioPathContext.mRecursionCount, float4(ioBSDFContext.mL, selected_r));
+				DebugValue(PixelDebugMode::V1, ioPathContext.mRecursionCount, float4(ioBSDFContext.mV, selected_r));
+				DebugValue(PixelDebugMode::H1, ioPathContext.mRecursionCount, float4(ioBSDFContext.mH, selected_r));
 			}
 			else
 			{
-				// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(selected_r, 0, 0, -1));
-				// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(L, -1));
-				// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(ioBSDFContext.mH, -1));
+				selected_r = ioBSDFContext.mNdotV * ioBSDFContext.mNdotL > 0;
+
+				ioBSDFContext = GenerateContext(ioBSDFContext.mMode, ioBSDFContext.mL, ioBSDFContext.mN, ioBSDFContext.mV, select(selected_r, 1.0, eta_it), inHitContext);
+
+				DebugValue(PixelDebugMode::L3, ioPathContext.mRecursionCount, float4(ioBSDFContext.mL, selected_r));
+				DebugValue(PixelDebugMode::V3, ioPathContext.mRecursionCount, float4(ioBSDFContext.mV, selected_r));
+				DebugValue(PixelDebugMode::H3, ioPathContext.mRecursionCount, float4(ioBSDFContext.mH, selected_r));
 			}
 
-			ioBSDFContext = GenerateContext(L, ioBSDFContext.mN, ioBSDFContext.mV, inHitContext);
-
 			float D = D_GGX(ioBSDFContext.mNdotH, InstanceDatas[inHitContext.mInstanceID].mRoughnessAlpha);
-			float G = G_SmithGGX(ioBSDFContext.mNdotL, ioBSDFContext.mNdotV, InstanceDatas[inHitContext.mInstanceID].mRoughnessAlpha);
-
-			if (D < 0 || ioBSDFContext.mNdotL < 0 || ioBSDFContext.mNdotV < 0)
-				D = 0;
+			float G = G_SmithGGX(abs(ioBSDFContext.mNdotL), abs(ioBSDFContext.mNdotV), InstanceDatas[inHitContext.mInstanceID].mRoughnessAlpha);
 
 			float3 F = select(selected_r, InstanceDatas[inHitContext.mInstanceID].mSpecularReflectance, InstanceDatas[inHitContext.mInstanceID].mSpecularTransmittance);
 
-			ioBSDFContext.mBSDF = select(selected_r, 
+			ioBSDFContext.mBSDF = abs(select(selected_r, 
 				D * G * F / (4.0f * ioBSDFContext.mNdotV * ioBSDFContext.mNdotL),
-				D * G * F * (sqr(eta_it) * ioBSDFContext.mHdotV * ioBSDFContext.mHdotL) / (ioBSDFContext.mNdotV * ioBSDFContext.mNdotL * sqr(ioBSDFContext.mHdotV + eta_it * ioBSDFContext.mHdotL)));
+				D * G * F * ioBSDFContext.mHdotV * (sqr(eta_it) * ioBSDFContext.mHdotL) / (ioBSDFContext.mNdotV * ioBSDFContext.mNdotL * sqr(ioBSDFContext.mHdotV + eta_it * ioBSDFContext.mHdotL))));
 			ioBSDFContext.mBSDF *= select(selected_r, r_i, 1.0 - r_i);
 
-			ioBSDFContext.mBSDFPDF = select(selected_r, 
+			ioBSDFContext.mBSDFPDF = abs(select(selected_r, 
 				(D * ioBSDFContext.mNdotH) / (4.0f * ioBSDFContext.mHdotL),
-				(D * ioBSDFContext.mNdotH) * (sqr(eta_it) * ioBSDFContext.mHdotL) / sqr(ioBSDFContext.mHdotV + eta_it * ioBSDFContext.mHdotL));
+				(D * ioBSDFContext.mNdotH) * (sqr(eta_it) * ioBSDFContext.mHdotL) / sqr(ioBSDFContext.mHdotV + eta_it * ioBSDFContext.mHdotL)));
 			ioBSDFContext.mBSDFPDF *= select(selected_r, r_i, 1.0 - r_i);
 
-			if (importance_sampling)
+			ioBSDFContext.mBSDF *= select(selected_r, 1.0, sqr(eta_ti));
+			ioBSDFContext.mEta = select(selected_r, 1.0, eta_it);
+
+			if (ioBSDFContext.mMode != BSDFContext::Mode::BSDFSample)
 			{
 				// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(ioBSDFContext.mBSDF, ioBSDFContext.mBSDFPDF));
 			}
@@ -314,9 +328,6 @@ namespace BSDFEvaluation
 			{
 				// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(ioBSDFContext.mBSDF, ioBSDFContext.mBSDFPDF));
 			}
-
-			ioBSDFContext.mBSDF *= select(selected_r, 1.0, sqr(eta_ti));
-			ioBSDFContext.mEta = select(selected_r, 1.0, eta_it);
 		}
 	}
 
@@ -333,7 +344,7 @@ namespace BSDFEvaluation
 	{
 		void Evaluate(HitContext inHitContext, inout BSDFContext ioBSDFContext, inout PathContext ioPathContext)
 		{
-			ioBSDFContext = GenerateContext(reflect(-ioBSDFContext.mV, ioBSDFContext.mN), ioBSDFContext.mN, ioBSDFContext.mV, inHitContext);
+			ioBSDFContext = GenerateContext(BSDFContext::Mode::LightSample, reflect(-ioBSDFContext.mV, ioBSDFContext.mN), ioBSDFContext.mN, ioBSDFContext.mV, 1.0, inHitContext);
 			ioBSDFContext.mBSDF = 1.0f;
 			ioBSDFContext.mBSDFPDF = 1.0f;
 		}
@@ -369,6 +380,10 @@ namespace BSDFEvaluation
 	{
 		// [TODO] Refactor this as sample micro distribution and return H
 
+		// Handle TwoSided
+		if (dot(inNormal, -inHitContext.mRayDirectionWS) < 0 && InstanceDatas[inHitContext.mInstanceID].mTwoSided)
+			inNormal = -inNormal;
+
 		float3x3 inTangentSpace = GenerateTangentSpace(inNormal);
 		[branch]
 		switch (GetBSDFType(inHitContext))
@@ -386,13 +401,28 @@ namespace BSDFEvaluation
 	BSDFContext GenerateImportanceSamplingContext(float3 inNormal, float3 inView, HitContext inHitContext, inout PathContext ioPathContext)
 	{
 		float3 importance_sampling_direction = GenerateImportanceSamplingDirection(inNormal, inHitContext, ioPathContext);
-		BSDFContext bsdf_context = BSDFEvaluation::GenerateContext(importance_sampling_direction, inHitContext.mVertexNormalWS, -inHitContext.mRayDirectionWS, inHitContext);
-		bsdf_context.mImportanceSamplingDirection = true;
+
+		// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(importance_sampling_direction, 0));
+
+ 		BSDFContext bsdf_context = BSDFEvaluation::GenerateContext(BSDFContext::Mode::BSDFSample, importance_sampling_direction, inHitContext.mVertexNormalWS, -inHitContext.mRayDirectionWS, 1.0, inHitContext);
 		return bsdf_context;
 	}
 
 	void Evaluate(HitContext inHitContext, inout BSDFContext ioBSDFContext, inout PathContext ioPathContext)
 	{
+		if (ioBSDFContext.mMode == BSDFContext::Mode::BSDFSample)
+		{
+			DebugValue(PixelDebugMode::L0, ioPathContext.mRecursionCount, float4(ioBSDFContext.mL, 0));
+			DebugValue(PixelDebugMode::V0, ioPathContext.mRecursionCount, float4(ioBSDFContext.mV, 0));
+			DebugValue(PixelDebugMode::H0, ioPathContext.mRecursionCount, float4(ioBSDFContext.mH, 0));
+		}
+		else
+		{
+			DebugValue(PixelDebugMode::L2, ioPathContext.mRecursionCount, float4(ioBSDFContext.mL, 0));
+			DebugValue(PixelDebugMode::V2, ioPathContext.mRecursionCount, float4(ioBSDFContext.mV, 0));
+			DebugValue(PixelDebugMode::H2, ioPathContext.mRecursionCount, float4(ioBSDFContext.mH, 0));
+		}
+
 		[branch]
 		switch (GetBSDFType(inHitContext))
 		{
@@ -414,7 +444,7 @@ namespace BSDFEvaluation
 			// https://www.pbr-book.org/3ed-2018/Reflection_Models/Specular_Reflection_and_Transmission
 			// https://stackoverflow.com/questions/22431912/path-tracing-why-is-there-no-cosine-term-when-calculating-perfect-mirror-reflec
 			// https://gamedev.net/forums/topic/657520-cosine-term-in-rendering-equation/5159311/?page=2
-			ioBSDFContext.mBSDF /= ioBSDFContext.mNdotL;
+			ioBSDFContext.mBSDF /= abs(ioBSDFContext.mNdotL);
 		}
 
 		// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(ioBSDFContext.mBSDF, ioBSDFContext.mBSDFPDF));

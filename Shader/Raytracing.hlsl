@@ -23,8 +23,8 @@ void TraceRay()
 
 	switch (mConstants.mOffsetMode)
 	{
-	case OffsetMode::HalfPixel:	crd += 0.5;
-	case OffsetMode::Random:	crd += float2(RandomFloat01(random_state), RandomFloat01(random_state));
+	case OffsetMode::HalfPixel:	crd += 0.5; break;
+	case OffsetMode::Random:	crd += float2(RandomFloat01(random_state), RandomFloat01(random_state)); break;
 	case OffsetMode::NoOffset:	// [[fallthrough]];
 	default: break;
 	}
@@ -54,8 +54,13 @@ void TraceRay()
 
 	for (;;)
 	{
+		path_context.mEmission				+= path_context.mLightEmission;
+		path_context.mLightEmission			= 0;
+
+		if (max(path_context.mThroughput.x, max(path_context.mThroughput.y, path_context.mThroughput.z)) <= 0)
+			break;
+
 		bool continue_bounce				= false;
-		float3 light_emission				= 0;
 
 		sWorldRayOrigin						= ray.Origin;
 		sWorldRayDirection					= ray.Direction;
@@ -98,10 +103,6 @@ void TraceRay()
 				float3 normal = normalize(normals[0] * hit_context.mBarycentrics.x + normals[1] * hit_context.mBarycentrics.y + normals[2] * hit_context.mBarycentrics.z);
 				hit_context.mVertexNormalOS = normal;
 				hit_context.mVertexNormalWS = normalize(mul((float3x3) InstanceDatas[hit_context.mInstanceID].mInverseTranspose, normal)); // Allow non-uniform scale
-
-				// Handle back face
-				if (dot(hit_context.mVertexNormalWS, -sGetWorldRayDirection()) < 0 && InstanceDatas[hit_context.mInstanceID].mTwoSided)
-					hit_context.mVertexNormalWS = -hit_context.mVertexNormalWS;
 
 				float2 uvs[3] = { UVs[indices[0]], UVs[indices[1]], UVs[indices[2]] };
 				hit_context.mUV = uvs[0] * hit_context.mBarycentrics.x + uvs[1] * hit_context.mBarycentrics.y + uvs[2] * hit_context.mBarycentrics.z;
@@ -205,20 +206,22 @@ void TraceRay()
 
 						if (shadow_query.CommittedStatus() == COMMITTED_TRIANGLE_HIT && shadow_query.CommittedInstanceID() == light.mInstanceID)
 						{
-							BSDFContext bsdf_context = BSDFEvaluation::GenerateContext(shadow_ray.Direction, hit_context.mVertexNormalWS, -hit_context.mRayDirectionWS, hit_context);
+							BSDFContext bsdf_context = BSDFEvaluation::GenerateContext(BSDFContext::Mode::LightSample, shadow_ray.Direction, hit_context.mVertexNormalWS, -hit_context.mRayDirectionWS, 1.0, hit_context);
 							BSDFEvaluation::Evaluate(hit_context, bsdf_context, path_context);
 
 							float3 luminance = light.mEmission * (kEmissionBoostScale * kPreExposure);
-							float3 emission = luminance * bsdf_context.mBSDF * bsdf_context.mNdotL / light_pdf;
+							float3 emission = luminance * bsdf_context.mBSDF * abs(bsdf_context.mNdotL) / light_pdf;
 
 							if (mConstants.mSampleMode == SampleMode::MIS)
 								emission *= max(0.0, MIS::PowerHeuristic(1, light_pdf, 1, bsdf_context.mBSDFPDF));
 
 							DebugValue(PixelDebugMode::MIS_Light, path_context.mRecursionCount, float4(bsdf_context.mBSDFPDF, light_pdf, LightEvaluation::GetLightSelectionPDF(), light_sample_pdf));
 
-							light_emission = path_context.mThroughput * emission;
+							path_context.mLightEmission = path_context.mThroughput * emission;
 
-							// DebugValue(PixelDebugMode::Manual, path_context.mRecursionCount, float4(light_emission, 1));
+							// DebugValue(PixelDebugMode::Manual, path_context.mRecursionCount, float4(bsdf_context.mBSDF, light_pdf));
+							// DebugValue(PixelDebugMode::Manual, path_context.mRecursionCount, float4(emission, 1));
+							// DebugTexture(path_context.mRecursionCount == 0, float4(bsdf_context.mBSDF, 0));
 						}
 					}
 				}
@@ -229,8 +232,12 @@ void TraceRay()
 					BSDFContext bsdf_context = BSDFEvaluation::GenerateImportanceSamplingContext(hit_context.mVertexNormalWS, -hit_context.mRayDirectionWS, hit_context, path_context);
 					BSDFEvaluation::Evaluate(hit_context, bsdf_context, path_context);
 
+					// DebugValue(PixelDebugMode::Manual, path_context.mRecursionCount, float4(hit_context.mVertexNormalWS, 0));
+					// DebugValue(PixelDebugMode::Manual, path_context.mRecursionCount, float4(bsdf_context.mL, 0));
+					DebugTexture(path_context.mRecursionCount == 0, float4(bsdf_context.mBSDF, 0));
+
 					path_context.mEmission += path_context.mThroughput * emission; // Non-light emission
-					path_context.mThroughput *= bsdf_context.mBSDFPDF > 0 ? (bsdf_context.mBSDF * bsdf_context.mNdotL / bsdf_context.mBSDFPDF) : 0;
+					path_context.mThroughput *= bsdf_context.mBSDFPDF > 0 ? (bsdf_context.mBSDF * abs(bsdf_context.mNdotL) / bsdf_context.mBSDFPDF) : 0;
 					path_context.mPrevBSDFPDF = bsdf_context.mBSDFPDF;
 					path_context.mPrevDiracDeltaDistribution = BSDFEvaluation::DiracDeltaDistribution(hit_context);
 					path_context.mEtaScale *= bsdf_context.mEta;
@@ -278,12 +285,7 @@ void TraceRay()
 			break;
 		}
 
-		if (!continue_bounce)
-			break;
-
 		float throughput_max = max(path_context.mThroughput.x, max(path_context.mThroughput.y, path_context.mThroughput.z));
-		if (throughput_max <= 0)
-			break;
 
 		// Russian Roulette
 		// [TODO] Make a test scene for comparison
@@ -292,7 +294,7 @@ void TraceRay()
 		if (path_context.mRecursionCount >= mConstants.mRecursionCountMax)
 		{
 			if (mConstants.mRecursionMode == RecursionMode::FixedCount)
-				break;
+				continue_bounce = false;
 
 			if (mConstants.mRecursionMode == RecursionMode::RussianRoulette)
 			{
@@ -313,13 +315,19 @@ void TraceRay()
 				else
 				{
 					// Termination by Russian Roulette
-					break;
+					continue_bounce = false;
 				}
 			}
 		}
 
-		path_context.mEmission += light_emission; // Keep accumulation from light sample after termination with RR
-		path_context.mRecursionCount++;
+		if (continue_bounce)
+		{
+			path_context.mRecursionCount++;
+		}
+		else
+		{
+			break;
+		}
 	}
 
 	// Accumulation

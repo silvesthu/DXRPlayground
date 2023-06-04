@@ -218,6 +218,30 @@ enum class PixelDebugMode : uint
 
 	_Newline4,
 
+	// BSDF Sample
+	L0,
+	V0,
+	H0,
+
+	// BSDF Sample with reflection/refraction
+	L1,
+	V1,
+	H1,
+
+	_Newline5,
+
+	// Light Sample
+	L2,
+	V2,
+	H2,
+
+	// Light Sample with reflection/refraction
+	L3,
+	V3,
+	H3,
+
+	_Newline6,
+
 	RussianRoulette_Probability_EtaScale,
 
 	Count
@@ -415,6 +439,8 @@ struct PathContext
 	float3						mThroughput;					// [0, 1]		Accumulated throughput, [PBRT3] call it beta https://github.com/mmp/pbrt-v3/blob/master/src/integrators/path.cpp#L68
 	float3						mEmission;						// [0, +inf]	Accumulated emission
 
+	float3						mLightEmission;					// [0, +inf]	Emission from light sample
+
 	float						mPrevBSDFPDF;
 	bool						mPrevDiracDeltaDistribution;
 
@@ -442,7 +468,13 @@ struct HitContext
 
 struct BSDFContext
 {
-	bool mImportanceSamplingDirection;
+	enum class Mode
+	{
+		BSDFSample,
+		LightSample,
+	};
+
+	Mode mMode;
 
 	float3 mL;
 	float3 mN;

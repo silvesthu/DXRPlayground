@@ -271,3 +271,11 @@ void DebugValue(PixelDebugMode inPixelDebugMode, uint inRecursionCount, float4 i
         if (sGetDispatchRaysIndex().x == mConstants.mPixelDebugCoord.x && sGetDispatchRaysIndex().y == mConstants.mPixelDebugCoord.y && inRecursionCount < Debug::kValueArraySize)
             BufferDebugUAV[0].mPixelValueArray[inRecursionCount] = inValue;
 }
+
+void DebugTexture(bool inCondition, float4 inValue)
+{
+    if (inCondition)
+    {
+        ScreenDebugUAV[sGetDispatchRaysIndex().xy] = inValue;
+    }
+}
