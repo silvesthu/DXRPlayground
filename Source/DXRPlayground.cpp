@@ -352,6 +352,17 @@ static void sPrepareImGui()
 				gRenderer.mReloadShader = true;
 			}
 
+			if (ImGui::Checkbox("Test Lib Shader", &gRenderer.mTestLibShader))
+				gRenderer.mAccumulationResetRequested = true;
+
+			if (gRenderer.mTestLibShader)
+			{
+				ImGui::Indent();
+
+				if (ImGui::Checkbox("Use Hit Shader", &gRenderer.mUseLibHitShader))
+					gRenderer.mReloadShader = true;				
+			}
+
 			ImGui::TreePop();
 		}
 
@@ -998,15 +1009,50 @@ void sRender()
 		gBarrierUAV(gCommandList, nullptr);
 	}
 
-	// Raytrace
+	// RayQuery
 	{
-		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Raytrace");
+		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "RayQuery");
 
 		DXGI_SWAP_CHAIN_DESC1 swap_chain_desc;
 		gSwapChain->GetDesc1(&swap_chain_desc);
 
 		gRenderer.Setup(gRenderer.mRuntime.mRayQueryShader.mData);
 		gCommandList->Dispatch((swap_chain_desc.Width + 7) / 8, (swap_chain_desc.Height + 7) / 8, 1);
+
+		gBarrierUAV(gCommandList, nullptr);
+	}
+
+	// Test Hit Shader
+	if (gRenderer.mTestLibShader)
+	{
+		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Test Hit Shader");
+
+		DXGI_SWAP_CHAIN_DESC1 swap_chain_desc;
+		gSwapChain->GetDesc1(&swap_chain_desc);
+
+		D3D12_DISPATCH_RAYS_DESC dispatch_rays_desc = {};
+		{
+			dispatch_rays_desc.Width = swap_chain_desc.Width;
+			dispatch_rays_desc.Height = swap_chain_desc.Height;
+			dispatch_rays_desc.Depth = 1;
+
+			// RayGen
+			dispatch_rays_desc.RayGenerationShaderRecord.StartAddress = gRenderer.mRuntime.mLibShaderTable.mResource->GetGPUVirtualAddress() + gRenderer.mRuntime.mLibShaderTable.mEntrySize * gRenderer.mRuntime.mLibShaderTable.mRayGenOffset;
+			dispatch_rays_desc.RayGenerationShaderRecord.SizeInBytes = gRenderer.mRuntime.mLibShaderTable.mEntrySize;
+
+			// Miss
+			dispatch_rays_desc.MissShaderTable.StartAddress = gRenderer.mRuntime.mLibShaderTable.mResource->GetGPUVirtualAddress() + gRenderer.mRuntime.mLibShaderTable.mEntrySize * gRenderer.mRuntime.mLibShaderTable.mMissOffset;
+			dispatch_rays_desc.MissShaderTable.StrideInBytes = gRenderer.mRuntime.mLibShaderTable.mEntrySize;
+			dispatch_rays_desc.MissShaderTable.SizeInBytes = gRenderer.mRuntime.mLibShaderTable.mEntrySize * gRenderer.mRuntime.mLibShaderTable.mMissCount;
+
+			// HitGroup
+			dispatch_rays_desc.HitGroupTable.StartAddress = gRenderer.mRuntime.mLibShaderTable.mResource->GetGPUVirtualAddress() + gRenderer.mRuntime.mLibShaderTable.mEntrySize * gRenderer.mRuntime.mLibShaderTable.mHitGroupOffset;
+			dispatch_rays_desc.HitGroupTable.StrideInBytes = gRenderer.mRuntime.mLibShaderTable.mEntrySize;
+			dispatch_rays_desc.HitGroupTable.SizeInBytes = gRenderer.mRuntime.mLibShaderTable.mEntrySize * gRenderer.mRuntime.mLibShaderTable.mHitGroupCount;
+		}
+
+		gRenderer.Setup(gRenderer.mRuntime.mLibShader.mData);
+		gCommandList->DispatchRays(&dispatch_rays_desc);
 
 		gBarrierUAV(gCommandList, nullptr);
 	}

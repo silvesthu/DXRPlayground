@@ -10,7 +10,7 @@
 #endif
 
 // System
-ID3D12Device5*						gDevice = nullptr;
+ID3D12Device7*						gDevice = nullptr;
 ID3D12DescriptorHeap*				gRTVDescriptorHeap = nullptr;
 ID3D12CommandQueue*					gCommandQueue = nullptr;
 ID3D12GraphicsCommandList4*			gCommandList = nullptr;

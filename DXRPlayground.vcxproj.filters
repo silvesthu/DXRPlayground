@@ -195,6 +195,9 @@
     <ClInclude Include="Source\Renderer.h">
       <Filter>Source</Filter>
     </ClInclude>
+    <ClInclude Include="Source\ShaderHelper.h">
+      <Filter>Source</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\DXRPlayground.cpp">
@@ -259,9 +262,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="Shader\Raytracing.hlsl">
-      <Filter>Shader</Filter>
-    </CopyFileToFolders>
     <CopyFileToFolders Include="Shader\Common.h">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
@@ -305,6 +305,12 @@
       <Filter>Shader</Filter>
     </CopyFileToFolders>
     <CopyFileToFolders Include="Shader\Binding.h">
+      <Filter>Shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Shader\RayQuery.hlsl">
+      <Filter>Shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Shader\LibShader.hlsl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
   </ItemGroup>

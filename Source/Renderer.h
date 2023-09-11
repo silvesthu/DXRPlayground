@@ -6,7 +6,7 @@ struct Renderer
 {
 	struct Runtime : RuntimeBase<Runtime>
 	{
-		Shader								mRayQueryShader = Shader().FileName("Shader/Raytracing.hlsl").CSName("RayQueryCS");
+		Shader								mRayQueryShader = Shader().FileName("Shader/RayQuery.hlsl").CSName("RayQueryCS");
 		Shader								mClearShader = Shader().FileName("Shader/Composite.hlsl").CSName("ClearCS");
 		Shader								mDiffTexture2DShader = Shader().FileName("Shader/DiffTexture.hlsl").CSName("DiffTexture2DShader");
 		Shader								mDiffTexture3DShader = Shader().FileName("Shader/DiffTexture.hlsl").CSName("DiffTexture3DShader");
@@ -14,6 +14,11 @@ struct Renderer
 
 		Shader								mSentinelShader = Shader();
 		std::span<Shader>					mShaders = std::span<Shader>(&mRayQueryShader, &mSentinelShader);
+
+		Shader								mLibBaseShader = Shader().FileName("Shader/LibShader.hlsl").LibName("LibBaseShader").LibType(ShaderLibType::Base).LibRootSignatureReference(&mRayQueryShader);
+		Shader								mLibHitShader = Shader().FileName("Shader/LibShader.hlsl").LibName("LibHitShader").LibType(ShaderLibType::Hit).LibRootSignatureReference(&mRayQueryShader);
+		Shader								mLibShader = Shader();
+		ShaderTable							mLibShaderTable;
 
 		Texture								mScreenColorTexture = Texture().Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(ViewDescriptorIndex::ScreenColorUAV).SRVIndex(ViewDescriptorIndex::ScreenColorSRV).Name("Renderer.ScreenColorTexture");
 		Texture								mScreenDebugTexture = Texture().Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(ViewDescriptorIndex::ScreenDebugUAV).SRVIndex(ViewDescriptorIndex::ScreenDebugSRV).Name("Renderer.ScreenDebugTexture");
@@ -85,6 +90,8 @@ struct Renderer
 
 	bool									mReloadShader = false;
 	bool									mDumpDisassemblyRayQuery = false;
+	bool									mTestLibShader = false;
+	bool									mUseLibHitShader = false;
 
 	bool									mAccumulationDone = false;
 	bool									mAccumulationFrameUnlimited = false;

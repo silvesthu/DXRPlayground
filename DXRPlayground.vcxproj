@@ -15,6 +15,7 @@
     <ClInclude Include="Shader\Light.h" />
     <ClInclude Include="Shader\BSDF.h" />
     <ClInclude Include="Source\Renderer.h" />
+    <ClInclude Include="Source\ShaderHelper.h" />
     <ClInclude Include="Source\Thirdparty\tinyxml2\tinyxml2.h" />
     <CopyFileToFolders Include="Shader\AtmosphereIntegration.Wilkie21.h">
       <FileType>Document</FileType>
@@ -95,13 +96,6 @@
     <ClCompile Include="Source\Thirdparty\tinyxml2\tinyxml2.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="Shader\Raytracing.hlsl">
-      <FileType>Document</FileType>
-      <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)$(Platform)\$(Configuration)\Shader</DestinationFolders>
-      <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)$(Platform)\$(Configuration)\Shader</DestinationFolders>
-    </CopyFileToFolders>
-  </ItemGroup>
-  <ItemGroup>
     <CopyFileToFolders Include="Shader\Common.h">
       <FileType>Document</FileType>
       <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)$(Platform)\$(Configuration)\Shader</DestinationFolders>
@@ -164,6 +158,16 @@
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="Source\Thirdparty\glm\util\glm.natvis" />
+  </ItemGroup>
+  <ItemGroup>
+    <CopyFileToFolders Include="Shader\RayQuery.hlsl">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
+  </ItemGroup>
+  <ItemGroup>
+    <CopyFileToFolders Include="Shader\LibShader.hlsl">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
