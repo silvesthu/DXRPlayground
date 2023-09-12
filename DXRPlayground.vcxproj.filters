@@ -310,7 +310,10 @@
     <CopyFileToFolders Include="Shader\RayQuery.hlsl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\LibShader.hlsl">
+    <CopyFileToFolders Include="Shader\LibBaseShader.hlsl">
+      <Filter>Shader</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Shader\LibHitShader.hlsl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
   </ItemGroup>

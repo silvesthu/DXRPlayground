@@ -165,7 +165,10 @@
     </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="Shader\LibShader.hlsl">
+    <CopyFileToFolders Include="Shader\LibBaseShader.hlsl">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Shader\LibHitShader.hlsl">
       <FileType>Document</FileType>
     </CopyFileToFolders>
   </ItemGroup>

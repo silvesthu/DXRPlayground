@@ -15,7 +15,7 @@
 #include "Thirdparty/filewatch/FileWatch.hpp"
 #pragma warning(pop)
 
-#define DX12_ENABLE_DEBUG_LAYER			(0)
+#define DX12_ENABLE_DEBUG_LAYER			(1)
 #define DX12_ENABLE_GBV					(0)
 #define DX12_ENABLE_INFO_QUEUE_CALLBACK (0)
 #define DX12_ENABLE_PIX_CAPTURE			(0)

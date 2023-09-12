@@ -67,6 +67,8 @@ void Renderer::InitializeShaders()
 		gCreatePipelineState(shader);
 
 	// Lib Shader
+	gRenderer.mRuntime.mLibLocalRootSignature = gCreateRootSignature(D3D12_ROOT_SIGNATURE_DESC{ .Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE }); // Empty root signature, placeholder
+	gRenderer.mRuntime.mLibLocalRootSignature->SetName(L"LocalRootSignature");
 	gCreatePipelineState(gRenderer.mRuntime.mLibBaseShader);
 	if (gRenderer.mUseLibHitShader)
 	{

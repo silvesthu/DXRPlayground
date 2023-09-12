@@ -15,8 +15,9 @@ struct Renderer
 		Shader								mSentinelShader = Shader();
 		std::span<Shader>					mShaders = std::span<Shader>(&mRayQueryShader, &mSentinelShader);
 
-		Shader								mLibBaseShader = Shader().FileName("Shader/LibShader.hlsl").LibName("LibBaseShader").LibType(ShaderLibType::Base).LibRootSignatureReference(&mRayQueryShader);
-		Shader								mLibHitShader = Shader().FileName("Shader/LibShader.hlsl").LibName("LibHitShader").LibType(ShaderLibType::Hit).LibRootSignatureReference(&mRayQueryShader);
+		ComPtr<ID3D12RootSignature>			mLibLocalRootSignature;
+		Shader								mLibBaseShader = Shader().FileName("Shader/LibBaseShader.hlsl").LibName("LibBaseShader").LibType(ShaderLibType::Base).LibRootSignatureReference(&mRayQueryShader);
+		Shader								mLibHitShader = Shader().FileName("Shader/LibHitShader.hlsl").LibName("LibHitShader").LibType(ShaderLibType::Hit).LibRootSignatureReference(&mRayQueryShader);
 		Shader								mLibShader = Shader();
 		ShaderTable							mLibShaderTable;
 

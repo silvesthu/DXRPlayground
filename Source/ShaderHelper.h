@@ -22,115 +22,15 @@ ComPtr<ID3D12RootSignature> gCreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC
 	return root_signature;
 }
 
-// Hold data for D3D12_STATE_SUBOBJECT
-template <typename DescType, D3D12_STATE_SUBOBJECT_TYPE SubObjectType>
-struct StateSubobjectHolder
-{
-	StateSubobjectHolder()
-	{
-		mStateSubobject.Type = SubObjectType;
-		mStateSubobject.pDesc = &mDesc;
-	}
-
-	StateSubobjectHolder(const StateSubobjectHolder& inOther)
-	{
-		*this = inOther;
-	}
-
-	StateSubobjectHolder& operator=(const StateSubobjectHolder& inOther)
-	{
-		gAssert(mStateSubobject.Type == inOther.mStateSubobject.Type);
-		mDesc = inOther.mDesc;
-
-		// mStateSubobject.pDesc is referencing this instance, make sure it is never copied.
-
-		return *this;
-	}
-
-	D3D12_STATE_SUBOBJECT mStateSubobject = {};
-
-protected:
-	DescType mDesc = {};
-};
-
-// Shader binary
-struct DXILLibrary : public StateSubobjectHolder<D3D12_DXIL_LIBRARY_DESC, D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY>
-{
-	DXILLibrary(IDxcBlob* inShaderBlob, const wchar_t* inEntryPoint[], glm::uint32 inEntryPointCount) : mShaderBlob(inShaderBlob)
-	{
-		mExportDescs.resize(inEntryPointCount);
-		mExportNames.resize(inEntryPointCount);
-
-		if (inShaderBlob)
-		{
-			mDesc.DXILLibrary.pShaderBytecode = inShaderBlob->GetBufferPointer();
-			mDesc.DXILLibrary.BytecodeLength = inShaderBlob->GetBufferSize();
-			mDesc.NumExports = inEntryPointCount;
-			mDesc.pExports = mExportDescs.data();
-
-			for (glm::uint32 i = 0; i < inEntryPointCount; i++)
-			{
-				mExportNames[i] = inEntryPoint[i];
-				mExportDescs[i].Name = mExportNames[i].c_str();
-				mExportDescs[i].Flags = D3D12_EXPORT_FLAG_NONE;
-				mExportDescs[i].ExportToRename = nullptr;
-			}
-		}
-	}
-
-private:
-	ComPtr<IDxcBlob> mShaderBlob;
-	std::vector<D3D12_EXPORT_DESC> mExportDescs;
-	std::vector<std::wstring> mExportNames;
-};
-
-// Ray tracing shader structure
-struct HitGroup : public StateSubobjectHolder<D3D12_HIT_GROUP_DESC, D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP>
-{
-	HitGroup() {}
-	HitGroup(const wchar_t* inAnyHitShaderImport, const wchar_t* inClosestHitShaderImport, const wchar_t* inHitGroupExport)
-	{
-		mDesc.AnyHitShaderImport = inAnyHitShaderImport;
-		mDesc.ClosestHitShaderImport = inClosestHitShaderImport;
-		mDesc.HitGroupExport = inHitGroupExport;
-		mDesc.Type = D3D12_HIT_GROUP_TYPE_TRIANGLES;
-		mDesc.IntersectionShaderImport = nullptr; // not used
-	}
-};
-
-// Local root signature - Shader input
-struct LocalRootSignature : public StateSubobjectHolder<ID3D12RootSignature*, D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE>
-{
-	LocalRootSignature() {}
-	LocalRootSignature(const D3D12_ROOT_SIGNATURE_DESC& inDesc)
-	{
-		mRootSignature = gCreateRootSignature(inDesc);
-		mRootSignature->SetName(L"LocalRootSignature");
-		mDesc = mRootSignature.Get();
-	}
-private:
-	ComPtr<ID3D12RootSignature> mRootSignature; // Necessary?
-};
-
-// Associate subobject to exports - Shader entry point -> Shader input
-struct SubobjectToExportsAssociation : public StateSubobjectHolder<D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION, D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION>
-{
-	SubobjectToExportsAssociation() {}
-	SubobjectToExportsAssociation(const wchar_t* inExportNames[], glm::uint32 inExportCount, const D3D12_STATE_SUBOBJECT* inSubobjectToAssociate)
-	{
-		mDesc.NumExports = inExportCount;
-		mDesc.pExports = inExportNames;
-		mDesc.pSubobjectToAssociate = inSubobjectToAssociate;
-	}
-};
-
 // String literals
-static const wchar_t* kGenerationShaderName		= L"RayGeneration";
-static const wchar_t* kMissShaderName			= L"Miss";
-static const wchar_t* kHitShaderName			= L"Hit";
-static const wchar_t* kBaseShaderNames[]		= { kGenerationShaderName, kMissShaderName, kHitShaderName };
-static const wchar_t* kBaseHitShaderNames[]		= { kHitShaderName };
-static const wchar_t* kHitShaderNames[]			= { L"Hit100", L"Hit010", L"Hit001" };
+static const wchar_t*		kGenerationShaderName		= L"RayGeneration";
+static const wchar_t*		kMissShaderName				= L"Miss";
+static const wchar_t*		kHitShaderName				= L"Hit";
+static const wchar_t*		kBaseShaderNames[]			= { kGenerationShaderName, kMissShaderName, kHitShaderName };
+static const wchar_t*		kBaseHitShaderNames[]		= { kHitShaderName };
+static const std::size_t	kBaseHitShaderCount			= std::size(kBaseHitShaderNames);
+static const wchar_t*		kHitShaderNames[]			= { L"Hit100", L"Hit010", L"Hit001" };
+static const std::size_t	kHitShaderCount				= std::size(kHitShaderNames);
 
 std::wstring gGetHitGroupName(const wchar_t* inHitShaderName)
 {
@@ -145,52 +45,36 @@ ComPtr<ID3D12StateObject> gCreateLibStateObject(ShaderLibType inShaderLibType, I
 	// https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#d3d12_state_subobject_type
 	// Note that all pointers should be valid until CreateStateObject
 
-	std::array<D3D12_STATE_SUBOBJECT, 64> subobjects;
+	std::array<D3D12_STATE_SUBOBJECT, 16> subobjects;
 	glm::uint32 index = 0;
 
-	std::vector<const wchar_t*> entry_points;
-	if (inShaderLibType == ShaderLibType::Base)
-	{
-		entry_points.insert(entry_points.end(), std::begin(kBaseShaderNames), std::end(kBaseShaderNames));
-	}
-	else
-	{
-		entry_points.insert(entry_points.end(), std::begin(kHitShaderNames), std::end(kHitShaderNames));
-	}
-	DXILLibrary dxilLibrary(inBlob, entry_points.data(), static_cast<glm::uint32>(entry_points.size()));
-	subobjects[index++] = dxilLibrary.mStateSubobject;
+	// DXIL library
+	D3D12_DXIL_LIBRARY_DESC library_desc{ .DXILLibrary = {.pShaderBytecode = inBlob->GetBufferPointer(), .BytecodeLength = inBlob->GetBufferSize() }, .NumExports = 0 /* export everything as long as no name conflict */ };
+	subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY, &library_desc };
 
-	// Hit group, allocate objects upfront to ensure pointers are valid by the end of this function
-	constexpr int kHitShaderReserveCount = static_cast<int>(gMax(std::size(kBaseHitShaderNames), std::size(kHitShaderNames)));
-	std::array<std::wstring, kHitShaderReserveCount> hit_group_names;
-	std::array<HitGroup, kHitShaderReserveCount> hit_groups;
-	std::array<LocalRootSignature, kHitShaderReserveCount> local_root_signatures;
-	std::array<SubobjectToExportsAssociation, kHitShaderReserveCount> export_associations;
-
-	int hit_shader_count = static_cast<int>(inShaderLibType == ShaderLibType::Base ? std::size(kBaseHitShaderNames) : std::size(kHitShaderNames));
+	// Hit group
+	std::array<std::wstring, std::max(kBaseHitShaderCount, kHitShaderCount)> hit_group_names;
+	std::array<D3D12_HIT_GROUP_DESC, std::max(kBaseHitShaderCount, kHitShaderCount)> hit_group_descs;
 	const wchar_t** hit_shader_names = inShaderLibType == ShaderLibType::Base ? kBaseHitShaderNames : kHitShaderNames;
+	size_t hit_shader_count = inShaderLibType == ShaderLibType::Base ? kBaseHitShaderCount : kHitShaderCount;
 	for (int hit_shader_index = 0; hit_shader_index < hit_shader_count; hit_shader_index++)
 	{
 		hit_group_names[hit_shader_index] = gGetHitGroupName(hit_shader_names[hit_shader_index]);
-
-		hit_groups[hit_shader_index] = HitGroup(nullptr, hit_shader_names[hit_shader_index], hit_group_names[hit_shader_index].c_str());
-		subobjects[index++] = hit_groups[hit_shader_index].mStateSubobject;
-
-		// Local signature desc, not used and can be omitted.
-		D3D12_ROOT_SIGNATURE_DESC local_signature_desc = {};
-		local_signature_desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
-		local_root_signatures[hit_shader_index] = LocalRootSignature(local_signature_desc);
-		subobjects[index++] = local_root_signatures[hit_shader_index].mStateSubobject;
-		export_associations[hit_shader_index] = SubobjectToExportsAssociation(&hit_shader_names[hit_shader_index], 1, &(subobjects[index - 1]));
-		subobjects[index++] = export_associations[hit_shader_index].mStateSubobject;
+		hit_group_descs[hit_shader_index] =  { .HitGroupExport = hit_group_names[hit_shader_index].c_str(), .Type = D3D12_HIT_GROUP_TYPE_TRIANGLES, .ClosestHitShaderImport = hit_shader_names[hit_shader_index] };
+		subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP, &hit_group_descs[hit_shader_index] };
 	}
+
+	// Local root signature and associations
+	subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE, gRenderer.mRuntime.mLibLocalRootSignature.GetAddressOf() };
+	D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION subobject_to_exports_association { .pSubobjectToAssociate = &subobjects[index - 1], .NumExports = 0 /* as default association, maybe can be omit? */ };
+	subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION, &subobject_to_exports_association };
 
 	// Shader config
 	D3D12_RAYTRACING_SHADER_CONFIG shader_config = { .MaxPayloadSizeInBytes = (glm::uint32)sizeof(RayPayload), .MaxAttributeSizeInBytes = sizeof(float) * 2 /* sizeof(BuiltInTriangleIntersectionAttributes) */};
 	subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG, &shader_config };
 
 	// Pipeline config, [0, 31] https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_raytracing_pipeline_config
-	D3D12_RAYTRACING_PIPELINE_CONFIG pipeline_config = { .MaxTraceRecursionDepth = 1 }; // 1 = TraceRay only from raygeneration
+	D3D12_RAYTRACING_PIPELINE_CONFIG pipeline_config = { .MaxTraceRecursionDepth = 1 }; // 1 means only TraceRay from raygeneration
 	subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG, &pipeline_config };
 
 	// Global root signature
@@ -282,6 +166,25 @@ ShaderTable gCreateShaderTable(const Shader& inShader)
 		// * Per Shader - SetDescriptorHeaps() - D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE
 		// * Per Shader Instance - Shader Table (DescriptorHeap or raw address) - D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE
 
+		// Hit group table indexing
+		// https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#hit-group-table-indexing
+		// HitGroupRecordAddress = 
+		//		D3D12_DISPATCH_RAYS_DESC.HitGroupTable.StartAddress						// from: DispatchRays()
+		//		+				
+		//		D3D12_DISPATCH_RAYS_DESC.HitGroupTable.StrideInBytes					// from: DispatchRays()
+		//		*
+		//		(
+		//			RayContributionToHitGroupIndex										// from shader: TraceRay()
+		//			+
+		//			(
+		//				MultiplierForGeometryContributionToHitGroupIndex				// from shader: TraceRay()
+		//				*
+		//				GeometryContributionToHitGroupIndex								// system generated index of geometry in bottom-level acceleration structure (0,1,2,3..)
+		//			) 
+		//			+ 
+		//			D3D12_RAYTRACING_INSTANCE_DESC.InstanceContributionToHitGroupIndex	// from instance
+		//		)
+
 		ComPtr<ID3D12StateObjectProperties> state_object_properties;
 		inShader.mData.mStateObject->QueryInterface(IID_PPV_ARGS(&state_object_properties));
 
@@ -309,6 +212,8 @@ ShaderTable gCreateShaderTable(const Shader& inShader)
 		{
 			shader_table.mHitGroupOffset = shader_table_entry_index;
 
+			// At least 1 Hit shader must be available if TraceRay is called in raygeneration shader, otherwise GPU hangs
+			// But indexing out of bounds seems ok...
 			for (int i = 0; i < static_cast<int>(std::size(kBaseHitShaderNames)); i++)
 			{
 				std::wstring shader_group_name = gGetHitGroupName(kBaseHitShaderNames[i]);
@@ -542,7 +447,7 @@ bool gCreateCSPipelineState(const char* inShaderFileName, const char* inCSName, 
 
 bool gCreateLibPipelineState(const char* inShaderFileName, const char* inLibName, Shader& ioSystemShader)
 {
-	IDxcBlob* blob = gCompileShader(inShaderFileName, inLibName, "lib_6_6");
+	IDxcBlob* blob = gCompileShader(inShaderFileName, "", "lib_6_6");
 	if (blob == nullptr)
 		return false;
 
