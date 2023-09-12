@@ -34,12 +34,12 @@ static const std::size_t	kHitShaderCount				= std::size(kHitShaderNames);
 
 std::wstring gGetHitGroupName(const wchar_t* inHitShaderName)
 {
-	std::wstring name = inHitShaderName;
+	std::wstring name = inHitShaderName != nullptr ? inHitShaderName : L"";
 	name += L"Group";
 	return name;
 }
 
-ComPtr<ID3D12StateObject> gCreateLibStateObject(ShaderLibType inShaderLibType, IDxcBlob* inBlob, ID3D12RootSignature* inGlobalRootSignature)
+ComPtr<ID3D12StateObject> gCreateStateObject(const Shader& inShader, IDxcBlob* inBlob)
 {
 	// See D3D12_STATE_SUBOBJECT_TYPE
 	// https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#d3d12_state_subobject_type
@@ -52,17 +52,11 @@ ComPtr<ID3D12StateObject> gCreateLibStateObject(ShaderLibType inShaderLibType, I
 	D3D12_DXIL_LIBRARY_DESC library_desc{ .DXILLibrary = {.pShaderBytecode = inBlob->GetBufferPointer(), .BytecodeLength = inBlob->GetBufferSize() }, .NumExports = 0 /* export everything as long as no name conflict */ };
 	subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY, &library_desc };
 
-	// Hit group
-	std::array<std::wstring, std::max(kBaseHitShaderCount, kHitShaderCount)> hit_group_names;
-	std::array<D3D12_HIT_GROUP_DESC, std::max(kBaseHitShaderCount, kHitShaderCount)> hit_group_descs;
-	const wchar_t** hit_shader_names = inShaderLibType == ShaderLibType::Base ? kBaseHitShaderNames : kHitShaderNames;
-	size_t hit_shader_count = inShaderLibType == ShaderLibType::Base ? kBaseHitShaderCount : kHitShaderCount;
-	for (int hit_shader_index = 0; hit_shader_index < hit_shader_count; hit_shader_index++)
-	{
-		hit_group_names[hit_shader_index] = gGetHitGroupName(hit_shader_names[hit_shader_index]);
-		hit_group_descs[hit_shader_index] =  { .HitGroupExport = hit_group_names[hit_shader_index].c_str(), .Type = D3D12_HIT_GROUP_TYPE_TRIANGLES, .ClosestHitShaderImport = hit_shader_names[hit_shader_index] };
-		subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP, &hit_group_descs[hit_shader_index] };
-	}
+	// Hit group, assume 0 or 1 hit group per lib
+	std::wstring hit_group_name = gGetHitGroupName(inShader.HitName());
+	D3D12_HIT_GROUP_DESC hit_group_desc { .HitGroupExport = hit_group_name.c_str(), .Type = D3D12_HIT_GROUP_TYPE_TRIANGLES, .ClosestHitShaderImport = inShader.mClosestHitName };
+	if (inShader.HitName() != nullptr)
+		subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP, &hit_group_desc };
 
 	// Local root signature and associations
 	subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE, gRenderer.mRuntime.mLibLocalRootSignature.GetAddressOf() };
@@ -78,7 +72,7 @@ ComPtr<ID3D12StateObject> gCreateLibStateObject(ShaderLibType inShaderLibType, I
 	subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG, &pipeline_config };
 
 	// Global root signature
-	subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE, &inGlobalRootSignature };
+	subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE, inShader.mRootSignatureReference->mData.mRootSignature.GetAddressOf() };
 
 	// State object config
 	D3D12_STATE_OBJECT_CONFIG state_object_config = { .Flags = D3D12_STATE_OBJECT_FLAG_ALLOW_STATE_OBJECT_ADDITIONS };
@@ -88,7 +82,7 @@ ComPtr<ID3D12StateObject> gCreateLibStateObject(ShaderLibType inShaderLibType, I
 	D3D12_STATE_OBJECT_DESC desc;
 	desc.NumSubobjects = index;
 	desc.pSubobjects = subobjects.data();
-	desc.Type = inShaderLibType == ShaderLibType::Base ? D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE : D3D12_STATE_OBJECT_TYPE_COLLECTION;
+	desc.Type = inShader.mRayGenerationName != nullptr ? D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE : D3D12_STATE_OBJECT_TYPE_COLLECTION;
 
 	ComPtr<ID3D12StateObject> state_object;
 	if (FAILED(gDevice->CreateStateObject(&desc, IID_PPV_ARGS(&state_object))))
@@ -97,16 +91,22 @@ ComPtr<ID3D12StateObject> gCreateLibStateObject(ShaderLibType inShaderLibType, I
 	return state_object;
 }
 
-ComPtr<ID3D12StateObject> gCombineLibStateObject(ID3D12StateObject* inBaseStateObject, ID3D12StateObject* inCollections)
+void gCombineShader(const Shader& inBaseShader, std::span<Shader> inCollections, Shader& outShader)
 {
-	std::array<D3D12_STATE_SUBOBJECT, 64> subobjects;
+	std::vector<D3D12_STATE_SUBOBJECT> subobjects;
+	subobjects.resize(1 /* D3D12_STATE_OBJECT_CONFIG */ + inCollections.size());
 	glm::uint32 index = 0;
 
 	D3D12_STATE_OBJECT_CONFIG state_object_config = { .Flags = D3D12_STATE_OBJECT_FLAG_ALLOW_STATE_OBJECT_ADDITIONS };
 	subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_STATE_OBJECT_CONFIG, &state_object_config };
 
-	D3D12_EXISTING_COLLECTION_DESC collection_desc = { .pExistingCollection = inCollections };
-	subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_EXISTING_COLLECTION, &collection_desc };
+	std::vector<D3D12_EXISTING_COLLECTION_DESC> collection_descs;
+	collection_descs.resize(inCollections.size());
+	for (int i = 0; i < inCollections.size(); i++)
+	{
+		collection_descs[i] = {.pExistingCollection = inCollections[i].mData.mStateObject.Get() };
+		subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_EXISTING_COLLECTION, &collection_descs[i] };
+	}
 
 	D3D12_STATE_OBJECT_DESC desc = {};
 	desc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
@@ -114,11 +114,10 @@ ComPtr<ID3D12StateObject> gCombineLibStateObject(ID3D12StateObject* inBaseStateO
 	desc.pSubobjects = subobjects.data();
 
 	ComPtr<ID3D12StateObject> state_object;
-	gValidate(gDevice->AddToStateObject(
-		&desc,
-		inBaseStateObject,
-		IID_PPV_ARGS(state_object.GetAddressOf())));
-	return state_object;
+	gValidate(gDevice->AddToStateObject(&desc, inBaseShader.mData.mStateObject.Get(), IID_PPV_ARGS(state_object.GetAddressOf())));
+	
+	outShader.mData = inBaseShader.mData;
+	outShader.mData.mStateObject = state_object;
 }
 
 struct ShaderIdentifier
@@ -214,21 +213,11 @@ ShaderTable gCreateShaderTable(const Shader& inShader)
 
 			// At least 1 Hit shader must be available if TraceRay is called in raygeneration shader, otherwise GPU hangs
 			// But indexing out of bounds seems ok...
-			for (int i = 0; i < static_cast<int>(std::size(kBaseHitShaderNames)); i++)
+			for (const Shader& shader : gRenderer.mRuntime.mHitShaders)
 			{
-				std::wstring shader_group_name = gGetHitGroupName(kBaseHitShaderNames[i]);
+				std::wstring shader_group_name = gGetHitGroupName(shader.HitName());
 				memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(shader_group_name.c_str()), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 				shader_table_entry_index++;
-			}
-
-			if (gRenderer.mUseLibHitShader)
-			{
-				for (int i = 0; i < static_cast<int>(std::size(kHitShaderNames)); i++)
-				{
-					std::wstring shader_group_name = gGetHitGroupName(kHitShaderNames[i]);
-					memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(shader_group_name.c_str()), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-					shader_table_entry_index++;
-				}
 			}
 
 			shader_table.mHitGroupCount = shader_table_entry_index - shader_table.mHitGroupOffset;
@@ -378,14 +367,14 @@ IDxcBlob* gCompileShader(const char* inFilename, const char* inEntryPoint, const
 	return blob;
 }
 
-bool gCreateVSPSPipelineState(const char* inShaderFileName, const char* inVSName, const char* inPSName, Shader& ioSystemShader)
+bool gCreateVSPSPipelineState(const char* inShaderFileName, const char* inVSName, const char* inPSName, Shader& ioShader)
 {
 	IDxcBlob* vs_blob = gCompileShader(inShaderFileName, inVSName, "vs_6_6");
 	IDxcBlob* ps_blob = gCompileShader(inShaderFileName, inPSName, "ps_6_6");
 	if (vs_blob == nullptr || ps_blob == nullptr)
 		return false;
 
-	if (FAILED(gDevice->CreateRootSignature(0, ps_blob->GetBufferPointer(), ps_blob->GetBufferSize(), IID_PPV_ARGS(&ioSystemShader.mData.mRootSignature))))
+	if (FAILED(gDevice->CreateRootSignature(0, ps_blob->GetBufferPointer(), ps_blob->GetBufferSize(), IID_PPV_ARGS(&ioShader.mData.mRootSignature))))
 		return false;
 
 	D3D12_RASTERIZER_DESC rasterizer_desc = {};
@@ -400,7 +389,7 @@ bool gCreateVSPSPipelineState(const char* inShaderFileName, const char* inVSName
 	pipeline_state_desc.VS.BytecodeLength = vs_blob->GetBufferSize();
 	pipeline_state_desc.PS.pShaderBytecode = ps_blob->GetBufferPointer();
 	pipeline_state_desc.PS.BytecodeLength = ps_blob->GetBufferSize();
-	pipeline_state_desc.pRootSignature = ioSystemShader.mData.mRootSignature.Get();
+	pipeline_state_desc.pRootSignature = ioShader.mData.mRootSignature.Get();
 	pipeline_state_desc.RasterizerState = rasterizer_desc;
 	pipeline_state_desc.BlendState = blend_desc;
 	pipeline_state_desc.DepthStencilState.DepthEnable = FALSE;
@@ -411,16 +400,16 @@ bool gCreateVSPSPipelineState(const char* inShaderFileName, const char* inVSName
 	pipeline_state_desc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
 	pipeline_state_desc.SampleDesc.Count = 1;
 
-	if (FAILED(gDevice->CreateGraphicsPipelineState(&pipeline_state_desc, IID_PPV_ARGS(&ioSystemShader.mData.mPipelineState))))
+	if (FAILED(gDevice->CreateGraphicsPipelineState(&pipeline_state_desc, IID_PPV_ARGS(&ioShader.mData.mPipelineState))))
 		return false;
 
 	std::wstring name = gToWString(inVSName) + L"_" + gToWString(inPSName);
-	ioSystemShader.mData.mPipelineState->SetName(name.c_str());
+	ioShader.mData.mPipelineState->SetName(name.c_str());
 
 	return true;
 }
 
-bool gCreateCSPipelineState(const char* inShaderFileName, const char* inCSName, Shader& ioSystemShader)
+bool gCreateCSPipelineState(const char* inShaderFileName, const char* inCSName, Shader& ioShader)
 {
 	IDxcBlob* blob = gCompileShader(inShaderFileName, inCSName, "cs_6_6");
 	if (blob == nullptr)
@@ -429,51 +418,53 @@ bool gCreateCSPipelineState(const char* inShaderFileName, const char* inCSName, 
 	LPVOID root_signature_pointer = blob->GetBufferPointer();
 	SIZE_T root_signature_size = blob->GetBufferSize();
 
-	if (FAILED(gDevice->CreateRootSignature(0, root_signature_pointer, root_signature_size, IID_PPV_ARGS(&ioSystemShader.mData.mRootSignature))))
+	if (FAILED(gDevice->CreateRootSignature(0, root_signature_pointer, root_signature_size, IID_PPV_ARGS(&ioShader.mData.mRootSignature))))
 		return false;
 
 	D3D12_COMPUTE_PIPELINE_STATE_DESC pipeline_state_desc = {};
 	pipeline_state_desc.CS.pShaderBytecode = blob->GetBufferPointer();
 	pipeline_state_desc.CS.BytecodeLength = blob->GetBufferSize();
-	pipeline_state_desc.pRootSignature = ioSystemShader.mData.mRootSignature.Get();
-	if (FAILED(gDevice->CreateComputePipelineState(&pipeline_state_desc, IID_PPV_ARGS(&ioSystemShader.mData.mPipelineState))))
+	pipeline_state_desc.pRootSignature = ioShader.mData.mRootSignature.Get();
+	if (FAILED(gDevice->CreateComputePipelineState(&pipeline_state_desc, IID_PPV_ARGS(&ioShader.mData.mPipelineState))))
 		return false;
 
 	std::wstring name = gToWString(inCSName);
-	ioSystemShader.mData.mPipelineState->SetName(name.c_str());
+	ioShader.mData.mPipelineState->SetName(name.c_str());
 
 	return true;
 }
 
-bool gCreateLibPipelineState(const char* inShaderFileName, const char* inLibName, Shader& ioSystemShader)
+bool gCreateLibPipelineState(const char* inShaderFileName, const wchar_t* inLibName, Shader& ioShader)
 {
 	IDxcBlob* blob = gCompileShader(inShaderFileName, "", "lib_6_6");
 	if (blob == nullptr)
 		return false;
 
-	if (ioSystemShader.mLibRootSignatureReference == nullptr || ioSystemShader.mLibRootSignatureReference->mData.mRootSignature == nullptr)
+	if (ioShader.mRootSignatureReference == nullptr || ioShader.mRootSignatureReference->mData.mRootSignature == nullptr)
 		return false;
 
 	std::vector<const wchar_t*> hit_shader_names;
-	ComPtr<ID3D12StateObject> pipeline_object = gCreateLibStateObject(ioSystemShader.mLibType, blob, ioSystemShader.mLibRootSignatureReference->mData.mRootSignature.Get());
+	ComPtr<ID3D12StateObject> pipeline_object = gCreateStateObject(ioShader, blob);
 	if (pipeline_object == nullptr)
 		return false;
 
-	ioSystemShader.mData.mRootSignature = ioSystemShader.mLibRootSignatureReference->mData.mRootSignature;
-	ioSystemShader.mData.mStateObject = pipeline_object;
-
-	std::wstring name = gToWString(inLibName);
-	ioSystemShader.mData.mStateObject->SetName(name.c_str());
+	ioShader.mData.mRootSignature = ioShader.mRootSignatureReference->mData.mRootSignature;
+	ioShader.mData.mStateObject = pipeline_object;
+	ioShader.mData.mStateObject->SetName(inLibName);
 
 	return true;
 }
 
-bool gCreatePipelineState(Shader& ioSystemShader)
+bool gCreatePipelineState(Shader& ioShader)
 {
-	if (ioSystemShader.mLibName != nullptr)
-		return gCreateLibPipelineState(ioSystemShader.mFileName, ioSystemShader.mLibName, ioSystemShader);
-	else if (ioSystemShader.mCSName != nullptr)
-		return gCreateCSPipelineState(ioSystemShader.mFileName, ioSystemShader.mCSName, ioSystemShader);
+	if (ioShader.mRayGenerationName != nullptr)
+		return gCreateLibPipelineState(ioShader.mFileName, ioShader.mRayGenerationName, ioShader);
+	else if (ioShader.mMissName != nullptr)
+		return gCreateLibPipelineState(ioShader.mFileName, ioShader.mMissName, ioShader);
+	else if (ioShader.HitName() != nullptr)
+		return gCreateLibPipelineState(ioShader.mFileName, ioShader.HitName(), ioShader);
+	else if (ioShader.mCSName != nullptr)
+		return gCreateCSPipelineState(ioShader.mFileName, ioShader.mCSName, ioShader);
 	else
-		return gCreateVSPSPipelineState(ioSystemShader.mFileName, ioSystemShader.mVSName, ioSystemShader.mPSName, ioSystemShader);
+		return gCreateVSPSPipelineState(ioShader.mFileName, ioShader.mVSName, ioShader.mPSName, ioShader);
 }

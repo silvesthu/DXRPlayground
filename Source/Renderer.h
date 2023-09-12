@@ -6,19 +6,24 @@ struct Renderer
 {
 	struct Runtime : RuntimeBase<Runtime>
 	{
-		Shader								mRayQueryShader = Shader().FileName("Shader/RayQuery.hlsl").CSName("RayQueryCS");
-		Shader								mClearShader = Shader().FileName("Shader/Composite.hlsl").CSName("ClearCS");
-		Shader								mDiffTexture2DShader = Shader().FileName("Shader/DiffTexture.hlsl").CSName("DiffTexture2DShader");
-		Shader								mDiffTexture3DShader = Shader().FileName("Shader/DiffTexture.hlsl").CSName("DiffTexture3DShader");
-		Shader								mCompositeShader = Shader().FileName("Shader/Composite.hlsl").VSName("ScreenspaceTriangleVS").PSName("CompositePS");
+		Shader								mRayQueryShader				= Shader().FileName("Shader/RayQuery.hlsl").CSName("RayQueryCS");
+		Shader								mClearShader				= Shader().FileName("Shader/Composite.hlsl").CSName("ClearCS");
+		Shader								mDiffTexture2DShader		= Shader().FileName("Shader/DiffTexture.hlsl").CSName("DiffTexture2DShader");
+		Shader								mDiffTexture3DShader		= Shader().FileName("Shader/DiffTexture.hlsl").CSName("DiffTexture3DShader");
+		Shader								mCompositeShader			= Shader().FileName("Shader/Composite.hlsl").VSName("ScreenspaceTriangleVS").PSName("CompositePS");
+		Shader								mSentinelShader				= Shader();
+		std::span<Shader>					mShaders					= std::span<Shader>(&mRayQueryShader, &mSentinelShader);
 
-		Shader								mSentinelShader = Shader();
-		std::span<Shader>					mShaders = std::span<Shader>(&mRayQueryShader, &mSentinelShader);
-
+		Shader								mRayGenerationShader		= Shader().FileName("Shader/RayGeneration.hlsl").RayGenerationName(L"RayGeneration").RootSignatureReference(&mRayQueryShader);
+		Shader								mMissShader					= Shader().FileName("Shader/Miss.hlsl").MissName(L"Miss").RootSignatureReference(&mRayQueryShader);
+		Shader								mClosestHit100Shader		= Shader().FileName("Shader/ClosestHit100.hlsl").ClosestHitName(L"ClosestHit100").RootSignatureReference(&mRayQueryShader);
+		Shader								mClosestHit010Shader		= Shader().FileName("Shader/ClosestHit010.hlsl").ClosestHitName(L"ClosestHit010").RootSignatureReference(&mRayQueryShader);
+		Shader								mClosestHit001Shader		= Shader().FileName("Shader/ClosestHit001.hlsl").ClosestHitName(L"ClosestHit001").RootSignatureReference(&mRayQueryShader);
+		Shader								mCollectionSentinelShader	= Shader();
+		std::span<Shader>					mCollectionShaders			= std::span<Shader>(&mMissShader,			&mCollectionSentinelShader);
+		std::span<Shader>					mHitShaders					= std::span<Shader>(&mClosestHit100Shader,	&mCollectionSentinelShader);
+		Shader								mLibShader					= Shader();
 		ComPtr<ID3D12RootSignature>			mLibLocalRootSignature;
-		Shader								mLibBaseShader = Shader().FileName("Shader/LibBaseShader.hlsl").LibName("LibBaseShader").LibType(ShaderLibType::Base).LibRootSignatureReference(&mRayQueryShader);
-		Shader								mLibHitShader = Shader().FileName("Shader/LibHitShader.hlsl").LibName("LibHitShader").LibType(ShaderLibType::Hit).LibRootSignatureReference(&mRayQueryShader);
-		Shader								mLibShader = Shader();
 		ShaderTable							mLibShaderTable;
 
 		Texture								mScreenColorTexture = Texture().Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(ViewDescriptorIndex::ScreenColorUAV).SRVIndex(ViewDescriptorIndex::ScreenColorSRV).Name("Renderer.ScreenColorTexture");
@@ -92,7 +97,6 @@ struct Renderer
 	bool									mReloadShader = false;
 	bool									mDumpDisassemblyRayQuery = false;
 	bool									mTestLibShader = false;
-	bool									mUseLibHitShader = false;
 
 	bool									mAccumulationDone = false;
 	bool									mAccumulationFrameUnlimited = false;

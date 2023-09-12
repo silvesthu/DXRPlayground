@@ -59,31 +59,21 @@ void Renderer::InitializeShaders()
 	for (auto&& shader : gRenderer.mRuntime.mShaders)
 		gCreatePipelineState(shader);
 
+	// Lib Shader
+	gRenderer.mRuntime.mLibLocalRootSignature = gCreateRootSignature(D3D12_ROOT_SIGNATURE_DESC{ .Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE }); // Empty root signature, placeholder
+	gRenderer.mRuntime.mLibLocalRootSignature->SetName(L"LocalRootSignature");
+	gCreatePipelineState(gRenderer.mRuntime.mRayGenerationShader);
+	for (auto&& shader : gRenderer.mRuntime.mCollectionShaders)
+		gCreatePipelineState(shader);
+	gCombineShader(gRenderer.mRuntime.mRayGenerationShader, gRenderer.mRuntime.mCollectionShaders, gRenderer.mRuntime.mLibShader);
+	gRenderer.mRuntime.mLibShaderTable = gCreateShaderTable(gRenderer.mRuntime.mLibShader);
+
 	for (auto&& shaders : gAtmosphere.mRuntime.mShadersSet)
 		for (auto&& shader : shaders)
 			gCreatePipelineState(shader);
 
 	for (auto&& shader : gCloud.mRuntime.mShaders)
 		gCreatePipelineState(shader);
-
-	// Lib Shader
-	gRenderer.mRuntime.mLibLocalRootSignature = gCreateRootSignature(D3D12_ROOT_SIGNATURE_DESC{ .Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE }); // Empty root signature, placeholder
-	gRenderer.mRuntime.mLibLocalRootSignature->SetName(L"LocalRootSignature");
-	gCreatePipelineState(gRenderer.mRuntime.mLibBaseShader);
-	if (gRenderer.mUseLibHitShader)
-	{
-		gCreatePipelineState(gRenderer.mRuntime.mLibHitShader);
-
-		ComPtr<ID3D12StateObject> combined_state_object = gCombineLibStateObject(
-			gRenderer.mRuntime.mLibBaseShader.mData.mStateObject.Get(),
-			gRenderer.mRuntime.mLibHitShader.mData.mStateObject.Get());
-
-		gRenderer.mRuntime.mLibShader.mData = gRenderer.mRuntime.mLibBaseShader.mData;
-		gRenderer.mRuntime.mLibShader.mData.mStateObject = combined_state_object;
-	}
-	else
-		gRenderer.mRuntime.mLibShader.mData = gRenderer.mRuntime.mLibBaseShader.mData;
-	gRenderer.mRuntime.mLibShaderTable = gCreateShaderTable(gRenderer.mRuntime.mLibShader);
 }
 
 void Renderer::FinalizeShaders()

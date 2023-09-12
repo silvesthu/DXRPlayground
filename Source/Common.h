@@ -320,12 +320,6 @@ struct DescriptorHeap
 	parent_type& name(type in##name) { m##name = in##name; return *this; } \
 	type m##name = default_value;
 
-enum class ShaderLibType
-{
-	Base,
-	Hit,
-};
-
 struct Shader
 {
 #define SHADER_MEMBER(type, name, default_value) MEMBER(Shader, type, name, default_value)
@@ -335,9 +329,13 @@ struct Shader
 	SHADER_MEMBER(const char*, PSName, nullptr);
 	SHADER_MEMBER(const char*, CSName, nullptr);
 
-	SHADER_MEMBER(const char*, LibName, nullptr);
-	SHADER_MEMBER(const Shader*, LibRootSignatureReference, nullptr);
-	SHADER_MEMBER(ShaderLibType, LibType, ShaderLibType::Base);
+	SHADER_MEMBER(const wchar_t*, RayGenerationName, nullptr);
+	SHADER_MEMBER(const wchar_t*, MissName, nullptr);
+	SHADER_MEMBER(const wchar_t*, AnyHitName, nullptr);
+	SHADER_MEMBER(const wchar_t*, ClosestHitName, nullptr);
+	SHADER_MEMBER(const wchar_t*, IntersectionName, nullptr);
+	SHADER_MEMBER(const Shader*, RootSignatureReference, nullptr);
+	const wchar_t* HitName() const { return mAnyHitName != nullptr ? mAnyHitName : (mClosestHitName != nullptr ? mClosestHitName : mIntersectionName); }
 
 	struct DescriptorInfo
 	{

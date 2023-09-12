@@ -355,14 +355,6 @@ static void sPrepareImGui()
 			if (ImGui::Checkbox("Test Lib Shader", &gRenderer.mTestLibShader))
 				gRenderer.mAccumulationResetRequested = true;
 
-			if (gRenderer.mTestLibShader)
-			{
-				ImGui::Indent();
-
-				if (ImGui::Checkbox("Use Hit Shader", &gRenderer.mUseLibHitShader))
-					gRenderer.mReloadShader = true;				
-			}
-
 			ImGui::TreePop();
 		}
 

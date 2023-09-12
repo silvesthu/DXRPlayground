@@ -3,18 +3,6 @@
 #include "Binding.h"
 #include "Common.h"
 
-[shader("miss")]
-void Miss(inout RayPayload payload)
-{
-	payload.mData = 0.1;
-}
-
-[shader("closesthit")]
-void Hit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attributes)
-{
-	payload.mData = float4(1, 0, 1, 0);
-}
-
 [shader("raygeneration")]
 void RayGeneration()
 {
