@@ -211,8 +211,7 @@ ShaderTable gCreateShaderTable(const Shader& inShader)
 		{
 			shader_table.mHitGroupOffset = shader_table_entry_index;
 
-			// At least 1 Hit shader must be available if TraceRay is called in raygeneration shader, otherwise GPU hangs
-			// But indexing out of bounds seems ok...
+			// Try not to index out of bounds from shader, otherwise GPU may crash...
 			for (const Shader& shader : gRenderer.mRuntime.mHitShaders)
 			{
 				std::wstring shader_group_name = gGetHitGroupName(shader.HitName());

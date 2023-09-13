@@ -828,7 +828,7 @@ void Scene::InitializeAccelerationStructures()
 		memcpy(instance_descs[instance_index].Transform, &transform, sizeof(instance_descs[instance_index].Transform));
 		instance_descs[instance_index].InstanceID = instance_index; // This value will be exposed to the shader via InstanceID()
 		instance_descs[instance_index].InstanceMask = 0xFF;
-		instance_descs[instance_index].InstanceContributionToHitGroupIndex = instance_index;
+		instance_descs[instance_index].InstanceContributionToHitGroupIndex = instance_index % 3;
 		instance_descs[instance_index].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
 		instance_descs[instance_index].AccelerationStructure = blas->GetGPUVirtualAddress();
 	}
