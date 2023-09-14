@@ -195,7 +195,7 @@
     <ClInclude Include="Source\Renderer.h">
       <Filter>Source</Filter>
     </ClInclude>
-    <ClInclude Include="Source\ShaderHelper.h">
+    <ClInclude Include="Source\Renderer.inl">
       <Filter>Source</Filter>
     </ClInclude>
   </ItemGroup>

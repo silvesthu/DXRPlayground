@@ -1,8 +1,33 @@
-#pragma once
-#include "Common.h"
 
-#include <fstream>
-#include <sstream>
+HMODULE Dxcompiler_dll = NULL;
+ComPtr<IDxcUtils> DxcUtils;
+ComPtr<IDxcCompiler> DxcCompiler;
+ComPtr<IDxcIncludeHandler> DxcIncludeHandler;
+void gInitializeDxcInterfaces()
+{
+	// LoadLibraryW + GetProcAddress to eliminate dependency on .lib. Make updating .dll easier.
+	Dxcompiler_dll = LoadLibraryW(L"dxcompiler.dll");
+	gAssert(Dxcompiler_dll != NULL);
+	DxcCreateInstanceProc DxcCreateInstance = reinterpret_cast<DxcCreateInstanceProc>(GetProcAddress(Dxcompiler_dll, "DxcCreateInstance"));
+
+	// See https://simoncoenen.com/blog/programming/graphics/DxcRevised.html
+	DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(DxcUtils.GetAddressOf()));
+
+	// [NOTE] There is also IDxcCompiler2, IDxcCompiler3. Improves on result handling.
+	// https://github.com/microsoft/DirectXShaderCompiler/wiki/Using-dxc.exe-and-dxcompiler.dll
+	DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(DxcCompiler.GetAddressOf()));
+
+	DxcUtils->CreateDefaultIncludeHandler(DxcIncludeHandler.GetAddressOf());
+}
+
+void gFinalizeDxcInterfaces()
+{
+	DxcUtils = nullptr;
+	DxcCompiler = nullptr;
+	DxcIncludeHandler = nullptr;
+
+	FreeLibrary(Dxcompiler_dll);
+}
 
 ComPtr<ID3D12RootSignature> gCreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC& desc)
 {
@@ -22,24 +47,82 @@ ComPtr<ID3D12RootSignature> gCreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC
 	return root_signature;
 }
 
-// String literals
-static const wchar_t*		kGenerationShaderName		= L"RayGeneration";
-static const wchar_t*		kMissShaderName				= L"Miss";
-static const wchar_t*		kHitShaderName				= L"Hit";
-static const wchar_t*		kBaseShaderNames[]			= { kGenerationShaderName, kMissShaderName, kHitShaderName };
-static const wchar_t*		kBaseHitShaderNames[]		= { kHitShaderName };
-static const std::size_t	kBaseHitShaderCount			= std::size(kBaseHitShaderNames);
-static const wchar_t*		kHitShaderNames[]			= { L"Hit100", L"Hit010", L"Hit001" };
-static const std::size_t	kHitShaderCount				= std::size(kHitShaderNames);
-
-std::wstring gGetHitGroupName(const wchar_t* inHitShaderName)
+void gInspectShaderReflection(ComPtr<IDxcBlob> inBlob, Shader& ioShader)
 {
-	std::wstring name = inHitShaderName != nullptr ? inHitShaderName : L"";
-	name += L"Group";
-	return name;
+	// For debug only
+
+	UNUSED(ioShader);
+
+	DxcBuffer dxc_buffer{ .Ptr = inBlob->GetBufferPointer(), .Size = inBlob->GetBufferSize(), .Encoding = DXC_CP_ACP };
+	ComPtr<ID3D12ShaderReflection> shader_reflection;
+	DxcUtils->CreateReflection(&dxc_buffer, IID_PPV_ARGS(&shader_reflection));
+
+	D3D12_SHADER_DESC shader_desc;
+	shader_reflection->GetDesc(&shader_desc);
+	UNUSED(shader_desc);
+
+	enum class D3D_SHADER_REQUIRES
+	{
+		REQUIRES_DOUBLES                                                         = D3D_SHADER_REQUIRES_DOUBLES,
+		REQUIRES_EARLY_DEPTH_STENCIL                                             = D3D_SHADER_REQUIRES_EARLY_DEPTH_STENCIL,
+		REQUIRES_UAVS_AT_EVERY_STAGE                                             = D3D_SHADER_REQUIRES_UAVS_AT_EVERY_STAGE,
+		REQUIRES_64_UAVS                                                         = D3D_SHADER_REQUIRES_64_UAVS,
+		REQUIRES_MINIMUM_PRECISION                                               = D3D_SHADER_REQUIRES_MINIMUM_PRECISION,
+		REQUIRES_11_1_DOUBLE_EXTENSIONS                                          = D3D_SHADER_REQUIRES_11_1_DOUBLE_EXTENSIONS,
+		REQUIRES_11_1_SHADER_EXTENSIONS                                          = D3D_SHADER_REQUIRES_11_1_SHADER_EXTENSIONS,
+		REQUIRES_LEVEL_9_COMPARISON_FILTERING                                    = D3D_SHADER_REQUIRES_LEVEL_9_COMPARISON_FILTERING,
+		REQUIRES_TILED_RESOURCES                                                 = D3D_SHADER_REQUIRES_TILED_RESOURCES,
+		REQUIRES_STENCIL_REF                                                     = D3D_SHADER_REQUIRES_STENCIL_REF,
+		REQUIRES_INNER_COVERAGE                                                  = D3D_SHADER_REQUIRES_INNER_COVERAGE,
+		REQUIRES_TYPED_UAV_LOAD_ADDITIONAL_FORMATS                               = D3D_SHADER_REQUIRES_TYPED_UAV_LOAD_ADDITIONAL_FORMATS,
+		REQUIRES_ROVS                                                            = D3D_SHADER_REQUIRES_ROVS,
+		REQUIRES_VIEWPORT_AND_RT_ARRAY_INDEX_FROM_ANY_SHADER_FEEDING_RASTERIZER  = D3D_SHADER_REQUIRES_VIEWPORT_AND_RT_ARRAY_INDEX_FROM_ANY_SHADER_FEEDING_RASTERIZER,
+		REQUIRES_WAVE_OPS                                                        = D3D_SHADER_REQUIRES_WAVE_OPS,
+		REQUIRES_INT64_OPS                                                       = D3D_SHADER_REQUIRES_INT64_OPS,
+		REQUIRES_VIEW_ID                                                         = D3D_SHADER_REQUIRES_VIEW_ID,
+		REQUIRES_BARYCENTRICS                                                    = D3D_SHADER_REQUIRES_BARYCENTRICS,
+		REQUIRES_NATIVE_16BIT_OPS                                                = D3D_SHADER_REQUIRES_NATIVE_16BIT_OPS,
+		REQUIRES_SHADING_RATE                                                    = D3D_SHADER_REQUIRES_SHADING_RATE,
+		REQUIRES_RAYTRACING_TIER_1_1                                             = D3D_SHADER_REQUIRES_RAYTRACING_TIER_1_1,
+		REQUIRES_SAMPLER_FEEDBACK                                                = D3D_SHADER_REQUIRES_SAMPLER_FEEDBACK,
+		REQUIRES_ATOMIC_INT64_ON_TYPED_RESOURCE                                  = D3D_SHADER_REQUIRES_ATOMIC_INT64_ON_TYPED_RESOURCE,
+		REQUIRES_ATOMIC_INT64_ON_GROUP_SHARED                                    = D3D_SHADER_REQUIRES_ATOMIC_INT64_ON_GROUP_SHARED,
+		REQUIRES_DERIVATIVES_IN_MESH_AND_AMPLIFICATION_SHADERS                   = D3D_SHADER_REQUIRES_DERIVATIVES_IN_MESH_AND_AMPLIFICATION_SHADERS,
+		REQUIRES_RESOURCE_DESCRIPTOR_HEAP_INDEXING                               = D3D_SHADER_REQUIRES_RESOURCE_DESCRIPTOR_HEAP_INDEXING,
+		REQUIRES_SAMPLER_DESCRIPTOR_HEAP_INDEXING                                = D3D_SHADER_REQUIRES_SAMPLER_DESCRIPTOR_HEAP_INDEXING,
+		REQUIRES_WAVE_MMA                                                        = D3D_SHADER_REQUIRES_WAVE_MMA,
+		REQUIRES_ATOMIC_INT64_ON_DESCRIPTOR_HEAP_RESOURCE                        = D3D_SHADER_REQUIRES_ATOMIC_INT64_ON_DESCRIPTOR_HEAP_RESOURCE,
+		FEATURE_ADVANCED_TEXTURE_OPS                                             = D3D_SHADER_FEATURE_ADVANCED_TEXTURE_OPS,
+		FEATURE_WRITEABLE_MSAA_TEXTURES                                          = D3D_SHADER_FEATURE_WRITEABLE_MSAA_TEXTURES,
+	};
+
+	D3D_SHADER_REQUIRES required_flags = (D3D_SHADER_REQUIRES)shader_reflection->GetRequiresFlags();
+	UNUSED(required_flags);
 }
 
-ComPtr<ID3D12StateObject> gCreateStateObject(const Shader& inShader, IDxcBlob* inBlob)
+void gInspectLibraryReflection(ComPtr<IDxcBlob> inBlob, Shader& ioShader)
+{
+	// For debug only
+	
+	UNUSED(ioShader);
+
+	// Note function name here is mangled, and other information does not seem reliable...
+
+	DxcBuffer dxc_buffer{ .Ptr = inBlob->GetBufferPointer(), .Size = inBlob->GetBufferSize(), .Encoding = DXC_CP_ACP };
+	ComPtr<ID3D12LibraryReflection> library_reflection;
+	DxcUtils->CreateReflection(&dxc_buffer, IID_PPV_ARGS(&library_reflection));
+
+	D3D12_LIBRARY_DESC library_desc;
+	library_reflection->GetDesc(&library_desc);
+	UNUSED(library_desc);
+
+	ID3D12FunctionReflection* function_reflection = library_reflection->GetFunctionByIndex(0);
+	D3D12_FUNCTION_DESC function_desc;
+	function_reflection->GetDesc(&function_desc);
+	UNUSED(function_desc);
+}
+
+ComPtr<ID3D12StateObject> gCreateStateObject(IDxcBlob* inBlob, Shader& ioShader)
 {
 	// See D3D12_STATE_SUBOBJECT_TYPE
 	// https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#d3d12_state_subobject_type
@@ -49,22 +132,22 @@ ComPtr<ID3D12StateObject> gCreateStateObject(const Shader& inShader, IDxcBlob* i
 	glm::uint32 index = 0;
 
 	// DXIL library
-	D3D12_DXIL_LIBRARY_DESC library_desc{ .DXILLibrary = {.pShaderBytecode = inBlob->GetBufferPointer(), .BytecodeLength = inBlob->GetBufferSize() }, .NumExports = 0 /* export everything as long as no name conflict */ };
-	subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY, &library_desc };
+	D3D12_DXIL_LIBRARY_DESC dxil_library_desc{ .DXILLibrary = {.pShaderBytecode = inBlob->GetBufferPointer(), .BytecodeLength = inBlob->GetBufferSize() }, .NumExports = 0 /* export everything as long as no name conflict */ };
+	subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY, &dxil_library_desc };
 
 	// Hit group, assume 0 or 1 hit group per lib
-	std::wstring hit_group_name = gGetHitGroupName(inShader.HitName());
-	D3D12_HIT_GROUP_DESC hit_group_desc { .HitGroupExport = hit_group_name.c_str(), .Type = D3D12_HIT_GROUP_TYPE_TRIANGLES, .ClosestHitShaderImport = inShader.mClosestHitName };
-	if (inShader.HitName() != nullptr)
+	std::wstring hit_group_name = ioShader.HitGroupName(); // Need the string object on stack
+	D3D12_HIT_GROUP_DESC hit_group_desc{ .HitGroupExport = hit_group_name.c_str(), .Type = D3D12_HIT_GROUP_TYPE_TRIANGLES, .ClosestHitShaderImport = ioShader.mClosestHitName };
+	if (ioShader.HitName() != nullptr)
 		subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP, &hit_group_desc };
 
 	// Local root signature and associations
 	subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE, gRenderer.mRuntime.mLibLocalRootSignature.GetAddressOf() };
-	D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION subobject_to_exports_association { .pSubobjectToAssociate = &subobjects[index - 1], .NumExports = 0 /* as default association, maybe can be omit? */ };
+	D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION subobject_to_exports_association{ .pSubobjectToAssociate = &subobjects[index - 1], .NumExports = 0 /* as default association, maybe can be omit? */ };
 	subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION, &subobject_to_exports_association };
 
 	// Shader config
-	D3D12_RAYTRACING_SHADER_CONFIG shader_config = { .MaxPayloadSizeInBytes = (glm::uint32)sizeof(RayPayload), .MaxAttributeSizeInBytes = sizeof(float) * 2 /* sizeof(BuiltInTriangleIntersectionAttributes) */};
+	D3D12_RAYTRACING_SHADER_CONFIG shader_config = { .MaxPayloadSizeInBytes = (glm::uint32)sizeof(RayPayload), .MaxAttributeSizeInBytes = sizeof(float) * 2 /* sizeof(BuiltInTriangleIntersectionAttributes) */ };
 	subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG, &shader_config };
 
 	// Pipeline config, [0, 31] https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_raytracing_pipeline_config
@@ -72,7 +155,7 @@ ComPtr<ID3D12StateObject> gCreateStateObject(const Shader& inShader, IDxcBlob* i
 	subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG, &pipeline_config };
 
 	// Global root signature
-	subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE, inShader.mRootSignatureReference->mData.mRootSignature.GetAddressOf() };
+	subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE, ioShader.mRootSignatureReference->mData.mRootSignature.GetAddressOf() };
 
 	// State object config
 	D3D12_STATE_OBJECT_CONFIG state_object_config = { .Flags = D3D12_STATE_OBJECT_FLAG_ALLOW_STATE_OBJECT_ADDITIONS };
@@ -82,7 +165,7 @@ ComPtr<ID3D12StateObject> gCreateStateObject(const Shader& inShader, IDxcBlob* i
 	D3D12_STATE_OBJECT_DESC desc;
 	desc.NumSubobjects = index;
 	desc.pSubobjects = subobjects.data();
-	desc.Type = inShader.mRayGenerationName != nullptr ? D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE : D3D12_STATE_OBJECT_TYPE_COLLECTION;
+	desc.Type = ioShader.mRayGenerationName != nullptr ? D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE : D3D12_STATE_OBJECT_TYPE_COLLECTION;
 
 	ComPtr<ID3D12StateObject> state_object;
 	if (FAILED(gDevice->CreateStateObject(&desc, IID_PPV_ARGS(&state_object))))
@@ -104,7 +187,7 @@ void gCombineShader(const Shader& inBaseShader, std::span<Shader> inCollections,
 	collection_descs.resize(inCollections.size());
 	for (int i = 0; i < inCollections.size(); i++)
 	{
-		collection_descs[i] = {.pExistingCollection = inCollections[i].mData.mStateObject.Get() };
+		collection_descs[i] = { .pExistingCollection = inCollections[i].mData.mStateObject.Get() };
 		subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_EXISTING_COLLECTION, &collection_descs[i] };
 	}
 
@@ -115,7 +198,7 @@ void gCombineShader(const Shader& inBaseShader, std::span<Shader> inCollections,
 
 	ComPtr<ID3D12StateObject> state_object;
 	gValidate(gDevice->AddToStateObject(&desc, inBaseShader.mData.mStateObject.Get(), IID_PPV_ARGS(state_object.GetAddressOf())));
-	
+
 	outShader.mData = inBaseShader.mData;
 	outShader.mData.mStateObject = state_object;
 }
@@ -168,20 +251,20 @@ ShaderTable gCreateShaderTable(const Shader& inShader)
 		// Hit group table indexing
 		// https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#hit-group-table-indexing
 		// HitGroupRecordAddress = 
-		//		D3D12_DISPATCH_RAYS_DESC.HitGroupTable.StartAddress						// from: DispatchRays()
+		//		D3D12_DISPATCH_RAYS_DESC.HitGroupTable.StartAddress						// from CPU: DispatchRays()
 		//		+				
-		//		D3D12_DISPATCH_RAYS_DESC.HitGroupTable.StrideInBytes					// from: DispatchRays()
+		//		D3D12_DISPATCH_RAYS_DESC.HitGroupTable.StrideInBytes					// from CPU: DispatchRays()
 		//		*
 		//		(
-		//			RayContributionToHitGroupIndex										// from shader: TraceRay()
+		//			RayContributionToHitGroupIndex										// from GPU: TraceRay()
 		//			+
 		//			(
-		//				MultiplierForGeometryContributionToHitGroupIndex				// from shader: TraceRay()
+		//				MultiplierForGeometryContributionToHitGroupIndex				// from GPU: TraceRay()
 		//				*
-		//				GeometryContributionToHitGroupIndex								// system generated index of geometry in bottom-level acceleration structure (0,1,2,3..)
+		//				GeometryContributionToHitGroupIndex								// from GPU: Same as GeometryIndex(), index in BLAS
 		//			) 
 		//			+ 
-		//			D3D12_RAYTRACING_INSTANCE_DESC.InstanceContributionToHitGroupIndex	// from instance
+		//			D3D12_RAYTRACING_INSTANCE_DESC.InstanceContributionToHitGroupIndex	// from CPU: D3D12_RAYTRACING_INSTANCE_DESC
 		//		)
 
 		ComPtr<ID3D12StateObjectProperties> state_object_properties;
@@ -191,7 +274,7 @@ ShaderTable gCreateShaderTable(const Shader& inShader)
 		{
 			shader_table.mRayGenOffset = shader_table_entry_index;
 
-			memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kGenerationShaderName), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+			memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(gRenderer.mRuntime.mRayGenerationShader.mRayGenerationName), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 			shader_table_entry_index++;
 
 			shader_table.mRayGenCount = shader_table_entry_index - shader_table.mRayGenOffset;
@@ -201,7 +284,7 @@ ShaderTable gCreateShaderTable(const Shader& inShader)
 		{
 			shader_table.mMissOffset = shader_table_entry_index;
 
-			memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(kMissShaderName), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+			memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(gRenderer.mRuntime.mMissShader.mMissName), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 			shader_table_entry_index++;
 
 			shader_table.mMissCount = shader_table_entry_index - shader_table.mMissOffset;
@@ -214,8 +297,7 @@ ShaderTable gCreateShaderTable(const Shader& inShader)
 			// Try not to index out of bounds from shader, otherwise GPU may crash...
 			for (const Shader& shader : gRenderer.mRuntime.mHitShaders)
 			{
-				std::wstring shader_group_name = gGetHitGroupName(shader.HitName());
-				memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(shader_group_name.c_str()), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+				memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(shader.HitGroupName().c_str()), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 				shader_table_entry_index++;
 			}
 
@@ -251,7 +333,7 @@ ShaderTable gCreateShaderTable(const Shader& inShader)
 }
 
 
-IDxcBlob* gCompileShader(const char* inFilename, const char* inEntryPoint, const char* inProfile)
+ComPtr<IDxcBlob> gCompileShader(const char* inFilename, const char* inEntryPoint, const char* inProfile)
 {
 	// Load shader
 	std::ifstream shader_file(inFilename);
@@ -259,24 +341,8 @@ IDxcBlob* gCompileShader(const char* inFilename, const char* inEntryPoint, const
 	shader_stream << shader_file.rdbuf();
 	std::string shader_string = shader_stream.str();
 
-	// LoadLibraryW + GetProcAddress to eliminate dependency on .lib. Make updating .dll easier.
-	HMODULE dll = LoadLibraryW(L"dxcompiler.dll");
-	if (dll == NULL)
-		return nullptr;
-	DxcCreateInstanceProc DxcCreateInstance = reinterpret_cast<DxcCreateInstanceProc>(GetProcAddress(dll, "DxcCreateInstance"));
-
-	// See https://simoncoenen.com/blog/programming/graphics/DxcRevised.html
-	ComPtr<IDxcUtils> utils;
-	DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(utils.GetAddressOf()));
-
 	IDxcBlobEncoding* blob_encoding;
-	gValidate(utils->CreateBlobFromPinned(shader_string.c_str(), static_cast<glm::uint32>(shader_string.length()), CP_UTF8, &blob_encoding));
-
-	ComPtr<IDxcCompiler> compiler;
-	DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(compiler.GetAddressOf()));
-
-	ComPtr<IDxcIncludeHandler> include_handler;
-	utils->CreateDefaultIncludeHandler(include_handler.GetAddressOf());
+	gValidate(DxcUtils->CreateBlobFromPinned(shader_string.c_str(), static_cast<glm::uint32>(shader_string.length()), CP_UTF8, &blob_encoding));
 
 	std::string filename(inFilename);
 	std::wstring wfilename(filename.begin(), filename.end());
@@ -311,14 +377,14 @@ IDxcBlob* gCompileShader(const char* inFilename, const char* inEntryPoint, const
 	arguments.push_back(L"-HV 2021");								// -HV 2021
 
 	IDxcOperationResult* operation_result;
-	if (FAILED(compiler->Compile(
+	if (FAILED(DxcCompiler->Compile(
 		blob_encoding,												// program text
 		wfilename.c_str(),											// file name, mostly for error messages
 		entry_point.c_str(),										// entry point function
 		profile.c_str(),											// target profile
 		arguments.data(), static_cast<UINT32>(arguments.size()),	// compilation arguments and their count
 		defines.data(), static_cast<UINT32>(defines.size()),		// name/value defines and their count
-		include_handler.Get(),										// handler for #include directives
+		DxcIncludeHandler.Get(),										// handler for #include directives
 		&operation_result)))
 		assert(false);
 
@@ -331,7 +397,7 @@ IDxcBlob* gCompileShader(const char* inFilename, const char* inEntryPoint, const
 		IDxcBlobUtf8* blob_8 = nullptr;
 		gValidate(operation_result->GetErrorBuffer(&blob));
 		// We can use the library to get our preferred encoding.
-		gValidate(utils->GetBlobAsUtf8(blob, &blob_8));
+		gValidate(DxcUtils->GetBlobAsUtf8(blob, &blob_8));
 		std::string str((char*)blob_8->GetBufferPointer(), blob_8->GetBufferSize() - 1);
 		gTrace(str.c_str());
 		blob->Release();
@@ -339,16 +405,16 @@ IDxcBlob* gCompileShader(const char* inFilename, const char* inEntryPoint, const
 		return nullptr;
 	}
 
-	IDxcBlob* blob = nullptr;
+	ComPtr<IDxcBlob> blob = nullptr;
 	gValidate(operation_result->GetResult(&blob));
 
 	if (gRenderer.mDumpDisassemblyRayQuery && std::string_view("RayQueryCS") == inEntryPoint)
 	{
-		IDxcBlob* blob_to_dissemble = blob;
+		ComPtr<IDxcBlob> blob_to_dissemble = blob;
 		IDxcBlobEncoding* disassemble = nullptr;
-		IDxcBlobUtf8* blob_8 = nullptr;
-		compiler->Disassemble(blob_to_dissemble, &disassemble);
-		gValidate(utils->GetBlobAsUtf8(disassemble, &blob_8));
+		ComPtr<IDxcBlobUtf8> blob_8 = nullptr;
+		DxcCompiler->Disassemble(blob_to_dissemble.Get(), &disassemble);
+		gValidate(DxcUtils->GetBlobAsUtf8(disassemble, &blob_8));
 		std::string str((char*)blob_8->GetBufferPointer(), blob_8->GetBufferSize() - 1);
 
 		static int counter = 0;
@@ -368,8 +434,8 @@ IDxcBlob* gCompileShader(const char* inFilename, const char* inEntryPoint, const
 
 bool gCreateVSPSPipelineState(const char* inShaderFileName, const char* inVSName, const char* inPSName, Shader& ioShader)
 {
-	IDxcBlob* vs_blob = gCompileShader(inShaderFileName, inVSName, "vs_6_6");
-	IDxcBlob* ps_blob = gCompileShader(inShaderFileName, inPSName, "ps_6_6");
+	ComPtr<IDxcBlob> vs_blob = gCompileShader(inShaderFileName, inVSName, "vs_6_6");
+	ComPtr<IDxcBlob> ps_blob = gCompileShader(inShaderFileName, inPSName, "ps_6_6");
 	if (vs_blob == nullptr || ps_blob == nullptr)
 		return false;
 
@@ -405,12 +471,15 @@ bool gCreateVSPSPipelineState(const char* inShaderFileName, const char* inVSName
 	std::wstring name = gToWString(inVSName) + L"_" + gToWString(inPSName);
 	ioShader.mData.mPipelineState->SetName(name.c_str());
 
+	gInspectShaderReflection(vs_blob, ioShader);
+	gInspectShaderReflection(ps_blob, ioShader);
+
 	return true;
 }
 
 bool gCreateCSPipelineState(const char* inShaderFileName, const char* inCSName, Shader& ioShader)
 {
-	IDxcBlob* blob = gCompileShader(inShaderFileName, inCSName, "cs_6_6");
+	ComPtr<IDxcBlob> blob = gCompileShader(inShaderFileName, inCSName, "cs_6_6");
 	if (blob == nullptr)
 		return false;
 
@@ -430,12 +499,14 @@ bool gCreateCSPipelineState(const char* inShaderFileName, const char* inCSName, 
 	std::wstring name = gToWString(inCSName);
 	ioShader.mData.mPipelineState->SetName(name.c_str());
 
+	gInspectShaderReflection(blob, ioShader);
+
 	return true;
 }
 
 bool gCreateLibPipelineState(const char* inShaderFileName, const wchar_t* inLibName, Shader& ioShader)
 {
-	IDxcBlob* blob = gCompileShader(inShaderFileName, "", "lib_6_6");
+	ComPtr<IDxcBlob> blob = gCompileShader(inShaderFileName, "", "lib_6_6");
 	if (blob == nullptr)
 		return false;
 
@@ -443,13 +514,15 @@ bool gCreateLibPipelineState(const char* inShaderFileName, const wchar_t* inLibN
 		return false;
 
 	std::vector<const wchar_t*> hit_shader_names;
-	ComPtr<ID3D12StateObject> pipeline_object = gCreateStateObject(ioShader, blob);
+	ComPtr<ID3D12StateObject> pipeline_object = gCreateStateObject(blob.Get(), ioShader);
 	if (pipeline_object == nullptr)
 		return false;
 
 	ioShader.mData.mRootSignature = ioShader.mRootSignatureReference->mData.mRootSignature;
 	ioShader.mData.mStateObject = pipeline_object;
 	ioShader.mData.mStateObject->SetName(inLibName);
+
+	gInspectLibraryReflection(blob, ioShader);
 
 	return true;
 }

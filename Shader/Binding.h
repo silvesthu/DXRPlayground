@@ -1,9 +1,9 @@
 #pragma once
 #include "Shared.h"
 
-// #define USE_DYNAMIC_RESOURCE_CBV		// 2x slower
-// #define USE_DYNAMIC_RESOURCE_SRV_UAV	// [TODO]
-// #define USE_DYNAMIC_RESOURCE_SAMPLER	// Almost same with 2 samplers
+// #define USE_DYNAMIC_RESOURCE_CBV		// About 2x slower
+#define USE_DYNAMIC_RESOURCE_SRV_UAV	// [TODO] Always enabled, need alternative implementation for comparison
+// #define USE_DYNAMIC_RESOURCE_SAMPLER	// About the same with 2 samplers
 
 // Common
 #ifdef USE_DYNAMIC_RESOURCE_SAMPLER

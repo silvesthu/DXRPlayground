@@ -15,7 +15,7 @@
     <ClInclude Include="Shader\Light.h" />
     <ClInclude Include="Shader\BSDF.h" />
     <ClInclude Include="Source\Renderer.h" />
-    <ClInclude Include="Source\ShaderHelper.h" />
+    <ClInclude Include="Source\Renderer.inl" />
     <ClInclude Include="Source\Thirdparty\tinyxml2\tinyxml2.h" />
     <CopyFileToFolders Include="Shader\AtmosphereIntegration.Wilkie21.h">
       <FileType>Document</FileType>

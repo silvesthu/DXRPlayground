@@ -2,19 +2,20 @@
 
 #define WIN32_LEAN_AND_MEAN
 
-#include <d3d12.h>
-#include <dxgi1_4.h>
-#include <dxcapi.h>
-#include <dxgidebug.h>
-#include <comdef.h>
-#include <shellapi.h>
-#include <wrl.h>	// For ComPtr. See https://github.com/Microsoft/DirectXTK/wiki/ComPtr
+#include <d3d12.h>			// For D3D12
+#include <dxgi1_4.h>		// For DXGI
+#include <dxcapi.h>			// For IDxcCompiler
+#include <shellapi.h>		// For ShellExecuteA
+#include <dxgidebug.h>		// For IDXGIDebug1
+#include <d3d12shader.h>	// For shader reflection
+#include <wrl.h>			// For ComPtr. See https://github.com/Microsoft/DirectXTK/wiki/ComPtr
 using Microsoft::WRL::ComPtr;
-#include <pix3.h>
+#include <pix3.h>			// For PIXScopedEvent
 
 #include <tchar.h>
 #include <string>
 #include <iostream>
+#include <fstream>
 #include <array>
 #include <vector>
 #include <memory>
@@ -38,6 +39,9 @@ using Microsoft::WRL::ComPtr;
 #include "../Shader/Shared.h"
 
 // Common helpers
+#define gAssert assert
+#define UNUSED(_VAR) ((void)(_VAR))
+
 template <typename T>
 constexpr inline T gAlignUp(T value, T alignment)
 {
@@ -114,8 +118,6 @@ inline void gOpenSceneFolder(const char* inSceneFile)
 	command = command.parent_path();
 	ShellExecuteA(nullptr, "open", command.string().c_str(), nullptr, nullptr, SW_SHOWDEFAULT);
 }
-
-#define gAssert assert
 
 inline std::wstring gToWString(const std::string_view string)
 {
@@ -336,6 +338,7 @@ struct Shader
 	SHADER_MEMBER(const wchar_t*, IntersectionName, nullptr);
 	SHADER_MEMBER(const Shader*, RootSignatureReference, nullptr);
 	const wchar_t* HitName() const { return mAnyHitName != nullptr ? mAnyHitName : (mClosestHitName != nullptr ? mClosestHitName : mIntersectionName); }
+	const std::wstring HitGroupName() const { if (HitName() == nullptr) return L""; std::wstring name = HitName(); name += L"Group"; return name; }
 
 	struct DescriptorInfo
 	{

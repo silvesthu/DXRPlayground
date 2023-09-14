@@ -1,10 +1,12 @@
 #include "Renderer.h"
 #include "Atmosphere.h"
 #include "Cloud.h"
-#include "ShaderHelper.h"
+#include "Renderer.inl"
 
 void Renderer::Initialize()
 {
+	gInitializeDxcInterfaces();
+
 	InitializeShaders();
 	InitializeScreenSizeTextures();
 
@@ -17,6 +19,8 @@ void Renderer::Finalize()
 	FinalizeScreenSizeTextures();
 
 	mRuntime.Reset();
+
+	gFinalizeDxcInterfaces();
 }
 
 void Renderer::Render()
