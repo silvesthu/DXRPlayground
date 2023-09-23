@@ -343,10 +343,10 @@ struct Shader
 	struct DescriptorInfo
 	{
 		DescriptorInfo(ID3D12Resource* inResource) : mResource(inResource) {}
-		DescriptorInfo(ID3D12Resource* inResource, glm::uint inStride) : mResource(inResource), mStride(inStride) {}
+		DescriptorInfo(ID3D12Resource* inResource, uint32_t inStride) : mResource(inResource), mStride(inStride) {}
 
 		ID3D12Resource*		mResource = nullptr;
-		glm::uint			mStride = 0;
+		uint32_t			mStride = 0;
 	};
 
 	void Reset() { mData = {}; }
@@ -364,16 +364,16 @@ struct Texture
 {
 #define TEXTURE_MEMBER(type, name, default_value) MEMBER(Texture, type, name, default_value)
 
-	TEXTURE_MEMBER(glm::uint32, Width, 1);
-	TEXTURE_MEMBER(glm::uint32, Height, 1);
-	TEXTURE_MEMBER(glm::uint32, Depth, 1);
-	TEXTURE_MEMBER(DXGI_FORMAT, Format, DXGI_FORMAT_R32G32B32A32_FLOAT);
-	TEXTURE_MEMBER(std::string, Name, "");
-	TEXTURE_MEMBER(float, UIScale, 0.0f);
-	TEXTURE_MEMBER(std::filesystem::path, Path, L"");
-	TEXTURE_MEMBER(ViewDescriptorIndex, UAVIndex, ViewDescriptorIndex::Invalid);
-	TEXTURE_MEMBER(ViewDescriptorIndex, SRVIndex, ViewDescriptorIndex::Invalid);
-	TEXTURE_MEMBER(DXGI_FORMAT, SRVFormat, DXGI_FORMAT_UNKNOWN);
+	TEXTURE_MEMBER(uint32_t,				Width,			1);
+	TEXTURE_MEMBER(uint32_t,				Height,			1);
+	TEXTURE_MEMBER(uint32_t,				Depth,			1);
+	TEXTURE_MEMBER(DXGI_FORMAT,				Format,			DXGI_FORMAT_R32G32B32A32_FLOAT);
+	TEXTURE_MEMBER(std::string,				Name,			"");
+	TEXTURE_MEMBER(float,					UIScale,		0.0f);
+	TEXTURE_MEMBER(std::filesystem::path,	Path,			L"");
+	TEXTURE_MEMBER(ViewDescriptorIndex,		UAVIndex,		ViewDescriptorIndex::Invalid);
+	TEXTURE_MEMBER(ViewDescriptorIndex,		SRVIndex,		ViewDescriptorIndex::Invalid);
+	TEXTURE_MEMBER(DXGI_FORMAT,				SRVFormat,		DXGI_FORMAT_UNKNOWN);
 
 	Texture& Dimension(glm::uvec3 dimension) 
 	{
@@ -384,7 +384,7 @@ struct Texture
 	}
 
 	int GetPixelSize() const;
-	glm::uint64 GetSubresourceSize() const;
+	uint64_t GetSubresourceSize() const;
 	void Initialize();
 	void Update();
 	void InitializeUpload();
@@ -394,19 +394,19 @@ struct Texture
 
 	int mSubresourceCount = 1; // TODO: Support multiple subresources
 	bool mLoaded = false;
-	std::vector<glm::uint8> mUploadData;
+	std::vector<uint8_t> mUploadData;
 };
 
 struct ShaderTable
 {
-	ComPtr<ID3D12Resource> mResource		= nullptr;
-	glm::uint64	mEntrySize					= 0;
-	glm::uint32	mRayGenOffset				= 0;
-	glm::uint32	mRayGenCount				= 0;
-	glm::uint32	mMissOffset					= 0;
-	glm::uint32	mMissCount					= 0;
-	glm::uint32	mHitGroupOffset				= 0;
-	glm::uint32	mHitGroupCount				= 0;
+	ComPtr<ID3D12Resource>	mResource					= nullptr;
+	uint64_t				mEntrySize					= 0;
+	uint32_t				mRayGenOffset				= 0;
+	uint32_t				mRayGenCount				= 0;
+	uint32_t				mMissOffset					= 0;
+	uint32_t				mMissCount					= 0;
+	uint32_t				mHitGroupOffset				= 0;
+	uint32_t				mHitGroupCount				= 0;
 };
 
 // Helper
@@ -444,7 +444,7 @@ struct FrameContext
 	ComPtr<ID3D12Resource>					mDebugReadbackBuffer;
 	Debug*									mDebugReadbackBufferPointer = nullptr;
 
-	glm::uint64								mFenceValue = 0;
+	uint64_t								mFenceValue = 0;
 
 	DescriptorHeap<ViewDescriptorIndex>		mViewDescriptorHeap		{ .mType = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, .mCount = 4096 };
 	DescriptorHeap<SamplerDescriptorIndex>	mSamplerDescriptorHeap	{ .mType = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, .mCount = 128 };
@@ -462,7 +462,7 @@ struct FrameContext
 	}
 };
 extern FrameContext							gFrameContexts[];
-extern glm::uint32							gFrameIndex;
+extern uint32_t								gFrameIndex;
 inline FrameContext&						gGetFrameContext() { return gFrameContexts[gFrameIndex % NUM_FRAMES_IN_FLIGHT]; }
 
 extern Texture*								gDumpTexture;

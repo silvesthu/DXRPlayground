@@ -30,7 +30,7 @@ private:
 };
 using BLASRef = std::shared_ptr<BLAS>;
 
-using IndexType = glm::uint32;
+using IndexType = uint32_t;
 using VertexType = glm::vec3;
 using NormalType = glm::vec3;
 using UVType = glm::vec2;

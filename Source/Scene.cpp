@@ -154,13 +154,13 @@ bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransfor
 		gTrace(reader.Error().c_str());
 
 	// Fetch indices, attributes
-	glm::uint32 index = 0;
+	uint32_t index = 0;
 	for (auto&& shape : reader.GetShapes())
 	{
-		glm::uint32 index_offset = static_cast<glm::uint32>(ioSceneContent.mIndices.size());
+		uint32_t index_offset = static_cast<uint32_t>(ioSceneContent.mIndices.size());
 
 		const int kNumFaceVerticesTriangle = 3;
-		glm::uint32 index_count = static_cast<glm::uint32>(shape.mesh.num_face_vertices.size()) * kNumFaceVerticesTriangle;
+		uint32_t index_count = static_cast<uint32_t>(shape.mesh.num_face_vertices.size()) * kNumFaceVerticesTriangle;
 		for (size_t face_index = 0; face_index < shape.mesh.num_face_vertices.size(); face_index++)
 		{
 			assert(shape.mesh.num_face_vertices[face_index] == kNumFaceVerticesTriangle);
@@ -499,10 +499,10 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 
 		if (primitive != nullptr)
 		{
-			glm::uint32 index_count = static_cast<glm::uint32>(primitive->mIndices.size());
-			glm::uint32 vertex_offset = static_cast<glm::uint32>(ioSceneContent.mVertices.size());
-			glm::uint32 index_offset = static_cast<glm::uint32>(ioSceneContent.mIndices.size());
-			for (glm::uint32 i = 0; i < index_count; i++)
+			uint32_t index_count = static_cast<uint32_t>(primitive->mIndices.size());
+			uint32_t vertex_offset = static_cast<uint32_t>(ioSceneContent.mVertices.size());
+			uint32_t index_offset = static_cast<uint32_t>(ioSceneContent.mIndices.size());
+			for (uint32_t i = 0; i < index_count; i++)
 				ioSceneContent.mIndices.push_back(primitive->mIndices[i] + vertex_offset);
 
 			std::copy(primitive->mVertices.begin(), primitive->mVertices.end(), std::back_inserter(ioSceneContent.mVertices));

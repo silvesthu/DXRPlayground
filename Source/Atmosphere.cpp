@@ -120,7 +120,7 @@ void Atmosphere::Runtime::Bruneton17::Render(const Profile& inProfile)
 
 		gBarrierUAV(gCommandList, nullptr);
 
-		for (glm::uint scattering_order = 2; scattering_order <= mScatteringOrder; scattering_order++)
+		for (uint32_t scattering_order = 2; scattering_order <= mScatteringOrder; scattering_order++)
 		{
 			ComputeMultipleScattering(scattering_order);
 
@@ -150,18 +150,18 @@ void Atmosphere::Runtime::Bruneton17::ComputeSingleScattering()
 	gCommandList->Dispatch(mScatteringTexture.mWidth / 8, mScatteringTexture.mHeight / 8, mScatteringTexture.mDepth);
 }
 
-void Atmosphere::Runtime::Bruneton17::ComputeScatteringDensity(glm::uint inScatteringOrder)
+void Atmosphere::Runtime::Bruneton17::ComputeScatteringDensity(uint32_t inScatteringOrder)
 {
 	gRenderer.Setup(mComputeScatteringDensityShader);
-	glm::uint scattering_order = inScatteringOrder;
+	uint32_t scattering_order = inScatteringOrder;
 	gCommandList->SetComputeRoot32BitConstants((int)RootParameterIndex::ConstantsAtmosphere, 1, &scattering_order, 0);
 	gCommandList->Dispatch(mDeltaScatteringDensityTexture.mWidth / 8, mDeltaScatteringDensityTexture.mHeight / 8, mDeltaScatteringDensityTexture.mDepth);
 }
 
-void Atmosphere::Runtime::Bruneton17::ComputeIndirectIrradiance(glm::uint inScatteringOrder)
+void Atmosphere::Runtime::Bruneton17::ComputeIndirectIrradiance(uint32_t inScatteringOrder)
 {
 	gRenderer.Setup(mComputeIndirectIrradianceShader);
-	glm::uint scattering_order = inScatteringOrder - 1;
+	uint32_t scattering_order = inScatteringOrder - 1;
 	gCommandList->SetComputeRoot32BitConstants((int)RootParameterIndex::ConstantsAtmosphere, 1, &scattering_order, 0);
 	gCommandList->Dispatch(mIrradianceTexture.mWidth / 8, mIrradianceTexture.mHeight / 8, mIrradianceTexture.mDepth);
 }
@@ -172,7 +172,7 @@ void Atmosphere::Runtime::Bruneton17::AccumulateMultipleScattering()
 	gCommandList->Dispatch(mScatteringTexture.mWidth / 8, mScatteringTexture.mHeight / 8, mScatteringTexture.mDepth);
 }
 
-void Atmosphere::Runtime::Bruneton17::ComputeMultipleScattering(glm::uint scattering_order)
+void Atmosphere::Runtime::Bruneton17::ComputeMultipleScattering(uint32_t scattering_order)
 {
 	ComputeScatteringDensity(scattering_order);
 	ComputeIndirectIrradiance(scattering_order);
@@ -781,7 +781,7 @@ void Atmosphere::Runtime::Wilkie21::Render(const Profile& inProfile)
 		};
 
 		mSkyView.mUploadData.resize(mSkyView.GetSubresourceSize());
-		glm::uint64* pixels = reinterpret_cast<glm::uint64*>(mSkyView.mUploadData.data());
+		uint64_t* pixels = reinterpret_cast<uint64_t*>(mSkyView.mUploadData.data());
 	
 		int width = static_cast<int>(mSkyView.mWidth);
 		int height = static_cast<int>(mSkyView.mHeight);
@@ -821,7 +821,7 @@ void Atmosphere::Runtime::Wilkie21::Render(const Profile& inProfile)
 				}
 				luminance.mData *= kPreExposure;
 			
-				glm::uint64 pixel = glm::packHalf2x16({luminance.mData.b, 1.0});
+				uint64_t pixel = glm::packHalf2x16({luminance.mData.b, 1.0});
 				pixel = pixel << 32;
 				pixel |= glm::packHalf2x16({luminance.mData.r, luminance.mData.g});
 				pixels[(h * width + w)] = pixel;

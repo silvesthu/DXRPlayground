@@ -129,7 +129,7 @@ ComPtr<ID3D12StateObject> gCreateStateObject(IDxcBlob* inBlob, Shader& ioShader)
 	// Note that all pointers should be valid until CreateStateObject
 
 	std::array<D3D12_STATE_SUBOBJECT, 16> subobjects;
-	glm::uint32 index = 0;
+	uint32_t index = 0;
 
 	// DXIL library
 	D3D12_DXIL_LIBRARY_DESC dxil_library_desc{ .DXILLibrary = {.pShaderBytecode = inBlob->GetBufferPointer(), .BytecodeLength = inBlob->GetBufferSize() }, .NumExports = 0 /* export everything as long as no name conflict */ };
@@ -147,7 +147,7 @@ ComPtr<ID3D12StateObject> gCreateStateObject(IDxcBlob* inBlob, Shader& ioShader)
 	subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION, &subobject_to_exports_association };
 
 	// Shader config
-	D3D12_RAYTRACING_SHADER_CONFIG shader_config = { .MaxPayloadSizeInBytes = (glm::uint32)sizeof(RayPayload), .MaxAttributeSizeInBytes = sizeof(float) * 2 /* sizeof(BuiltInTriangleIntersectionAttributes) */ };
+	D3D12_RAYTRACING_SHADER_CONFIG shader_config = { .MaxPayloadSizeInBytes = (uint32_t)sizeof(RayPayload), .MaxAttributeSizeInBytes = sizeof(float) * 2 /* sizeof(BuiltInTriangleIntersectionAttributes) */ };
 	subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG, &shader_config };
 
 	// Pipeline config, [0, 31] https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_raytracing_pipeline_config
@@ -178,7 +178,7 @@ void gCombineShader(const Shader& inBaseShader, std::span<Shader> inCollections,
 {
 	std::vector<D3D12_STATE_SUBOBJECT> subobjects;
 	subobjects.resize(1 /* D3D12_STATE_OBJECT_CONFIG */ + inCollections.size());
-	glm::uint32 index = 0;
+	uint32_t index = 0;
 
 	D3D12_STATE_OBJECT_CONFIG state_object_config = { .Flags = D3D12_STATE_OBJECT_FLAG_ALLOW_STATE_OBJECT_ADDITIONS };
 	subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_STATE_OBJECT_CONFIG, &state_object_config };
@@ -205,24 +205,25 @@ void gCombineShader(const Shader& inBaseShader, std::span<Shader> inCollections,
 
 struct ShaderIdentifier
 {
-	uint8_t identifier[32];
+	uint8_t							identifier[32];
 };
 
 struct ShaderTableEntry
 {
-	ShaderIdentifier mShaderIdentifier;
+	ShaderIdentifier				mShaderIdentifier;
 
 	union RootArgument
 	{
-		D3D12_GPU_VIRTUAL_ADDRESS mAddress;
-		uint64_t mHandle;
+		D3D12_GPU_VIRTUAL_ADDRESS	mAddress;
+		uint64_t					mHandle;
 	};
 
-	RootArgument mRootArgument = {};
-	uint8_t mPadding[24] = {};
+	RootArgument					mRootArgument = {};
+	uint8_t							mPadding[24] = {};
 };
+
 static_assert(sizeof(ShaderTableEntry::mShaderIdentifier) == D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES, "D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES check failed");
-static_assert(sizeof(ShaderTableEntry) == D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT, "D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT check failed");
+static_assert(sizeof(ShaderTableEntry) % D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT == 0, "D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT check failed");
 
 ShaderTable gCreateShaderTable(const Shader& inShader)
 {
@@ -232,40 +233,41 @@ ShaderTable gCreateShaderTable(const Shader& inShader)
 
 	// Construct the table
 	ShaderTableEntry shader_table_entries[32];
-	glm::uint32 shader_table_entry_index = 0;
+	uint32_t shader_table_entry_index = 0;
 	{
-		// Shader table between all ray tracing shader types, by adding offset when reference the table
-		// So it is necessary to align up to table size rather than record size (entry size)
+		// Local root argument layout
+		// 
+		// 
+		// 
+		// Reference
+		// - https://github.com/NVIDIAGameWorks/DxrTutorials/blob/dcb8810086f80e77157a6a3b7deff2f24e0986d7/Tutorials/06-Raytrace/06-Raytrace.cpp#L734
+		// - https://github.com/NVIDIAGameWorks/Falcor/blob/236927c2bca252f9ea1e3bacb982f8fcba817a67/Framework/Source/Experimental/Raytracing/RtProgramVars.cpp#L116
+		// - p21 http://intro-to-dxr.cwyman.org/presentations/IntroDXR_RaytracingAPI.pdf
 
-		// Local root argument may be embedded along with shader identifier
-		// https://github.com/NVIDIAGameWorks/DxrTutorials/blob/dcb8810086f80e77157a6a3b7deff2f24e0986d7/Tutorials/06-Raytrace/06-Raytrace.cpp#L734
-		// https://github.com/NVIDIAGameWorks/Falcor/blob/236927c2bca252f9ea1e3bacb982f8fcba817a67/Framework/Source/Experimental/Raytracing/RtProgramVars.cpp#L116
-		// p20 http://intro-to-dxr.cwyman.org/presentations/IntroDXR_RaytracingAPI.pdf
-		// http://intro-to-dxr.cwyman.org/spec/DXR_FunctionalSpec_v0.09.docx
-
-		// Signature -> DescriptorHeap
-		// * Global - SetDescriptorHeaps() - D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE
-		// * Per Shader - SetDescriptorHeaps() - D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE
-		// * Per Shader Instance - Shader Table (DescriptorHeap or raw address) - D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE
-
-		// Hit group table indexing
-		// https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#hit-group-table-indexing
+		// HitGroup table indexing
+		// 
 		// HitGroupRecordAddress = 
 		//		D3D12_DISPATCH_RAYS_DESC.HitGroupTable.StartAddress						// from CPU: DispatchRays()
 		//		+				
 		//		D3D12_DISPATCH_RAYS_DESC.HitGroupTable.StrideInBytes					// from CPU: DispatchRays()
 		//		*
 		//		(
-		//			RayContributionToHitGroupIndex										// from GPU: TraceRay()
+		//			RayContributionToHitGroupIndex										// from GPU: TraceRay(). Typically as ray type, e.g. Primary ray, Shadow ray
 		//			+
 		//			(
-		//				MultiplierForGeometryContributionToHitGroupIndex				// from GPU: TraceRay()
+		//				MultiplierForGeometryContributionToHitGroupIndex				// from GPU: TraceRay(). Typically as count of ray type, to index for each geometry in BLAS
 		//				*
 		//				GeometryContributionToHitGroupIndex								// from GPU: Same as GeometryIndex(), index in BLAS
 		//			) 
 		//			+ 
-		//			D3D12_RAYTRACING_INSTANCE_DESC.InstanceContributionToHitGroupIndex	// from CPU: D3D12_RAYTRACING_INSTANCE_DESC
+		//			D3D12_RAYTRACING_INSTANCE_DESC.InstanceContributionToHitGroupIndex	// from CPU: D3D12_RAYTRACING_INSTANCE_DESC. Typically as material index.
 		//		)
+		// 
+		// Reference
+		// - Figure 2 https://www.willusher.io/graphics/2019/11/20/the-sbt-three-ways
+		// - https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#hit-group-table-indexing
+		// - https://github.com/NVIDIAGameWorks/Falcor/blob/236927c2bca252f9ea1e3bacb982f8fcba817a67/Framework/Source/Experimental/Raytracing/RtProgramVars.cpp#L131
+		// - p24 https://intro-to-dxr.cwyman.org/presentations/IntroDXR_RaytracingAPI.pdf
 
 		ComPtr<ID3D12StateObjectProperties> state_object_properties;
 		inShader.mData.mStateObject->QueryInterface(IID_PPV_ARGS(&state_object_properties));
@@ -295,7 +297,7 @@ ShaderTable gCreateShaderTable(const Shader& inShader)
 			shader_table.mHitGroupOffset = shader_table_entry_index;
 
 			// Try not to index out of bounds from shader, otherwise GPU may crash...
-			for (const Shader& shader : gRenderer.mRuntime.mHitShaders)
+			for (const Shader& shader : gRenderer.mRuntime.mHitGroupShaders)
 			{
 				memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(shader.HitGroupName().c_str()), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 				shader_table_entry_index++;
@@ -342,7 +344,7 @@ ComPtr<IDxcBlob> gCompileShader(const char* inFilename, const char* inEntryPoint
 	std::string shader_string = shader_stream.str();
 
 	IDxcBlobEncoding* blob_encoding;
-	gValidate(DxcUtils->CreateBlobFromPinned(shader_string.c_str(), static_cast<glm::uint32>(shader_string.length()), CP_UTF8, &blob_encoding));
+	gValidate(DxcUtils->CreateBlobFromPinned(shader_string.c_str(), static_cast<uint32_t>(shader_string.length()), CP_UTF8, &blob_encoding));
 
 	std::string filename(inFilename);
 	std::wstring wfilename(filename.begin(), filename.end());

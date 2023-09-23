@@ -367,7 +367,7 @@ public:
 			Texture mValidationSentinelTexture					= Texture();
 			std::span<Texture> mValidationTextures				= std::span<Texture>(&mValidationSentinelTexture, &mValidationSentinelTexture);
 
-			glm::uint mScatteringOrder							= 4;
+			uint32_t mScatteringOrder							= 4;
 			AtmosphereMuSEncodingMode mMuSEncodingMode			= AtmosphereMuSEncodingMode::Bruneton17;
 
 			bool mRecomputeRequested							= true;
@@ -378,10 +378,10 @@ public:
 			void ComputeTransmittance();
 			void ComputeDirectIrradiance();
 			void ComputeSingleScattering();
-			void ComputeScatteringDensity(glm::uint inScatteringOrder);
-			void ComputeIndirectIrradiance(glm::uint inScatteringOrder);
+			void ComputeScatteringDensity(uint32_t inScatteringOrder);
+			void ComputeIndirectIrradiance(uint32_t inScatteringOrder);
 			void AccumulateMultipleScattering();
-			void ComputeMultipleScattering(glm::uint inScatteringOrder);
+			void ComputeMultipleScattering(uint32_t inScatteringOrder);
 		};
 		Bruneton17 mBruneton17;
 		
@@ -461,7 +461,7 @@ public:
 		};
 		Wilkie21 mWilkie21;
 
-		glm::uint mSliceCount = 0; // Slice axis to use 3D texture as 4D storage
+		uint32_t mSliceCount = 0; // Slice axis to use 3D texture as 4D storage
 
 		static void Bruneton17(Runtime& inRuntime)
 		{

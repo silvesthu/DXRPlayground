@@ -870,7 +870,7 @@ void sRender()
 	// Frame Context
 	sWaitForFrameContext();
 	FrameContext& frame_context = gGetFrameContext();
-	glm::uint32 frame_index = gSwapChain->GetCurrentBackBufferIndex();
+	uint32_t frame_index = gSwapChain->GetCurrentBackBufferIndex();
 	ID3D12Resource* back_buffer = gRenderer.mRuntime.mBackBuffers[frame_index].Get();
 	D3D12_CPU_DESCRIPTOR_HANDLE& back_buffer_RTV = gRenderer.mRuntime.mBufferBufferRTVs[frame_index];
 
@@ -912,7 +912,7 @@ void sRender()
 			gConstants.mLightCount		= (glm::uint)gScene.GetSceneContent().mLights.size();
 
 			if (ImGui::IsMouseDown(ImGuiMouseButton_Middle))
-				gConstants.mPixelDebugCoord	= glm::uvec2(static_cast<glm::uint32>(ImGui::GetMousePos().x), (glm::uint32)ImGui::GetMousePos().y);
+				gConstants.mPixelDebugCoord	= glm::uvec2(static_cast<uint32_t>(ImGui::GetMousePos().x), (uint32_t)ImGui::GetMousePos().y);
 		}
 
 		// Accumulation
@@ -950,7 +950,7 @@ void sRender()
 			if (!gRenderer.mAccumulationPaused)
 				gConstants.mCurrentFrameIndex++;
 
-			glm::uint32 accumulation_frame_count = gRenderer.mAccumulationFrameUnlimited ? UINT_MAX : gRenderer.mAccumulationFrameCount;
+			uint32_t accumulation_frame_count = gRenderer.mAccumulationFrameUnlimited ? UINT_MAX : gRenderer.mAccumulationFrameCount;
 
 			if (gConstants.mCurrentFrameIndex == accumulation_frame_count)
 				gRenderer.mAccumulationDone = true;

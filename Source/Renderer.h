@@ -21,7 +21,7 @@ struct Renderer
 		Shader								mClosestHit001Shader		= Shader().FileName("Shader/ClosestHit001.hlsl").ClosestHitName(L"ClosestHit001").RootSignatureReference(&mRayQueryShader);
 		Shader								mCollectionSentinelShader	= Shader();
 		std::span<Shader>					mCollectionShaders			= std::span<Shader>(&mMissShader,			&mCollectionSentinelShader);
-		std::span<Shader>					mHitShaders					= std::span<Shader>(&mClosestHit100Shader,	&mCollectionSentinelShader);
+		std::span<Shader>					mHitGroupShaders			= std::span<Shader>(&mClosestHit100Shader,	&mCollectionSentinelShader);
 		Shader								mLibShader					= Shader();
 		ComPtr<ID3D12RootSignature>			mLibLocalRootSignature;
 		ShaderTable							mLibShaderTable;
@@ -101,7 +101,7 @@ struct Renderer
 	bool									mAccumulationDone = false;
 	bool									mAccumulationFrameUnlimited = false;
 	bool									mAccumulationPaused = false;
-	glm::uint32								mAccumulationFrameCount = 64;
+	uint32_t								mAccumulationFrameCount = 64;
 	bool									mAccumulationResetRequested = false;
 
 	int										mResizeWidth = 0;

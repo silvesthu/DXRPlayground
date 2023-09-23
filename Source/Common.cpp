@@ -30,7 +30,7 @@ ComPtr<ID3D12Resource>				gDebugBuffer = nullptr;
 
 // Frame
 FrameContext						gFrameContexts[NUM_FRAMES_IN_FLIGHT] = {};
-glm::uint32							gFrameIndex = 0;
+uint32_t							gFrameIndex = 0;
 Constants							gConstants = {};
 
 // Capture
@@ -42,7 +42,7 @@ int Texture::GetPixelSize() const
 	return static_cast<int>(DirectX::BitsPerPixel(mFormat) / 8);
 }
 
-glm::uint64 Texture::GetSubresourceSize() const
+uint64_t Texture::GetSubresourceSize() const
 {
 	return GetRequiredIntermediateSize(mResource.Get(), 0, mSubresourceCount);
 }
@@ -135,8 +135,8 @@ void Texture::Update()
 			float* data = stbi_loadf(mPath.string().c_str(), &x, &y, &n, color_count);
 
 			mUploadData.resize(GetSubresourceSize());
-			glm::uint8* pixels = reinterpret_cast<glm::uint8*>(mUploadData.data());
-			uint byte_count = x * y * 4;
+			uint8_t* pixels = reinterpret_cast<uint8_t*>(mUploadData.data());
+			uint32_t byte_count = x * y * 4;
 			gAssert(byte_count <= mUploadData.size());
 			memcpy(pixels, data, byte_count);
 
@@ -151,8 +151,8 @@ void Texture::Update()
 			unsigned char* data = stbi_load(mPath.string().c_str(), &x, &y, &n, color_count);
 
 			mUploadData.resize(GetSubresourceSize());
-			glm::uint8* pixels = reinterpret_cast<glm::uint8*>(mUploadData.data());
-			uint byte_count = x * y * 4;
+			uint8_t* pixels = reinterpret_cast<uint8_t*>(mUploadData.data());
+			uint32_t byte_count = x * y * 4;
 			gAssert(byte_count <= mUploadData.size());
 			memcpy(pixels, data, byte_count);
 
