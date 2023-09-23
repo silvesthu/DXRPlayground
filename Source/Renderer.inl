@@ -205,21 +205,16 @@ void gCombineShader(const Shader& inBaseShader, std::span<Shader> inCollections,
 
 struct ShaderIdentifier
 {
-	uint8_t							identifier[32];
+	uint8_t							mIdentifier[32] = {};
 };
 
 struct ShaderTableEntry
 {
-	ShaderIdentifier				mShaderIdentifier;
+	ShaderIdentifier				mShaderIdentifier = {};		// 32 bytes
 
-	union RootArgument
-	{
-		D3D12_GPU_VIRTUAL_ADDRESS	mAddress;
-		uint64_t					mHandle;
-	};
-
-	RootArgument					mRootArgument = {};
-	uint8_t							mPadding[24] = {};
+	LocalConstants					mLocalConstants = {};		// 16 bytes
+	D3D12_GPU_VIRTUAL_ADDRESS		mLocalCBV = {};				// 8 bytes
+	D3D12_GPU_DESCRIPTOR_HANDLE		mLocalSRVs = {};			// 8 bytes
 };
 
 static_assert(sizeof(ShaderTableEntry::mShaderIdentifier) == D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES, "D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES check failed");
@@ -232,8 +227,7 @@ ShaderTable gCreateShaderTable(const Shader& inShader)
 		return shader_table;
 
 	// Construct the table
-	ShaderTableEntry shader_table_entries[32];
-	uint32_t shader_table_entry_index = 0;
+	std::vector<ShaderTableEntry> shader_table_entries;
 	{
 		// Local root argument layout
 		// 
@@ -274,36 +268,45 @@ ShaderTable gCreateShaderTable(const Shader& inShader)
 
 		// RayGen shaders
 		{
-			shader_table.mRayGenOffset = shader_table_entry_index;
+			shader_table.mRayGenOffset = shader_table_entries.size();
 
-			memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(gRenderer.mRuntime.mRayGenerationShader.mRayGenerationName), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-			shader_table_entry_index++;
+			shader_table_entries.push_back({});
+			memcpy(&shader_table_entries.back().mShaderIdentifier, state_object_properties->GetShaderIdentifier(gRenderer.mRuntime.mRayGenerationShader.mRayGenerationName), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+			shader_table_entries.back().mLocalConstants.mShaderIndex = static_cast<uint32_t>(shader_table_entries.size() - 1);
+			shader_table_entries.back().mLocalCBV = gConstantBuffer->GetGPUVirtualAddress();
+			shader_table_entries.back().mLocalSRVs = gGetFrameContext().mViewDescriptorHeap.GetGPUHandle(ViewDescriptorIndex::Invalid);
 
-			shader_table.mRayGenCount = shader_table_entry_index - shader_table.mRayGenOffset;
+			shader_table.mRayGenCount = shader_table_entries.size() - shader_table.mRayGenOffset;
 		}
 
 		// Miss shaders
 		{
-			shader_table.mMissOffset = shader_table_entry_index;
+			shader_table.mMissOffset = shader_table_entries.size();
 
-			memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(gRenderer.mRuntime.mMissShader.mMissName), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-			shader_table_entry_index++;
+			shader_table_entries.push_back({});
+			memcpy(&shader_table_entries.back().mShaderIdentifier, state_object_properties->GetShaderIdentifier(gRenderer.mRuntime.mMissShader.mMissName), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+			shader_table_entries.back().mLocalConstants.mShaderIndex = static_cast<uint32_t>(shader_table_entries.size() - 1);
+			shader_table_entries.back().mLocalCBV = gConstantBuffer->GetGPUVirtualAddress();
+			shader_table_entries.back().mLocalSRVs = gGetFrameContext().mViewDescriptorHeap.GetGPUHandle(ViewDescriptorIndex::Invalid);
 
-			shader_table.mMissCount = shader_table_entry_index - shader_table.mMissOffset;
+			shader_table.mMissCount = shader_table_entries.size() - shader_table.mMissOffset;
 		}
 
 		// HitGroup shaders
 		{
-			shader_table.mHitGroupOffset = shader_table_entry_index;
+			shader_table.mHitGroupOffset = shader_table_entries.size();
 
 			// Try not to index out of bounds from shader, otherwise GPU may crash...
 			for (const Shader& shader : gRenderer.mRuntime.mHitGroupShaders)
 			{
-				memcpy(&shader_table_entries[shader_table_entry_index].mShaderIdentifier, state_object_properties->GetShaderIdentifier(shader.HitGroupName().c_str()), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-				shader_table_entry_index++;
+				shader_table_entries.push_back({});
+				memcpy(&shader_table_entries.back().mShaderIdentifier, state_object_properties->GetShaderIdentifier(shader.HitGroupName().c_str()), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+				shader_table_entries.back().mLocalConstants.mShaderIndex = static_cast<uint32_t>(shader_table_entries.size() - 1);
+				shader_table_entries.back().mLocalCBV = gConstantBuffer->GetGPUVirtualAddress();
+				shader_table_entries.back().mLocalSRVs = gGetFrameContext().mViewDescriptorHeap.GetGPUHandle(ViewDescriptorIndex::Invalid);
 			}
 
-			shader_table.mHitGroupCount = shader_table_entry_index - shader_table.mHitGroupOffset;
+			shader_table.mHitGroupCount = shader_table_entries.size() - shader_table.mHitGroupOffset;
 		}
 
 		shader_table.mEntrySize = sizeof(ShaderTableEntry);
@@ -312,7 +315,7 @@ ShaderTable gCreateShaderTable(const Shader& inShader)
 	// Create the table
 	{
 		D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
-		D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(shader_table.mEntrySize * shader_table_entry_index);
+		D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(shader_table.mEntrySize * shader_table_entries.size());
 
 		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&shader_table.mResource)));
 		shader_table.mResource->SetName(L"ShaderTable");
@@ -325,7 +328,7 @@ ShaderTable gCreateShaderTable(const Shader& inShader)
 		gValidate(shader_table.mResource->Map(0, nullptr, (void**)&data_pointer));
 
 		// Copy
-		memcpy(data_pointer, shader_table_entries, shader_table.mEntrySize * shader_table_entry_index);
+		memcpy(data_pointer, shader_table_entries.data(), shader_table.mEntrySize * shader_table_entries.size());
 
 		// Unmap
 		shader_table.mResource->Unmap(0, nullptr);

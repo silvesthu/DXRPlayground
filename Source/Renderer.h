@@ -32,10 +32,11 @@ struct Renderer
 		Texture								mScreenSentinelTexture;
 		std::span<Texture>					mScreenTextures = std::span<Texture>(&mScreenColorTexture, &mScreenSentinelTexture);
 
+		Texture								mUVCheckerMap = Texture().Width(1024).Height(1024).Format(DXGI_FORMAT_R8G8B8A8_UNORM_SRGB).SRVIndex(ViewDescriptorIndex::UVCheckerMap).Name("Renderer.UVCheckerMap").Path(L"Asset/UVChecker-map/UVCheckerMaps/UVCheckerMap01-1024.png");
 		Texture								mIESTexture = Texture().Width(256).Height(16).Format(DXGI_FORMAT_R32_FLOAT).SRVIndex(ViewDescriptorIndex::IESSRV).Name("Renderer.IES").Path(L"Asset/IES/007cfb11e343e2f42e3b476be4ab684e/IES.hdr");
 
 		Texture								mSentinelTexture;
-		std::span<Texture>					mTextures = std::span<Texture>(&mIESTexture, &mSentinelTexture);
+		std::span<Texture>					mTextures = std::span<Texture>(&mUVCheckerMap, &mSentinelTexture);
 
 		ComPtr<ID3D12Resource>				mBackBuffers[NUM_BACK_BUFFERS] = {};
 		D3D12_CPU_DESCRIPTOR_HANDLE			mBufferBufferRTVs[NUM_BACK_BUFFERS] = {};
@@ -97,6 +98,7 @@ struct Renderer
 	bool									mReloadShader = false;
 	bool									mDumpDisassemblyRayQuery = false;
 	bool									mTestLibShader = false;
+	bool									mTestMultipleHitShaders = false;
 
 	bool									mAccumulationDone = false;
 	bool									mAccumulationFrameUnlimited = false;

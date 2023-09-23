@@ -401,12 +401,12 @@ struct ShaderTable
 {
 	ComPtr<ID3D12Resource>	mResource					= nullptr;
 	uint64_t				mEntrySize					= 0;
-	uint32_t				mRayGenOffset				= 0;
-	uint32_t				mRayGenCount				= 0;
-	uint32_t				mMissOffset					= 0;
-	uint32_t				mMissCount					= 0;
-	uint32_t				mHitGroupOffset				= 0;
-	uint32_t				mHitGroupCount				= 0;
+	uint64_t				mRayGenOffset				= 0;
+	uint64_t				mRayGenCount				= 0;
+	uint64_t				mMissOffset					= 0;
+	uint64_t				mMissCount					= 0;
+	uint64_t				mHitGroupOffset				= 0;
+	uint64_t				mHitGroupCount				= 0;
 };
 
 // Helper

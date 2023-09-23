@@ -23,3 +23,6 @@
 [submodule "Source/Thirdparty/tinyxml2"]
 	path = Source/Thirdparty/tinyxml2
 	url = https://github.com/leethomason/tinyxml2.git
+[submodule "Asset/UVChecker-map"]
+	path = Asset/UVChecker-map
+	url = https://github.com/Arahnoid/UVChecker-map.git

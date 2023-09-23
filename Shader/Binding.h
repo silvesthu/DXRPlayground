@@ -48,6 +48,11 @@ cbuffer RootConstantsAtmosphere : register(b0, space2)
 "RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0), RootConstants(num32BitConstants=1, b0, space = 2)" \
 ROOT_SIGNATURE_SAMPLER
 
+// Local RootSignature
+ConstantBuffer<LocalConstants> mLocalConstants : register(b0, space100);
+ConstantBuffer<Constants> mLocalCBV : register(b1, space100);
+Texture2D LocalSRVs[] : register(s0, space100);
+
 // CBV Helper
 float3 GetSunDirection() { return mConstants.mSunDirection.xyz; }
 
@@ -63,6 +68,7 @@ static StructuredBuffer<Light> Lights = ResourceDescriptorHeap[(uint)ViewDescrip
 
 static RWStructuredBuffer<Debug> BufferDebugUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::BufferDebugUAV];
 
+static Texture2D<float4> UVCheckerMap = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::UVCheckerMap];
 static Texture2D<float4> IESSRV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::IESSRV];
 
 static Texture2D<float4> TransmittanceSRV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Bruneton17TransmittanceSRV];

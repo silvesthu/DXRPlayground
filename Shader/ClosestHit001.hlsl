@@ -2,9 +2,12 @@
 #include "Shared.h"
 #include "Binding.h"
 #include "Common.h"
+#include "ClosestHit.h"
 
 [shader("closesthit")]
-void ClosestHit001(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attributes)
+void ClosestHit001(inout RayPayload ioPayload, in BuiltInTriangleIntersectionAttributes inAttributes)
 {
-	payload.mData = float4(0, 0, 1, 0);
+	ioPayload.mData = float4(0, 0, 1, 0);
+
+	ClosestHitOverride(ioPayload, inAttributes);
 }

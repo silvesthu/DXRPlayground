@@ -71,6 +71,9 @@ enum class ViewDescriptorIndex : uint
 	// [Debug]
 	BufferDebugUAV,
 
+	// [UVCheckerMaps]
+	UVCheckerMap,
+
 	// [Misc]
 	IESSRV,
 
@@ -654,6 +657,12 @@ struct Debug
 
 	int							mPixelInstanceID				CONSTANT_DEFAULT(-1);
 	uint3						GENERATE_PAD_NAME				CONSTANT_DEFAULT(uint3(0, 0, 0));
+};
+
+struct LocalConstants
+{
+	uint						mShaderIndex					CONSTANT_DEFAULT(0);
+	uint3						mPad							CONSTANT_DEFAULT(uint3(0, 0, 0));
 };
 
 #undef CONSTANT_DEFAULT

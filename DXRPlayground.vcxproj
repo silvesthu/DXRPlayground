@@ -12,8 +12,9 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Shader\Light.h" />
-    <ClInclude Include="Shader\BSDF.h" />
+    <CopyFileToFolders Include="Shader\ClosestHit.h" />
+    <CopyFileToFolders Include="Shader\Light.h" />
+    <CopyFileToFolders Include="Shader\BSDF.h" />
     <ClInclude Include="Source\Renderer.h" />
     <ClInclude Include="Source\Renderer.inl" />
     <ClInclude Include="Source\Thirdparty\tinyxml2\tinyxml2.h" />
@@ -173,9 +174,6 @@
     </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="Shader\ClosestHit.hlsl">
-      <FileType>Document</FileType>
-    </CopyFileToFolders>
     <CopyFileToFolders Include="Shader\ClosestHit001.hlsl">
       <FileType>Document</FileType>
     </CopyFileToFolders>
