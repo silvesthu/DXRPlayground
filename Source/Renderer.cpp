@@ -63,30 +63,7 @@ void Renderer::InitializeShaders()
 	for (auto&& shader : gRenderer.mRuntime.mShaders)
 		gCreatePipelineState(shader);
 
-	// Lib Shader
-	uint32_t local_root_signature_register_space = 100;
-	D3D12_DESCRIPTOR_RANGE local_root_descriptor_table_range =
-	{
-		.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV,
-		.NumDescriptors = 4096, // Unbounded, match size with referencing FrameContext::mViewDescriptorHeap
-		.BaseShaderRegister = 0,
-		.RegisterSpace = local_root_signature_register_space,
-		.OffsetInDescriptorsFromTableStart = 0,
-	};
-	D3D12_ROOT_PARAMETER local_root_parameters[] =
-	{
-		D3D12_ROOT_PARAMETER { .ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS, .Constants = {.ShaderRegister = 0, .RegisterSpace = local_root_signature_register_space, .Num32BitValues = 4 } },
-		D3D12_ROOT_PARAMETER { .ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV, .Descriptor = { .ShaderRegister = 1, .RegisterSpace = local_root_signature_register_space }  },
-		D3D12_ROOT_PARAMETER { .ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE, .DescriptorTable = D3D12_ROOT_DESCRIPTOR_TABLE { .NumDescriptorRanges = 1, .pDescriptorRanges = &local_root_descriptor_table_range } },
-	};
-	gRenderer.mRuntime.mLibLocalRootSignature = gCreateRootSignature(
-		D3D12_ROOT_SIGNATURE_DESC
-		{ 
-			.NumParameters = ARRAYSIZE(local_root_parameters),
-			.pParameters = local_root_parameters,
-			.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE,
-		});
-	gRenderer.mRuntime.mLibLocalRootSignature->SetName(L"LocalRootSignature");
+	gRenderer.mRuntime.mLibLocalRootSignature = gCreateLocalRootSignature();
 	gCreatePipelineState(gRenderer.mRuntime.mRayGenerationShader);
 	for (auto&& shader : gRenderer.mRuntime.mCollectionShaders)
 		gCreatePipelineState(shader);

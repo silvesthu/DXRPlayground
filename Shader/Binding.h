@@ -48,7 +48,7 @@ cbuffer RootConstantsAtmosphere : register(b0, space2)
 "RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0), RootConstants(num32BitConstants=1, b0, space = 2)" \
 ROOT_SIGNATURE_SAMPLER
 
-// Local RootSignature
+// Local Root Parameters, see also ShaderTableEntry, gCreateLocalRootSignature
 ConstantBuffer<LocalConstants> mLocalConstants : register(b0, space100);
 ConstantBuffer<Constants> mLocalCBV : register(b1, space100);
 Texture2D LocalSRVs[] : register(s0, space100);

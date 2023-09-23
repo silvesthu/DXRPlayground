@@ -212,13 +212,47 @@ struct ShaderTableEntry
 {
 	ShaderIdentifier				mShaderIdentifier = {};		// 32 bytes
 
-	LocalConstants					mLocalConstants = {};		// 16 bytes
-	D3D12_GPU_VIRTUAL_ADDRESS		mLocalCBV = {};				// 8 bytes
-	D3D12_GPU_DESCRIPTOR_HANDLE		mLocalSRVs = {};			// 8 bytes
+	// Local Root Parameters, see also gCreateLocalRootSignature
+	LocalConstants					mLocalConstants = {};		// 16 bytes, as SetGraphicsRoot32BitConstant for global root signature
+	D3D12_GPU_VIRTUAL_ADDRESS		mLocalCBV = {};				// 8 bytes, as SetGraphicsRootConstantBufferView for global root signature
+	D3D12_GPU_DESCRIPTOR_HANDLE		mLocalSRVs = {};			// 8 bytes, as SetGraphicsRootDescriptorTable for global root signature
 };
 
 static_assert(sizeof(ShaderTableEntry::mShaderIdentifier) == D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES, "D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES check failed");
 static_assert(sizeof(ShaderTableEntry) % D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT == 0, "D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT check failed");
+
+ComPtr<ID3D12RootSignature> gCreateLocalRootSignature()
+{
+	uint32_t local_root_signature_register_space = 100; // As long as no overlap with global root signature
+
+	D3D12_DESCRIPTOR_RANGE local_root_descriptor_table_range =
+	{
+		.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV,
+		.NumDescriptors = 4096, // Unbounded, match size with referencing FrameContext::mViewDescriptorHeap
+		.BaseShaderRegister = 0,
+		.RegisterSpace = local_root_signature_register_space,
+		.OffsetInDescriptorsFromTableStart = 0,
+	};
+
+	// Local Root Parameters, see also ShaderTableEntry
+	D3D12_ROOT_PARAMETER local_root_parameters[] =
+	{
+		D3D12_ROOT_PARAMETER {.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS, .Constants = {.ShaderRegister = 0, .RegisterSpace = local_root_signature_register_space, .Num32BitValues = 4 } },
+		D3D12_ROOT_PARAMETER {.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV, .Descriptor = {.ShaderRegister = 1, .RegisterSpace = local_root_signature_register_space }  },
+		D3D12_ROOT_PARAMETER {.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE, .DescriptorTable = D3D12_ROOT_DESCRIPTOR_TABLE {.NumDescriptorRanges = 1, .pDescriptorRanges = &local_root_descriptor_table_range } },
+	};
+
+	ComPtr<ID3D12RootSignature> local_root_signature = gCreateRootSignature(
+		D3D12_ROOT_SIGNATURE_DESC
+		{
+			.NumParameters = ARRAYSIZE(local_root_parameters),
+			.pParameters = local_root_parameters,
+			.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE,
+		});
+	local_root_signature->SetName(L"LocalRootSignature");
+
+	return local_root_signature;
+}
 
 ShaderTable gCreateShaderTable(const Shader& inShader)
 {
