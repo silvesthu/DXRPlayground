@@ -334,6 +334,7 @@ struct Shader
 	SHADER_MEMBER(const wchar_t*, RayGenerationName, nullptr);
 	SHADER_MEMBER(const wchar_t*, MissName, nullptr);
 	SHADER_MEMBER(const wchar_t*, AnyHitName, nullptr);
+	SHADER_MEMBER(const Shader*, AnyHitReference, nullptr);
 	SHADER_MEMBER(const wchar_t*, ClosestHitName, nullptr);
 	SHADER_MEMBER(const wchar_t*, IntersectionName, nullptr);
 	SHADER_MEMBER(const Shader*, RootSignatureReference, nullptr);

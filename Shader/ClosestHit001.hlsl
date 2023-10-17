@@ -11,3 +11,10 @@ void ClosestHit001(inout RayPayload ioPayload, in BuiltInTriangleIntersectionAtt
 
 	ClosestHitOverride(ioPayload, inAttributes);
 }
+
+[shader("anyhit")]
+void AnyHit001(inout RayPayload ioPayload, in BuiltInTriangleIntersectionAttributes inAttributes)
+{
+	if (inAttributes.barycentrics.y > 0.5)
+		IgnoreHit();
+}

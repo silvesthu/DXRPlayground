@@ -137,8 +137,10 @@ ComPtr<ID3D12StateObject> gCreateStateObject(IDxcBlob* inBlob, Shader& ioShader)
 
 	// Hit group, assume 0 or 1 hit group per lib
 	std::wstring hit_group_name = ioShader.HitGroupName(); // Need the string object on stack
-	D3D12_HIT_GROUP_DESC hit_group_desc{ .HitGroupExport = hit_group_name.c_str(), .Type = D3D12_HIT_GROUP_TYPE_TRIANGLES, .ClosestHitShaderImport = ioShader.mClosestHitName };
-	if (ioShader.HitName() != nullptr)
+	D3D12_HIT_GROUP_DESC hit_group_desc{ .HitGroupExport = hit_group_name.c_str(), .Type = D3D12_HIT_GROUP_TYPE_TRIANGLES, .AnyHitShaderImport = ioShader.mAnyHitName, .ClosestHitShaderImport = ioShader.mClosestHitName };
+	if (ioShader.mAnyHitReference != nullptr)
+		hit_group_desc.AnyHitShaderImport = ioShader.mAnyHitReference->mAnyHitName;
+	if (ioShader.mClosestHitName != nullptr)
 		subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP, &hit_group_desc };
 
 	// Local root signature and associations
@@ -159,6 +161,10 @@ ComPtr<ID3D12StateObject> gCreateStateObject(IDxcBlob* inBlob, Shader& ioShader)
 
 	// State object config
 	D3D12_STATE_OBJECT_CONFIG state_object_config = { .Flags = D3D12_STATE_OBJECT_FLAG_ALLOW_STATE_OBJECT_ADDITIONS };
+	if (ioShader.mAnyHitReference != nullptr)
+		state_object_config.Flags |= D3D12_STATE_OBJECT_FLAG_ALLOW_LOCAL_DEPENDENCIES_ON_EXTERNAL_DEFINITIONS;	// Reference to separated AnyHit
+	if (ioShader.mClosestHitName == nullptr && ioShader.mAnyHitName != nullptr)
+		state_object_config.Flags |= D3D12_STATE_OBJECT_FLAG_ALLOW_EXTERNAL_DEPENDENCIES_ON_LOCAL_DEFINITIONS;	// Separated AnyHit being referenced
 	subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_STATE_OBJECT_CONFIG, &state_object_config };
 
 	// Create the state object

@@ -27,7 +27,7 @@ void BLAS::Initialize(const InstanceInfo& inInstanceInfo, const InstanceData& in
 		mDesc.Triangles.IndexCount = inInstanceData.mIndexCount;
 		mDesc.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
 	}
-	mDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
+	mDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
 
 	mInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
 	mInputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;

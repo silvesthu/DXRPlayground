@@ -48,7 +48,7 @@ void TraceRay()
 
 	// Note that RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH will give first hit for "Any Hit". The result may not be the closest one
 	// https://docs.microsoft.com/en-us/windows/win32/direct3d12/ray_flag
-	RayQuery<RAY_FLAG_CULL_NON_OPAQUE | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> query;
+	RayQuery<RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> query;
 	uint additional_ray_flags = 0;
 	uint ray_instance_mask = 0xffffffff;
 
@@ -195,7 +195,7 @@ void TraceRay()
 						shadow_ray.TMin = 0.001;
 						shadow_ray.TMax = 1E6; // long distance
 
-						RayQuery<RAY_FLAG_CULL_NON_OPAQUE | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> shadow_query;
+						RayQuery<RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> shadow_query;
 						uint additional_shadow_ray_flags = 0;
 						uint shadow_ray_instance_mask = 0xffffffff;
 
