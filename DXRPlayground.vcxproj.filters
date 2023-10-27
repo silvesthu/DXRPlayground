@@ -192,6 +192,9 @@
     <ClInclude Include="Source\Renderer.inl">
       <Filter>Source</Filter>
     </ClInclude>
+    <ClInclude Include="Source\MLRunner.h">
+      <Filter>Source</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\DXRPlayground.cpp">
@@ -253,6 +256,9 @@
     </ClCompile>
     <ClCompile Include="Source\Thirdparty\tinyxml2\tinyxml2.cpp">
       <Filter>Source\Thirdparty\tinyxml2</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\MLRunner.cpp">
+      <Filter>Source</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

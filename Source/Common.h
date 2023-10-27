@@ -11,6 +11,7 @@
 #include <wrl.h>			// For ComPtr. See https://github.com/Microsoft/DirectXTK/wiki/ComPtr
 using Microsoft::WRL::ComPtr;
 #include <pix3.h>			// For PIXScopedEvent
+#include <DirectML.h>		// For DirectML
 
 #include <tchar.h>
 #include <string>
@@ -283,7 +284,6 @@ struct DescriptorHeap
 	void Initialize()
 	{
 		gAssert(mType != D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES && mCount != 0);
-		gAssert(mCount >= (int)DescriptorIndex::Count);
 
 		Reset();
 
@@ -471,44 +471,44 @@ extern Texture								gDumpTextureProxy;
 
 extern Constants							gConstants;
 
-inline void gBarrierTransition(ID3D12GraphicsCommandList4* command_list, ID3D12Resource* resource, D3D12_RESOURCE_STATES state_before, D3D12_RESOURCE_STATES state_after)
+inline void gBarrierTransition(ID3D12GraphicsCommandList4* inCommandList, ID3D12Resource* inResource, D3D12_RESOURCE_STATES inBeforeState, D3D12_RESOURCE_STATES inAfterState)
 {
 	D3D12_RESOURCE_BARRIER barrier = {};
 	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-	barrier.Transition.pResource = resource;
+	barrier.Transition.pResource = inResource;
 	barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-	barrier.Transition.StateBefore = state_before;
-	barrier.Transition.StateAfter = state_after;
-	command_list->ResourceBarrier(1, &barrier);
+	barrier.Transition.StateBefore = inBeforeState;
+	barrier.Transition.StateAfter = inAfterState;
+	inCommandList->ResourceBarrier(1, &barrier);
 }
 
 struct BarrierScope
 {
-	BarrierScope(ID3D12GraphicsCommandList4* command_list, ID3D12Resource* resource, D3D12_RESOURCE_STATES state_before, D3D12_RESOURCE_STATES state_after)
-		: mCommandList(command_list), mResource(resource), mStateBefore(state_before), mStateAfter(state_after)
+	BarrierScope(ID3D12GraphicsCommandList4* inCommandList, ID3D12Resource* inResource, D3D12_RESOURCE_STATES inCurrentState, D3D12_RESOURCE_STATES inScopeState)
+		: mCommandList(inCommandList), mResource(inResource), mCurrentState(inCurrentState), mScopeState(inScopeState)
 	{
-		gBarrierTransition(mCommandList, mResource, mStateBefore, mStateAfter);
+		gBarrierTransition(mCommandList, mResource, mCurrentState, mScopeState);
 	}
 
 	~BarrierScope()
 	{
-		gBarrierTransition(mCommandList, mResource, mStateAfter, mStateBefore);
+		gBarrierTransition(mCommandList, mResource, mScopeState, mCurrentState);
 	}
 
 private:
 	ID3D12GraphicsCommandList4* mCommandList{};
 	ID3D12Resource* mResource{};
-	D3D12_RESOURCE_STATES mStateBefore{};
-	D3D12_RESOURCE_STATES mStateAfter{};
+	D3D12_RESOURCE_STATES mCurrentState{};
+	D3D12_RESOURCE_STATES mScopeState{};
 };
 
-inline void gBarrierUAV(ID3D12GraphicsCommandList4* command_list, ID3D12Resource* resource)
+inline void gBarrierUAV(ID3D12GraphicsCommandList4* inCommandList, ID3D12Resource* inResource)
 {
 	D3D12_RESOURCE_BARRIER barrier = {};
 	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-	barrier.UAV.pResource = resource;
-	command_list->ResourceBarrier(1, &barrier);
+	barrier.UAV.pResource = inResource;
+	inCommandList->ResourceBarrier(1, &barrier);
 }
 
 inline D3D12_HEAP_PROPERTIES gGetDefaultHeapProperties()
