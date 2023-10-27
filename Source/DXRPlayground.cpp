@@ -1,7 +1,6 @@
 ﻿#include "Common.h"
 
 #include "Renderer.h"
-#include "MLRunner.h"
 
 #include "Color.h"
 #include "Scene.h"
@@ -356,13 +355,6 @@ static void sPrepareImGui()
 
 			if (ImGui::Checkbox("Test Lib Shader", &gRenderer.mTestLibShader))
 				gRenderer.mAccumulationResetRequested = true;
-
-			ImGui::TreePop();
-		}
-
-		if (ImGui::TreeNodeEx("DirectML"))
-		{
-			gMLRunner.ImGui();
 
 			ImGui::TreePop();
 		}
@@ -750,9 +742,6 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 
 	// Renderer
 	gRenderer.Initialize();
-
-	// MLRunner
-	gMLRunner.Initialize();
 	
 	// Load Scene
 	sLoadScene();
@@ -829,8 +818,6 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 		gScene.Unload();
 
 		gRenderer.Finalize();
-
-		gMLRunner.Finalize();
 
 		sCleanupDeviceD3D();
 		::DestroyWindow(hwnd);
@@ -982,13 +969,6 @@ void sRender()
 		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Renderer");
 
 		gRenderer.Render();
-	}
-
-	// MLRunner
-	{
-		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "MLRunner");
-
-		gMLRunner.Render();
 	}
 
 	// Scene
