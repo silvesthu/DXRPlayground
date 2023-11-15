@@ -15,6 +15,10 @@ ID3D12DescriptorHeap*				gRTVDescriptorHeap = nullptr;
 ID3D12CommandQueue*					gCommandQueue = nullptr;
 ID3D12GraphicsCommandList4*			gCommandList = nullptr;
 
+ID3D12QueryHeap*					gQueryHeap = nullptr;
+TimingStat							gTimingStat;
+Timing								gTiming;
+
 ID3D12Fence*						gIncrementalFence = nullptr;
 HANDLE                       		gIncrementalFenceEvent = nullptr;
 UINT64                       		gFenceLastSignaledValue = 0;

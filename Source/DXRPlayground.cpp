@@ -359,6 +359,14 @@ static void sPrepareImGui()
 			ImGui::TreePop();
 		}
 
+		if (ImGui::TreeNodeEx("TimingStat"))
+		{
+			ImGui::InputFloat("RayQuery (ms)", &gTimingStat.mTimeInMSRayQuery, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+			ImGui::InputFloat("HitShader (ms)", &gTimingStat.mTimeInMSHitShader, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+
+			ImGui::TreePop();
+		}
+
 		if (ImGui::TreeNodeEx("Display"))
 		{
 			ImGui::Checkbox("Vsync", &gDisplaySettings.mVsync);
@@ -1010,7 +1018,9 @@ void sRender()
 		gSwapChain->GetDesc1(&swap_chain_desc);
 
 		gRenderer.Setup(gRenderer.mRuntime.mRayQueryShader.mData);
+		UINT64 timestamp = gTiming.TimestampBegin(frame_context.mQueryReadbackBufferPointer);
 		gCommandList->Dispatch((swap_chain_desc.Width + 7) / 8, (swap_chain_desc.Height + 7) / 8, 1);
+		gTiming.TimestampEnd(frame_context.mQueryReadbackBufferPointer, timestamp, gTimingStat.mTimeInMSRayQuery);
 
 		gBarrierUAV(gCommandList, nullptr);
 	}
@@ -1045,7 +1055,9 @@ void sRender()
 		}
 
 		gRenderer.Setup(gRenderer.mRuntime.mLibShader.mData);
+		UINT64 timestamp = gTiming.TimestampBegin(frame_context.mQueryReadbackBufferPointer);
 		gCommandList->DispatchRays(&dispatch_rays_desc);
+		gTiming.TimestampEnd(frame_context.mQueryReadbackBufferPointer, timestamp, gTimingStat.mTimeInMSHitShader);
 
 		gBarrierUAV(gCommandList, nullptr);
 	}
@@ -1105,6 +1117,8 @@ SkipRender:
 
 	// Frame End
 	{
+		gTiming.FrameEnd(frame_context.mQueryReadbackBuffer.Get());
+
 		gBarrierTransition(gCommandList, back_buffer, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
 		gCommandList->Close();
 		gCommandQueue->ExecuteCommandLists(1, reinterpret_cast<ID3D12CommandList* const*>(&gCommandList));
@@ -1254,8 +1268,9 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 		desc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
 		desc.NodeMask = 1;
-		if (gDevice->CreateCommandQueue(&desc, IID_PPV_ARGS(&gCommandQueue)) != S_OK)
-			return false;
+		gValidate(gDevice->CreateCommandQueue(&desc, IID_PPV_ARGS(&gCommandQueue)));
+		gCommandQueue->SetName(L"gCommandQueue");
+		gCommandQueue->GetTimestampFrequency(&gTiming.mTimestampFrequency);
 	}
 
 	// Constants
@@ -1303,9 +1318,9 @@ static bool sCreateDeviceD3D(HWND hWnd)
 			gFrameContexts[i].mConstantUploadBuffer->Map(0, nullptr, (void**)&gFrameContexts[i].mConstantUploadBufferPointer);
 		}
 
-		// ReadbackBuffer
+		// ReadbackBuffer - Debug
 		{
-			D3D12_RESOURCE_DESC resource_desc = gGetBufferResourceDesc(gAlignUp(static_cast<UINT>(sizeof(Debug)), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
+			D3D12_RESOURCE_DESC resource_desc = gGetBufferResourceDesc(gAlignUp(sizeof(Debug), (UINT64)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
 			D3D12_HEAP_PROPERTIES props = gGetReadbackHeapProperties();
 
 			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&gFrameContexts[i].mDebugReadbackBuffer)));
@@ -1314,6 +1329,19 @@ static bool sCreateDeviceD3D(HWND hWnd)
 
 			// Persistent map - https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12resource-map#advanced-usage-models
 			gFrameContexts[i].mDebugReadbackBuffer->Map(0, nullptr, (void**)&gFrameContexts[i].mDebugReadbackBufferPointer);
+		}
+
+		// ReadbackBuffer - Query
+		{
+			D3D12_RESOURCE_DESC resource_desc = gGetBufferResourceDesc(gAlignUp(sizeof(UINT64) * NUM_TIMESTAMP_COUNT, (UINT64)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
+			D3D12_HEAP_PROPERTIES props = gGetReadbackHeapProperties();
+
+			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&gFrameContexts[i].mQueryReadbackBuffer)));
+			name = L"FrameContext.QueryReadbackBuffer_" + std::to_wstring(i);
+			gFrameContexts[i].mQueryReadbackBuffer->SetName(name.c_str());
+
+			// Persistent map - https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12resource-map#advanced-usage-models
+			gFrameContexts[i].mQueryReadbackBuffer->Map(0, nullptr, (void**)&gFrameContexts[i].mQueryReadbackBufferPointer);
 		}
 	}
 
@@ -1359,8 +1387,11 @@ static bool sCreateDeviceD3D(HWND hWnd)
 	gValidate(gDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, gFrameContexts[0].mCommandAllocator.Get(), nullptr, IID_PPV_ARGS(&gCommandList)));
 	gCommandList->SetName(L"gCommandList");
 
-	if (gDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&gIncrementalFence)) != S_OK)
-		return false;
+	D3D12_QUERY_HEAP_DESC query_heap_desc = { .Type = D3D12_QUERY_HEAP_TYPE_TIMESTAMP, .Count = NUM_TIMESTAMP_COUNT };
+	gValidate(gDevice->CreateQueryHeap(&query_heap_desc, IID_PPV_ARGS(&gQueryHeap)));
+	gQueryHeap->SetName(L"gQueryHeap");
+
+	gValidate(gDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&gIncrementalFence)));
 	gIncrementalFence->SetName(L"gIncrementalFence");
 
 	gIncrementalFenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
@@ -1400,12 +1431,16 @@ static void sCleanupDeviceD3D()
 
 	gConstantBuffer = nullptr;
 	gDebugBuffer = nullptr;
+
+	gSafeRelease(gDevice);
 	gSafeRelease(gCommandQueue);
 	gSafeRelease(gCommandList);
 	gSafeRelease(gRTVDescriptorHeap);
+
+	gSafeRelease(gQueryHeap);
+
 	gSafeRelease(gIncrementalFence);
 	gSafeCloseHandle(gIncrementalFenceEvent);
-	gSafeRelease(gDevice);
 
 	if (DX12_ENABLE_DEBUG_LAYER)
 	{

@@ -244,7 +244,9 @@ inline void gSetName(ComPtr<T>& inObject, std::string_view inPrefix, std::string
 enum
 {
 	NUM_FRAMES_IN_FLIGHT = 2,
-	NUM_BACK_BUFFERS = 2
+	NUM_BACK_BUFFERS = 2,
+
+	NUM_TIMESTAMP_COUNT = 1024,
 };
 
 extern ID3D12Device7*						gDevice;
@@ -252,9 +254,45 @@ extern ID3D12DescriptorHeap* 				gRTVDescriptorHeap;
 extern ID3D12CommandQueue* 					gCommandQueue;
 extern ID3D12GraphicsCommandList4* 			gCommandList;
 
+extern ID3D12QueryHeap*						gQueryHeap;
+struct TimingStat
+{
+	// [NOTE] Time might look longer than necessary if GPU is not full load, turn off Vsync to force it run full speed
+	float									mTimeInMSRayQuery = 0;
+	float									mTimeInMSHitShader = 0;
+};
+extern TimingStat							gTimingStat;
+struct Timing
+{
+	UINT									mQueryHeapIndex = 0;
+	UINT64									mTimestampFrequency = 0;
+
+	UINT64 TimestampBegin(UINT64* inReadbackBufferPointer)
+	{
+		UINT64 timestamp = inReadbackBufferPointer[mQueryHeapIndex];
+		gCommandList->EndQuery(gQueryHeap, D3D12_QUERY_TYPE_TIMESTAMP, mQueryHeapIndex++);
+		return timestamp;
+	}
+
+	void TimestampEnd(UINT64* inReadbackBufferPointer, UINT64 inTimestampBegin, float& outMS)
+	{
+		UINT64 timestamp = inReadbackBufferPointer[mQueryHeapIndex];
+		outMS = (timestamp - inTimestampBegin) * 1000.0f / mTimestampFrequency;
+		gCommandList->EndQuery(gQueryHeap, D3D12_QUERY_TYPE_TIMESTAMP, mQueryHeapIndex++);
+	}
+
+	void FrameEnd(ID3D12Resource* inReadbackResource)
+	{
+		gCommandList->ResolveQueryData(gQueryHeap, D3D12_QUERY_TYPE_TIMESTAMP, 0, mQueryHeapIndex, inReadbackResource, 0);
+		mQueryHeapIndex = 0;
+		gTimingStat = {};
+	}
+};
+extern Timing								gTiming;
+
 extern ID3D12Fence* 						gIncrementalFence;			// Fence value increment each frame (most time)
 extern HANDLE                       		gIncrementalFenceEvent;		// Allow CPU to wait on fence
-extern uint64_t                       		gFenceLastSignaledValue;
+extern UINT64                       		gFenceLastSignaledValue;
 
 extern IDXGISwapChain3* 					gSwapChain;
 extern HANDLE                       		gSwapChainWaitableObject;
@@ -441,6 +479,9 @@ struct FrameContext
 
 	ComPtr<ID3D12Resource>					mConstantUploadBuffer;
 	Constants*								mConstantUploadBufferPointer = nullptr;
+
+	ComPtr<ID3D12Resource>					mQueryReadbackBuffer;
+	UINT64*									mQueryReadbackBufferPointer = nullptr;
 
 	ComPtr<ID3D12Resource>					mDebugReadbackBuffer;
 	Debug*									mDebugReadbackBufferPointer = nullptr;
