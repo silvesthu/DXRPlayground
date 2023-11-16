@@ -340,4 +340,7 @@
       <Filter>Source\Thirdparty\glm</Filter>
     </Natvis>
   </ItemGroup>
+  <ItemGroup>
+    <Manifest Include="dpi.manifest" />
+  </ItemGroup>
 </Project>

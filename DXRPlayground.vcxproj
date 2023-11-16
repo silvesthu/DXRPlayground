@@ -189,6 +189,9 @@
       <FileType>Document</FileType>
     </CopyFileToFolders>
   </ItemGroup>
+  <ItemGroup>
+    <Manifest Include="dpi.manifest" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <ProjectGuid>{1296E4A0-1F08-493D-8453-CD5EF53FF812}</ProjectGuid>
@@ -256,6 +259,10 @@
     <PostBuildEvent>
       <Command>if not exist $(ProjectDir)Asset\ArPragueSkyModelGround\SkyModelDataset.dat powershell Expand-Archive $(ProjectDir)Asset\ArPragueSkyModelGround\SkyModelDataset.zip -DestinationPath $(ProjectDir)Asset\ArPragueSkyModelGround\</Command>
     </PostBuildEvent>
+    <Manifest />
+    <Manifest>
+      <AdditionalManifestFiles>dpi.manifest</AdditionalManifestFiles>
+    </Manifest>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -282,6 +289,10 @@
     <PostBuildEvent>
       <Command>if not exist $(ProjectDir)Asset\ArPragueSkyModelGround\SkyModelDataset.dat powershell Expand-Archive $(ProjectDir)Asset\ArPragueSkyModelGround\SkyModelDataset.zip -DestinationPath $(ProjectDir)Asset\ArPragueSkyModelGround\</Command>
     </PostBuildEvent>
+    <Manifest>
+      <AdditionalManifestFiles>
+      </AdditionalManifestFiles>
+    </Manifest>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

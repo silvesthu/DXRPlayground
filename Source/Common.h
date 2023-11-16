@@ -732,5 +732,7 @@ static void gPrintStateObjectDesc(const D3D12_STATE_OBJECT_DESC* desc)
 
 namespace ImGui
 {
+	extern float gDpiScale;
+
 	void Textures(std::span<Texture> inTextures, const std::string& inName = "Texture", ImGuiTreeNodeFlags inFlags = 0);
 }

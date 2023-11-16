@@ -371,20 +371,14 @@ static void sPrepareImGui()
 		{
 			ImGui::Checkbox("Vsync", &gDisplaySettings.mVsync);
 
-			if (ImGui::Button("640 x 480"))
-				gRenderer.Resize(640, 480);
-
-			if (ImGui::Button("800 x 600"))
-				gRenderer.Resize(800, 600);
-
 			if (ImGui::Button("1280 x 720"))
 				gRenderer.Resize(1280, 720);
 
-			if (ImGui::Button("1280 x 800"))
-				gRenderer.Resize(1280, 800);
-
 			if (ImGui::Button("1920 x 1080"))
 				gRenderer.Resize(1920, 1080);
+
+			if (ImGui::Button("2560 x 1440"))
+				gRenderer.Resize(2560, 1440);
 
 			ImGui::TreePop();
 		}
@@ -503,6 +497,7 @@ static void sPrepareImGui()
 
 				gConstants.mDebugInstanceIndex = glm::clamp(gConstants.mDebugInstanceIndex, -1, gScene.GetInstanceCount() - 1);
 			}
+			ImGui::SetWindowFontScale(ImGui::gDpiScale);
 			ImGui::End();
 
 			if (ImGui::Begin("Lights"))
@@ -564,9 +559,11 @@ static void sPrepareImGui()
 					ImGui::EndTable();
 				}
 			}
+			ImGui::SetWindowFontScale(ImGui::gDpiScale);
 			ImGui::End();
 		}
 	}
+	ImGui::SetWindowFontScale(ImGui::gDpiScale);
 	ImGui::End();
 }
 
@@ -1504,6 +1501,27 @@ static LRESULT WINAPI sWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam
 				swap_chain_desc.Flags);
 
 			gRenderer.InitializeScreenSizeTextures();
+		}
+		return 0;
+	case WM_DPICHANGED:
+		{
+			UINT dpi = HIWORD(wParam);
+			float scale = dpi * 1.0f / USER_DEFAULT_SCREEN_DPI;
+			ImGui::GetStyle().ScaleAllSizes(scale / ImGui::gDpiScale);
+			ImGui::gDpiScale = scale;
+
+			// https://learn.microsoft.com/en-us/windows/win32/hidpi/wm-dpichanged
+			// https://learn.microsoft.com/en-us/windows/win32/hidpi/high-dpi-desktop-application-development-on-windows
+			// 1. Ensure that the mouse cursor will stay in the same relative position on the Window when dragging between displays
+			// 2. Prevent the application window from getting into a recursive dpi - change cycle where one DPI change triggers a subsequent DPI change, which triggers yet another DPI change.
+			RECT* const prcNewWindow = (RECT*)lParam;
+			SetWindowPos(hWnd,
+				NULL,
+				prcNewWindow->left,
+				prcNewWindow->top,
+				prcNewWindow->right - prcNewWindow->left,
+				prcNewWindow->bottom - prcNewWindow->top,
+				SWP_NOZORDER | SWP_NOACTIVATE);
 		}
 		return 0;
 	case WM_SYSCOMMAND:
