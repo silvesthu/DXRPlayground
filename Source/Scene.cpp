@@ -209,15 +209,15 @@ bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransfor
 			const tinyobj::material_t& material = reader.GetMaterials()[shape.mesh.material_ids[0]];
 			instance_info.mMaterialName = material.name;
 
-			BSDFType type = BSDFType::Unsupported;
+			BSDF type = BSDF::Unsupported;
 			switch (material.illum)
 			{
 			case 0: [[fallthrough]];
-			case 1: type = BSDFType::Diffuse; break;
-			case 2: type = BSDFType::RoughConductor; break;
+			case 1: type = BSDF::Diffuse; break;
+			case 2: type = BSDF::RoughConductor; break;
 			default: break;
 			}
-			instance_data.mBSDFType = type;
+			instance_data.mBSDF = type;
 			instance_data.mTwoSided = false;
 			instance_data.mAlbedo = glm::vec3(material.diffuse[0], material.diffuse[1], material.diffuse[2]);
 			instance_data.mOpacity = 1.0f;
@@ -381,7 +381,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 		
 		if (local_type == "diffuse")
 		{
-			bsdf_instance.mInstanceData.mBSDFType = BSDFType::Diffuse;
+			bsdf_instance.mInstanceData.mBSDF = BSDF::Diffuse;
 
 			std::string_view reflectance = get_child_texture(local_bsdf, "reflectance");
 
@@ -394,7 +394,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 		}
 		else if (local_type == "roughconductor")
 		{
-			bsdf_instance.mInstanceData.mBSDFType = BSDFType::RoughConductor;
+			bsdf_instance.mInstanceData.mBSDF = BSDF::RoughConductor;
 
 			// [TODO] Support beckmann
 			// [TODO] Support sample_visible
@@ -408,7 +408,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 		}
 		else if (local_type == "dielectric")
 		{
-			bsdf_instance.mInstanceData.mBSDFType = BSDFType::Dielectric;
+			bsdf_instance.mInstanceData.mBSDF = BSDF::Dielectric;
 			
 			float int_ior = 1.0f;
 			gFromString(get_child_value(local_bsdf, "int_ior").data(), int_ior);
@@ -421,7 +421,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 		}
 		else if (local_type == "thindielectric")
 		{
-			bsdf_instance.mInstanceData.mBSDFType = BSDFType::ThinDielectric;
+			bsdf_instance.mInstanceData.mBSDF = BSDF::ThinDielectric;
 
 			float int_ior = 1.0f;
 			gFromString(get_child_value(local_bsdf, "int_ior").data(), int_ior);
@@ -434,7 +434,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 		}
 		else if (local_type == "roughdielectric")
 		{
-			bsdf_instance.mInstanceData.mBSDFType = BSDFType::RoughDielectric;
+			bsdf_instance.mInstanceData.mBSDF = BSDF::RoughDielectric;
 
 			float int_ior = 1.0f;
 			gFromString(get_child_value(local_bsdf, "int_ior").data(), int_ior);
@@ -452,7 +452,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 		}
 		else
 		{
-			bsdf_instance.mInstanceData.mBSDFType = BSDFType::Unsupported;
+			bsdf_instance.mInstanceData.mBSDF = BSDF::Unsupported;
 			bsdf_instance.mInstanceData.mAlbedo = glm::vec3(0.5f);
 		}
 
@@ -570,7 +570,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 
 					gFromString(get_child_value(emitter, "radiance").data(), instance_data.mEmission);
 
-					instance_data.mBSDFType = BSDFType::Light;
+					instance_data.mBSDF = BSDF::Light;
 					instance_data.mTwoSided = false;
 					instance_data.mLightID = static_cast<uint>(ioSceneContent.mLights.size());
 
@@ -635,7 +635,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 void Scene::FillDummyMaterial(InstanceInfo& ioInstanceInfo, InstanceData& ioInstanceData)
 {
 	ioInstanceInfo.mMaterialName = "DummyMaterial";
-	ioInstanceData.mBSDFType = BSDFType::Diffuse;
+	ioInstanceData.mBSDF = BSDF::Diffuse;
 }
 
 void Scene::Load(const char* inFilename, const glm::mat4x4& inTransform)

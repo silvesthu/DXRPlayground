@@ -147,7 +147,7 @@ void TraceRay()
 			// DebugValue(PixelDebugMode::Manual, path_context.mRecursionCount, float4(hit_context.mVertexNormalWS, 0));
 
 			// Lighting
-			if (InstanceDatas[hit_context.mInstanceID].mBSDFType == BSDFType::Light)
+			if (InstanceDatas[hit_context.mInstanceID].mBSDF == BSDF::Light)
 			{
 				// Direct Lighting
 				if (path_context.mRecursionCount == 0 || mConstants.mLightCount == 0 || mConstants.mSampleMode == SampleMode::SampleBSDF || path_context.mPrevDiracDeltaDistribution)

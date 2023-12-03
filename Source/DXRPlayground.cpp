@@ -412,7 +412,7 @@ static void sPrepareImGui()
 					"Index",
 					"Name",
 					"Position",
-					"BSDFType",
+					"BSDF",
 					"Albedo",
 					"Reflectance",
 					"Transmittance",
@@ -458,7 +458,7 @@ static void sPrepareImGui()
 						ImGui::Text(position.c_str());
 
 						ImGui::TableSetColumnIndex(column_index++);
-						ImGui::Text("%s%s", NAMEOF_ENUM(instance_data.mBSDFType).data(), instance_data.mTwoSided ? " (TwoSided)" : "");
+						ImGui::Text("%s%s", NAMEOF_ENUM(instance_data.mBSDF).data(), instance_data.mTwoSided ? " (TwoSided)" : "");
 
 						ImGui::TableSetColumnIndex(column_index++);
 						std::string albedo = std::format("{:.2f} {:.2f} {:.2f}", instance_data.mAlbedo.x, instance_data.mAlbedo.y, instance_data.mAlbedo.z);
@@ -497,7 +497,6 @@ static void sPrepareImGui()
 
 				gConstants.mDebugInstanceIndex = glm::clamp(gConstants.mDebugInstanceIndex, -1, gScene.GetInstanceCount() - 1);
 			}
-			ImGui::SetWindowFontScale(ImGui::gDpiScale);
 			ImGui::End();
 
 			if (ImGui::Begin("Lights"))
@@ -559,11 +558,9 @@ static void sPrepareImGui()
 					ImGui::EndTable();
 				}
 			}
-			ImGui::SetWindowFontScale(ImGui::gDpiScale);
 			ImGui::End();
 		}
 	}
-	ImGui::SetWindowFontScale(ImGui::gDpiScale);
 	ImGui::End();
 }
 
@@ -702,7 +699,7 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 	WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, sWndProc, 0L, 0L, GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, kApplicationTitleW, nullptr };
 	::RegisterClassEx(&wc);
 
-	RECT rect = { 0, 0, 1280, 720 };
+	RECT rect = { 0, 0, 1920, 1080 };
 	AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, false);
 	HWND hwnd = ::CreateWindow(wc.lpszClassName, kApplicationTitleW, WS_OVERLAPPEDWINDOW, 100, 100, rect.right - rect.left, rect.bottom - rect.top, nullptr, nullptr, wc.hInstance, nullptr);
 
@@ -743,6 +740,18 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 	// Setup Platform/Renderer bindings
 	ImGui_ImplWin32_Init(hwnd);
 	ImGui_ImplDX12_Init(gDevice, NUM_FRAMES_IN_FLIGHT, DXGI_FORMAT_R8G8B8A8_UNORM, nullptr, {}, {});
+	{
+		// DPI
+		UINT dpi = GetDpiForWindow(hwnd);
+		float scale = dpi * 1.0f / USER_DEFAULT_SCREEN_DPI;
+		ImGui::GetStyle().ScaleAllSizes(scale / ImGui::gDpiScale);
+		ImGui::gDpiScale = scale;
+
+		// Font [TODO] This should also update on WM_DPICHANGED, which requires rebuild of font texture
+		std::filesystem::path font_path = "C:\\Windows\\Fonts\\Consola.ttf";
+		ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path.string().c_str(), 13 * scale, nullptr, nullptr);
+		ImGui::GetIO().Fonts->Build();
+	}
 	ImGui_ImplDX12_CreateDeviceObjects();
 
 	// Renderer

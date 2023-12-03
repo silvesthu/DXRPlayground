@@ -273,7 +273,6 @@ namespace ImGui
 				ImGui::TreePop();
 			}
 		}
-		ImGui::SetWindowFontScale(ImGui::gDpiScale);
 		ImGui::End();
 	}
 }

@@ -350,28 +350,28 @@ namespace BSDFEvaluation
 		}
 	}
 
-	BSDFType GetBSDFType(HitContext inHitContext)
+	BSDF GetBSDF(HitContext inHitContext)
 	{
 		if (mConstants.mDebugInstanceIndex == inHitContext.mInstanceID)
 		{
 			switch (mConstants.mDebugInstanceMode)
 			{
-			case DebugInstanceMode::Barycentrics: return BSDFType::DebugEmissive;
-			case DebugInstanceMode::Mirror: return BSDFType::DebugMirror;
+			case DebugInstanceMode::Barycentrics: return BSDF::DebugEmissive;
+			case DebugInstanceMode::Mirror: return BSDF::DebugMirror;
 			default: break;
 			}
 		}
 
-		return InstanceDatas[inHitContext.mInstanceID].mBSDFType;
+		return InstanceDatas[inHitContext.mInstanceID].mBSDF;
 	}
 
 	bool DiracDeltaDistribution(HitContext inHitContext)
 	{
-		switch (GetBSDFType(inHitContext))
+		switch (GetBSDF(inHitContext))
 		{
-		case BSDFType::Dielectric:		return true;
-		case BSDFType::ThinDielectric:	return true;
-		case BSDFType::DebugMirror:		return true;
+		case BSDF::Dielectric:			return true;
+		case BSDF::ThinDielectric:		return true;
+		case BSDF::DebugMirror:			return true;
 		default:						return false;
 		}
 	}
@@ -386,14 +386,14 @@ namespace BSDFEvaluation
 
 		float3x3 inTangentSpace = GenerateTangentSpace(inNormal);
 		[branch]
-		switch (GetBSDFType(inHitContext))
+		switch (GetBSDF(inHitContext))
 		{
-		case BSDFType::Unsupported:		// [[fallthrough]];
-		case BSDFType::Diffuse:			return Lambert::GenerateImportanceSamplingDirection(inTangentSpace, inHitContext, ioPathContext);
-		case BSDFType::RoughConductor:	return RoughConductor::GenerateImportanceSamplingDirection(inTangentSpace, inHitContext, ioPathContext);
-		case BSDFType::Dielectric:		return Dielectric::GenerateImportanceSamplingDirection(inTangentSpace, inHitContext, ioPathContext);
-		case BSDFType::ThinDielectric:	return ThinDielectric::GenerateImportanceSamplingDirection(inTangentSpace, inHitContext, ioPathContext);
-		case BSDFType::RoughDielectric:	return RoughDielectric::GenerateImportanceSamplingDirection(inTangentSpace, inHitContext, ioPathContext);
+		case BSDF::Unsupported:			// [[fallthrough]];
+		case BSDF::Diffuse:				return Lambert::GenerateImportanceSamplingDirection(inTangentSpace, inHitContext, ioPathContext);
+		case BSDF::RoughConductor:		return RoughConductor::GenerateImportanceSamplingDirection(inTangentSpace, inHitContext, ioPathContext);
+		case BSDF::Dielectric:			return Dielectric::GenerateImportanceSamplingDirection(inTangentSpace, inHitContext, ioPathContext);
+		case BSDF::ThinDielectric:		return ThinDielectric::GenerateImportanceSamplingDirection(inTangentSpace, inHitContext, ioPathContext);
+		case BSDF::RoughDielectric:		return RoughDielectric::GenerateImportanceSamplingDirection(inTangentSpace, inHitContext, ioPathContext);
 		default:						return 0;
 		}
 	}
@@ -424,16 +424,16 @@ namespace BSDFEvaluation
 		}
 
 		[branch]
-		switch (GetBSDFType(inHitContext))
+		switch (GetBSDF(inHitContext))
 		{
-		case BSDFType::Diffuse:			Lambert::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
-		case BSDFType::RoughConductor:	RoughConductor::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
-		case BSDFType::Dielectric:		Dielectric::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
-		case BSDFType::ThinDielectric:	ThinDielectric::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
-		case BSDFType::RoughDielectric:	RoughDielectric::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
-		case BSDFType::DebugEmissive:	DebugEmissive::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
-		case BSDFType::DebugMirror:		DebugMirror::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
-		case BSDFType::Unsupported:		// [[fallthrough]];
+		case BSDF::Diffuse:				Lambert::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
+		case BSDF::RoughConductor:		RoughConductor::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
+		case BSDF::Dielectric:			Dielectric::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
+		case BSDF::ThinDielectric:		ThinDielectric::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
+		case BSDF::RoughDielectric:		RoughDielectric::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
+		case BSDF::DebugEmissive:		DebugEmissive::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
+		case BSDF::DebugMirror:			DebugMirror::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
+		case BSDF::Unsupported:			// [[fallthrough]];
 		default:						break;
 		}
 

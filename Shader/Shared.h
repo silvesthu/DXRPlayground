@@ -276,7 +276,7 @@ enum class SampleMode : uint
 	Count
 };
 
-enum class BSDFType : uint
+enum class BSDF : uint
 {
 	Light = 0,
 
@@ -364,7 +364,7 @@ struct InstanceData
 {
 	// [TODO] Split material
 
-	BSDFType					mBSDFType						CONSTANT_DEFAULT(BSDFType::Diffuse);
+	BSDF						mBSDF							CONSTANT_DEFAULT(BSDF::Diffuse);
 	uint						mTwoSided						CONSTANT_DEFAULT(0);
 	float						mOpacity						CONSTANT_DEFAULT(1.0f);
 	uint						mLightID						CONSTANT_DEFAULT(0);
