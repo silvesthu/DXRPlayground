@@ -5,6 +5,32 @@
 
 namespace BSDFEvaluation
 {
+	BSDF GetBSDF(HitContext inHitContext)
+	{
+		if (mConstants.mDebugInstanceIndex == inHitContext.mInstanceID)
+		{
+			switch (mConstants.mDebugInstanceMode)
+			{
+			case DebugInstanceMode::Barycentrics: return BSDF::DebugEmissive;
+			case DebugInstanceMode::Mirror: return BSDF::DebugMirror;
+			default: break;
+			}
+		}
+
+		return InstanceDatas[inHitContext.mInstanceID].mBSDF;
+	}
+
+	bool DiracDeltaDistribution(HitContext inHitContext)
+	{
+		switch (GetBSDF(inHitContext))
+		{
+		case BSDF::Dielectric:			return true;
+		case BSDF::ThinDielectric:		return true;
+		case BSDF::DebugMirror:			return true;
+		default:						return false;
+		}
+	}
+
 	BSDFContext GenerateContext(BSDFContext::Mode inMode, float3 inLight, float3 inNormal, float3 inView, float inEta, HitContext inHitContext)
 	{
 		// [NOTE] All vectors should be in the same space
@@ -22,11 +48,13 @@ namespace BSDFEvaluation
 		if (dot(bsdf_context.mN, bsdf_context.mV) < 0 && InstanceDatas[inHitContext.mInstanceID].mTwoSided)
 			bsdf_context.mN = -bsdf_context.mN;
 
-		// // Assume N, H, V on the same side, for BSDF sample only
+		// Assume N, H, V on the same side, for BSDF sample only
 		float3 V = bsdf_context.mV;
 		if (inMode == BSDFContext::Mode::BSDFSample)
 			V = dot(bsdf_context.mN, bsdf_context.mV) < 0 ? -V : V;
 		bsdf_context.mH = normalize(V + bsdf_context.mL * inEta);
+
+		// [TODO] Need stricter handling of side of vectors
 
 		bsdf_context.mNdotV = dot(bsdf_context.mN, bsdf_context.mV);
 		bsdf_context.mNdotL = dot(bsdf_context.mN, bsdf_context.mL);
@@ -67,7 +95,6 @@ namespace BSDFEvaluation
 				float a = InstanceDatas[inHitContext.mInstanceID].mRoughnessAlpha;
 				float a2 = a * a;
 
-				// Microfacet
 				float3 H; // Microfacet normal (Half-vector)
 				{
 					float e0 = RandomFloat01(ioPathContext.mRandomState);
@@ -132,7 +159,7 @@ namespace BSDFEvaluation
 			if (D < 0 || ioBSDFContext.mNdotL < 0 || ioBSDFContext.mNdotV < 0)
 				D = 0;
 
-			// [NOTE] Sample may return BSDF * NdotL / PDF as a whole or in separated terms vary between implementations.
+			// [NOTE] Sample may return BSDF * NdotL / PDF as a whole or in separated terms, which varies between implementations.
 			//        Also, NdotL needs to be eliminated for Dirac delta distribution.
 			//        [PBRT3] `Sample_f` return BSDF and PDF. Dirac delta distribution (e.g. BSDF_SPECULAR) divide an extra NdotL for BSDF. https://github.com/mmp/pbrt-v3/blob/aaa552a4b9cbf9dccb71450f47b268e0ed6370e2/src/core/reflection.cpp#L410
 			//        [Mitsuba3] `sample` returns as whole. Dirac delta distribution (e.g. ) does not have the NdotL term. https://github.com/mitsuba-renderer/mitsuba3/blob/master/src/bsdfs/roughconductor.cpp#L226
@@ -142,7 +169,7 @@ namespace BSDFEvaluation
 			//                      The thing is, H is the half vector, HdotV == HdotL. (May differs due to floating point arithmetic though)
 			//                      [TODO] Where does the HdotV come from in the first place?
 
-			// [NOTE] Naming of wi/wo vary between implementations depending on point of view. The result should be same.
+			// [NOTE] Naming of wi/wo varies between implementations depending on point of view. The result should be same.
 			//		  [PBRT3] has wo as V, wi as L
 			// 		  [Mitsuba3] has wi as V, wo as L
 			//        https://www.shadertoy.com/view/MsXfz4 has wi as V, wo as L
@@ -175,56 +202,7 @@ namespace BSDFEvaluation
 			float eta_ti;
 			F_Dielectric_Mitsuba(InstanceDatas[inHitContext.mInstanceID].mEta.x, ioBSDFContext.mNdotV, r_i, cos_theta_t, eta_it, eta_ti);
 
-			bool selected_r = RandomFloat01(ioPathContext.mRandomState) <= r_i;
-			float3 L = select(selected_r,
-				reflect(-ioBSDFContext.mV, ioBSDFContext.mNdotV < 0 ? -ioBSDFContext.mN : ioBSDFContext.mN),
-				refract(-ioBSDFContext.mV, ioBSDFContext.mNdotV < 0 ? -ioBSDFContext.mN : ioBSDFContext.mN, eta_ti));
-
-			ioBSDFContext = GenerateContext(ioBSDFContext.mMode, L, ioBSDFContext.mN, ioBSDFContext.mV, select(selected_r, 1.0, eta_it), inHitContext);
-
-			DebugValue(PixelDebugMode::L1, ioPathContext.mRecursionCount, float4(ioBSDFContext.mL, 0));
-			DebugValue(PixelDebugMode::V1, ioPathContext.mRecursionCount, float4(ioBSDFContext.mV, 0));
-			DebugValue(PixelDebugMode::H1, ioPathContext.mRecursionCount, float4(ioBSDFContext.mH, 0));
-
-			ioBSDFContext.mBSDF = select(selected_r, InstanceDatas[inHitContext.mInstanceID].mSpecularReflectance, InstanceDatas[inHitContext.mInstanceID].mSpecularTransmittance) * select(selected_r, r_i, 1.0 - r_i);
-			ioBSDFContext.mBSDFPDF = select(selected_r, r_i, 1.0 - r_i);
-
-			// [NOTE] Account for solid angle compression
-			//        [Mitsuba3] > For transmission, radiance must be scaled to account for the solid angle compression that occurs when crossing the interface. 
-			//                   https://github.com/mitsuba-renderer/mitsuba3/blob/master/src/bsdfs/dielectric.cpp#L359
-			//        [PBRT3] > Account for non-symmetry with transmission to different medium 
-			//	              https://github.com/mmp/pbrt-v3/blob/aaa552a4b9cbf9dccb71450f47b268e0ed6370e2/src/core/reflection.cpp#L163
-			//		          https://www.pbr-book.org/3ed-2018/Light_Transport_III_Bidirectional_Methods/The_Path-Space_Measurement_Equation#x3-Non-symmetryDuetoRefraction
-			// [NOTE] Output eta (inverse) to remove its effect on Russian Roulette. As Russian Roulette depends on throughput, which in turn depends on BSDF.
-			//        The difference is easily observable when Russian Roulette is enabled even for the first iterations.
-			//		  [PBRT3] > It lets us sometimes avoid terminating refracted rays that are about to be refracted back out of a medium and thus have their beta value increased.
-			//                https://github.com/mmp/pbrt-v3/blob/master/src/integrators/path.cpp#L72
-			ioBSDFContext.mBSDF *= select(selected_r, 1.0, sqr(eta_ti));
-			ioBSDFContext.mEta = select(selected_r, 1.0, eta_it);
-
-			// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(-ioBSDFContext.mV, selected_r));
-			// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(L, 0));
-		}
-	}
-
-	namespace ThinDielectric
-	{
-		float3 GenerateImportanceSamplingDirection(float3x3 inTangentSpace, HitContext inHitContext, inout PathContext ioPathContext)
-		{
-			// Dummy, will generate sampling direction in Evaluate
-			return reflect(inHitContext.mRayDirectionWS, inTangentSpace[2]);
-		}
-
-		void Evaluate(HitContext inHitContext, inout BSDFContext ioBSDFContext, inout PathContext ioPathContext)
-		{
-			float r_i;
-			float cos_theta_t;
-			float eta_it;
-			float eta_ti;
-			F_Dielectric_Mitsuba(InstanceDatas[inHitContext.mInstanceID].mEta.x, ioBSDFContext.mNdotV, r_i, cos_theta_t, eta_it, eta_ti);
-
-			// [NOTE] Thin Dielectric (other than these, calculation is identical to Dielectric)
-			//		  [Mitsuba3] 
+			if (GetBSDF(inHitContext) == BSDF::ThinDielectric)
 			{
 				// Account for internal reflections: r' = r + trt + tr^3t + ..
 				// [NOTE] r' = r + trt + tr^3t + .. 
@@ -250,11 +228,25 @@ namespace BSDFEvaluation
 			DebugValue(PixelDebugMode::V1, ioPathContext.mRecursionCount, float4(ioBSDFContext.mV, 0));
 			DebugValue(PixelDebugMode::H1, ioPathContext.mRecursionCount, float4(ioBSDFContext.mH, 0));
 
-			ioBSDFContext.mBSDF = abs(select(selected_r, InstanceDatas[inHitContext.mInstanceID].mSpecularReflectance, InstanceDatas[inHitContext.mInstanceID].mSpecularTransmittance)) * select(selected_r, r_i, 1.0 - r_i);
+			ioBSDFContext.mBSDF = select(selected_r, InstanceDatas[inHitContext.mInstanceID].mSpecularReflectance, InstanceDatas[inHitContext.mInstanceID].mSpecularTransmittance) * select(selected_r, r_i, 1.0 - r_i);
 			ioBSDFContext.mBSDFPDF = select(selected_r, r_i, 1.0 - r_i);
-			
+
+			// [NOTE] Account for solid angle compression
+			//        [Mitsuba3] > For transmission, radiance must be scaled to account for the solid angle compression that occurs when crossing the interface. 
+			//                   https://github.com/mitsuba-renderer/mitsuba3/blob/master/src/bsdfs/dielectric.cpp#L359
+			//        [PBRT3] > Account for non-symmetry with transmission to different medium 
+			//	              https://github.com/mmp/pbrt-v3/blob/aaa552a4b9cbf9dccb71450f47b268e0ed6370e2/src/core/reflection.cpp#L163
+			//		          https://www.pbr-book.org/3ed-2018/Light_Transport_III_Bidirectional_Methods/The_Path-Space_Measurement_Equation#x3-Non-symmetryDuetoRefraction
 			ioBSDFContext.mBSDF *= select(selected_r, 1.0, sqr(eta_ti));
+
+			// [NOTE] Output eta (inverse) to remove its effect on Russian Roulette. As Russian Roulette depends on throughput, which in turn depends on BSDF.
+			//        The difference is easily observable when Russian Roulette is enabled even for the first iterations.
+			//		  [PBRT3] > It lets us sometimes avoid terminating refracted rays that are about to be refracted back out of a medium and thus have their beta value increased.
+			//                https://github.com/mmp/pbrt-v3/blob/master/src/integrators/path.cpp#L72
 			ioBSDFContext.mEta = select(selected_r, 1.0, eta_it);
+
+			// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(-ioBSDFContext.mV, selected_r));
+			// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(L, 0));
 		}
 	}
 
@@ -267,8 +259,6 @@ namespace BSDFEvaluation
 
 		void Evaluate(HitContext inHitContext, inout BSDFContext ioBSDFContext, inout PathContext ioPathContext)
 		{
-			float eta = InstanceDatas[inHitContext.mInstanceID].mEta.x;
-
 			float r_i;
 			float cos_theta_t;
 			float eta_it;
@@ -276,7 +266,6 @@ namespace BSDFEvaluation
 			F_Dielectric_Mitsuba(InstanceDatas[inHitContext.mInstanceID].mEta.x, ioBSDFContext.mNdotV, r_i, cos_theta_t, eta_it, eta_ti);
 	
 			bool selected_r = false;
-
 			if (ioBSDFContext.mMode == BSDFContext::Mode::BSDFSample)
 			{
 				selected_r = RandomFloat01(ioPathContext.mRandomState) <= r_i;
@@ -304,7 +293,6 @@ namespace BSDFEvaluation
 
 			float D = D_GGX(ioBSDFContext.mNdotH, InstanceDatas[inHitContext.mInstanceID].mRoughnessAlpha);
 			float G = G_SmithGGX(abs(ioBSDFContext.mNdotL), abs(ioBSDFContext.mNdotV), InstanceDatas[inHitContext.mInstanceID].mRoughnessAlpha);
-
 			float3 F = select(selected_r, InstanceDatas[inHitContext.mInstanceID].mSpecularReflectance, InstanceDatas[inHitContext.mInstanceID].mSpecularTransmittance);
 
 			ioBSDFContext.mBSDF = abs(select(selected_r, 
@@ -317,17 +305,9 @@ namespace BSDFEvaluation
 				(D * ioBSDFContext.mNdotH) * (sqr(eta_it) * ioBSDFContext.mHdotL) / sqr(ioBSDFContext.mHdotV + eta_it * ioBSDFContext.mHdotL)));
 			ioBSDFContext.mBSDFPDF *= select(selected_r, r_i, 1.0 - r_i);
 
+			// See Dielectric::Evaluate
 			ioBSDFContext.mBSDF *= select(selected_r, 1.0, sqr(eta_ti));
 			ioBSDFContext.mEta = select(selected_r, 1.0, eta_it);
-
-			if (ioBSDFContext.mMode != BSDFContext::Mode::BSDFSample)
-			{
-				// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(ioBSDFContext.mBSDF, ioBSDFContext.mBSDFPDF));
-			}
-			else
-			{
-				// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float4(ioBSDFContext.mBSDF, ioBSDFContext.mBSDFPDF));
-			}
 		}
 	}
 
@@ -350,32 +330,6 @@ namespace BSDFEvaluation
 		}
 	}
 
-	BSDF GetBSDF(HitContext inHitContext)
-	{
-		if (mConstants.mDebugInstanceIndex == inHitContext.mInstanceID)
-		{
-			switch (mConstants.mDebugInstanceMode)
-			{
-			case DebugInstanceMode::Barycentrics: return BSDF::DebugEmissive;
-			case DebugInstanceMode::Mirror: return BSDF::DebugMirror;
-			default: break;
-			}
-		}
-
-		return InstanceDatas[inHitContext.mInstanceID].mBSDF;
-	}
-
-	bool DiracDeltaDistribution(HitContext inHitContext)
-	{
-		switch (GetBSDF(inHitContext))
-		{
-		case BSDF::Dielectric:			return true;
-		case BSDF::ThinDielectric:		return true;
-		case BSDF::DebugMirror:			return true;
-		default:						return false;
-		}
-	}
-
 	float3 GenerateImportanceSamplingDirection(float3 inNormal, HitContext inHitContext, inout PathContext ioPathContext)
 	{
 		// [TODO] Refactor this as sample micro distribution and return H
@@ -392,7 +346,7 @@ namespace BSDFEvaluation
 		case BSDF::Diffuse:				return Lambert::GenerateImportanceSamplingDirection(inTangentSpace, inHitContext, ioPathContext);
 		case BSDF::RoughConductor:		return RoughConductor::GenerateImportanceSamplingDirection(inTangentSpace, inHitContext, ioPathContext);
 		case BSDF::Dielectric:			return Dielectric::GenerateImportanceSamplingDirection(inTangentSpace, inHitContext, ioPathContext);
-		case BSDF::ThinDielectric:		return ThinDielectric::GenerateImportanceSamplingDirection(inTangentSpace, inHitContext, ioPathContext);
+		case BSDF::ThinDielectric:		return Dielectric::GenerateImportanceSamplingDirection(inTangentSpace, inHitContext, ioPathContext);
 		case BSDF::RoughDielectric:		return RoughDielectric::GenerateImportanceSamplingDirection(inTangentSpace, inHitContext, ioPathContext);
 		default:						return 0;
 		}
@@ -429,7 +383,7 @@ namespace BSDFEvaluation
 		case BSDF::Diffuse:				Lambert::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
 		case BSDF::RoughConductor:		RoughConductor::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
 		case BSDF::Dielectric:			Dielectric::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
-		case BSDF::ThinDielectric:		ThinDielectric::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
+		case BSDF::ThinDielectric:		Dielectric::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
 		case BSDF::RoughDielectric:		RoughDielectric::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
 		case BSDF::DebugEmissive:		DebugEmissive::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
 		case BSDF::DebugMirror:			DebugMirror::Evaluate(inHitContext, ioBSDFContext, ioPathContext); break;
