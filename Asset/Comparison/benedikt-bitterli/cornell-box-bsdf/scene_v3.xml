@@ -2,8 +2,8 @@
 	<default name="integrator" value="path" />
 	<!-- <default name="integrator" value="direct" /> -->
 	<default name="spp" value="64" />
-	<default name="resx" value="1280" />
-	<default name="resy" value="720" />	
+	<default name="resx" value="1920" />
+	<default name="resy" value="1080" />	
 	<default name="max_depth" value="16" />
 	<integrator type="$integrator">
 		<integer name="max_depth" value="$max_depth" />
@@ -73,8 +73,9 @@
 		</bsdf>
 	</bsdf>
 	<!-- <bsdf type="dielectric" id="TargetBSDF"> -->
+	<!-- <bsdf type="thindielectric" id="TargetBSDF"> -->
 	<bsdf type="roughdielectric" id="TargetBSDF">
-		<float name="alpha" value="0.01" />
+		<float name="alpha" value="0.1" />
 		<string name="distribution" value="ggx" />
 		<float name="int_ior" value="1.5" />
 		<float name="ext_ior" value="1" />

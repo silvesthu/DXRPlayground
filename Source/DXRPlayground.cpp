@@ -176,7 +176,7 @@ static void sPrepareImGui()
 				for (int i = 0; i < static_cast<int>(PixelDebugMode::Count); i++)
 				{
 					const auto& name = nameof::nameof_enum(static_cast<PixelDebugMode>(i));
-					if (name[0] == '_')
+					if (name.starts_with('_'))
 					{
 						ImGui::NewLine();
 						continue;
@@ -307,7 +307,7 @@ static void sPrepareImGui()
 			for (int i = 0; i < static_cast<int>(DebugMode::Count); i++)
 			{
 				const auto& name = nameof::nameof_enum(static_cast<DebugMode>(i));
-				if (name[0] == '_')
+				if (name.starts_with('_'))
 				{
 					ImGui::NewLine();
 					continue;
@@ -395,7 +395,7 @@ static void sPrepareImGui()
 				for (int i = 0; i < static_cast<int>(DebugInstanceMode::Count); i++)
 				{
 					const auto& name = nameof::nameof_enum(static_cast<DebugInstanceMode>(i));
-					if (name[0] == '_')
+					if (name.starts_with('_'))
 					{
 						ImGui::NewLine();
 						continue;

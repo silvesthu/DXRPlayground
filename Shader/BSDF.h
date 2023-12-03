@@ -48,7 +48,6 @@ namespace BSDFEvaluation
 		if (dot(bsdf_context.mN, bsdf_context.mV) < 0 && InstanceDatas[inHitContext.mInstanceID].mTwoSided)
 			bsdf_context.mN = -bsdf_context.mN;
 
-		// Assume N, H, V on the same side, for BSDF sample only
 		float3 V = bsdf_context.mV;
 		if (inMode == BSDFContext::Mode::BSDFSample)
 			V = dot(bsdf_context.mN, bsdf_context.mV) < 0 ? -V : V;
@@ -224,9 +223,11 @@ namespace BSDFEvaluation
 
 			ioBSDFContext = GenerateContext(ioBSDFContext.mMode, L, ioBSDFContext.mN, ioBSDFContext.mV, select(selected_r, 1.0, eta_it), inHitContext);
 
-			DebugValue(PixelDebugMode::L1, ioPathContext.mRecursionCount, float4(ioBSDFContext.mL, 0));
-			DebugValue(PixelDebugMode::V1, ioPathContext.mRecursionCount, float4(ioBSDFContext.mV, 0));
-			DebugValue(PixelDebugMode::H1, ioPathContext.mRecursionCount, float4(ioBSDFContext.mH, 0));
+			DebugValue(PixelDebugMode::L2, ioPathContext.mRecursionCount, float4(ioBSDFContext.mL, 0));
+			DebugValue(PixelDebugMode::V2, ioPathContext.mRecursionCount, float4(ioBSDFContext.mV, 0));
+			DebugValue(PixelDebugMode::N2, ioPathContext.mRecursionCount, float4(ioBSDFContext.mN, 0));
+			DebugValue(PixelDebugMode::H2, ioPathContext.mRecursionCount, float4(ioBSDFContext.mH, 0));
+			DebugValue(PixelDebugMode::BSDF_Material, ioPathContext.mRecursionCount, float4(0, 0, 0, 0));
 
 			ioBSDFContext.mBSDF = select(selected_r, InstanceDatas[inHitContext.mInstanceID].mSpecularReflectance, InstanceDatas[inHitContext.mInstanceID].mSpecularTransmittance) * select(selected_r, r_i, 1.0 - r_i);
 			ioBSDFContext.mBSDFPDF = select(selected_r, r_i, 1.0 - r_i);
@@ -276,9 +277,11 @@ namespace BSDFEvaluation
 
 				ioBSDFContext = GenerateContext(ioBSDFContext.mMode, L, ioBSDFContext.mN, ioBSDFContext.mV, select(selected_r, 1.0, eta_it), inHitContext);
 
-				DebugValue(PixelDebugMode::L1, ioPathContext.mRecursionCount, float4(ioBSDFContext.mL, selected_r));
-				DebugValue(PixelDebugMode::V1, ioPathContext.mRecursionCount, float4(ioBSDFContext.mV, selected_r));
-				DebugValue(PixelDebugMode::H1, ioPathContext.mRecursionCount, float4(ioBSDFContext.mH, selected_r));
+				DebugValue(PixelDebugMode::L2, ioPathContext.mRecursionCount, float4(ioBSDFContext.mL, r_i));
+				DebugValue(PixelDebugMode::V2, ioPathContext.mRecursionCount, float4(ioBSDFContext.mV, cos_theta_t));
+				DebugValue(PixelDebugMode::N2, ioPathContext.mRecursionCount, float4(ioBSDFContext.mN, selected_r));
+				DebugValue(PixelDebugMode::H2, ioPathContext.mRecursionCount, float4(ioBSDFContext.mH, ioBSDFContext.mNdotH));
+				DebugValue(PixelDebugMode::BSDF_Material, ioPathContext.mRecursionCount, float4(0, 0, 0, 0));
 			}
 			else
 			{
@@ -286,14 +289,29 @@ namespace BSDFEvaluation
 
 				ioBSDFContext = GenerateContext(ioBSDFContext.mMode, ioBSDFContext.mL, ioBSDFContext.mN, ioBSDFContext.mV, select(selected_r, 1.0, eta_it), inHitContext);
 
-				DebugValue(PixelDebugMode::L3, ioPathContext.mRecursionCount, float4(ioBSDFContext.mL, selected_r));
-				DebugValue(PixelDebugMode::V3, ioPathContext.mRecursionCount, float4(ioBSDFContext.mV, selected_r));
-				DebugValue(PixelDebugMode::H3, ioPathContext.mRecursionCount, float4(ioBSDFContext.mH, selected_r));
+				DebugValue(PixelDebugMode::L3, ioPathContext.mRecursionCount, float4(ioBSDFContext.mL, r_i));
+				DebugValue(PixelDebugMode::V3, ioPathContext.mRecursionCount, float4(ioBSDFContext.mV, cos_theta_t));
+				DebugValue(PixelDebugMode::N3, ioPathContext.mRecursionCount, float4(ioBSDFContext.mN, selected_r));
+				DebugValue(PixelDebugMode::H3, ioPathContext.mRecursionCount, float4(ioBSDFContext.mH, ioBSDFContext.mNdotH));
+				DebugValue(PixelDebugMode::Light_Material, ioPathContext.mRecursionCount, float4(0, 0, 0, 0));
 			}
 
 			float D = D_GGX(ioBSDFContext.mNdotH, InstanceDatas[inHitContext.mInstanceID].mRoughnessAlpha);
 			float G = G_SmithGGX(abs(ioBSDFContext.mNdotL), abs(ioBSDFContext.mNdotV), InstanceDatas[inHitContext.mInstanceID].mRoughnessAlpha);
 			float3 F = select(selected_r, InstanceDatas[inHitContext.mInstanceID].mSpecularReflectance, InstanceDatas[inHitContext.mInstanceID].mSpecularTransmittance);
+
+			if (ioBSDFContext.mMode == BSDFContext::Mode::BSDFSample)
+			{
+				DebugValue(PixelDebugMode::BSDF_D, ioPathContext.mRecursionCount, float4(D, ioBSDFContext.mNdotH, InstanceDatas[inHitContext.mInstanceID].mRoughnessAlpha, 0));
+				DebugValue(PixelDebugMode::BSDF_G, ioPathContext.mRecursionCount, float4(G, 0, 0, 0));
+				DebugValue(PixelDebugMode::BSDF_F, ioPathContext.mRecursionCount, float4(F, 0));
+			}
+			else
+			{
+				DebugValue(PixelDebugMode::Light_D, ioPathContext.mRecursionCount, float4(D, ioBSDFContext.mNdotH, InstanceDatas[inHitContext.mInstanceID].mRoughnessAlpha, 0));
+				DebugValue(PixelDebugMode::Light_G, ioPathContext.mRecursionCount, float4(G, 0, 0, 0));
+				DebugValue(PixelDebugMode::Light_F, ioPathContext.mRecursionCount, float4(F, 0));
+			}
 
 			ioBSDFContext.mBSDF = abs(select(selected_r, 
 				D * G * F / (4.0f * ioBSDFContext.mNdotV * ioBSDFContext.mNdotL),
@@ -368,13 +386,17 @@ namespace BSDFEvaluation
 		{
 			DebugValue(PixelDebugMode::L0, ioPathContext.mRecursionCount, float4(ioBSDFContext.mL, 0));
 			DebugValue(PixelDebugMode::V0, ioPathContext.mRecursionCount, float4(ioBSDFContext.mV, 0));
+			DebugValue(PixelDebugMode::N0, ioPathContext.mRecursionCount, float4(ioBSDFContext.mN, 0));
 			DebugValue(PixelDebugMode::H0, ioPathContext.mRecursionCount, float4(ioBSDFContext.mH, 0));
+			DebugValue(PixelDebugMode::BSDF_Importance_Sampling, ioPathContext.mRecursionCount, float4(0, 0, 0, 0));
 		}
 		else
 		{
-			DebugValue(PixelDebugMode::L2, ioPathContext.mRecursionCount, float4(ioBSDFContext.mL, 0));
-			DebugValue(PixelDebugMode::V2, ioPathContext.mRecursionCount, float4(ioBSDFContext.mV, 0));
-			DebugValue(PixelDebugMode::H2, ioPathContext.mRecursionCount, float4(ioBSDFContext.mH, 0));
+			DebugValue(PixelDebugMode::L1, ioPathContext.mRecursionCount, float4(ioBSDFContext.mL, 0));
+			DebugValue(PixelDebugMode::V1, ioPathContext.mRecursionCount, float4(ioBSDFContext.mV, 0));
+			DebugValue(PixelDebugMode::N1, ioPathContext.mRecursionCount, float4(ioBSDFContext.mN, 0));
+			DebugValue(PixelDebugMode::H1, ioPathContext.mRecursionCount, float4(ioBSDFContext.mH, 0));
+			DebugValue(PixelDebugMode::Light_Importance_Sampling, ioPathContext.mRecursionCount, float4(0, 0, 0, 0));
 		}
 
 		[branch]

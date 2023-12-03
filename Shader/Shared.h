@@ -211,7 +211,6 @@ enum class PixelDebugMode : uint
 
 	_Newline2,
 
-	BSDF_PDF,
 	Throughput_DiracDelta,
 
 	_Newline3,
@@ -224,26 +223,52 @@ enum class PixelDebugMode : uint
 	// BSDF Sample
 	L0,
 	V0,
+	N0,
 	H0,
-
-	// BSDF Sample with reflection/refraction
-	L1,
-	V1,
-	H1,
+	BSDF_Importance_Sampling,
 
 	_Newline5,
 
 	// Light Sample
+	L1,
+	V1,
+	N1,
+	H1,
+	Light_Importance_Sampling,
+
+	_Newline6,
+
+	// BSDF Sample with reflection/refraction
 	L2,
 	V2,
+	N2,
 	H2,
+	BSDF_Material,
+
+	_Newline7,
 
 	// Light Sample with reflection/refraction
 	L3,
 	V3,
+	N3,
 	H3,
+	Light_Material,
 
-	_Newline6,
+	_Newline8,
+
+	Light_D,
+	Light_F,
+	Light_G,
+	Light_BSDF,
+
+	_Newline9,
+
+	BSDF_D,
+	BSDF_F,
+	BSDF_G,
+	BSDF_BSDF,
+
+	_Newline10,
 
 	RussianRoulette_Probability_EtaScale,
 

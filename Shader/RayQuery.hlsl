@@ -150,9 +150,16 @@ void TraceRay()
 			if (InstanceDatas[hit_context.mInstanceID].mBSDF == BSDF::Light)
 			{
 				// Direct Lighting
-				if (path_context.mRecursionCount == 0 || mConstants.mLightCount == 0 || mConstants.mSampleMode == SampleMode::SampleBSDF || path_context.mPrevDiracDeltaDistribution)
+				if (path_context.mRecursionCount == 0 ||					// Camera ray hit the light
+					mConstants.mLightCount == 0 ||							// Force SampleBSDF when no light
+					path_context.mPrevDiracDeltaDistribution || 			// Force SampleBSDF when DiracDelta
+					mConstants.mSampleMode == SampleMode::SampleBSDF ||		// SampleBSDF ray hit the light
+					false
+					)
 				{
 					path_context.mEmission += path_context.mThroughput * emission;
+
+					// DebugValue(PixelDebugMode::Manual, path_context.mRecursionCount, float4(emission, 1));
 				}
 				else if (mConstants.mSampleMode == SampleMode::MIS)
 				{
@@ -166,7 +173,7 @@ void TraceRay()
 					float mis_weight = max(0.0, MIS::PowerHeuristic(1, path_context.mPrevBSDFPDF, 1, light_pdf));
 					path_context.mEmission += path_context.mThroughput * emission * mis_weight;
 
-					DebugValue(PixelDebugMode::MIS_BSDF, path_context.mRecursionCount - 1, float4(path_context.mPrevBSDFPDF, light_pdf, LightEvaluation::GetLightSelectionPDF(), light_sample_pdf));
+					DebugValue(PixelDebugMode::MIS_BSDF, path_context.mRecursionCount - 1, float4(path_context.mPrevBSDFPDF, light_pdf, 0, 0));
 				}
 			}
 			else
@@ -175,7 +182,11 @@ void TraceRay()
 
 				// Sample Light
 				bool sample_light = mConstants.mSampleMode == SampleMode::SampleLight || mConstants.mSampleMode == SampleMode::MIS;
-				if (sample_light && mConstants.mLightCount > 0 && !BSDFEvaluation::DiracDeltaDistribution(hit_context))
+				if (sample_light && 
+					mConstants.mLightCount > 0 &&							// Force SampleBSDF when no light
+					!BSDFEvaluation::DiracDeltaDistribution(hit_context) &&	// Force SampleBSDF when DiracDelta
+					true
+					)
 				{
 					uint light_index = min(RandomFloat01(path_context.mRandomState) * mConstants.mLightCount, mConstants.mLightCount - 1);
 					Light light = Lights[light_index];
@@ -210,18 +221,20 @@ void TraceRay()
 							BSDFEvaluation::Evaluate(hit_context, bsdf_context, path_context);
 
 							float3 luminance = light.mEmission * (kEmissionBoostScale * kPreExposure);
-							float3 emission = luminance * bsdf_context.mBSDF * abs(bsdf_context.mNdotL) / light_pdf;
+							float3 light_emission = luminance * bsdf_context.mBSDF * abs(bsdf_context.mNdotL) / light_pdf;
 
 							if (mConstants.mSampleMode == SampleMode::MIS)
-								emission *= max(0.0, MIS::PowerHeuristic(1, light_pdf, 1, bsdf_context.mBSDFPDF));
+								light_emission *= max(0.0, MIS::PowerHeuristic(1, light_pdf, 1, bsdf_context.mBSDFPDF));
 
-							DebugValue(PixelDebugMode::MIS_Light, path_context.mRecursionCount, float4(bsdf_context.mBSDFPDF, light_pdf, LightEvaluation::GetLightSelectionPDF(), light_sample_pdf));
+							DebugValue(PixelDebugMode::Light_BSDF, path_context.mRecursionCount, float4(bsdf_context.mBSDF, bsdf_context.mBSDFPDF));
+							DebugValue(PixelDebugMode::MIS_Light, path_context.mRecursionCount, float4(bsdf_context.mBSDFPDF, light_pdf, 0, 0));
 
-							path_context.mLightEmission = path_context.mThroughput * emission;
+							path_context.mLightEmission = path_context.mThroughput * light_emission;
 
 							// DebugValue(PixelDebugMode::Manual, path_context.mRecursionCount, float4(bsdf_context.mBSDF, light_pdf));
-							// DebugValue(PixelDebugMode::Manual, path_context.mRecursionCount, float4(emission, 1));
-							// DebugTexture(path_context.mRecursionCount == 0, float4(bsdf_context.mBSDF, 0));
+							// DebugValue(PixelDebugMode::Manual, path_context.mRecursionCount, float4(path_context.mThroughput, 1));
+							// DebugValue(PixelDebugMode::Manual, path_context.mRecursionCount, float4(luminance, 1));
+							// DebugValue(PixelDebugMode::Manual, path_context.mRecursionCount, float4(light_emission, 1));
 						}
 					}
 				}
@@ -242,7 +255,7 @@ void TraceRay()
 					path_context.mPrevDiracDeltaDistribution = BSDFEvaluation::DiracDeltaDistribution(hit_context);
 					path_context.mEtaScale *= bsdf_context.mEta;
 
-					DebugValue(PixelDebugMode::BSDF_PDF, path_context.mRecursionCount, float4(bsdf_context.mBSDF, bsdf_context.mBSDFPDF));
+					DebugValue(PixelDebugMode::BSDF_BSDF, path_context.mRecursionCount, float4(bsdf_context.mBSDF, bsdf_context.mBSDFPDF));
 					DebugValue(PixelDebugMode::Throughput_DiracDelta, path_context.mRecursionCount, float4(path_context.mThroughput, path_context.mPrevDiracDeltaDistribution));
 
 					// Next bounce
