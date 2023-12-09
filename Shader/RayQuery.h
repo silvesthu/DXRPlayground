@@ -1,5 +1,11 @@
 #pragma once
 
+struct PixelContext
+{
+	uint3	mPixelIndex;
+	uint3	mPixelTotal;
+};
+
 // [TODO] Remove these
 // Adapters for RayQuery
 

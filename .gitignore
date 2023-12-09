@@ -1,5 +1,6 @@
 packages/
 Dump/
+enc_temp_folder/
 Asset/ArPragueSkyModelGround/SkyModelDataset.dat
 imgui.ini
 run_mitsuba.bat

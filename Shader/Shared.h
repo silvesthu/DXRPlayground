@@ -225,7 +225,6 @@ enum class PixelDebugMode : uint
 	V0,
 	N0,
 	H0,
-	BSDF_Importance_Sampling,
 
 	_Newline5,
 
@@ -234,7 +233,6 @@ enum class PixelDebugMode : uint
 	V1,
 	N1,
 	H1,
-	Light_Importance_Sampling,
 
 	_Newline6,
 
@@ -243,7 +241,6 @@ enum class PixelDebugMode : uint
 	V2,
 	N2,
 	H2,
-	BSDF_Material,
 
 	_Newline7,
 
@@ -252,7 +249,6 @@ enum class PixelDebugMode : uint
 	V3,
 	N3,
 	H3,
-	Light_Material,
 
 	_Newline8,
 
@@ -260,17 +256,20 @@ enum class PixelDebugMode : uint
 	Light_F,
 	Light_G,
 	Light_BSDF,
+	Light_PDF,
 
 	_Newline9,
 
-	BSDF_D,
-	BSDF_F,
-	BSDF_G,
-	BSDF_BSDF,
+	BSDF__D,
+	BSDF__F,
+	BSDF__G,
+	BSDF__BSDF,
+	BSDF__PDF,
 
 	_Newline10,
 
-	RussianRoulette_Probability_EtaScale,
+	RussianRoulette,
+	EtaScale,
 
 	Count
 };
@@ -392,7 +391,7 @@ struct InstanceData
 	BSDF						mBSDF							CONSTANT_DEFAULT(BSDF::Diffuse);
 	uint						mTwoSided						CONSTANT_DEFAULT(0);
 	float						mOpacity						CONSTANT_DEFAULT(1.0f);
-	uint						mLightID						CONSTANT_DEFAULT(0);
+	uint						mLightIndex						CONSTANT_DEFAULT(0);
 
 	float						mRoughnessAlpha					CONSTANT_DEFAULT(0.0f);
 	float3						GENERATE_PAD_NAME				CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
@@ -471,59 +470,15 @@ struct PathContext
 {
 	float3						mThroughput;					// [0, 1]		Accumulated throughput, [PBRT3] call it beta https://github.com/mmp/pbrt-v3/blob/master/src/integrators/path.cpp#L68
 	float3						mEmission;						// [0, +inf]	Accumulated emission
+	float						mEtaScale;
 
 	float3						mLightEmission;					// [0, +inf]	Emission from light sample
 
-	float						mPrevBSDFPDF;
+	float						mPrevBSDFSamplePDF;
 	bool						mPrevDiracDeltaDistribution;
-
-	float						mEtaScale;
 
 	uint						mRandomState;
 	uint						mRecursionCount;
-};
-
-struct HitContext
-{
-	uint						mInstanceID;
-	uint						mPrimitiveIndex;
-
-	float3						mRayOriginWS;
-	float3						mRayDirectionWS;
-
-	float3						mHitPositionWS;
-	float3						mBarycentrics;
-	float2						mUV;
-	float3						mVertexPositionOS;
-	float3						mVertexNormalOS;
-	float3						mVertexNormalWS;
-};
-
-struct BSDFContext
-{
-	enum class Mode
-	{
-		BSDFSample,
-		LightSample,
-	};
-
-	Mode mMode;
-
-	float3 mL;
-	float3 mN;
-	float3 mV;
-	float3 mH;
-
-	float mNdotH;
-	float mNdotV;
-	float mNdotL;
-	float mHdotV;
-	float mHdotL;
-
-	float3 mBSDF;
-	float mBSDFPDF;
-
-	float mEta;
 };
 
 struct DensityProfileLayer
@@ -667,7 +622,7 @@ struct Constants
 
 	int2						mPixelDebugCoord				CONSTANT_DEFAULT(int2(-1, -1));
 	PixelDebugMode				mPixelDebugMode					CONSTANT_DEFAULT(PixelDebugMode::Manual);
-	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	uint						mPixelDebugRecursion			CONSTANT_DEFAULT(0);
 
 	AtmosphereConstants			mAtmosphere;
 	CloudConstants				mCloud;

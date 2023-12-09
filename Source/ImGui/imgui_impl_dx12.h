@@ -57,6 +57,8 @@ extern ImTextureID ImGui_ImplDX12_NullTexture2D;
 extern ImTextureID ImGui_ImplDX12_NullTexture3D;
 enum
 {
-    ImGui_ImplDX12_ImTextureID_Mask_3D = 0x1,
+    ImGui_ImplDX12_ImTextureID_Mask_3D  = 0x1,
 };
+
+constexpr unsigned int ImGuiSelectableFlags_SelectOnNav = 1 << 21;  // from imgui_internal.h
 #endif // DXRPLAYGROUND_IMGUI

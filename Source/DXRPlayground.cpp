@@ -58,7 +58,7 @@ enum class ScenePresetType
 	Count,
 };
 
-static ScenePresetType sCurrentScene = ScenePresetType::CornellBoxBSDF;
+static ScenePresetType sCurrentScene = ScenePresetType::VeachMIS;
 static ScenePresetType sPreviousScene = sCurrentScene;
 static ScenePreset kScenePresets[(int)ScenePresetType::Count] =
 {
@@ -171,7 +171,8 @@ static void sPrepareImGui()
 		{
 			ImGui::InputInt2("Coords", (int*)&gConstants.mPixelDebugCoord);
 			ImGui::InputFloat3("Pixel Value", &gGetFrameContext().mDebugReadbackBufferPointer->mPixelValue.x, "%.8f", ImGuiInputTextFlags_ReadOnly);
-			if (ImGui::TreeNodeEx("Pixel Debug Value (on each hit)"))
+			ImGui::SliderInt("ScreenDebug Recursion", reinterpret_cast<int*>(&gConstants.mPixelDebugRecursion), 0, 16);
+			if (ImGui::TreeNodeEx("DebugValue For Each Recursion"))
 			{
 				for (int i = 0; i < static_cast<int>(PixelDebugMode::Count); i++)
 				{
@@ -347,9 +348,9 @@ static void sPrepareImGui()
 
 		if (ImGui::TreeNodeEx("Shader"))
 		{
-			if (ImGui::Button("Print Disassembly RayQuery"))
+			if (ImGui::Button("Dump RayQuery"))
 			{
-				gRenderer.mDumpDisassemblyRayQuery = true;
+				gRenderer.mDumpRayQuery = true;
 				gRenderer.mReloadShader = true;
 			}
 
@@ -443,7 +444,7 @@ static void sPrepareImGui()
 						int column_index = 0;
 
 						ImGui::TableSetColumnIndex(column_index++);
-						if (ImGui::Selectable(std::to_string(row).c_str(), row == gConstants.mDebugInstanceIndex, ImGuiSelectableFlags_SpanAllColumns))
+						if (ImGui::Selectable(std::to_string(row).c_str(), row == gConstants.mDebugInstanceIndex, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_SelectOnNav))
 							gConstants.mDebugInstanceIndex = row;
 
 						if (row == gGetFrameContext().mDebugReadbackBufferPointer->mPixelInstanceID)
@@ -528,7 +529,7 @@ static void sPrepareImGui()
 						int column_index = 0;
 
 						ImGui::TableSetColumnIndex(column_index++);
-						if (ImGui::Selectable(std::to_string(row).c_str(), row == gConstants.mDebugLightIndex, ImGuiSelectableFlags_SpanAllColumns))
+						if (ImGui::Selectable(std::to_string(row).c_str(), row == gConstants.mDebugLightIndex, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_SelectOnNav))
 							gConstants.mDebugLightIndex = row;
 
 						if ((int)light.mInstanceID == gGetFrameContext().mDebugReadbackBufferPointer->mPixelInstanceID)

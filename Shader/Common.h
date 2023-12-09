@@ -251,11 +251,11 @@ float3 F_Conductor_Mitsuba(float3 inEta, float3 inK, float inCosThetaI)
     return 0.5f * (r_s + r_p);
 }
 
-static float3 sDebugOutput = 0;
-void DebugOutput(DebugMode inDebugMode, float3 inValue)
+static float3 sDebugModeValue = 0;
+void DebugModeValue(DebugMode inDebugMode, float3 inValue)
 {
     if (mConstants.mDebugMode == inDebugMode)
-        sDebugOutput = inValue;
+        sDebugModeValue = inValue;
 }
 
 void DebugValueInit()
@@ -265,17 +265,15 @@ void DebugValueInit()
             BufferDebugUAV[0].mPixelValueArray[i] = 0;
 }
 
+static float4 sDebugValue = 0;
 void DebugValue(PixelDebugMode inPixelDebugMode, uint inRecursionCount, float4 inValue)
 {
     if (mConstants.mPixelDebugMode == inPixelDebugMode)
+    {
         if (sGetDispatchRaysIndex().x == mConstants.mPixelDebugCoord.x && sGetDispatchRaysIndex().y == mConstants.mPixelDebugCoord.y && inRecursionCount < Debug::kValueArraySize)
             BufferDebugUAV[0].mPixelValueArray[inRecursionCount] = inValue;
-}
 
-void DebugTexture(bool inCondition, float4 inValue)
-{
-    if (inCondition)
-    {
-        ScreenDebugUAV[sGetDispatchRaysIndex().xy] = inValue;
+        if (mConstants.mPixelDebugRecursion == inRecursionCount)
+            sDebugValue = float4(inValue.xyz, 1.0); // ignore alpha to show on ImGui
     }
 }

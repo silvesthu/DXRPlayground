@@ -4,11 +4,14 @@
 #include "Binding.h"
 #include "Common.h"
 
-#include "RayQuery.h"
-
 namespace LightEvaluation
 {
-	float GetLightSelectionPDF()
+	uint SelectLight(inout PathContext ioPathContext)
+	{
+		return min(RandomFloat01(ioPathContext.mRandomState) * mConstants.mLightCount, mConstants.mLightCount - 1);
+	}
+
+	float SelectLightPDF(uint inLightIndex)
 	{
 		return 1.0 / mConstants.mLightCount;
 	}
@@ -22,7 +25,6 @@ namespace LightEvaluation
 		case LightType::Sphere:
 		{
 			// UniformSampleCone / UniformConePdf
-			// 
 			// https://citeseerx.ist.psu.edu/doc/10.1.1.40.6561
 			// https://www.pbr-book.org/3ed-2018/Monte_Carlo_Integration/2D_Sampling_with_Multidimensional_Transformations#UniformConePdf
 

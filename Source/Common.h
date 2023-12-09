@@ -134,9 +134,6 @@ inline T gFromString(const char* inString);
 template <typename T>
 inline void gFromString(const char* inString, T& outValue) { if (inString == nullptr) return; outValue = gFromString<T>(inString); }
 
-template <typename T>
-inline std::string gToString(const T& inValue) { return std::to_string(inValue); }
-
 template<>
 inline float gFromString(const char* inString)
 {
@@ -176,6 +173,13 @@ inline glm::mat4x4 gFromString(const char* inString)
 		&matrix[0][3], &matrix[1][3], &matrix[2][3], &matrix[3][3]);
 	return matrix;
 }
+
+template <typename T>
+inline std::string gToString(const T& inValue) { return std::to_string(inValue); }
+
+
+template <>
+inline std::string gToString(const LPCSTR& inValue) { return std::string(inValue); }
 
 template <>
 inline std::string gToString(const glm::mat4x4& inValue) 

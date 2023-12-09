@@ -572,7 +572,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 
 					instance_data.mBSDF = BSDF::Light;
 					instance_data.mTwoSided = false;
-					instance_data.mLightID = static_cast<uint>(ioSceneContent.mLights.size());
+					instance_data.mLightIndex = static_cast<uint>(ioSceneContent.mLights.size());
 
 					Light light;
 					light.mType = LightType::Count;

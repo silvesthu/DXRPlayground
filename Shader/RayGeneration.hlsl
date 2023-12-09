@@ -6,24 +6,19 @@
 [shader("raygeneration")]
 void RayGeneration()
 {
-	uint3 launchIndex = sGetDispatchRaysIndex();
-	uint3 launchDim = sGetDispatchRaysDimensions();
+	float2 screen_coords						= float2(DispatchRaysIndex().xy) + 0.5;
+	float2 screen_size							= float2(DispatchRaysDimensions().xy);
 
-	float2 crd = float2(launchIndex.xy) + 0.5;
-	float2 dims = float2(launchDim.xy);
-
-	float2 d = ((crd / dims) * 2.f - 1.f); // 0~1 => -1~1
-	d.y = -d.y;
+	float2 ndc_xy								= ((screen_coords / screen_size) * 2.f - 1.f);	// [0,1] => [-1,1]
+	ndc_xy.y									= -ndc_xy.y;									// Flip y
 
 	RayDesc ray;
-	ray.Origin = mConstants.mCameraPosition.xyz;
-	ray.Direction = normalize(mConstants.mCameraDirection.xyz + mConstants.mCameraRightExtend.xyz * d.x + mConstants.mCameraUpExtend.xyz * d.y);
-	ray.TMin = 0.001;
-	ray.TMax = 100000;
+	ray.Origin									= mConstants.mCameraPosition.xyz;
+	ray.Direction								= normalize(mConstants.mCameraDirection.xyz + mConstants.mCameraRightExtend.xyz * ndc_xy.x + mConstants.mCameraUpExtend.xyz * ndc_xy.y);
+	ray.TMin									= 0.001;
+	ray.TMax									= 100000;
 
-	RayPayload payload = (RayPayload)0;
-	payload.mData = 0;
-
+	RayPayload payload							= (RayPayload)0;
 	TraceRay(
 		RaytracingScene, 		// RaytracingAccelerationStructure
 		0,						// RayFlags 
@@ -35,5 +30,5 @@ void RayGeneration()
 		payload					// Payload
 	);
 
-	ScreenColorUAV[sGetDispatchRaysIndex().xy] = payload.mData;
+	ScreenColorUAV[sGetDispatchRaysIndex().xy]	= payload.mData;
 }

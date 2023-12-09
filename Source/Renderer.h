@@ -97,7 +97,7 @@ struct Renderer
 	}
 
 	bool									mReloadShader = false;
-	bool									mDumpDisassemblyRayQuery = false;
+	bool									mDumpRayQuery = false;
 	bool									mTestLibShader = false;
 	bool									mTestMultipleHitShaders = false;
 

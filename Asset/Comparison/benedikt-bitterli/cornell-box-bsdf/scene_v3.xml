@@ -96,7 +96,7 @@
 	</shape>
 	<shape type="rectangle" id="BackWall">
 		<transform name="to_world">
-			<matrix value="0 1 0 0 1 0 0 1 0 0 -2 +1 0 0 0 1" />
+			<matrix value="0 1 0 0 1 0 0 1 0 0 -2 -1 0 0 0 1" />
 		</transform>
 		<!-- <ref id="BackWallBSDF" /> -->
 		<ref id="TargetBSDF" />
