@@ -207,58 +207,26 @@ enum class PixelDebugMode : uint
 
 	_Newline1,
 
-	PositionWS_InstanceID,
-
-	_Newline2,
-
-	Throughput_DiracDelta,
-
-	_Newline3,
-
-	MIS_BSDF,
-	MIS_Light,
+	PositionWS,
+	InstanceID,
 
 	_Newline4,
 
 	// BSDF Sample
-	L0,
-	V0,
-	N0,
-	H0,
+	BRDF__L,
+	BRDF__V,
+	BRDF__N,
+	BRDF__H,
 
 	_Newline5,
 
 	// Light Sample
-	L1,
-	V1,
-	N1,
-	H1,
+	Light_L,
+	Light_V,
+	Light_N,
+	Light_H,
 
 	_Newline6,
-
-	// BSDF Sample with reflection/refraction
-	L2,
-	V2,
-	N2,
-	H2,
-
-	_Newline7,
-
-	// Light Sample with reflection/refraction
-	L3,
-	V3,
-	N3,
-	H3,
-
-	_Newline8,
-
-	Light_D,
-	Light_F,
-	Light_G,
-	Light_BSDF,
-	Light_PDF,
-
-	_Newline9,
 
 	BSDF__D,
 	BSDF__F,
@@ -266,10 +234,28 @@ enum class PixelDebugMode : uint
 	BSDF__BSDF,
 	BSDF__PDF,
 
-	_Newline10,
+	_Newline7,
+
+	Light_D,
+	Light_F,
+	Light_G,
+	Light_BSDF,
+	Light_PDF,
+
+	_Newline8,
+
+	Throughput,
+	DiracDelta,
+
+	_Newline9,
 
 	RussianRoulette,
 	EtaScale,
+
+	_Newline10,
+
+	BSDF__MIS,
+	Light_MIS,
 
 	Count
 };
@@ -306,6 +292,7 @@ enum class BSDF : uint
 
 	Diffuse,				// https://mitsuba.readthedocs.io/en/stable/src/generated/plugins_bsdfs.html#smooth-diffuse-material-diffuse
 
+	Conductor,				// https://mitsuba.readthedocs.io/en/stable/src/generated/plugins_bsdfs.html#smooth-conductor-conductor
 	RoughConductor,			// https://mitsuba.readthedocs.io/en/stable/src/generated/plugins_bsdfs.html#rough-conductor-material-roughconductor
 
 	Dielectric,				// https://mitsuba.readthedocs.io/en/stable/src/generated/plugins_bsdfs.html#smooth-dielectric-material-dielectric
@@ -313,12 +300,6 @@ enum class BSDF : uint
 	RoughDielectric,		// https://mitsuba.readthedocs.io/en/stable/src/generated/plugins_bsdfs.html#rough-dielectric-material-roughdielectric
 	// Plastic	
 	// Roughplastic
-
-	// [TODO]
-	// Mask, // forward-facing Dirac delta distribution
-
-	DebugEmissive,
-	DebugMirror,
 
 	Unsupported,			// Fallback to Diffuse
 
@@ -330,7 +311,7 @@ enum class DebugInstanceMode : uint
 	None = 0,
 
 	Barycentrics,
-	Mirror, 				// [TODO] Handle as dirac delta properly
+	Reflection,				// [TODO] Handle as dirac delta properly
 
 	Count
 };

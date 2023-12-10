@@ -417,6 +417,8 @@ static void sPrepareImGui()
 					"Albedo",
 					"Reflectance",
 					"Transmittance",
+					"Eta",
+					"K",
 					"Emission",
 					"RoughnessAlpha",
 					"Opacity",
@@ -476,6 +478,16 @@ static void sPrepareImGui()
 						std::string transmittance = std::format("{:.2f} {:.2f} {:.2f}", instance_data.mSpecularTransmittance.x, instance_data.mSpecularTransmittance.y, instance_data.mSpecularTransmittance.z);
 						transmittance = instance_data.mSpecularTransmittance != InstanceData().mSpecularTransmittance ? transmittance : "";
 						ImGui::Text(transmittance.c_str());
+
+						ImGui::TableSetColumnIndex(column_index++);
+						std::string eta = std::format("{:.2f} {:.2f} {:.2f}", instance_data.mEta.x, instance_data.mEta.y, instance_data.mEta.z);
+						eta = instance_data.mEta != InstanceData().mEta ? eta : "";
+						ImGui::Text(eta.c_str());
+
+						ImGui::TableSetColumnIndex(column_index++);
+						std::string k = std::format("{:.2f} {:.2f} {:.2f}", instance_data.mK.x, instance_data.mK.y, instance_data.mK.z);
+						k = instance_data.mK != InstanceData().mK ? k : "";
+						ImGui::Text(k.c_str());
 
 						ImGui::TableSetColumnIndex(column_index++);
 						std::string emission = std::format("{:.2f} {:.2f} {:.2f}", instance_data.mEmission.x, instance_data.mEmission.y, instance_data.mEmission.z);

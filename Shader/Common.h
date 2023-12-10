@@ -2,15 +2,17 @@
 
 #include "RayQuery.h"
 
-template <typename T> T fmadd(T inA, T inB, T inC) { return inA * inB + inC; }
-template <typename T> T fmsub(T inA, T inB, T inC) { return inA * inB - inC; }
-template <typename T> T fnmadd(T inA, T inB, T inC) { return -inA * inB + inC; }
-template <typename T> T fnmsub(T inA, T inB, T inC) { return -inA * inB - inC; }
+template <typename T> T fmadd(T inA, T inB, T inC)              { return inA * inB + inC; }
+template <typename T> T fmsub(T inA, T inB, T inC)              { return inA * inB - inC; }
+template <typename T> T fnmadd(T inA, T inB, T inC)             { return -inA * inB + inC; }
+template <typename T> T fnmsub(T inA, T inB, T inC)             { return -inA * inB - inC; }
 
-template <typename T> T sqr(T inValue) { return inValue * inValue; }
-template <typename T> T safe_sqrt(T inValue) { return sqrt(max(0, inValue)); }
+template <typename T> T sqr(T inValue)                          { return inValue * inValue; }
+template <typename T> T safe_sqrt(T inValue)                    { return sqrt(max(0, inValue)); }
 
-template <typename T> T remap(T x, T a, T b, T c, T d) { return (((x - a) / (b - a)) * (d - c)) + c; }
+template <typename T> T remap(T x, T a, T b, T c, T d)          { return (((x - a) / (b - a)) * (d - c)) + c; }
+
+float nan()                                                     { return asfloat(0x7fc00000); }
 
 // From https://www.shadertoy.com/view/tsBBWW
 uint wang_hash(inout uint seed)
@@ -266,14 +268,14 @@ void DebugValueInit()
 }
 
 static float4 sDebugValue = 0;
-void DebugValue(PixelDebugMode inPixelDebugMode, uint inRecursionCount, float4 inValue)
+void DebugValue(PixelDebugMode inPixelDebugMode, uint inRecursionCount, float3 inValue)
 {
     if (mConstants.mPixelDebugMode == inPixelDebugMode)
     {
         if (sGetDispatchRaysIndex().x == mConstants.mPixelDebugCoord.x && sGetDispatchRaysIndex().y == mConstants.mPixelDebugCoord.y && inRecursionCount < Debug::kValueArraySize)
-            BufferDebugUAV[0].mPixelValueArray[inRecursionCount] = inValue;
+            BufferDebugUAV[0].mPixelValueArray[inRecursionCount] = float4(inValue, 0.0);
 
         if (mConstants.mPixelDebugRecursion == inRecursionCount)
-            sDebugValue = float4(inValue.xyz, 1.0); // ignore alpha to show on ImGui
+            sDebugValue = float4(inValue, 1.0); // fill alpha to show on ImGui
     }
 }
