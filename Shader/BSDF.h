@@ -194,7 +194,7 @@ namespace BSDFEvaluation
 
 	namespace Diffuse
 	{
-		BSDFContext GenerateImportanceSamplingContext(HitContext inHitContext, inout PathContext ioPathContext)
+		BSDFContext GenerateContext(HitContext inHitContext, inout PathContext ioPathContext)
 		{
 			float3x3 tangent_space				= GenerateTangentSpace(inHitContext.NormalWS());
 			float3 randome_direction			= RandomCosineDirection(ioPathContext.mRandomState);
@@ -226,7 +226,7 @@ namespace BSDFEvaluation
 
 	namespace Conductor
 	{
-		BSDFContext GenerateImportanceSamplingContext(HitContext inHitContext, inout PathContext ioPathContext)
+		BSDFContext GenerateContext(HitContext inHitContext, inout PathContext ioPathContext)
 		{
 			float3 L							= reflect(-inHitContext.ViewWS(), inHitContext.NormalWS());
 
@@ -266,7 +266,7 @@ namespace BSDFEvaluation
 
 	namespace RoughConductor
 	{
-		BSDFContext GenerateImportanceSamplingContext(HitContext inHitContext, inout PathContext ioPathContext)
+		BSDFContext GenerateContext(HitContext inHitContext, inout PathContext ioPathContext)
 		{
 			float3x3 tangent_space				= GenerateTangentSpace(inHitContext.NormalWS());
 			float3 H							= Distribution::GGX::GenerateMicrofacetDirection(tangent_space, inHitContext, ioPathContext);
@@ -328,7 +328,7 @@ namespace BSDFEvaluation
 
 	namespace Dielectric
 	{
-		BSDFContext GenerateImportanceSamplingContext(HitContext inHitContext, inout PathContext ioPathContext)
+		BSDFContext GenerateContext(HitContext inHitContext, inout PathContext ioPathContext)
 		{
 			float r_i;
 			float cos_theta_t;
@@ -391,7 +391,7 @@ namespace BSDFEvaluation
 
 	namespace RoughDielectric
 	{
-		BSDFContext GenerateImportanceSamplingContext(HitContext inHitContext, inout PathContext ioPathContext)
+		BSDFContext GenerateContext(HitContext inHitContext, inout PathContext ioPathContext)
 		{
 			float3 L = reflect(-inHitContext.ViewWS(), inHitContext.NormalWS());
 
@@ -408,20 +408,20 @@ namespace BSDFEvaluation
 		}
 	}
 
-	BSDFContext GenerateImportanceSamplingContext(HitContext inHitContext, inout PathContext ioPathContext)
+	BSDFContext GenerateContext(HitContext inHitContext, inout PathContext ioPathContext)
 	{
 		BSDFContext bsdf_context;
 
 		switch (inHitContext.BSDF())
 		{
-		case BSDF::Unsupported:					bsdf_context = Diffuse::GenerateImportanceSamplingContext(inHitContext, ioPathContext); break;
-		case BSDF::Diffuse:						bsdf_context = Diffuse::GenerateImportanceSamplingContext(inHitContext, ioPathContext); break;
-		case BSDF::Conductor:					bsdf_context = Conductor::GenerateImportanceSamplingContext(inHitContext, ioPathContext); break;
-		case BSDF::RoughConductor:				bsdf_context = RoughConductor::GenerateImportanceSamplingContext(inHitContext, ioPathContext); break;
-		case BSDF::Dielectric:					bsdf_context = Dielectric::GenerateImportanceSamplingContext(inHitContext, ioPathContext); break;
-		case BSDF::ThinDielectric:				bsdf_context = Dielectric::GenerateImportanceSamplingContext(inHitContext, ioPathContext); break;
-		case BSDF::RoughDielectric:				bsdf_context = RoughDielectric::GenerateImportanceSamplingContext(inHitContext, ioPathContext); break;
-		default:								bsdf_context = Diffuse::GenerateImportanceSamplingContext(inHitContext, ioPathContext); break;
+		case BSDF::Unsupported:					bsdf_context = Diffuse::GenerateContext(inHitContext, ioPathContext); break;
+		case BSDF::Diffuse:						bsdf_context = Diffuse::GenerateContext(inHitContext, ioPathContext); break;
+		case BSDF::Conductor:					bsdf_context = Conductor::GenerateContext(inHitContext, ioPathContext); break;
+		case BSDF::RoughConductor:				bsdf_context = RoughConductor::GenerateContext(inHitContext, ioPathContext); break;
+		case BSDF::Dielectric:					bsdf_context = Dielectric::GenerateContext(inHitContext, ioPathContext); break;
+		case BSDF::ThinDielectric:				bsdf_context = Dielectric::GenerateContext(inHitContext, ioPathContext); break;
+		case BSDF::RoughDielectric:				bsdf_context = RoughDielectric::GenerateContext(inHitContext, ioPathContext); break;
+		default:								bsdf_context = Diffuse::GenerateContext(inHitContext, ioPathContext); break;
 		}
 
 		DebugValue(PixelDebugMode::BRDF__L,		ioPathContext.mRecursionCount, float3(bsdf_context.mL));

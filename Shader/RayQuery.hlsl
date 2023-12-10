@@ -164,13 +164,12 @@ void TraceRay(PixelContext inPixelContext)
 				{
 					// Add light contribution with MIS
 					
-					// Select light (the light just hit)
-					Light light = Lights[hit_context.LightIndex()];
+					// Select light
+					uint light_index							= hit_context.LightIndex();
+					Light light									= Lights[light_index];
 
-					float3 light_sample_direction				= 0;
-					float light_sample_direction_pdf			= 0;
-					LightEvaluation::GenerateSamplingDirection(light, ray.Origin, path_context, light_sample_direction, light_sample_direction_pdf);
-					float light_pdf								= light_sample_direction_pdf * LightEvaluation::SelectLightPDF(hit_context.LightIndex());
+					LightContext light_context					= LightEvaluation::GenerateContext(light, ray.Origin, path_context);					
+					float light_pdf								= light_context.mLPDF * LightEvaluation::SelectLightPDF(light_index);
 					
 					float mis_weight							= max(0.0, MIS::PowerHeuristic(1, path_context.mPrevBSDFSamplePDF, 1, light_pdf));
 					path_context.mEmission						+= path_context.mThroughput * emission * mis_weight;
@@ -191,13 +190,11 @@ void TraceRay(PixelContext inPixelContext)
 					// Select light
 					uint light_index							= LightEvaluation::SelectLight(path_context);
 					Light light									= Lights[light_index];
-
-					float light_sample_direction_pdf			= 0;
-					float3 light_sample_direction				= 0;
-					LightEvaluation::GenerateSamplingDirection(light, hit_context.PositionWS(), path_context, light_sample_direction, light_sample_direction_pdf);					
-					float light_pdf								= light_sample_direction_pdf * LightEvaluation::SelectLightPDF(light_index);
 					
-					BSDFContext bsdf_context					= BSDFContext::Generate(BSDFContext::Mode::Light, light_sample_direction, hit_context);
+					LightContext light_context					= LightEvaluation::GenerateContext(light, hit_context.PositionWS(), path_context);					
+					float light_pdf								= light_context.mLPDF * LightEvaluation::SelectLightPDF(light_index);
+					
+					BSDFContext bsdf_context					= BSDFContext::Generate(BSDFContext::Mode::Light, light_context.mL, hit_context);
 					
 					DebugValue(PixelDebugMode::Light_L, path_context.mRecursionCount, float3(bsdf_context.mL));
 					DebugValue(PixelDebugMode::Light_V, path_context.mRecursionCount, float3(bsdf_context.mV));
@@ -245,7 +242,7 @@ void TraceRay(PixelContext inPixelContext)
 
 				// Sample BSDF
 				{
-					BSDFContext bsdf_context					= BSDFEvaluation::GenerateImportanceSamplingContext(hit_context, path_context);
+					BSDFContext bsdf_context					= BSDFEvaluation::GenerateContext(hit_context, path_context);
 					BSDFResult bsdf_result						= BSDFEvaluation::Evaluate(bsdf_context, hit_context, path_context);
 					
 					path_context.mEmission						+= path_context.mThroughput * emission; // Emissive BSDF
