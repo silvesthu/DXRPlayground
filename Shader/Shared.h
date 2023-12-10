@@ -220,19 +220,19 @@ enum class PixelDebugMode : uint
 
 	_Newline5,
 
-	// Light Sample
-	Light_L,
-	Light_V,
-	Light_N,
-	Light_H,
-
-	_Newline6,
-
 	BSDF__D,
 	BSDF__F,
 	BSDF__G,
 	BSDF__BSDF,
 	BSDF__PDF,
+
+	_Newline6,
+
+	// Light Sample
+	Light_L,
+	Light_V,
+	Light_N,
+	Light_H,
 
 	_Newline7,
 

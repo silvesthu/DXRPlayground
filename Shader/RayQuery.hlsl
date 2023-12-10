@@ -164,13 +164,14 @@ void TraceRay(PixelContext inPixelContext)
 				{
 					// Add light contribution with MIS
 					
+					// Select light (the light just hit)
 					Light light = Lights[hit_context.LightIndex()];
 
 					float3 light_sample_direction				= 0;
 					float light_sample_direction_pdf			= 0;
 					LightEvaluation::GenerateSamplingDirection(light, ray.Origin, path_context, light_sample_direction, light_sample_direction_pdf);
-
 					float light_pdf								= light_sample_direction_pdf * LightEvaluation::SelectLightPDF(hit_context.LightIndex());
+					
 					float mis_weight							= max(0.0, MIS::PowerHeuristic(1, path_context.mPrevBSDFSamplePDF, 1, light_pdf));
 					path_context.mEmission						+= path_context.mThroughput * emission * mis_weight;
 
@@ -193,15 +194,22 @@ void TraceRay(PixelContext inPixelContext)
 
 					float light_sample_direction_pdf			= 0;
 					float3 light_sample_direction				= 0;
-					LightEvaluation::GenerateSamplingDirection(light, hit_context.PositionWS(), path_context, light_sample_direction, light_sample_direction_pdf);
-					
+					LightEvaluation::GenerateSamplingDirection(light, hit_context.PositionWS(), path_context, light_sample_direction, light_sample_direction_pdf);					
 					float light_pdf								= light_sample_direction_pdf * LightEvaluation::SelectLightPDF(light_index);
+					
+					BSDFContext bsdf_context					= BSDFContext::Generate(BSDFContext::Mode::Light, light_sample_direction, hit_context);
+					
+					DebugValue(PixelDebugMode::Light_L, path_context.mRecursionCount, float3(bsdf_context.mL));
+					DebugValue(PixelDebugMode::Light_V, path_context.mRecursionCount, float3(bsdf_context.mV));
+					DebugValue(PixelDebugMode::Light_N, path_context.mRecursionCount, float3(bsdf_context.mN));
+					DebugValue(PixelDebugMode::Light_H, path_context.mRecursionCount, float3(bsdf_context.mH));
+					
 					if (light_pdf > 0)
 					{
 						// Cast shadow ray
 						RayDesc shadow_ray;
 						shadow_ray.Origin						= hit_context.PositionWS();
-						shadow_ray.Direction					= normalize(light_sample_direction);
+						shadow_ray.Direction					= bsdf_context.mL;
 						shadow_ray.TMin							= 0.001;
 						shadow_ray.TMax							= 100000;
 
@@ -214,7 +222,6 @@ void TraceRay(PixelContext inPixelContext)
 						// Shadow ray hit the light
 						if (shadow_query.CommittedStatus() == COMMITTED_TRIANGLE_HIT && shadow_query.CommittedInstanceID() == light.mInstanceID)
 						{
-							BSDFContext bsdf_context			= BSDFContext::Generate(BSDFContext::Mode::LightSample, shadow_ray.Direction, hit_context.mVertexNormalWS, -hit_context.mRayDirectionWS, 1.0, hit_context);
 							BSDFResult bsdf_result				= BSDFEvaluation::Evaluate(bsdf_context, hit_context, path_context);
 							
 							DebugValue(PixelDebugMode::Light_BSDF,	path_context.mRecursionCount, float3(bsdf_result.mBSDF));

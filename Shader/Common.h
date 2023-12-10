@@ -173,7 +173,7 @@ float3 F_Schlick(float3 inR0, float inHoV)
 
 // [Mitsuba3] fresnel in fresnel.h for dielectric-dielectric interface, unpolarized
 // Same as formulation on https://en.wikipedia.org/wiki/Fresnel_equations where r = R_eff = 1/2 * (R_s + R_p)
-void F_Dielectric_Mitsuba(float inEta, float inCosThetaI, out float outR, out float outCosThetaT, out float outEtaIT, out float outEtaTI)
+void F_Dielectric_Mitsuba(float inCosThetaI, float inEta, out float outR, out float outCosThetaT, out float outEtaIT, out float outEtaTI)
 {
     float eta = inEta;
     float cos_theta_i = inCosThetaI;
@@ -273,7 +273,7 @@ void DebugValue(PixelDebugMode inPixelDebugMode, uint inRecursionCount, float3 i
     if (mConstants.mPixelDebugMode == inPixelDebugMode)
     {
         if (sGetDispatchRaysIndex().x == mConstants.mPixelDebugCoord.x && sGetDispatchRaysIndex().y == mConstants.mPixelDebugCoord.y && inRecursionCount < Debug::kValueArraySize)
-            BufferDebugUAV[0].mPixelValueArray[inRecursionCount] = float4(inValue, 0.0);
+            BufferDebugUAV[0].mPixelValueArray[inRecursionCount] = float4(inValue, 1.0); // 1.0 indicate value is written
 
         if (mConstants.mPixelDebugRecursion == inRecursionCount)
             sDebugValue = float4(inValue, 1.0); // fill alpha to show on ImGui

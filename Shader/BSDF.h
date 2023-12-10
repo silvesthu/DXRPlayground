@@ -64,6 +64,7 @@ struct HitContext
 
 		return normal;
 	}
+	float			NdotV()						{ return dot(NormalWS(), ViewWS()); }
 
 	uint			mInstanceID;
 	uint			mPrimitiveIndex;
@@ -83,38 +84,42 @@ struct HitContext
 // Context information for BSDF evalution at the hit point
 struct BSDFContext
 {
+	// [NOTE] All vectors should be in the same space
+	//     [Mitsuba3] All calculation in tangent space where N = (0,0,1), then e.g NdotL = L.z
+
 	enum class Mode
 	{
-		BSDFSample,
-		LightSample,
+		BSDF,
+		Light,
 	};
+	Mode			mMode;
 
-	static BSDFContext Generate(BSDFContext::Mode inMode, float3 inLight, float3 inNormal, float3 inView, float inEta, HitContext inHitContext)
+	static BSDFContext Generate(Mode inMode, float3 inLight, float inEtaIT, bool inLobe0Selected, HitContext inHitContext)
 	{
-		// [NOTE] All vectors should be in the same space
-		//        [Mitsuba3] Does all calculation in tangent space where N = (0,0,1), then e.g NdotL = L.z
-
 		BSDFContext bsdf_context;
 
 		bsdf_context.mMode						= inMode;
 
 		bsdf_context.mL							= inLight;
-		bsdf_context.mN							= inNormal;
-		bsdf_context.mV							= inView;
-		bsdf_context.mH							= normalize(bsdf_context.mV + bsdf_context.mL * inEta);
-
-		// [TODO] Need stricter handling of side of vectors
-
+		bsdf_context.mN							= inHitContext.NormalWS();
+		bsdf_context.mV							= inHitContext.ViewWS();
+		bsdf_context.mH							= normalize(bsdf_context.mV + bsdf_context.mL * inEtaIT);	// See roughdielectric::eval
+	
 		bsdf_context.mNdotV						= dot(bsdf_context.mN, bsdf_context.mV);
 		bsdf_context.mNdotL						= dot(bsdf_context.mN, bsdf_context.mL);
 		bsdf_context.mNdotH						= dot(bsdf_context.mN, bsdf_context.mH);
 		bsdf_context.mHdotV						= dot(bsdf_context.mH, bsdf_context.mV);
 		bsdf_context.mHdotL						= dot(bsdf_context.mH, bsdf_context.mL);
 
+		bsdf_context.mLobe0Selected				= inLobe0Selected;
+
 		return bsdf_context;
 	}
 
-	Mode			mMode;
+	static BSDFContext Generate(Mode inMode, float3 inLight, HitContext inHitContext)
+	{
+		return Generate(inMode, inLight, 1.0, true, inHitContext);
+	}
 
 	float3			mL;
 	float3			mN;
@@ -126,6 +131,10 @@ struct BSDFContext
 	float			mNdotL;
 	float			mHdotV;
 	float			mHdotL;
+
+	bool			mLobe0Selected;		// [TODO] Need to handle more than 2 lobes?
+
+	float			mLPDF;				// For light sample
 };
 
 struct BSDFResult
@@ -154,12 +163,12 @@ namespace BSDFEvaluation
 	{
 		namespace GGX
 		{
-			float3 GenerateImportanceSamplingDirection(float3x3 inTangentSpace, HitContext inHitContext, inout PathContext ioPathContext)
+			float3 GenerateMicrofacetDirection(float3x3 inTangentSpace, HitContext inHitContext, inout PathContext ioPathContext)
 			{
 				float a							= inHitContext.RoughnessAlpha();
 				float a2						= a * a;
 
-				float3 H; // Microfacet normal (Half-vector)
+				float3 H; // Microfacet normal (Half-vector), sometimes called m
 				{
 					float e0					= RandomFloat01(ioPathContext.mRandomState);
 					float e1					= RandomFloat01(ioPathContext.mRandomState);
@@ -178,20 +187,20 @@ namespace BSDFEvaluation
 					H							= normalize(H.x * inTangentSpace[0] + H.y * inTangentSpace[1] + H.z * inTangentSpace[2]);
 				}
 
-				// Assume N, H, V on the same side
-				float3 V						= dot(inTangentSpace[2], inHitContext.mRayDirectionWS) < 0 ? -inHitContext.mRayDirectionWS : inHitContext.mRayDirectionWS;
-				float HdotV						= dot(H, V);
-				return 2.0 * HdotV * H - V;
+				return H;
 			}
 		}
 	}
 
 	namespace Diffuse
 	{
-		float3 GenerateImportanceSamplingDirection(float3x3 inTangentSpace, HitContext inHitContext, inout PathContext ioPathContext)
+		BSDFContext GenerateImportanceSamplingContext(HitContext inHitContext, inout PathContext ioPathContext)
 		{
-			float3 direction					= RandomCosineDirection(ioPathContext.mRandomState);
-			return normalize(direction.x * inTangentSpace[0] + direction.y * inTangentSpace[1] + direction.z * inTangentSpace[2]);
+			float3x3 tangent_space				= GenerateTangentSpace(inHitContext.NormalWS());
+			float3 randome_direction			= RandomCosineDirection(ioPathContext.mRandomState);
+			float3 L							= normalize(randome_direction.x * tangent_space[0] + randome_direction.y * tangent_space[1] + randome_direction.z * tangent_space[2]);
+
+			return BSDFContext::Generate(BSDFContext::Mode::BSDF, L, inHitContext);
 		}
 
 		BSDFResult Evaluate(BSDFContext inBSDFContext, HitContext inHitContext, inout PathContext ioPathContext)
@@ -217,18 +226,29 @@ namespace BSDFEvaluation
 
 	namespace Conductor
 	{
-		float3 GenerateImportanceSamplingDirection(float3x3 inTangentSpace, HitContext inHitContext, inout PathContext ioPathContext)
+		BSDFContext GenerateImportanceSamplingContext(HitContext inHitContext, inout PathContext ioPathContext)
 		{
-			return reflect(-inHitContext.ViewWS(), inHitContext.NormalWS());
+			float3 L							= reflect(-inHitContext.ViewWS(), inHitContext.NormalWS());
+
+			return BSDFContext::Generate(BSDFContext::Mode::BSDF, L, inHitContext);
 		}
 
 		BSDFResult Evaluate(BSDFContext inBSDFContext, HitContext inHitContext, inout PathContext ioPathContext)
 		{
 			float3 F							= F_Conductor_Mitsuba(inHitContext.Eta(), inHitContext.K(), inBSDFContext.mHdotV) * inHitContext.SpecularReflectance();
 
-			DebugValue(PixelDebugMode::BSDF__D, ioPathContext.mRecursionCount, float3(nan(), 0, 0));
-			DebugValue(PixelDebugMode::BSDF__G, ioPathContext.mRecursionCount, float3(nan(), 0, 0));
-			DebugValue(PixelDebugMode::BSDF__F, ioPathContext.mRecursionCount, float3(F));
+			if (inBSDFContext.mMode == BSDFContext::Mode::BSDF)
+			{
+				DebugValue(PixelDebugMode::BSDF__D, ioPathContext.mRecursionCount, float3(nan(), 0, 0));
+				DebugValue(PixelDebugMode::BSDF__G, ioPathContext.mRecursionCount, float3(nan(), 0, 0));
+				DebugValue(PixelDebugMode::BSDF__F, ioPathContext.mRecursionCount, float3(F));
+			}
+			else
+			{
+				DebugValue(PixelDebugMode::Light_D, ioPathContext.mRecursionCount, float3(nan(), 0, 0));
+				DebugValue(PixelDebugMode::Light_G, ioPathContext.mRecursionCount, float3(nan(), 0, 0));
+				DebugValue(PixelDebugMode::Light_F, ioPathContext.mRecursionCount, float3(F));
+			}
 
 			BSDFResult result;
 			result.mBSDF						= F;
@@ -246,9 +266,15 @@ namespace BSDFEvaluation
 
 	namespace RoughConductor
 	{
-		float3 GenerateImportanceSamplingDirection(float3x3 inTangentSpace, HitContext inHitContext, inout PathContext ioPathContext)
+		BSDFContext GenerateImportanceSamplingContext(HitContext inHitContext, inout PathContext ioPathContext)
 		{
-			return Distribution::GGX::GenerateImportanceSamplingDirection(inTangentSpace, inHitContext, ioPathContext);
+			float3x3 tangent_space				= GenerateTangentSpace(inHitContext.NormalWS());
+			float3 H							= Distribution::GGX::GenerateMicrofacetDirection(tangent_space, inHitContext, ioPathContext);
+			float3 V							= inHitContext.ViewWS();
+			float HdotV							= dot(H, V);
+			float3 L							= 2.0 * HdotV * H - V;
+
+			return BSDFContext::Generate(BSDFContext::Mode::BSDF, L, inHitContext);
 		}
 
 		BSDFResult Evaluate(BSDFContext inBSDFContext, HitContext inHitContext, inout PathContext ioPathContext)
@@ -264,9 +290,18 @@ namespace BSDFEvaluation
 			if (D < 0 || inBSDFContext.mNdotL < 0 || inBSDFContext.mNdotV < 0)
 				D								= 0;
 
-			DebugValue(PixelDebugMode::BSDF__D, ioPathContext.mRecursionCount, float3(D, 0, 0));
-			DebugValue(PixelDebugMode::BSDF__G, ioPathContext.mRecursionCount, float3(G, 0, 0));
-			DebugValue(PixelDebugMode::BSDF__F, ioPathContext.mRecursionCount, float3(F));
+			if (inBSDFContext.mMode == BSDFContext::Mode::BSDF)
+			{
+				DebugValue(PixelDebugMode::BSDF__D, ioPathContext.mRecursionCount, float3(D, 0, 0));
+				DebugValue(PixelDebugMode::BSDF__G, ioPathContext.mRecursionCount, float3(G, 0, 0));
+				DebugValue(PixelDebugMode::BSDF__F, ioPathContext.mRecursionCount, float3(F));
+			}
+			else
+			{
+				DebugValue(PixelDebugMode::Light_D, ioPathContext.mRecursionCount, float3(D, 0, 0));
+				DebugValue(PixelDebugMode::Light_G, ioPathContext.mRecursionCount, float3(G, 0, 0));
+				DebugValue(PixelDebugMode::Light_F, ioPathContext.mRecursionCount, float3(F));
+			}
 
 			// [NOTE] Sample may return BSDF * NdotL / PDF as a whole or in separated terms, which varies between implementations.
 			//        Also, NdotL needs to be eliminated for Dirac delta distribution.
@@ -293,21 +328,13 @@ namespace BSDFEvaluation
 
 	namespace Dielectric
 	{
-		float3 GenerateImportanceSamplingDirection(float3x3 inTangentSpace, HitContext inHitContext, inout PathContext ioPathContext)
+		BSDFContext GenerateImportanceSamplingContext(HitContext inHitContext, inout PathContext ioPathContext)
 		{
-			// Dummy, will generate sampling direction in Evaluate
-			return reflect(inHitContext.mRayDirectionWS, inTangentSpace[2]);
-		}
-
-		BSDFResult Evaluate(BSDFContext inBSDFContext, HitContext inHitContext, inout PathContext ioPathContext)
-		{
-			// [NOTE] L and related information are not avaiable yet before selection between reflection and refraction
-
 			float r_i;
 			float cos_theta_t;
 			float eta_it;
 			float eta_ti;
-			F_Dielectric_Mitsuba(InstanceDatas[inHitContext.mInstanceID].mEta.x, inBSDFContext.mNdotV, r_i, cos_theta_t, eta_it, eta_ti);
+			F_Dielectric_Mitsuba(inHitContext.NdotV(), inHitContext.Eta().x, r_i, cos_theta_t, eta_it, eta_ti);
 
 			if (inHitContext.BSDF() == BSDF::ThinDielectric)
 			{
@@ -317,22 +344,31 @@ namespace BSDFEvaluation
 				//			 = r + (1 - r) ^ 2 * r * \sum_0^\infty r^{2i}
 				//			 = r * 2 / (r+1)
 				r_i								*= 2.0f / (1.0f + r_i);
-
-				// No change of direction for transmittion
-				cos_theta_t						= inBSDFContext.mNdotV;
+				// Need to patch cos_theta_t either, but leave it since unused
 				eta_it							= 1.0f;
 				eta_ti							= 1.0f;
 			}
 
 			bool selected_r						= RandomFloat01(ioPathContext.mRandomState) <= r_i;
 			float3 L							= select(selected_r,
-													reflect(-inBSDFContext.mV, inBSDFContext.mNdotV < 0 ? -inBSDFContext.mN : inBSDFContext.mN),
-													refract(-inBSDFContext.mV, inBSDFContext.mNdotV < 0 ? -inBSDFContext.mN : inBSDFContext.mN, eta_ti));
+													reflect(-inHitContext.ViewWS(), inHitContext.NdotV() < 0 ? -inHitContext.NormalWS() : inHitContext.NormalWS()),
+													refract(-inHitContext.ViewWS(), inHitContext.NdotV() < 0 ? -inHitContext.NormalWS() : inHitContext.NormalWS(), eta_ti));
+			
+			return BSDFContext::Generate(BSDFContext::Mode::BSDF, L, select(selected_r, 1.0, eta_it), selected_r, inHitContext);
+		}
 
-			inBSDFContext						= BSDFContext::Generate(inBSDFContext.mMode, L, inBSDFContext.mN, inBSDFContext.mV, select(selected_r, 1.0, eta_it), inHitContext);
+		BSDFResult Evaluate(BSDFContext inBSDFContext, HitContext inHitContext, inout PathContext ioPathContext)
+		{
+			float r_i;
+			float cos_theta_t;
+			float eta_it;
+			float eta_ti;
+			F_Dielectric_Mitsuba(inHitContext.NdotV(), inHitContext.Eta().x, r_i, cos_theta_t, eta_it, eta_ti);
+
+			bool selected_r						= inBSDFContext.mLobe0Selected;
 
 			BSDFResult result;
-			result.mBSDF						= select(selected_r, r_i, 1.0 - r_i) * select(selected_r, InstanceDatas[inHitContext.mInstanceID].mSpecularReflectance, InstanceDatas[inHitContext.mInstanceID].mSpecularTransmittance);
+			result.mBSDF						= select(selected_r, r_i, 1.0 - r_i) * select(selected_r, inHitContext.SpecularReflectance(), inHitContext.SpecularTransmittance());
 			result.mBSDFSamplePDF				= select(selected_r, r_i, 1.0 - r_i);
 
 			// [NOTE] Account for solid angle compression
@@ -355,78 +391,15 @@ namespace BSDFEvaluation
 
 	namespace RoughDielectric
 	{
-		float3 GenerateImportanceSamplingDirection(float3x3 inTangentSpace, HitContext inHitContext, inout PathContext ioPathContext)
+		BSDFContext GenerateImportanceSamplingContext(HitContext inHitContext, inout PathContext ioPathContext)
 		{
-			return Distribution::GGX::GenerateImportanceSamplingDirection(inTangentSpace, inHitContext, ioPathContext);
+			float3 L = reflect(-inHitContext.ViewWS(), inHitContext.NormalWS());
+
+			return BSDFContext::Generate(BSDFContext::Mode::BSDF, L, inHitContext);
 		}
 
 		BSDFResult Evaluate(BSDFContext inBSDFContext, HitContext inHitContext, inout PathContext ioPathContext)
 		{
-			//float r_i;
-			//float cos_theta_t;
-			//float eta_it;
-			//float eta_ti;
-			//F_Dielectric_Mitsuba(InstanceDatas[inHitContext.mInstanceID].mEta.x, inBSDFContext.mNdotV, r_i, cos_theta_t, eta_it, eta_ti);
-	
-			//bool selected_r = false;
-			//if (inBSDFContext.mMode == BSDFContext::Mode::BSDFSample)
-			//{
-			//	selected_r = RandomFloat01(ioPathContext.mRandomState) <= r_i;
-
-			//	float3 L = select(selected_r,
-			//		reflect(-inBSDFContext.mV, inBSDFContext.mNdotV < 0 ? -inBSDFContext.mH : inBSDFContext.mH),
-			//		refract(-inBSDFContext.mV, inBSDFContext.mNdotV < 0 ? -inBSDFContext.mH : inBSDFContext.mH, eta_ti));
-
-			//	inBSDFContext = BSDFContext::Generate(inBSDFContext.mMode, L, inBSDFContext.mN, inBSDFContext.mV, select(selected_r, 1.0, eta_it), inHitContext);
-
-			//	DebugValue(PixelDebugMode::L2, ioPathContext.mRecursionCount, float3(inBSDFContext.mL));
-			//	DebugValue(PixelDebugMode::V2, ioPathContext.mRecursionCount, float3(inBSDFContext.mV));
-			//	DebugValue(PixelDebugMode::N2, ioPathContext.mRecursionCount, float3(inBSDFContext.mN));
-			//	DebugValue(PixelDebugMode::H2, ioPathContext.mRecursionCount, float3(inBSDFContext.mH));
-			//}
-			//else
-			//{
-			//	selected_r = inBSDFContext.mNdotV * inBSDFContext.mNdotL > 0;
-
-			//	inBSDFContext = BSDFContext::Generate(inBSDFContext.mMode, inBSDFContext.mL, inBSDFContext.mN, inBSDFContext.mV, select(selected_r, 1.0, eta_it), inHitContext);
-
-			//	DebugValue(PixelDebugMode::L3, ioPathContext.mRecursionCount, float3(inBSDFContext.mL));
-			//	DebugValue(PixelDebugMode::V3, ioPathContext.mRecursionCount, float3(inBSDFContext.mV));
-			//	DebugValue(PixelDebugMode::N3, ioPathContext.mRecursionCount, float3(inBSDFContext.mN));
-			//	DebugValue(PixelDebugMode::H3, ioPathContext.mRecursionCount, float3(inBSDFContext.mH));
-			//}
-
-			//float D = D_GGX(inBSDFContext.mNdotH, inHitContext.RoughnessAlpha());
-			//float G = G_SmithGGX(abs(inBSDFContext.mNdotL), abs(inBSDFContext.mNdotV), inHitContext.RoughnessAlpha());
-			//float3 F = select(selected_r, InstanceDatas[inHitContext.mInstanceID].mSpecularReflectance, InstanceDatas[inHitContext.mInstanceID].mSpecularTransmittance);
-
-			//if (inBSDFContext.mMode == BSDFContext::Mode::BSDFSample)
-			//{
-			//	DebugValue(PixelDebugMode::BSDF__D, ioPathContext.mRecursionCount, float3(D, inBSDFContext.mNdotH, inHitContext.RoughnessAlpha()));
-			//	DebugValue(PixelDebugMode::BSDF__G, ioPathContext.mRecursionCount, float3(G, 0, 0));
-			//	DebugValue(PixelDebugMode::BSDF__F, ioPathContext.mRecursionCount, float3(F));
-			//}
-			//else
-			//{
-			//	DebugValue(PixelDebugMode::Light_D, ioPathContext.mRecursionCount, float3(D, inBSDFContext.mNdotH, inHitContext.RoughnessAlpha()));
-			//	DebugValue(PixelDebugMode::Light_G, ioPathContext.mRecursionCount, float3(G, 0, 0));
-			//	DebugValue(PixelDebugMode::Light_F, ioPathContext.mRecursionCount, float3(F));
-			//}
-
-			//inBSDFContext.mBSDF = abs(select(selected_r, 
-			//	D * G * F / (4.0f * inBSDFContext.mNdotV * inBSDFContext.mNdotL),
-			//	D * G * F * inBSDFContext.mHdotV * (sqr(eta_it) * inBSDFContext.mHdotL) / (inBSDFContext.mNdotV * inBSDFContext.mNdotL * sqr(inBSDFContext.mHdotV + eta_it * inBSDFContext.mHdotL))));
-			//inBSDFContext.mBSDF *= select(selected_r, r_i, 1.0 - r_i);
-
-			//inBSDFContext.mBSDFSamplePDF = abs(select(selected_r, 
-			//	(D * inBSDFContext.mNdotH) / (4.0f * inBSDFContext.mHdotL),
-			//	(D * inBSDFContext.mNdotH) * (sqr(eta_it) * inBSDFContext.mHdotL) / sqr(inBSDFContext.mHdotV + eta_it * inBSDFContext.mHdotL)));
-			//inBSDFContext.mBSDFSamplePDF *= select(selected_r, r_i, 1.0 - r_i);
-
-			//// See Dielectric::Evaluate
-			//inBSDFContext.mBSDF *= select(selected_r, 1.0, sqr(eta_ti));
-			//inBSDFContext.mEta = select(selected_r, 1.0, eta_it);
-
 			BSDFResult result;
 			result.mBSDF						= 0;
 			result.mBSDFSamplePDF				= 0;
@@ -437,41 +410,30 @@ namespace BSDFEvaluation
 
 	BSDFContext GenerateImportanceSamplingContext(HitContext inHitContext, inout PathContext ioPathContext)
 	{
-		float3x3 tangent_space					= GenerateTangentSpace(inHitContext.NormalWS());
-		float3 importance_sampling_direction	= 0;
+		BSDFContext bsdf_context;
+
 		switch (inHitContext.BSDF())
 		{
-		case BSDF::Unsupported:					// [[fallthrough]];
-		case BSDF::Diffuse:						importance_sampling_direction = Diffuse::GenerateImportanceSamplingDirection(tangent_space, inHitContext, ioPathContext); break;
-		case BSDF::Conductor:					importance_sampling_direction = Conductor::GenerateImportanceSamplingDirection(tangent_space, inHitContext, ioPathContext); break;
-		case BSDF::RoughConductor:				importance_sampling_direction = RoughConductor::GenerateImportanceSamplingDirection(tangent_space, inHitContext, ioPathContext); break;
-		case BSDF::Dielectric:					importance_sampling_direction = Dielectric::GenerateImportanceSamplingDirection(tangent_space, inHitContext, ioPathContext); break;
-		case BSDF::ThinDielectric:				importance_sampling_direction = Dielectric::GenerateImportanceSamplingDirection(tangent_space, inHitContext, ioPathContext); break;
-		case BSDF::RoughDielectric:				importance_sampling_direction = RoughDielectric::GenerateImportanceSamplingDirection(tangent_space, inHitContext, ioPathContext); break;
-		default:								break;
+		case BSDF::Unsupported:					bsdf_context = Diffuse::GenerateImportanceSamplingContext(inHitContext, ioPathContext); break;
+		case BSDF::Diffuse:						bsdf_context = Diffuse::GenerateImportanceSamplingContext(inHitContext, ioPathContext); break;
+		case BSDF::Conductor:					bsdf_context = Conductor::GenerateImportanceSamplingContext(inHitContext, ioPathContext); break;
+		case BSDF::RoughConductor:				bsdf_context = RoughConductor::GenerateImportanceSamplingContext(inHitContext, ioPathContext); break;
+		case BSDF::Dielectric:					bsdf_context = Dielectric::GenerateImportanceSamplingContext(inHitContext, ioPathContext); break;
+		case BSDF::ThinDielectric:				bsdf_context = Dielectric::GenerateImportanceSamplingContext(inHitContext, ioPathContext); break;
+		case BSDF::RoughDielectric:				bsdf_context = RoughDielectric::GenerateImportanceSamplingContext(inHitContext, ioPathContext); break;
+		default:								bsdf_context = Diffuse::GenerateImportanceSamplingContext(inHitContext, ioPathContext); break;
 		}
 
- 		BSDFContext bsdf_context				= BSDFContext::Generate(BSDFContext::Mode::BSDFSample, importance_sampling_direction, inHitContext.NormalWS(), inHitContext.ViewWS(), 1.0, inHitContext);
+		DebugValue(PixelDebugMode::BRDF__L,		ioPathContext.mRecursionCount, float3(bsdf_context.mL));
+		DebugValue(PixelDebugMode::BRDF__V,		ioPathContext.mRecursionCount, float3(bsdf_context.mV));
+		DebugValue(PixelDebugMode::BRDF__N,		ioPathContext.mRecursionCount, float3(bsdf_context.mN));
+		DebugValue(PixelDebugMode::BRDF__H,		ioPathContext.mRecursionCount, float3(bsdf_context.mH));
+
 		return bsdf_context;
 	}
 
 	BSDFResult Evaluate(BSDFContext inBSDFContext, HitContext inHitContext, inout PathContext ioPathContext)
 	{
-		if (inBSDFContext.mMode == BSDFContext::Mode::BSDFSample)
-		{
-			DebugValue(PixelDebugMode::BRDF__L, ioPathContext.mRecursionCount, float3(inBSDFContext.mL));
-			DebugValue(PixelDebugMode::BRDF__V, ioPathContext.mRecursionCount, float3(inBSDFContext.mV));
-			DebugValue(PixelDebugMode::BRDF__N, ioPathContext.mRecursionCount, float3(inBSDFContext.mN));
-			DebugValue(PixelDebugMode::BRDF__H, ioPathContext.mRecursionCount, float3(inBSDFContext.mH));
-		}
-		else
-		{
-			DebugValue(PixelDebugMode::Light_L, ioPathContext.mRecursionCount, float3(inBSDFContext.mL));
-			DebugValue(PixelDebugMode::Light_V, ioPathContext.mRecursionCount, float3(inBSDFContext.mV));
-			DebugValue(PixelDebugMode::Light_N, ioPathContext.mRecursionCount, float3(inBSDFContext.mN));
-			DebugValue(PixelDebugMode::Light_H, ioPathContext.mRecursionCount, float3(inBSDFContext.mH));
-		}
-
 		BSDFResult result;
 		switch (inHitContext.BSDF())
 		{
