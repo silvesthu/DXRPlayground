@@ -58,7 +58,7 @@ enum class ScenePresetType
 	Count,
 };
 
-static ScenePresetType sCurrentScene = ScenePresetType::VeachMIS;
+static ScenePresetType sCurrentScene = ScenePresetType::CornellBoxBSDF;
 static ScenePresetType sPreviousScene = sCurrentScene;
 static ScenePreset kScenePresets[(int)ScenePresetType::Count] =
 {

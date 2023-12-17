@@ -87,10 +87,12 @@ float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 {
 	RWTexture2D<float4> screen_color = ResourceDescriptorHeap[(int)ViewDescriptorIndex::ScreenColorUAV];
 
+	int2 coords = (int2)position.xy;
 	float4 color = screen_color[position.xy];
-	if ((int)position.x == mConstants.mPixelDebugCoord.x && (int)position.y == mConstants.mPixelDebugCoord.y)
+	bool debug_pixel = all(coords == mConstants.mPixelDebugCoord);
+	if (debug_pixel)
 		BufferDebugUAV[0].mPixelValue = color;
-
+	
 	// For visualization
 	switch (mConstants.mDebugMode)
 	{
@@ -108,7 +110,17 @@ float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 	case DebugMode::RecursionCount:				color.xyz = hsv2rgb(float3(color.x / 8.0, 1, 1)); break;
 	default:									break;
 	}
-
+	
+	if (!debug_pixel)
+	{
+		if (coords.y == mConstants.mPixelDebugCoord.y)
+			if (abs(coords.x - mConstants.mPixelDebugCoord.x) < 10)
+				color.xyz = float3(1, 0, 1);
+		if (coords.x == mConstants.mPixelDebugCoord.x)
+			if (abs(coords.y - mConstants.mPixelDebugCoord.y) < 10)
+				color.xyz = float3(1, 0, 1);
+	}
+	
 	color.xyz = ApplySRGBCurve(color.xyz);
 	return float4(color.xyz, 1);
 }

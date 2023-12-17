@@ -208,6 +208,7 @@ enum class PixelDebugMode : uint
 	_Newline1,
 
 	PositionWS,
+	DirectionWS,
 	InstanceID,
 
 	_Newline4,

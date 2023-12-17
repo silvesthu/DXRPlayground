@@ -43,6 +43,7 @@ float3 RandomCosineDirection(inout uint state)
 {
     float r1 = RandomFloat01(state);
     float r2 = RandomFloat01(state);
+
     float z = sqrt(1 - r2);
 
     float phi = 2 * MATH_PI * r1;

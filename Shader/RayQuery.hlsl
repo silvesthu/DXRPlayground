@@ -115,6 +115,8 @@ void TraceRay(PixelContext inPixelContext)
 					BufferDebugUAV[0].mPixelInstanceID			= hit_context.mInstanceID;
 				
 				DebugValue(PixelDebugMode::PositionWS, path_context.mRecursionCount, float3(hit_context.PositionWS()));
+				DebugValue(PixelDebugMode::DirectionWS, path_context.mRecursionCount, float3(hit_context.DirectionWS()));
+				// DebugValue(PixelDebugMode::DirectionWS, path_context.mRecursionCount, float3(hit_context.DirectionWS() * 0.5 + 0.5));
 				DebugValue(PixelDebugMode::InstanceID, path_context.mRecursionCount, float3(hit_context.mInstanceID, 0.0, 0.0));
 			}
 

@@ -52,6 +52,7 @@ struct HitContext
 	}
 
 	float3			PositionWS()				{ return mRayOriginWS + mRayDirectionWS * mRayTCurrent; }
+	float3			DirectionWS()				{ return mRayDirectionWS; }
 	float3			ViewWS()					{ return -mRayDirectionWS; }
 	float3			NormalWS()
 	{
@@ -328,26 +329,45 @@ namespace BSDFEvaluation
 
 	namespace Dielectric
 	{
+		void PatchThinDielectricBefore(HitContext inHitContext, inout float ioCosTheta, inout float ioEta)
+		{
+			if (inHitContext.BSDF() != BSDF::ThinDielectric)
+				return;
+
+			// [NOTE] ThinDielectric essentially mean IOR is same on both side, hence the abs
+			ioCosTheta = abs(ioCosTheta);
+		}
+
+		void PatchThinDielectricAfter(HitContext inHitContext, inout float ioR, inout float ioCosThetaT, inout float ioEtaIT, inout float ioEtaTI)
+		{
+			if (inHitContext.BSDF() != BSDF::ThinDielectric)
+				return;
+
+			// Account for internal reflections: r' = r + trt + tr^3t + ..
+			// [NOTE] r' = r + trt + tr^3t + .. 
+			//           = r + (1 - r) * r * (1-r) + (1-r) * r^3 * (1-r) + ...
+			//			 = r + (1 - r) ^ 2 * r * \sum_0^\infty r^{2i}
+			//			 = r * 2 / (r+1)
+			ioR									*= 2.0f / (1.0f + ioR);
+			// Need to patch cos_theta_t either, but leave it since unused
+			ioEtaIT								= 1.0f;
+			ioEtaTI								= 1.0f;
+
+			// [NOTE] Somehow in implementation of Mitsuba3, flag DeltaTransmission looks missing, not sure why
+			// https://github.com/mitsuba-renderer/mitsuba/blob/10af06f365886c1b6dd8818e0a3841078a62f283/src/bsdfs/thindielectric.cpp#L226
+		}
+
 		BSDFContext GenerateContext(HitContext inHitContext, inout PathContext ioPathContext)
 		{
+			float cos_theta						= inHitContext.NdotV();
+			float eta							= inHitContext.Eta().x;
 			float r_i;
 			float cos_theta_t;
 			float eta_it;
 			float eta_ti;
-			F_Dielectric_Mitsuba(inHitContext.NdotV(), inHitContext.Eta().x, r_i, cos_theta_t, eta_it, eta_ti);
-
-			if (inHitContext.BSDF() == BSDF::ThinDielectric)
-			{
-				// Account for internal reflections: r' = r + trt + tr^3t + ..
-				// [NOTE] r' = r + trt + tr^3t + .. 
-				//           = r + (1 - r) * r * (1-r) + (1-r) * r^3 * (1-r) + ...
-				//			 = r + (1 - r) ^ 2 * r * \sum_0^\infty r^{2i}
-				//			 = r * 2 / (r+1)
-				r_i								*= 2.0f / (1.0f + r_i);
-				// Need to patch cos_theta_t either, but leave it since unused
-				eta_it							= 1.0f;
-				eta_ti							= 1.0f;
-			}
+			PatchThinDielectricBefore(inHitContext, cos_theta, eta);
+			F_Dielectric_Mitsuba(cos_theta, eta, r_i, cos_theta_t, eta_it, eta_ti);
+			PatchThinDielectricAfter(inHitContext, r_i, cos_theta_t, eta_it, eta_ti);
 
 			bool selected_r						= RandomFloat01(ioPathContext.mRandomState) <= r_i;
 			float3 L							= select(selected_r,
@@ -359,11 +379,15 @@ namespace BSDFEvaluation
 
 		BSDFResult Evaluate(BSDFContext inBSDFContext, HitContext inHitContext, inout PathContext ioPathContext)
 		{
+			float cos_theta						= inHitContext.NdotV();
+			float eta							= inHitContext.Eta().x;
 			float r_i;
 			float cos_theta_t;
 			float eta_it;
 			float eta_ti;
-			F_Dielectric_Mitsuba(inHitContext.NdotV(), inHitContext.Eta().x, r_i, cos_theta_t, eta_it, eta_ti);
+			PatchThinDielectricBefore(inHitContext, cos_theta, eta);
+			F_Dielectric_Mitsuba(cos_theta, eta, r_i, cos_theta_t, eta_it, eta_ti);
+			PatchThinDielectricAfter(inHitContext, r_i, cos_theta_t, eta_it, eta_ti);
 
 			bool selected_r						= inBSDFContext.mLobe0Selected;
 
@@ -393,6 +417,32 @@ namespace BSDFEvaluation
 	{
 		BSDFContext GenerateContext(HitContext inHitContext, inout PathContext ioPathContext)
 		{
+			//float3x3 tangent_space = GenerateTangentSpace(inHitContext.NormalWS());
+			//float3 H = Distribution::GGX::GenerateMicrofacetDirection(tangent_space, inHitContext, ioPathContext);
+			//float3 V = inHitContext.ViewWS();
+			//float HdotV = dot(H, V);
+			//float3 L = 2.0 * HdotV * H - V;
+
+			//return BSDFContext::Generate(BSDFContext::Mode::BSDF, L, inHitContext);
+
+			//float r_i;
+			//float cos_theta_t;
+			//float eta_it;
+			//float eta_ti;
+			//F_Dielectric_Mitsuba(inHitContext.NdotV(), inHitContext.Eta().x, r_i, cos_theta_t, eta_it, eta_ti);
+
+			//if (inHitContext.BSDF() == BSDF::ThinDielectric)
+			//	PatchThinDielectric(r_i, cos_theta_t, eta_it, eta_ti);
+
+			//bool selected_r = RandomFloat01(ioPathContext.mRandomState) <= r_i;
+			//float3 L = select(selected_r,
+			//	reflect(-inHitContext.ViewWS(), inHitContext.NdotV() < 0 ? -inHitContext.NormalWS() : inHitContext.NormalWS()),
+			//	refract(-inHitContext.ViewWS(), inHitContext.NdotV() < 0 ? -inHitContext.NormalWS() : inHitContext.NormalWS(), eta_ti));
+
+			//return BSDFContext::Generate(BSDFContext::Mode::BSDF, L, select(selected_r, 1.0, eta_it), selected_r, inHitContext);
+
+
+
 			float3 L = reflect(-inHitContext.ViewWS(), inHitContext.NormalWS());
 
 			return BSDFContext::Generate(BSDFContext::Mode::BSDF, L, inHitContext);
