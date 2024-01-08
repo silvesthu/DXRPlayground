@@ -149,11 +149,37 @@ float D_GGX(float inNdotH, float inA)
     // [TODO] Check VNDF
 }
 
-// [TODO] G_SmithGGX_Lambda, G_SmithGGX_1
+float G1_SmithGGX(float inNdotX, float inA)
+{
+    // [Heitz 2014] Original https://jcgt.org/published/0003/02/03/paper.pdf
+    // [Filament] Smith-GGX https://google.github.io/filament/Filament.md.html#materialsystem/specularbrdf/geometricshadowing(specularg)
+    // [NOTE] Some implementations use tangent instead of cosine, and keep the lambda as it is (most likely non-real-time ones).
 
-// [Schuttejoe 2018] https://schuttejoe.github.io/post/ggximportancesamplingpart1/
+    float a = inA;
+    float a2 = a * a;
+
+    // [NOTE] inNdotX * inNdotX = cos^2, 1 - inNdotX * inNdotX = sin^2, (1 - inNdotX * inNdotX) / (inNdotX * inNdotX) = tan^2
+    float denom = 1.0 + sqrt(1.0 + a2 * (1 - inNdotX * inNdotX) / (inNdotX * inNdotX));
+
+    // [TODO][Mitsuba] Perpendicular incidence
+    // [TODO][Mitsuba] Ensure consistent orientation
+
+    return 2.0 / denom;
+}
+
 float G_SmithGGX(float inNdotL, float inNdotV, float inA)
 {
+    return G1_SmithGGX(inNdotL, inA) * G1_SmithGGX(inNdotV, inA);
+}
+
+// [Schuttejoe 2018] https://schuttejoe.github.io/post/ggximportancesamplingpart1/
+float G_SmithGGX_Correlated(float inNdotL, float inNdotV, float inA)
+{
+    // [Heitz 2014] Original https://jcgt.org/published/0003/02/03/paper.pdf
+    // [Filament] V_SmithGGXCorrelated. Note that V = G / (4 * NdotL * NdotV) https://google.github.io/filament/Filament.md.html#materialsystem/specularbrdf/geometricshadowing(specularg)
+    // [NOTE] Some implementations use tangent instead of cosine, and keep the lambda as it is (most likely non-real-time ones).
+    // [TODO] How to make it work for dieletric? Where NdotL and NdotV may have different signs, is taking abs mathmatically correct?
+
     float a = inA;
     float a2 = a * a;
 
@@ -161,10 +187,6 @@ float G_SmithGGX(float inNdotL, float inNdotV, float inA)
     float denomB = inNdotL * sqrt(a2 + (1.0 - a2) * inNdotV * inNdotV);
 
     return 2.0 * inNdotL * inNdotV / (denomA + denomB);
-
-    // [Heitz 2014] original https://jcgt.org/published/0003/02/03/paper.pdf
-    // [Filament] V_SmithGGXCorrelated. Note that V = G / (4 * NdotL * NdotV) https://google.github.io/filament/Filament.md.html#materialsystem/specularbrdf/geometricshadowing(specularg)
-    // Also some implementation use tangent instead of cosine, and keep the lambda as it is.
 }
 
 float3 F_Schlick(float3 inR0, float inHoV)

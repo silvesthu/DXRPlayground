@@ -43,7 +43,7 @@ enum class ScenePresetType
 	None,
 
 	CornellBox,
-	CornellBoxBSDF,
+	CornellBoxDielectric,
 	CornellBoxTeapot,
 	CornellBoxMonkey,
 	VeachMIS,
@@ -58,13 +58,13 @@ enum class ScenePresetType
 	Count,
 };
 
-static ScenePresetType sCurrentScene = ScenePresetType::CornellBoxBSDF;
+static ScenePresetType sCurrentScene = ScenePresetType::CornellBoxDielectric;
 static ScenePresetType sPreviousScene = sCurrentScene;
 static ScenePreset kScenePresets[(int)ScenePresetType::Count] =
 {
 	ScenePreset().Name("None"),
 	ScenePreset().Name("CornellBox").Path("Asset/Comparison/benedikt-bitterli/cornell-box/scene_v3.xml"),
-	ScenePreset().Name("CornellBoxBSDF").Path("Asset/Comparison/benedikt-bitterli/cornell-box-bsdf/scene_v3.xml"),
+	ScenePreset().Name("CornellBoxDielectric").Path("Asset/Comparison/benedikt-bitterli/cornell-box-dielectric/scene_v3.xml"),
 	ScenePreset().Name("CornellBoxTeapot").Path("Asset/Comparison/benedikt-bitterli/cornell-box-teapot/scene_v3.xml"),
 	ScenePreset().Name("CornellMonkey").Path("Asset/Comparison/benedikt-bitterli/cornell-box-monkey/scene_v3.xml"),
 	ScenePreset().Name("VeachMIS").Path("Asset/Comparison/benedikt-bitterli/veach-mis/scene_ggx_v3.xml"),
@@ -225,6 +225,8 @@ static void sPrepareImGui()
 				gRenderer.mAccumulationResetRequested = true;
 			ImGui::SameLine();
 			ImGui::Checkbox("Paused", &gRenderer.mAccumulationPaused);
+			ImGui::SameLine();
+			ImGui::Checkbox("Vsync", &gDisplaySettings.mVsync);
 
 			if (!gRenderer.mAccumulationFrameUnlimited)
 				if (ImGui::SliderInt("Frame Count", reinterpret_cast<int*>(&gRenderer.mAccumulationFrameCount), 1, 64))

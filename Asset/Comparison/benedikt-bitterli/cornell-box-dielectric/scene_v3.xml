@@ -1,0 +1,128 @@
+<scene version="3.0.0">
+	<default name="integrator" value="path" />
+	<!-- <default name="integrator" value="direct" /> -->
+	<default name="spp" value="64" />
+	<default name="resx" value="1920" />
+	<default name="resy" value="1080" />
+	<default name="max_depth" value="16" />
+	<integrator type="$integrator">
+		<integer name="max_depth" value="$max_depth" />
+		<integer name="rr_depth" value="16" />
+		<!-- <integer name="emitter_samples" value="0" /> -->
+		<!-- <integer name="bsdf_samples" value="1" /> -->
+	</integrator>
+<!-- 	<integrator type="aov">
+	    <string name="aovs" value="dd.y:depth,nn:sh_normal"/>
+	    <integrator type="path" name="my_image"/>
+	</integrator> -->
+	<sensor type="perspective">
+		<float name="fov" value="45" />
+		<transform name="to_world">
+			<!-- Front View -->
+			<!-- <matrix value="-1 0 0 0 0 1 0 1 0 0 -1 6 0 0 0 1" /> -->
+			<!-- Back View -->
+			<matrix value="1 0 0 0 0 1 0 1 0 -0 1 -6 0 0 0 1" />
+		</transform>
+		<sampler type="independent">
+			<integer name="sample_count" value="$spp" />
+		</sampler>
+		<film type="hdrfilm">
+			<integer name="width" value="$resx" />
+			<integer name="height" value="$resy" />
+			<string name="file_format" value="openexr" />
+			<string name="pixel_format" value="rgb" />
+			<rfilter type="box" />
+		</film>
+	</sensor>
+	<bsdf type="twosided" id="LeftWallBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0.63, 0.065, 0.05" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="RightWallBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0.14, 0.45, 0.091" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="FloorBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0.725, 0.71, 0.68" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="CeilingBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0.725, 0.71, 0.68" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="BackWallBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0.725, 0.71, 0.68" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="ShortBoxBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0.725, 0.71, 0.68" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="TallBoxBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0.725, 0.71, 0.68" />
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="LightBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0, 0, 0" />
+		</bsdf>
+	</bsdf>
+	<!-- <bsdf type="dielectric" id="TargetBSDF"> -->
+	<!-- <bsdf type="thindielectric" id="TargetBSDF"> -->
+	<bsdf type="roughdielectric" id="TargetBSDF">
+		<float name="alpha" value="0.001" />
+		<string name="distribution" value="ggx" />
+		<float name="int_ior" value="1" />
+		<float name="ext_ior" value="1.5" />
+		<!-- <rgb name="specular_reflectance" value="0, 0, 0" /> -->
+		<!-- <rgb name="specular_transmittance" value="0, 0, 0" /> -->
+		<boolean name="sample_visible" value="false" />
+	</bsdf>
+	<shape type="rectangle" id="Floor">
+		<transform name="to_world">
+			<matrix value="0 1 0 0 0 0 -2 0 1 0 0 0 0 0 0 1" />
+		</transform>
+		<ref id="FloorBSDF" />
+	</shape>
+	<shape type="rectangle" id="Ceiling">
+		<transform name="to_world">
+			<matrix value="-1 0 0 0 0 0 -2 2 0 -1 0 0 0 0 0 1" />
+		</transform>
+		<ref id="CeilingBSDF" />
+	</shape>
+	<shape type="rectangle" id="BackWall">
+		<transform name="to_world">
+			<matrix value="0 1 0 0 1 0 0 1 0 0 -2 -1 0 0 0 1" />
+		</transform>
+		<!-- <ref id="BackWallBSDF" /> -->
+		<ref id="TargetBSDF" />
+	</shape>
+	<shape type="rectangle" id="RightWall">
+		<transform name="to_world">
+			<matrix value="0 0 2 1 1 0 0 1 0 1 0 0 0 0 0 1" />
+		</transform>
+		<ref id="RightWallBSDF" />
+	</shape>
+	<shape type="rectangle" id="LeftWall">
+		<transform name="to_world">
+			<matrix value="0 0 -2 -1 1 0 0 1 0 -1 0 0 0 0 0 1" />
+		</transform>
+		<ref id="LeftWallBSDF" />
+	</shape>
+	<shape type="rectangle" id="Light">
+		<transform name="to_world">
+			<matrix value="0.235 0 0 -0.005 0 0 -0.0893 1.98 0 0.19 0 -0.03 0 0 0 1" />
+		</transform>
+		<ref id="LightBSDF" />
+		<emitter type="area">
+			<rgb name="radiance" value="17, 12, 4" />
+		</emitter>
+	</shape>
+</scene>

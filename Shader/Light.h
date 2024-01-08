@@ -67,24 +67,28 @@ namespace LightEvaluation
 		break;
 		case LightType::Rectangle:
 		{
-			// Seems Mitsuba3 just use uniform sampling on rectangle. See Rectangle::sample_position <- SHape::sample_direction
+			// Seems Mitsuba3 just use uniform sampling on rectangle. See Rectangle::sample_position <- Shape::sample_direction
 			// Alternatively sampling of spherical rectangles / triangles could be used (Sample with solid angle instead of surface area)
 
-			float xi1 = RandomFloat01(ioPathContext.mRandomState);
-			float xi2 = RandomFloat01(ioPathContext.mRandomState);
+			float xi1							= RandomFloat01(ioPathContext.mRandomState);
+			float xi2							= RandomFloat01(ioPathContext.mRandomState);
 
-			float3 vector_to_sample = vector_to_light;
-			vector_to_sample += inLight.mTangent * inLight.mHalfExtends.x * (xi1 * 2.0 - 1.0);
-			vector_to_sample += inLight.mBitangent * inLight.mHalfExtends.y * (xi2 * 2.0 - 1.0);
+			float3 vector_to_sample				= vector_to_light;
+			vector_to_sample					+= inLight.mTangent * inLight.mHalfExtends.x * (xi1 * 2.0 - 1.0);
+			vector_to_sample					+= inLight.mBitangent * inLight.mHalfExtends.y * (xi2 * 2.0 - 1.0);
 
-			light_context.mL = normalize(vector_to_sample);
+			light_context.mL					= normalize(vector_to_sample);
 
-			float distance_to_sample_position = length(vector_to_sample);
-			float surface_area = 4.0 * inLight.mHalfExtends.x * inLight.mHalfExtends.y;
-			float pdf_position = 1.0 / surface_area;
-			float pdf_direction = pdf_position * (distance_to_sample_position * distance_to_sample_position) / max(dot(-light_context.mL, inLight.mNormal), 0.0);
+			float distance_to_sample_position	= length(vector_to_sample);
+			float surface_area					= 4.0 * inLight.mHalfExtends.x * inLight.mHalfExtends.y;
+			float pdf_position					= 1.0 / surface_area;
+			float denom							= max(dot(-light_context.mL, inLight.mNormal), 0.0);
+			float pdf_direction					= pdf_position * (distance_to_sample_position * distance_to_sample_position) / denom;
 
-			light_context.mLPDF = pdf_direction;
+			light_context.mLPDF					= pdf_direction;
+
+			if (denom == 0.0)
+				light_context.mLPDF				= 0;
 		}
 		break;
 		default:

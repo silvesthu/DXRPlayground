@@ -67,7 +67,7 @@ void TraceRay(PixelContext inPixelContext)
 		uint ray_instance_mask					= 0xffffffff;
 		query.TraceRayInline(RaytracingScene, additional_ray_flags, ray_instance_mask, ray);
 		query.Proceed();
-
+		
 		if (query.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
 		{
 			// Ray hit something
@@ -87,7 +87,7 @@ void TraceRay(PixelContext inPixelContext)
 			hit_context.mRayDirectionWS			= ray.Direction;
 			hit_context.mRayTCurrent			= query.CommittedRayT();
 			hit_context.mBarycentrics			= float3(1.0 - attributes.barycentrics.x - attributes.barycentrics.y, attributes.barycentrics.x, attributes.barycentrics.y);
-			
+
 			// Vertex attributes
 			{
 				// Only support 32bit index for simplicity
@@ -196,19 +196,12 @@ void TraceRay(PixelContext inPixelContext)
 					LightContext light_context					= LightEvaluation::GenerateContext(light, hit_context.PositionWS(), path_context);					
 					float light_pdf								= light_context.mLPDF * LightEvaluation::SelectLightPDF(light_index);
 					
-					BSDFContext bsdf_context					= BSDFContext::Generate(BSDFContext::Mode::Light, light_context.mL, hit_context);
-					
-					DebugValue(PixelDebugMode::Light_L, path_context.mRecursionCount, float3(bsdf_context.mL));
-					DebugValue(PixelDebugMode::Light_V, path_context.mRecursionCount, float3(bsdf_context.mV));
-					DebugValue(PixelDebugMode::Light_N, path_context.mRecursionCount, float3(bsdf_context.mN));
-					DebugValue(PixelDebugMode::Light_H, path_context.mRecursionCount, float3(bsdf_context.mH));
-					
 					if (light_pdf > 0)
 					{
 						// Cast shadow ray
 						RayDesc shadow_ray;
 						shadow_ray.Origin						= hit_context.PositionWS();
-						shadow_ray.Direction					= bsdf_context.mL;
+						shadow_ray.Direction					= light_context.mL;
 						shadow_ray.TMin							= 0.001;
 						shadow_ray.TMax							= 100000;
 
@@ -221,8 +214,14 @@ void TraceRay(PixelContext inPixelContext)
 						// Shadow ray hit the light
 						if (shadow_query.CommittedStatus() == COMMITTED_TRIANGLE_HIT && shadow_query.CommittedInstanceID() == light.mInstanceID)
 						{
+							BSDFContext bsdf_context			= BSDFContext::Generate(BSDFContext::Mode::Light, light_context.mL, hit_context);
 							BSDFResult bsdf_result				= BSDFEvaluation::Evaluate(bsdf_context, hit_context, path_context);
 							
+							DebugValue(PixelDebugMode::Light_L, path_context.mRecursionCount, float3(bsdf_context.mL));
+							DebugValue(PixelDebugMode::Light_V, path_context.mRecursionCount, float3(bsdf_context.mV));
+							DebugValue(PixelDebugMode::Light_N, path_context.mRecursionCount, float3(bsdf_context.mN));
+							DebugValue(PixelDebugMode::Light_H, path_context.mRecursionCount, float3(bsdf_context.mH));
+
 							DebugValue(PixelDebugMode::Light_BSDF,	path_context.mRecursionCount, float3(bsdf_result.mBSDF));
 							DebugValue(PixelDebugMode::Light_PDF,	path_context.mRecursionCount, float3(light_pdf, 0, 0));
 
@@ -290,14 +289,14 @@ void TraceRay(PixelContext inPixelContext)
 
 			float3 cloud_transmittance			= 1;
 			float3 cloud_luminance				= 0;
-			RaymarchCloud(cloud_transmittance, cloud_luminance);
+		 	RaymarchCloud(cloud_transmittance, cloud_luminance);
 
 			float3 emission						= lerp(sky_luminance, cloud_luminance, 1.0 - cloud_transmittance);
 			path_context.mEmission				= path_context.mEmission + path_context.mThroughput * emission;
-
+			
 			break;
 		}
-
+		
 		float throughput_max					= max(path_context.mThroughput.x, max(path_context.mThroughput.y, path_context.mThroughput.z));
 
 		// Russian Roulette
