@@ -214,10 +214,11 @@ enum class PixelDebugMode : uint
 	_Newline4,
 
 	// BSDF Sample
-	BRDF__L,
-	BRDF__V,
-	BRDF__N,
-	BRDF__H,
+	BSDF__L,
+	BSDF__V,
+	BSDF__N,
+	BSDF__H,
+	BSDF__I,
 
 	_Newline5,
 
@@ -234,6 +235,7 @@ enum class PixelDebugMode : uint
 	Light_V,
 	Light_N,
 	Light_H,
+	Light_I,
 
 	_Newline7,
 
@@ -245,6 +247,7 @@ enum class PixelDebugMode : uint
 
 	_Newline8,
 
+	Emission,
 	Throughput,
 	DiracDelta,
 
@@ -612,7 +615,7 @@ struct Constants
 
 struct Debug
 {
-	static const int			kValueArraySize = 16;
+	static const int			kValueArraySize					= 16;
 
 	float4						mPixelValue						CONSTANT_DEFAULT(float4(0.0f, 0.0f, 0.0f, 0.0f));
 	float4						mPixelValueArray[kValueArraySize];

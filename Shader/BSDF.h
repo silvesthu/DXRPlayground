@@ -137,6 +137,9 @@ struct BSDFContext
 	void			SetEta(float inEtaIT)
 	{
 		mH										= normalize(mV + mL * inEtaIT);	// See roughdielectric::eval
+		if (dot(mN, mH) < 0)
+			mH									= -mH; // Put H on the same side as N
+
 		mNdotH									= dot(mN, mH);
 		mHdotV									= dot(mH, mV);
 		mHdotL									= dot(mH, mL);
@@ -146,9 +149,10 @@ struct BSDFContext
 	{
 		mN										= -mN;
 		mH										= -mH;
+
 		mNdotV									= -mNdotV;
 		mNdotL									= -mNdotL;
-		mNdotH									= -mNdotH;
+
 		mHdotV									= -mHdotV;
 		mHdotL									= -mHdotL;
 	}
@@ -471,6 +475,8 @@ namespace BSDFEvaluation
 
 		BSDFResult Evaluate(inout BSDFContext inBSDFContext, HitContext inHitContext, inout PathContext ioPathContext)
 		{
+			BSDFResult result					= (BSDFResult)0;
+
 			float cos_theta						= inHitContext.NdotV();
 			float eta							= inHitContext.Eta().x;
 			float r_i;
@@ -479,13 +485,17 @@ namespace BSDFEvaluation
 			float eta_ti;
 			F_Dielectric_Mitsuba(cos_theta, eta, r_i, cos_theta_t, eta_it, eta_ti);
 
-			if (inBSDFContext.mMode == BSDFContext::Mode::Light)
-				inBSDFContext.SetEta(eta_it);
-
 			bool selected_r						= inBSDFContext.mLobe0Selected;
-			float3 F							= select(selected_r, r_i, 1.0 - r_i) * select(selected_r, inHitContext.SpecularReflectance(), inHitContext.SpecularTransmittance());
 
-			BSDFResult result;
+			if (inBSDFContext.mMode == BSDFContext::Mode::BSDF)
+			{
+				DebugValue(PixelDebugMode::BSDF__I, ioPathContext.mRecursionCount, float3(selected_r ? 0 : 1, 0, 0));
+			}
+			else
+			{
+				DebugValue(PixelDebugMode::Light_I, ioPathContext.mRecursionCount, float3(selected_r ? 0 : 1, 0, 0));
+			}
+
 			if (selected_r)
 			{
 				// Effectively TwoSided for reflection
@@ -496,6 +506,7 @@ namespace BSDFEvaluation
 
 				float D							= D_GGX(inBSDFContext.mNdotH, inHitContext.RoughnessAlpha());
 				float G							= G_SmithGGX(inBSDFContext.mNdotL, inBSDFContext.mNdotV, inHitContext.RoughnessAlpha());
+				float3 F						= r_i * inHitContext.SpecularReflectance();
 
 				if (inBSDFContext.mNdotL < 0 || inBSDFContext.mNdotV < 0 || inBSDFContext.mHdotL < 0 || inBSDFContext.mHdotV < 0)
 					D							= 0;
@@ -516,7 +527,6 @@ namespace BSDFEvaluation
 				float microfacet_pdf			= D * inBSDFContext.mNdotH;
 				float jacobian					= 1.0 / (4.0f * inBSDFContext.mHdotL);
 
-				BSDFResult result;
 				result.mBSDF					= D * G * F / (4.0f * inBSDFContext.mNdotV * inBSDFContext.mNdotL);
 				result.mBSDFSamplePDF			= microfacet_pdf * jacobian;
 			}
@@ -525,8 +535,13 @@ namespace BSDFEvaluation
 				// Based on RoughDieletric in Mitsuba, which is an implementation of [WMLT07] Microfacet Models for Refraction through Rough Surfaces
 				// Omit roughness scale for now
 
+				// Patch eta
+				if (inBSDFContext.mMode == BSDFContext::Mode::Light)
+					inBSDFContext.SetEta(eta_it);
+
 				float D							= D_GGX(inBSDFContext.mNdotH, inHitContext.RoughnessAlpha());
 				float G							= G_SmithGGX(inBSDFContext.mNdotL, inBSDFContext.mNdotV, inHitContext.RoughnessAlpha());
+				float3 F						= (1.0 - r_i) * inHitContext.SpecularTransmittance();
 
 				if (inBSDFContext.mMode == BSDFContext::Mode::BSDF)
 				{
@@ -544,9 +559,7 @@ namespace BSDFEvaluation
 				float microfacet_pdf			= D * inBSDFContext.mNdotH;
 				float jacobian					= abs(sqr(eta_it) * inBSDFContext.mHdotL / sqr(inBSDFContext.mHdotV + eta_it * inBSDFContext.mHdotL));
 
-				// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, float3(jacobian, 0, 0));
-
-				result.mBSDF					= D * G * F * inBSDFContext.mHdotV * jacobian / (abs(inBSDFContext.mNdotV) * abs(inBSDFContext.mNdotL));
+				result.mBSDF					= abs(D * G * F * inBSDFContext.mHdotV * jacobian / (abs(inBSDFContext.mNdotV) * abs(inBSDFContext.mNdotL)));
 				result.mBSDFSamplePDF			= microfacet_pdf * jacobian;
 			}
 			result.mBSDFSamplePDF				*= select(selected_r, r_i, 1.0 - r_i);
@@ -554,8 +567,6 @@ namespace BSDFEvaluation
 			// See Dielectric::Evaluate
 			result.mBSDF						*= select(selected_r, 1.0, sqr(eta_ti));
 			result.mEta							= select(selected_r, 1.0, eta_it);
-
-			// DebugValue(PixelDebugMode::Manual, ioPathContext.mRecursionCount, result.mBSDF / result.mBSDFSamplePDF * abs(inBSDFContext.mNdotL));
 
 			return result;
 		}
@@ -577,10 +588,10 @@ namespace BSDFEvaluation
 		default:								bsdf_context = Diffuse::GenerateContext(inHitContext, ioPathContext); break;
 		}
 
-		DebugValue(PixelDebugMode::BRDF__L,		ioPathContext.mRecursionCount, float3(bsdf_context.mL));
-		DebugValue(PixelDebugMode::BRDF__V,		ioPathContext.mRecursionCount, float3(bsdf_context.mV));
-		DebugValue(PixelDebugMode::BRDF__N,		ioPathContext.mRecursionCount, float3(bsdf_context.mN));
-		DebugValue(PixelDebugMode::BRDF__H,		ioPathContext.mRecursionCount, float3(bsdf_context.mH));
+		DebugValue(PixelDebugMode::BSDF__L,		ioPathContext.mRecursionCount, float3(bsdf_context.mL));
+		DebugValue(PixelDebugMode::BSDF__V,		ioPathContext.mRecursionCount, float3(bsdf_context.mV));
+		DebugValue(PixelDebugMode::BSDF__N,		ioPathContext.mRecursionCount, float3(bsdf_context.mN));
+		DebugValue(PixelDebugMode::BSDF__H,		ioPathContext.mRecursionCount, float3(bsdf_context.mH));
 
 		return bsdf_context;
 	}
