@@ -49,6 +49,8 @@ void TraceRay(PixelContext inPixelContext)
 		// Defer the accumulation from light sample to make recursion count easier
 		path_context.mEmission					+= path_context.mLightEmission;
 		path_context.mLightEmission				= 0;
+		
+		DebugValue(PixelDebugMode::Emission,	path_context.mRecursionCount, path_context.mEmission);
 
 		// Drop the ray if throughput is 0
 		if (max(path_context.mThroughput.x, max(path_context.mThroughput.y, path_context.mThroughput.z)) <= 0)
@@ -175,8 +177,8 @@ void TraceRay(PixelContext inPixelContext)
 					
 					float mis_weight							= max(0.0, MIS::PowerHeuristic(1, path_context.mPrevBSDFSamplePDF, 1, light_pdf));
 					path_context.mEmission						+= path_context.mThroughput * emission * mis_weight;
-
-					DebugValue(PixelDebugMode::BSDF__MIS, path_context.mRecursionCount - 1 /* for prev BSDF hit */, float3(path_context.mPrevBSDFSamplePDF, light_pdf, mis_weight));
+					
+					DebugValue(PixelDebugMode::BSDF__MIS,		path_context.mRecursionCount - 1 /* for prev BSDF hit */, float3(path_context.mPrevBSDFSamplePDF, light_pdf, mis_weight));
 				}
 			}
 			else
