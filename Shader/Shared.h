@@ -191,7 +191,7 @@ enum class DebugMode : uint
 
 	_Newline3,
 
-	RecursionCount,
+	RecursionDepth,
 	DebugValue,
 
 	_Newline4,
@@ -260,14 +260,6 @@ enum class PixelDebugMode : uint
 
 	BSDF__MIS,
 	Light_MIS,
-
-	Count
-};
-
-enum class RecursionMode : uint
-{
-	FixedCount = 0,
-	RussianRoulette,
 
 	Count
 };
@@ -463,7 +455,7 @@ struct PathContext
 	bool						mPrevDiracDeltaDistribution;
 
 	uint						mRandomState;
-	uint						mRecursionCount;
+	uint						mRecursionDepth;
 };
 
 struct DensityProfileLayer
@@ -595,8 +587,8 @@ struct Constants
 	int							mDebugInstanceIndex				CONSTANT_DEFAULT(-1);
 	int							mDebugLightIndex				CONSTANT_DEFAULT(-1);
 
-	RecursionMode				mRecursionMode					CONSTANT_DEFAULT(RecursionMode::FixedCount);
-	uint						mRecursionCountMax				CONSTANT_DEFAULT(1);
+	uint						mRecursionDepthCountMax				CONSTANT_DEFAULT(16);
+	uint						mRussianRouletteDepth			CONSTANT_DEFAULT(16);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 

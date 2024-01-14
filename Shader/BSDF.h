@@ -275,15 +275,15 @@ namespace BSDFEvaluation
 
 			if (inBSDFContext.mMode == BSDFContext::Mode::BSDF)
 			{
-				DebugValue(PixelDebugMode::BSDF__D, ioPathContext.mRecursionCount, float3(nan(), 0, 0));
-				DebugValue(PixelDebugMode::BSDF__G, ioPathContext.mRecursionCount, float3(nan(), 0, 0));
-				DebugValue(PixelDebugMode::BSDF__F, ioPathContext.mRecursionCount, float3(F));
+				DebugValue(PixelDebugMode::BSDF__D, ioPathContext.mRecursionDepth, float3(nan(), 0, 0));
+				DebugValue(PixelDebugMode::BSDF__G, ioPathContext.mRecursionDepth, float3(nan(), 0, 0));
+				DebugValue(PixelDebugMode::BSDF__F, ioPathContext.mRecursionDepth, float3(F));
 			}
 			else
 			{
-				DebugValue(PixelDebugMode::Light_D, ioPathContext.mRecursionCount, float3(nan(), 0, 0));
-				DebugValue(PixelDebugMode::Light_G, ioPathContext.mRecursionCount, float3(nan(), 0, 0));
-				DebugValue(PixelDebugMode::Light_F, ioPathContext.mRecursionCount, float3(F));
+				DebugValue(PixelDebugMode::Light_D, ioPathContext.mRecursionDepth, float3(nan(), 0, 0));
+				DebugValue(PixelDebugMode::Light_G, ioPathContext.mRecursionDepth, float3(nan(), 0, 0));
+				DebugValue(PixelDebugMode::Light_F, ioPathContext.mRecursionDepth, float3(F));
 			}
 
 			BSDFResult result;
@@ -330,15 +330,15 @@ namespace BSDFEvaluation
 
 			if (inBSDFContext.mMode == BSDFContext::Mode::BSDF)
 			{
-				DebugValue(PixelDebugMode::BSDF__D, ioPathContext.mRecursionCount, float3(D, 0, 0));
-				DebugValue(PixelDebugMode::BSDF__G, ioPathContext.mRecursionCount, float3(G, 0, 0));
-				DebugValue(PixelDebugMode::BSDF__F, ioPathContext.mRecursionCount, float3(F));
+				DebugValue(PixelDebugMode::BSDF__D, ioPathContext.mRecursionDepth, float3(D, 0, 0));
+				DebugValue(PixelDebugMode::BSDF__G, ioPathContext.mRecursionDepth, float3(G, 0, 0));
+				DebugValue(PixelDebugMode::BSDF__F, ioPathContext.mRecursionDepth, float3(F));
 			}
 			else
 			{
-				DebugValue(PixelDebugMode::Light_D, ioPathContext.mRecursionCount, float3(D, 0, 0));
-				DebugValue(PixelDebugMode::Light_G, ioPathContext.mRecursionCount, float3(G, 0, 0));
-				DebugValue(PixelDebugMode::Light_F, ioPathContext.mRecursionCount, float3(F));
+				DebugValue(PixelDebugMode::Light_D, ioPathContext.mRecursionDepth, float3(D, 0, 0));
+				DebugValue(PixelDebugMode::Light_G, ioPathContext.mRecursionDepth, float3(G, 0, 0));
+				DebugValue(PixelDebugMode::Light_F, ioPathContext.mRecursionDepth, float3(F));
 			}
 
 			// [NOTE] Eval/Sample functions may return BSDF * NdotL / PDF as a whole or in separated terms, which varies between implementations.
@@ -489,11 +489,11 @@ namespace BSDFEvaluation
 
 			if (inBSDFContext.mMode == BSDFContext::Mode::BSDF)
 			{
-				DebugValue(PixelDebugMode::BSDF__I, ioPathContext.mRecursionCount, float3(selected_r ? 0 : 1, 0, 0));
+				DebugValue(PixelDebugMode::BSDF__I, ioPathContext.mRecursionDepth, float3(selected_r ? 0 : 1, 0, 0));
 			}
 			else
 			{
-				DebugValue(PixelDebugMode::Light_I, ioPathContext.mRecursionCount, float3(selected_r ? 0 : 1, 0, 0));
+				DebugValue(PixelDebugMode::Light_I, ioPathContext.mRecursionDepth, float3(selected_r ? 0 : 1, 0, 0));
 			}
 
 			if (selected_r)
@@ -513,15 +513,15 @@ namespace BSDFEvaluation
 
 				if (inBSDFContext.mMode == BSDFContext::Mode::BSDF)
 				{
-					DebugValue(PixelDebugMode::BSDF__D, ioPathContext.mRecursionCount, float3(D, 0, 0));
-					DebugValue(PixelDebugMode::BSDF__G, ioPathContext.mRecursionCount, float3(G, 0, 0));
-					DebugValue(PixelDebugMode::BSDF__F, ioPathContext.mRecursionCount, float3(F));
+					DebugValue(PixelDebugMode::BSDF__D, ioPathContext.mRecursionDepth, float3(D, 0, 0));
+					DebugValue(PixelDebugMode::BSDF__G, ioPathContext.mRecursionDepth, float3(G, 0, 0));
+					DebugValue(PixelDebugMode::BSDF__F, ioPathContext.mRecursionDepth, float3(F));
 				}
 				else
 				{
-					DebugValue(PixelDebugMode::Light_D, ioPathContext.mRecursionCount, float3(D, 0, 0));
-					DebugValue(PixelDebugMode::Light_G, ioPathContext.mRecursionCount, float3(G, 0, 0));
-					DebugValue(PixelDebugMode::Light_F, ioPathContext.mRecursionCount, float3(F));
+					DebugValue(PixelDebugMode::Light_D, ioPathContext.mRecursionDepth, float3(D, 0, 0));
+					DebugValue(PixelDebugMode::Light_G, ioPathContext.mRecursionDepth, float3(G, 0, 0));
+					DebugValue(PixelDebugMode::Light_F, ioPathContext.mRecursionDepth, float3(F));
 				}
 
 				float microfacet_pdf			= D * inBSDFContext.mNdotH;
@@ -545,15 +545,15 @@ namespace BSDFEvaluation
 
 				if (inBSDFContext.mMode == BSDFContext::Mode::BSDF)
 				{
-					DebugValue(PixelDebugMode::BSDF__D, ioPathContext.mRecursionCount, float3(D, 0, 0));
-					DebugValue(PixelDebugMode::BSDF__G, ioPathContext.mRecursionCount, float3(G, 0, 0));
-					DebugValue(PixelDebugMode::BSDF__F, ioPathContext.mRecursionCount, float3(F));
+					DebugValue(PixelDebugMode::BSDF__D, ioPathContext.mRecursionDepth, float3(D, 0, 0));
+					DebugValue(PixelDebugMode::BSDF__G, ioPathContext.mRecursionDepth, float3(G, 0, 0));
+					DebugValue(PixelDebugMode::BSDF__F, ioPathContext.mRecursionDepth, float3(F));
 				}
 				else
 				{
-					DebugValue(PixelDebugMode::Light_D, ioPathContext.mRecursionCount, float3(D, 0, 0));
-					DebugValue(PixelDebugMode::Light_G, ioPathContext.mRecursionCount, float3(G, 0, 0));
-					DebugValue(PixelDebugMode::Light_F, ioPathContext.mRecursionCount, float3(F));
+					DebugValue(PixelDebugMode::Light_D, ioPathContext.mRecursionDepth, float3(D, 0, 0));
+					DebugValue(PixelDebugMode::Light_G, ioPathContext.mRecursionDepth, float3(G, 0, 0));
+					DebugValue(PixelDebugMode::Light_F, ioPathContext.mRecursionDepth, float3(F));
 				}
 
 				float microfacet_pdf			= D * inBSDFContext.mNdotH;
@@ -588,10 +588,10 @@ namespace BSDFEvaluation
 		default:								bsdf_context = Diffuse::GenerateContext(inHitContext, ioPathContext); break;
 		}
 
-		DebugValue(PixelDebugMode::BSDF__L,		ioPathContext.mRecursionCount, float3(bsdf_context.mL));
-		DebugValue(PixelDebugMode::BSDF__V,		ioPathContext.mRecursionCount, float3(bsdf_context.mV));
-		DebugValue(PixelDebugMode::BSDF__N,		ioPathContext.mRecursionCount, float3(bsdf_context.mN));
-		DebugValue(PixelDebugMode::BSDF__H,		ioPathContext.mRecursionCount, float3(bsdf_context.mH));
+		DebugValue(PixelDebugMode::BSDF__L,		ioPathContext.mRecursionDepth, float3(bsdf_context.mL));
+		DebugValue(PixelDebugMode::BSDF__V,		ioPathContext.mRecursionDepth, float3(bsdf_context.mV));
+		DebugValue(PixelDebugMode::BSDF__N,		ioPathContext.mRecursionDepth, float3(bsdf_context.mN));
+		DebugValue(PixelDebugMode::BSDF__H,		ioPathContext.mRecursionDepth, float3(bsdf_context.mH));
 
 		return bsdf_context;
 	}

@@ -291,14 +291,14 @@ void DebugValueInit()
 }
 
 static float4 sDebugValue = 0;
-void DebugValue(PixelDebugMode inPixelDebugMode, uint inRecursionCount, float3 inValue)
+void DebugValue(PixelDebugMode inPixelDebugMode, uint inRecursionDepth, float3 inValue)
 {
     if (mConstants.mPixelDebugMode == inPixelDebugMode)
     {
-        if (sGetDispatchRaysIndex().x == mConstants.mPixelDebugCoord.x && sGetDispatchRaysIndex().y == mConstants.mPixelDebugCoord.y && inRecursionCount < Debug::kValueArraySize)
-            BufferDebugUAV[0].mPixelValueArray[inRecursionCount] = float4(inValue, 1.0); // 1.0 indicate value is written
+        if (sGetDispatchRaysIndex().x == mConstants.mPixelDebugCoord.x && sGetDispatchRaysIndex().y == mConstants.mPixelDebugCoord.y && inRecursionDepth < Debug::kValueArraySize)
+            BufferDebugUAV[0].mPixelValueArray[inRecursionDepth] = float4(inValue, 1.0); // 1.0 indicate value is written
 
-        if (mConstants.mPixelDebugRecursion == inRecursionCount)
+        if (mConstants.mPixelDebugRecursion == inRecursionDepth)
             sDebugValue = float4(inValue, 1.0); // fill alpha to show on ImGui
     }
 }

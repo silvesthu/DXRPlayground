@@ -232,14 +232,8 @@ static void sPrepareImGui()
 				if (ImGui::SliderInt("Frame Count", reinterpret_cast<int*>(&gRenderer.mAccumulationFrameCount), 1, 64))
 					gRenderer.mAccumulationResetRequested = true;
 
-			ImGui::Text("Recursion Mode");
-			for (int i = 0; i < static_cast<int>(RecursionMode::Count); i++)
-			{
-				const auto& name = nameof::nameof_enum(static_cast<RecursionMode>(i));
-				ImGui::SameLine();
-				ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mRecursionMode), i);
-			}
-			ImGui::SliderInt("Recursion Count Max", reinterpret_cast<int*>(&gConstants.mRecursionCountMax), 0, 16);
+			ImGui::SliderInt("Recursion Depth Max", reinterpret_cast<int*>(&gConstants.mRecursionDepthCountMax), 1, 16);
+			ImGui::SliderInt("Russian Roulette Depth", reinterpret_cast<int*>(&gConstants.mRussianRouletteDepth), 1, 16);
 
 			ImGui::TreePop();
 		}

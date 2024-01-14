@@ -42,20 +42,10 @@ void TraceRay(PixelContext inPixelContext)
 	path_context.mPrevDiracDeltaDistribution	= false;
 	path_context.mEtaScale						= 1.0;
 	path_context.mRandomState					= random_state;
-	path_context.mRecursionCount				= 0;
+	path_context.mRecursionDepth				= 0;
 
 	for (;;)
 	{
-		// Defer the accumulation from light sample to make recursion count easier
-		path_context.mEmission					+= path_context.mLightEmission;
-		path_context.mLightEmission				= 0;
-		
-		DebugValue(PixelDebugMode::Emission,	path_context.mRecursionCount, path_context.mEmission);
-
-		// Drop the ray if throughput is 0
-		if (max(path_context.mThroughput.x, max(path_context.mThroughput.y, path_context.mThroughput.z)) <= 0)
-			break;
-
 		bool continue_bounce					= false;
 
 		// Helper
@@ -113,13 +103,13 @@ void TraceRay(PixelContext inPixelContext)
 			// HitConext is constructed, fill the debug values
 			{
 				// Report InstanceID of instance at PixelDebugCoord
-				if (inPixelContext.mPixelIndex.x == mConstants.mPixelDebugCoord.x && inPixelContext.mPixelIndex.y == mConstants.mPixelDebugCoord.y && path_context.mRecursionCount == 0)
+				if (inPixelContext.mPixelIndex.x == mConstants.mPixelDebugCoord.x && inPixelContext.mPixelIndex.y == mConstants.mPixelDebugCoord.y && path_context.mRecursionDepth == 0)
 					BufferDebugUAV[0].mPixelInstanceID			= hit_context.mInstanceID;
 				
-				DebugValue(PixelDebugMode::PositionWS, path_context.mRecursionCount, float3(hit_context.PositionWS()));
-				DebugValue(PixelDebugMode::DirectionWS, path_context.mRecursionCount, float3(hit_context.DirectionWS()));
-				// DebugValue(PixelDebugMode::DirectionWS, path_context.mRecursionCount, float3(hit_context.DirectionWS() * 0.5 + 0.5));
-				DebugValue(PixelDebugMode::InstanceID, path_context.mRecursionCount, float3(hit_context.mInstanceID, 0.0, 0.0));
+				DebugValue(PixelDebugMode::PositionWS, path_context.mRecursionDepth, float3(hit_context.PositionWS()));
+				DebugValue(PixelDebugMode::DirectionWS, path_context.mRecursionDepth, float3(hit_context.DirectionWS()));
+				// DebugValue(PixelDebugMode::DirectionWS, path_context.mRecursionDepth, float3(hit_context.DirectionWS() * 0.5 + 0.5));
+				DebugValue(PixelDebugMode::InstanceID, path_context.mRecursionDepth, float3(hit_context.mInstanceID, 0.0, 0.0));
 			}
 
 			// Participating media
@@ -150,10 +140,10 @@ void TraceRay(PixelContext inPixelContext)
 					emission = hit_context.mBarycentrics;
 			}
 			
-			// Ray hit a light
+			// Ray hit a light / [Mitsuba] Direct emission
 			if (hit_context.BSDF() == BSDF::Light)
 			{
-				if (path_context.mRecursionCount == 0 ||					// Camera ray hit the light
+				if (path_context.mRecursionDepth == 0 ||					// Camera ray hit the light
 					mConstants.mLightCount == 0 ||							// No light -> no light sample
 					path_context.mPrevDiracDeltaDistribution || 			// Prev hit is DiracDeltaDistribution -> no light sample
 					mConstants.mSampleMode == SampleMode::SampleBSDF ||		// SampleBSDF mode -> no light sample
@@ -178,12 +168,12 @@ void TraceRay(PixelContext inPixelContext)
 					float mis_weight							= max(0.0, MIS::PowerHeuristic(1, path_context.mPrevBSDFSamplePDF, 1, light_pdf));
 					path_context.mEmission						+= path_context.mThroughput * emission * mis_weight;
 					
-					DebugValue(PixelDebugMode::BSDF__MIS,		path_context.mRecursionCount - 1 /* for prev BSDF hit */, float3(path_context.mPrevBSDFSamplePDF, light_pdf, mis_weight));
+					DebugValue(PixelDebugMode::BSDF__MIS,		path_context.mRecursionDepth - 1 /* for prev BSDF hit */, float3(path_context.mPrevBSDFSamplePDF, light_pdf, mis_weight));
 				}
 			}
 			else
 			{
-				// Sample light (NEE)
+				// Sample light (NEE) / [Mitsuba] Emitter sampling
 				bool sample_light = mConstants.mSampleMode == SampleMode::SampleLight || mConstants.mSampleMode == SampleMode::MIS;
 				if (mConstants.mLightCount > 0 &&							// No light -> no light sample
 					!hit_context.DiracDeltaDistribution() &&				// Current hit is DiracDeltaDistribution -> no light sample
@@ -219,13 +209,13 @@ void TraceRay(PixelContext inPixelContext)
 							BSDFContext bsdf_context			= BSDFContext::Generate(BSDFContext::Mode::Light, light_context.mL, hit_context);
 							BSDFResult bsdf_result				= BSDFEvaluation::Evaluate(bsdf_context, hit_context, path_context);
 							
-							DebugValue(PixelDebugMode::Light_L, path_context.mRecursionCount, float3(bsdf_context.mL));
-							DebugValue(PixelDebugMode::Light_V, path_context.mRecursionCount, float3(bsdf_context.mV));
-							DebugValue(PixelDebugMode::Light_N, path_context.mRecursionCount, float3(bsdf_context.mN));
-							DebugValue(PixelDebugMode::Light_H, path_context.mRecursionCount, float3(bsdf_context.mH));
+							DebugValue(PixelDebugMode::Light_L, path_context.mRecursionDepth, float3(bsdf_context.mL));
+							DebugValue(PixelDebugMode::Light_V, path_context.mRecursionDepth, float3(bsdf_context.mV));
+							DebugValue(PixelDebugMode::Light_N, path_context.mRecursionDepth, float3(bsdf_context.mN));
+							DebugValue(PixelDebugMode::Light_H, path_context.mRecursionDepth, float3(bsdf_context.mH));
 
-							DebugValue(PixelDebugMode::Light_BSDF,	path_context.mRecursionCount, float3(bsdf_result.mBSDF));
-							DebugValue(PixelDebugMode::Light_PDF,	path_context.mRecursionCount, float3(light_pdf, 0, 0));
+							DebugValue(PixelDebugMode::Light_BSDF,	path_context.mRecursionDepth, float3(bsdf_result.mBSDF));
+							DebugValue(PixelDebugMode::Light_PDF,	path_context.mRecursionDepth, float3(light_pdf, 0, 0));
 
 							float3 luminance					= light.mEmission * (kEmissionBoostScale * kPreExposure);
 							float3 light_emission				= luminance * bsdf_result.mBSDF * abs(bsdf_context.mNdotL) / light_pdf;
@@ -235,7 +225,7 @@ void TraceRay(PixelContext inPixelContext)
 								float mis_weight				= max(0.0, MIS::PowerHeuristic(1, light_pdf, 1, bsdf_result.mBSDFSamplePDF));
 								light_emission					*= mis_weight;
 								
-								DebugValue(PixelDebugMode::Light_MIS,	path_context.mRecursionCount, float3(bsdf_result.mBSDFSamplePDF, light_pdf, mis_weight));
+								DebugValue(PixelDebugMode::Light_MIS,	path_context.mRecursionDepth, float3(bsdf_result.mBSDFSamplePDF, light_pdf, mis_weight));
 							}
 
 							path_context.mLightEmission			= path_context.mThroughput * light_emission;
@@ -243,7 +233,7 @@ void TraceRay(PixelContext inPixelContext)
 					}
 				}
 
-				// Sample BSDF
+				// Sample BSDF / [Mitsuba] BSDF sampling
 				{
 					BSDFContext bsdf_context					= BSDFEvaluation::GenerateContext(hit_context, path_context);
 					BSDFResult bsdf_result						= BSDFEvaluation::Evaluate(bsdf_context, hit_context, path_context);
@@ -255,10 +245,10 @@ void TraceRay(PixelContext inPixelContext)
 					path_context.mPrevBSDFSamplePDF				= bsdf_result.mBSDFSamplePDF;
 					path_context.mPrevDiracDeltaDistribution	= hit_context.DiracDeltaDistribution();
 
-					DebugValue(PixelDebugMode::BSDF__BSDF,		path_context.mRecursionCount, float3(bsdf_result.mBSDF));
-					DebugValue(PixelDebugMode::BSDF__PDF,		path_context.mRecursionCount, float3(bsdf_result.mBSDFSamplePDF, 0, 0));
-					DebugValue(PixelDebugMode::Throughput,		path_context.mRecursionCount, float3(path_context.mThroughput));
-					DebugValue(PixelDebugMode::DiracDelta,		path_context.mRecursionCount, float3(path_context.mPrevDiracDeltaDistribution, 0, 0));
+					DebugValue(PixelDebugMode::BSDF__BSDF,		path_context.mRecursionDepth, float3(bsdf_result.mBSDF));
+					DebugValue(PixelDebugMode::BSDF__PDF,		path_context.mRecursionDepth, float3(bsdf_result.mBSDFSamplePDF, 0, 0));
+					DebugValue(PixelDebugMode::Throughput,		path_context.mRecursionDepth, float3(path_context.mThroughput));
+					DebugValue(PixelDebugMode::DiracDelta,		path_context.mRecursionDepth, float3(path_context.mPrevDiracDeltaDistribution, 0, 0));
 
 					// Prepare for next bounce
 					ray.Origin									= hit_context.PositionWS();
@@ -279,7 +269,7 @@ void TraceRay(PixelContext inPixelContext)
 			case DebugMode::Reflectance: 		path_context.mEmission = InstanceDatas[hit_context.mInstanceID].mSpecularReflectance; continue_bounce = false; break;
 			case DebugMode::Emission: 			path_context.mEmission = InstanceDatas[hit_context.mInstanceID].mEmission; continue_bounce = false; break;
 			case DebugMode::RoughnessAlpha: 	path_context.mEmission = InstanceDatas[hit_context.mInstanceID].mRoughnessAlpha; continue_bounce = false; break;
-			case DebugMode::RecursionCount:		continue_bounce = true; break;
+			case DebugMode::RecursionDepth:		continue_bounce = true; break;
 			default:							path_context.mEmission = sDebugModeValue; continue_bounce = false; break;
 			}
 		}
@@ -294,52 +284,53 @@ void TraceRay(PixelContext inPixelContext)
 		 	RaymarchCloud(cloud_transmittance, cloud_luminance);
 
 			float3 emission						= lerp(sky_luminance, cloud_luminance, 1.0 - cloud_transmittance);
-			path_context.mEmission				= path_context.mEmission + path_context.mThroughput * emission;
+			path_context.mEmission				+= path_context.mThroughput * emission;
 			
 			break;
 		}
 		
+		DebugValue(PixelDebugMode::Emission,	path_context.mRecursionDepth, path_context.mEmission);
+		
+		if (!continue_bounce)
+			break;
+		
+		// Drop the ray if throughput is 0
 		float throughput_max					= max(path_context.mThroughput.x, max(path_context.mThroughput.y, path_context.mThroughput.z));
+		if (throughput_max <= 0)
+			break;
 
-		// Russian Roulette
-		// [TODO] Make a test scene for comparison
+		// Recursion Depth Count Max
 		// http://www.pbr-book.org/3ed-2018/Monte_Carlo_Integration/Russian_Roulette_and_Splitting.html
 		// https://computergraphics.stackexchange.com/questions/2316/is-russian-roulette-really-the-answer
-		if (path_context.mRecursionCount >= mConstants.mRecursionCountMax)
+		if (path_context.mRecursionDepth + 1 > mConstants.mRecursionDepthCountMax)
+			break;
+		
+		// [TODO] How should it be affect by Russian Roulette through MIS? Can not find anything related in Mitsuba.
+		// LightEmission is kind of from next depth, but it does not look right to put this after Russian Roulette evaluation.
+		path_context.mEmission					+= path_context.mLightEmission;
+		path_context.mLightEmission				= 0;
+		
+		// Russian Roulette Depth
+		if (path_context.mRecursionDepth + 1 >= mConstants.mRussianRouletteDepth)
 		{
-			if (mConstants.mRecursionMode == RecursionMode::FixedCount)
-				continue_bounce					= false;
+			// Probability can be chosen in almost any manner
+			// e.g. Fixed threshold
+			// e.g. Veach's Efficiency-Optimized Russian roulette is based on average variance and cost
+			float scale							= path_context.mEtaScale * path_context.mEtaScale; // See Dielectric::Evaluate
+			float continue_probablity			= min(throughput_max * scale, 0.95);
+			float probablity					= RandomFloat01(path_context.mRandomState);
+			bool probability_passed				= probablity < continue_probablity;
 
-			if (mConstants.mRecursionMode == RecursionMode::RussianRoulette)
-			{
-				// Probability can be chosen in almost any manner
-				// e.g. Fixed threshold
-				// e.g. Veach's Efficiency-Optimized Russian roulette is based on average variance and cost
-				float scale						= path_context.mEtaScale * path_context.mEtaScale; // See Dielectric::Evaluate
-				float continue_probablity		= min(throughput_max * scale, 0.95);
-				float probablity				= RandomFloat01(path_context.mRandomState);
-				bool probability_passed			= probablity < continue_probablity;
+			DebugValue(PixelDebugMode::RussianRoulette,			path_context.mRecursionDepth, float3(probability_passed, probablity, continue_probablity));
+			DebugValue(PixelDebugMode::EtaScale,				path_context.mRecursionDepth, float3(path_context.mEtaScale, 0, 0));				
 
-				DebugValue(PixelDebugMode::RussianRoulette,		path_context.mRecursionCount, float3(probability_passed, probablity, continue_probablity));
-				DebugValue(PixelDebugMode::EtaScale,			path_context.mRecursionCount, float3(path_context.mEtaScale, 0, 0));				
-
-				if (probability_passed)
-				{
-					// Weight the path to keep result unbiased
-					path_context.mThroughput	/= continue_probablity;
-				}
-				else
-				{
-					// Termination by Russian Roulette
-					continue_bounce = false;
-				}
-			}
+			if (probability_passed)
+				path_context.mThroughput		/= continue_probablity; 				// Weight the path to keep result unbiased
+			else
+				break;																	// Termination by Russian Roulette
 		}
 
-		if (continue_bounce)
-			path_context.mRecursionCount++;
-		else
-			break;
+		path_context.mRecursionDepth++;
 	}
 
 	// Accumulation
@@ -352,8 +343,8 @@ void TraceRay(PixelContext inPixelContext)
 		if (mConstants.mDebugMode != DebugMode::None)
 			mixed_output						= current_output;
 
-		if (mConstants.mDebugMode == DebugMode::RecursionCount)
-			mixed_output						= path_context.mRecursionCount;
+		if (mConstants.mDebugMode == DebugMode::RecursionDepth)
+			mixed_output						= path_context.mRecursionDepth;
 
 		ScreenColorUAV[inPixelContext.mPixelIndex.xy] = float4(mixed_output, 1);
 		ScreenDebugUAV[inPixelContext.mPixelIndex.xy] = sDebugValue;

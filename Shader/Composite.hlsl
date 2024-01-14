@@ -107,7 +107,7 @@ float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 	case DebugMode::RoughnessAlpha: 			break;
 	case DebugMode::Transmittance:				break;
 	case DebugMode::InScattering:				break;
-	case DebugMode::RecursionCount:				color.xyz = hsv2rgb(float3(color.x / 8.0, 1, 1)); break;
+	case DebugMode::RecursionDepth:				color.xyz = hsv2rgb(float3(color.x / 8.0, 1, 1)); break;
 	default:									break;
 	}
 	
