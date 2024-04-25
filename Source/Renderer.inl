@@ -470,7 +470,7 @@ ComPtr<IDxcBlob> gCompileShader(const char* inFilename, const char* inEntryPoint
 		profile.c_str(),											// target profile
 		arguments.data(), static_cast<UINT32>(arguments.size()),	// compilation arguments and their count
 		defines.data(), static_cast<UINT32>(defines.size()),		// name/value defines and their count
-		DxcIncludeHandler.Get(),										// handler for #include directives
+		DxcIncludeHandler.Get(),									// handler for #include directives
 		&operation_result)))
 		assert(false);
 

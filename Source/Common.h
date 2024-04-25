@@ -500,6 +500,8 @@ struct FrameContext
 		mCommandAllocator					= nullptr;
 		mConstantUploadBuffer				= nullptr;
 		mConstantUploadBufferPointer		= nullptr;
+		mQueryReadbackBuffer				= nullptr;
+		mQueryReadbackBufferPointer			= nullptr;
 		mDebugReadbackBuffer				= nullptr;
 		mDebugReadbackBufferPointer			= nullptr;
 		mFenceValue							= 0;

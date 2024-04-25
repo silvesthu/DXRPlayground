@@ -13,26 +13,6 @@ struct PixelContext
 #define ENABLE_RAY_QUERY
 #endif // SHADER_PROFILE_LIB
 
-static uint3 sDispatchRaysIndex;
-uint3 sGetDispatchRaysIndex()
-{
-#ifdef ENABLE_RAY_QUERY
-	return sDispatchRaysIndex;
-#else
-	return DispatchRaysIndex();
-#endif // ENABLE_RAY_QUERY
-}
-
-static uint3 sDispatchRaysDimensions;
-uint3 sGetDispatchRaysDimensions()
-{
-#ifdef ENABLE_RAY_QUERY
-	return sDispatchRaysDimensions;
-#else
-	return DispatchRaysDimensions();
-#endif // ENABLE_RAY_QUERY
-}
-
 static float3 sWorldRayOrigin;
 float3 sGetWorldRayOrigin()
 {

@@ -587,7 +587,7 @@ struct Constants
 	int							mDebugInstanceIndex				CONSTANT_DEFAULT(-1);
 	int							mDebugLightIndex				CONSTANT_DEFAULT(-1);
 
-	uint						mRecursionDepthCountMax				CONSTANT_DEFAULT(16);
+	uint						mRecursionDepthCountMax			CONSTANT_DEFAULT(16);
 	uint						mRussianRouletteDepth			CONSTANT_DEFAULT(16);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);

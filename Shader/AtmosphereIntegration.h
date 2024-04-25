@@ -154,14 +154,7 @@ void GetSkyRadiance(out float3 outSkyRadiance, out float3 outTransmittanceToTop)
 	outSkyRadiance = 0;
 	outTransmittanceToTop = 1;
 
-	AtmosphereMode mode = mConstants.mAtmosphere.mMode;
-	bool left_screen = sGetDispatchRaysIndex().x * 1.0 / sGetDispatchRaysDimensions().x < 0.5;
-	if (mConstants.mAtmosphere.mWilkie21SkyViewSplitScreen == 1 && left_screen)
-		mode = AtmosphereMode::Wilkie21;
-	if (mConstants.mAtmosphere.mWilkie21SkyViewSplitScreen == 2 && !left_screen)
-		mode = AtmosphereMode::Wilkie21;
-
-	switch (mode)
+	switch (mConstants.mAtmosphere.mMode)
 	{
 	case AtmosphereMode::ConstantColor:				outSkyRadiance = mConstants.mAtmosphere.mConstantColor.xyz; break;
 	case AtmosphereMode::Wilkie21:					AtmosphereIntegration::Wilkie21::GetSkyRadiance(outSkyRadiance, outTransmittanceToTop); break;

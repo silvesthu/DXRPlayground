@@ -108,7 +108,6 @@ void TraceRay(PixelContext inPixelContext)
 				
 				DebugValue(PixelDebugMode::PositionWS, path_context.mRecursionDepth, float3(hit_context.PositionWS()));
 				DebugValue(PixelDebugMode::DirectionWS, path_context.mRecursionDepth, float3(hit_context.DirectionWS()));
-				// DebugValue(PixelDebugMode::DirectionWS, path_context.mRecursionDepth, float3(hit_context.DirectionWS() * 0.5 + 0.5));
 				DebugValue(PixelDebugMode::InstanceID, path_context.mRecursionDepth, float3(hit_context.mInstanceID, 0.0, 0.0));
 			}
 
@@ -132,7 +131,7 @@ void TraceRay(PixelContext inPixelContext)
 					emission = 0;
 
 				// IES
-				//float angle = acos(dot(-sGetWorldRayDirection(), float3(0,-1,0))) / MATH_PI;
+				//float angle = acos(dot(-hit_context.mRayDirectionWS, float3(0,-1,0))) / MATH_PI;
 				//float ies = IESSRV.SampleLevel(BilinearClampSampler, float2(angle, 0), 0).x;
 				//hit_context.mEmission *= ies;
 
@@ -362,9 +361,9 @@ void RayQueryCS(
 	uint2 output_dimensions;
 	ScreenColorUAV.GetDimensions(output_dimensions.x, output_dimensions.y);
 
-	// Helper
-	sDispatchRaysIndex.xyz						= inDispatchThreadID.xyz;
-	sDispatchRaysDimensions						= uint3(output_dimensions.xy, 1);
+	// Debug
+	sDebugDispatchRaysIndex.xyz					= inDispatchThreadID.xyz;
+	sDebugDispatchRaysDimensions				= uint3(output_dimensions.xy, 1);
 	
 	PixelContext pixel_context;
 	pixel_context.mPixelIndex					= inDispatchThreadID.xyz;

@@ -16,10 +16,10 @@ struct Renderer
 
 		Shader									mRayGenerationShader		= Shader().FileName("Shader/RayGeneration.hlsl").RayGenerationName(L"RayGeneration").RootSignatureReference(&mRayQueryShader);
 		Shader									mMissShader					= Shader().FileName("Shader/Miss.hlsl").MissName(L"Miss").RootSignatureReference(&mRayQueryShader);
-		Shader									mAnyHitShader				= Shader().FileName("Shader/AnyHit.hlsl").AnyHitName(L"AnyHit").RootSignatureReference(&mRayQueryShader);														// Separated AnyHit MUST be in front of the HitGroup refering it when being AddToStateObject, otherwise DXGI_ERROR_DRIVER_INTERNAL_ERROR
-		Shader									mClosestHit100Shader		= Shader().FileName("Shader/ClosestHit100.hlsl").ClosestHitName(L"ClosestHit100").RootSignatureReference(&mRayQueryShader);
-		Shader									mClosestHit010Shader		= Shader().FileName("Shader/ClosestHit010.hlsl").ClosestHitName(L"ClosestHit010").AnyHitReference(&mAnyHitShader).RootSignatureReference(&mRayQueryShader);		// Reference separated AnyHit
-		Shader									mClosestHit001Shader		= Shader().FileName("Shader/ClosestHit001.hlsl").ClosestHitName(L"ClosestHit001").AnyHitName(L"AnyHit001").RootSignatureReference(&mRayQueryShader);			// Reference embedded AnyHit
+		Shader									mAnyHitShader				= Shader().FileName("Shader/AnyHit.hlsl").AnyHitName(L"AnyHit").RootSignatureReference(&mRayQueryShader);														// AnyHit MUST comes before HitGroup referencing it when being AddToStateObject, otherwise DXGI_ERROR_DRIVER_INTERNAL_ERROR
+		Shader									mClosestHit100Shader		= Shader().FileName("Shader/ClosestHit100.hlsl").ClosestHitName(L"ClosestHit100").RootSignatureReference(&mRayQueryShader);										// ClosestHit without AnyHit
+		Shader									mClosestHit010Shader		= Shader().FileName("Shader/ClosestHit010.hlsl").ClosestHitName(L"ClosestHit010").AnyHitReference(&mAnyHitShader).RootSignatureReference(&mRayQueryShader);		// ClosestHit with AnyHit in different library
+		Shader									mClosestHit001Shader		= Shader().FileName("Shader/ClosestHit001.hlsl").ClosestHitName(L"ClosestHit001").AnyHitName(L"AnyHit001").RootSignatureReference(&mRayQueryShader);			// ClosestHit with AnyHit in same library
 		Shader									mCollectionSentinelShader	= Shader();
 		std::span<Shader>						mCollectionShaders			= std::span<Shader>(&mMissShader,			&mCollectionSentinelShader);
 		std::span<Shader>						mHitGroupShaders			= std::span<Shader>(&mClosestHit100Shader,	&mCollectionSentinelShader);

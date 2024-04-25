@@ -276,7 +276,11 @@ float3 F_Conductor_Mitsuba(float3 inEta, float3 inK, float inCosThetaI)
     return 0.5f * (r_s + r_p);
 }
 
-static float3 sDebugModeValue = 0;
+static float3       sDebugModeValue = 0;
+static float4       sDebugValue = 0;
+static uint3        sDebugDispatchRaysIndex;
+static uint3        sDebugDispatchRaysDimensions;
+
 void DebugModeValue(DebugMode inDebugMode, float3 inValue)
 {
     if (mConstants.mDebugMode == inDebugMode)
@@ -285,17 +289,16 @@ void DebugModeValue(DebugMode inDebugMode, float3 inValue)
 
 void DebugValueInit()
 {
-    if (sGetDispatchRaysIndex().x == mConstants.mPixelDebugCoord.x && sGetDispatchRaysIndex().y == mConstants.mPixelDebugCoord.y)
+    if (sDebugDispatchRaysIndex.x == mConstants.mPixelDebugCoord.x && sDebugDispatchRaysIndex.y == mConstants.mPixelDebugCoord.y)
         for (int i = 0; i < Debug::kValueArraySize; i++)
             BufferDebugUAV[0].mPixelValueArray[i] = 0;
 }
 
-static float4 sDebugValue = 0;
 void DebugValue(PixelDebugMode inPixelDebugMode, uint inRecursionDepth, float3 inValue)
 {
     if (mConstants.mPixelDebugMode == inPixelDebugMode)
     {
-        if (sGetDispatchRaysIndex().x == mConstants.mPixelDebugCoord.x && sGetDispatchRaysIndex().y == mConstants.mPixelDebugCoord.y && inRecursionDepth < Debug::kValueArraySize)
+        if (sDebugDispatchRaysIndex.x == mConstants.mPixelDebugCoord.x && sDebugDispatchRaysIndex.y == mConstants.mPixelDebugCoord.y && inRecursionDepth < Debug::kValueArraySize)
             BufferDebugUAV[0].mPixelValueArray[inRecursionDepth] = float4(inValue, 1.0); // 1.0 indicate value is written
 
         if (mConstants.mPixelDebugRecursion == inRecursionDepth)

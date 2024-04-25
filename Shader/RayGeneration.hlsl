@@ -30,5 +30,5 @@ void RayGeneration()
 		payload					// Payload
 	);
 
-	ScreenColorUAV[sGetDispatchRaysIndex().xy]	= payload.mData;
+	ScreenColorUAV[DispatchRaysIndex().xy]	= payload.mData;
 }
