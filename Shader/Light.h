@@ -3,6 +3,7 @@
 #include "Shared.h"
 #include "Binding.h"
 #include "Common.h"
+#include "Reservoir.h"
 
 struct LightContext
 {
@@ -12,14 +13,47 @@ struct LightContext
 
 namespace LightEvaluation
 {
-	uint SelectLight(inout PathContext ioPathContext)
+	uint SelectLight(inout HitContext ioHitContext, inout PathContext ioPathContext)
 	{
-		return min(RandomFloat01(ioPathContext.mRandomState) * mConstants.mLightCount, mConstants.mLightCount - 1);
+		switch (mConstants.mLightSampleMode)
+		{
+		case LightSampleMode::Distance:
+		{
+			Reservoir reservoir = Reservoir::Generate();
+			for (uint light_index = 0; light_index < mConstants.mLightCount; light_index++)
+			{
+				float3 v = Lights[light_index].mPosition - ioHitContext.PositionWS();
+				float weight = 1.0 / dot(v, v);
+				reservoir.Update(light_index, weight, ioPathContext);
+			}
+			return reservoir.mLightIndex;
+		}
+		case LightSampleMode::Uniform: // [passthrough]
+		default: return min(RandomFloat01(ioPathContext.mRandomState) * mConstants.mLightCount, mConstants.mLightCount - 1);
+		}
 	}
 
-	float SelectLightPDF(uint inLightIndex)
+	float SelectLightPDF(uint inLightIndex, inout HitContext ioHitContext, inout PathContext ioPathContext)
 	{
-		return 1.0 / mConstants.mLightCount;
+		switch (mConstants.mLightSampleMode)
+		{
+		case LightSampleMode::Distance:
+		{
+			float selected_light_weight = 0.0;
+			Reservoir reservoir = Reservoir::Generate();
+			for (uint light_index = 0; light_index < mConstants.mLightCount; light_index++)
+			{
+				float3 v = Lights[light_index].mPosition - ioHitContext.PositionWS();
+				float weight = 1.0 / dot(v, v);
+				if (inLightIndex == light_index)
+					selected_light_weight = weight;
+				reservoir.Update(light_index, weight, ioPathContext);
+			}
+			return selected_light_weight / reservoir.mTotalWeight;
+		}
+		case LightSampleMode::Uniform: // [passthrough]
+		default: return 1.0 / mConstants.mLightCount;
+		}
 	}
 
 	LightContext GenerateContext(Light inLight, float3 inPositionWS, inout PathContext ioPathContext)

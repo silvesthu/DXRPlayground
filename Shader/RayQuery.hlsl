@@ -4,6 +4,7 @@
 #include "Common.h"
 #include "BSDF.h"
 #include "Light.h"
+#include "Reservoir.h"
 #include "Planet.h"
 #include "AtmosphereIntegration.h"
 #include "CloudIntegration.h"
@@ -11,6 +12,12 @@
 void TraceRay(PixelContext inPixelContext)
 {
 	DebugValueInit();
+	
+	// Initialize on first frame
+	if (mConstants.mCurrentFrameIndex == 0)
+	{
+		ScreenReservoirUAV[inPixelContext.mPixelIndex.xy]		= 0;
+	}
 
 	// From https://www.shadertoy.com/view/tsBBWW
 	// [TODO] Need proper noise
@@ -152,6 +159,9 @@ void TraceRay(PixelContext inPixelContext)
 					// Add light contribution
 					
 					path_context.mEmission						+= path_context.mThroughput * emission;
+					
+					if (path_context.mRecursionDepth == 0)
+						DebugValue(PixelDebugMode::LightIndex, path_context.mRecursionDepth, hit_context.LightIndex() + 0.5); // Add a offset to identify light source
 				}
 				else if (mConstants.mSampleMode == SampleMode::MIS)
 				{
@@ -162,7 +172,7 @@ void TraceRay(PixelContext inPixelContext)
 					Light light									= Lights[light_index];
 
 					LightContext light_context					= LightEvaluation::GenerateContext(light, ray.Origin, path_context);					
-					float light_pdf								= light_context.mLPDF * LightEvaluation::SelectLightPDF(light_index);
+					float light_pdf								= light_context.mLPDF * LightEvaluation::SelectLightPDF(light_index, hit_context, path_context);
 					
 					float mis_weight							= max(0.0, MIS::PowerHeuristic(1, path_context.mPrevBSDFSamplePDF, 1, light_pdf));
 					path_context.mEmission						+= path_context.mThroughput * emission * mis_weight;
@@ -181,11 +191,16 @@ void TraceRay(PixelContext inPixelContext)
 					)
 				{
 					// Select light
-					uint light_index							= LightEvaluation::SelectLight(path_context);
+					uint light_index							= LightEvaluation::SelectLight(hit_context, path_context);
 					Light light									= Lights[light_index];
 					
+					DebugValue(PixelDebugMode::LightIndex, path_context.mRecursionDepth, light_index);
+					
+					// [TODO]
+					// ScreenReservoirUAV[inPixelContext.mPixelIndex.xy] = 0;
+					
 					LightContext light_context					= LightEvaluation::GenerateContext(light, hit_context.PositionWS(), path_context);					
-					float light_pdf								= light_context.mLPDF * LightEvaluation::SelectLightPDF(light_index);
+					float light_pdf								= light_context.mLPDF * LightEvaluation::SelectLightPDF(light_index, hit_context, path_context);
 					
 					if (light_pdf > 0)
 					{

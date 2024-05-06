@@ -47,6 +47,7 @@ enum class ScenePresetType
 	CornellBoxTeapot,
 	CornellBoxMonkey,
 	VeachMIS,
+	VeachMISManyLight,
 	LivingRoom2,
 
 	Bruneton17,
@@ -58,7 +59,7 @@ enum class ScenePresetType
 	Count,
 };
 
-static ScenePresetType sCurrentScene = ScenePresetType::CornellBoxDielectric;
+static ScenePresetType sCurrentScene = ScenePresetType::VeachMISManyLight;
 static ScenePresetType sPreviousScene = sCurrentScene;
 static ScenePreset kScenePresets[(int)ScenePresetType::Count] =
 {
@@ -68,6 +69,7 @@ static ScenePreset kScenePresets[(int)ScenePresetType::Count] =
 	ScenePreset().Name("CornellBoxTeapot").Path("Asset/Comparison/benedikt-bitterli/cornell-box-teapot/scene_v3.xml"),
 	ScenePreset().Name("CornellMonkey").Path("Asset/Comparison/benedikt-bitterli/cornell-box-monkey/scene_v3.xml"),
 	ScenePreset().Name("VeachMIS").Path("Asset/Comparison/benedikt-bitterli/veach-mis/scene_ggx_v3.xml"),
+	ScenePreset().Name("VeachMISManyLight").Path("Asset/Comparison/benedikt-bitterli/veach-mis-manylight/scene_ggx_v3.xml"),
 	ScenePreset().Name("LivingRoom2").Path("Asset/Comparison/benedikt-bitterli/living-room-2/scene_v3.xml"),
 	
 	ScenePreset().Name("Bruneton17").Path("Asset/primitives/sphere.obj").CameraPosition(glm::vec4(0.0f, 0.0f, 9.0f, 0.0f)).CameraDirection(glm::vec4(0.0f, 0.0f, -1.0f, 0.0f)).Transform(glm::translate(glm::vec3(0.0f, 1.0f, 0.0f))).Atmosphere(AtmosphereMode::Bruneton17),
@@ -214,6 +216,14 @@ static void sPrepareImGui()
 				const auto& name = nameof::nameof_enum(static_cast<SampleMode>(i));
 				ImGui::SameLine();
 				ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mSampleMode), i);
+			}
+
+			ImGui::Text("Light Sample Mode");
+			for (int i = 0; i < static_cast<int>(LightSampleMode::Count); i++)
+			{
+				const auto& name = nameof::nameof_enum(static_cast<LightSampleMode>(i));
+				ImGui::SameLine();
+				ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mLightSampleMode), i);
 			}
 
 			ImGui::TreePop();

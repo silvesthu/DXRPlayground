@@ -331,6 +331,9 @@
     <CopyFileToFolders Include="Shader\AnyHit.hlsl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
+    <CopyFileToFolders Include="Shader\Reservoir.h">
+      <Filter>Shader</Filter>
+    </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

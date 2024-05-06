@@ -37,6 +37,7 @@ using float4x4 = glm::mat4x4;
 #define CONCAT(a, b) CONCAT_INNER(a, b)
 #define CONCAT_INNER(a, b) a ## b
 #define GENERATE_PAD_NAME CONCAT(mPad_, __LINE__)
+#define GENERATE_NEW_LINE_NAME CONCAT(_Newline_, __LINE__)
 
 static const float MATH_PI						= 3.1415926535897932384626433832795f;
 static const float kEmissionBoostScale			= 1.0e4f;	// Boost emission to keep up with daylight
@@ -67,6 +68,8 @@ enum class ViewDescriptorIndex : uint
 	ScreenColorSRV,
 	ScreenDebugUAV,
 	ScreenDebugSRV,
+	ScreenReservoirSRV,
+	ScreenReservoirUAV,
 
 	// [Debug]
 	BufferDebugUAV,
@@ -170,31 +173,31 @@ enum class DebugMode : uint
 {
 	None = 0,
 
-	_Newline0,
+	GENERATE_NEW_LINE_NAME,
 
 	Barycentrics,
 	Position,
 	Normal,
 	UV,
 
-	_Newline1,
+	GENERATE_NEW_LINE_NAME,
 
 	Albedo,
 	Reflectance,
 	RoughnessAlpha,
 	Emission,
 
-	_Newline2,
+	GENERATE_NEW_LINE_NAME,
 
 	Transmittance,
 	InScattering,
 
-	_Newline3,
+	GENERATE_NEW_LINE_NAME,
 
 	RecursionDepth,
 	DebugValue,
 
-	_Newline4,
+	GENERATE_NEW_LINE_NAME,
 
 	Cloud,
 
@@ -205,13 +208,13 @@ enum class PixelDebugMode : uint
 {
 	Manual,
 
-	_Newline1,
+	GENERATE_NEW_LINE_NAME,
 
 	PositionWS,
 	DirectionWS,
 	InstanceID,
 
-	_Newline4,
+	GENERATE_NEW_LINE_NAME,
 
 	// BSDF Sample
 	BSDF__L,
@@ -220,7 +223,7 @@ enum class PixelDebugMode : uint
 	BSDF__H,
 	BSDF__I,
 
-	_Newline5,
+	GENERATE_NEW_LINE_NAME,
 
 	BSDF__D,
 	BSDF__F,
@@ -228,7 +231,7 @@ enum class PixelDebugMode : uint
 	BSDF__BSDF,
 	BSDF__PDF,
 
-	_Newline6,
+	GENERATE_NEW_LINE_NAME,
 
 	// Light Sample
 	Light_L,
@@ -237,7 +240,7 @@ enum class PixelDebugMode : uint
 	Light_H,
 	Light_I,
 
-	_Newline7,
+	GENERATE_NEW_LINE_NAME,
 
 	Light_D,
 	Light_F,
@@ -245,18 +248,22 @@ enum class PixelDebugMode : uint
 	Light_BSDF,
 	Light_PDF,
 
-	_Newline8,
+	GENERATE_NEW_LINE_NAME,
+
+	LightIndex,
+
+	GENERATE_NEW_LINE_NAME,
 
 	Emission,
 	Throughput,
 	DiracDelta,
 
-	_Newline9,
+	GENERATE_NEW_LINE_NAME,
 
 	RussianRoulette,
 	EtaScale,
 
-	_Newline10,
+	GENERATE_NEW_LINE_NAME,
 
 	BSDF__MIS,
 	Light_MIS,
@@ -280,6 +287,14 @@ enum class SampleMode : uint
 	MIS,
 
 	Count
+};
+
+enum class LightSampleMode : uint
+{
+	Uniform = 0,
+	Distance,
+
+	Count,
 };
 
 enum class BSDF : uint
@@ -333,7 +348,7 @@ enum class AtmosphereMode : uint
 	ConstantColor = 0,
 	Wilkie21,
 
-	_Newline0,
+	GENERATE_NEW_LINE_NAME,
 	
 	RaymarchAtmosphereOnly,
 	Bruneton17,
@@ -578,7 +593,7 @@ struct Constants
 	uint						mLightCount						CONSTANT_DEFAULT(0);
 	OffsetMode					mOffsetMode						CONSTANT_DEFAULT(OffsetMode::HalfPixel);
 	SampleMode					mSampleMode						CONSTANT_DEFAULT(SampleMode::MIS);
-	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	LightSampleMode				mLightSampleMode				CONSTANT_DEFAULT(LightSampleMode::Uniform);
 
 	float4						mSunDirection					CONSTANT_DEFAULT(float4(1.0f, 0.0f, 0.0f, 0.0f));
 
