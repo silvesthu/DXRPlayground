@@ -461,6 +461,7 @@ ComPtr<IDxcBlob> gCompileShader(const char* inFilename, const char* inEntryPoint
 	arguments.push_back(DXC_ARG_DEBUG);								// -Zi
 	arguments.push_back(L"-Qembed_debug");							// -Qembed_debug
 	arguments.push_back(L"-HV 2021");								// -HV 2021
+	arguments.push_back(L"-disable-payload-qualifiers");			// -disable-payload-qualifiers, see https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#payload-access-qualifiers
 
 	IDxcOperationResult* operation_result;
 	if (FAILED(DxcCompiler->Compile(
@@ -519,8 +520,8 @@ ComPtr<IDxcBlob> gCompileShader(const char* inFilename, const char* inEntryPoint
 
 bool gCreateVSPSPipelineState(const char* inShaderFileName, const char* inVSName, const char* inPSName, Shader& ioShader)
 {
-	ComPtr<IDxcBlob> vs_blob = gCompileShader(inShaderFileName, inVSName, "vs_6_6");
-	ComPtr<IDxcBlob> ps_blob = gCompileShader(inShaderFileName, inPSName, "ps_6_6");
+	ComPtr<IDxcBlob> vs_blob = gCompileShader(inShaderFileName, inVSName, "vs_6_7");
+	ComPtr<IDxcBlob> ps_blob = gCompileShader(inShaderFileName, inPSName, "ps_6_7");
 	if (vs_blob == nullptr || ps_blob == nullptr)
 		return false;
 
@@ -561,7 +562,7 @@ bool gCreateVSPSPipelineState(const char* inShaderFileName, const char* inVSName
 
 bool gCreateCSPipelineState(const char* inShaderFileName, const char* inCSName, Shader& ioShader)
 {
-	ComPtr<IDxcBlob> blob = gCompileShader(inShaderFileName, inCSName, "cs_6_6");
+	ComPtr<IDxcBlob> blob = gCompileShader(inShaderFileName, inCSName, "cs_6_7");
 	if (blob == nullptr)
 		return false;
 
@@ -586,7 +587,7 @@ bool gCreateCSPipelineState(const char* inShaderFileName, const char* inCSName, 
 
 bool gCreateLibPipelineState(const char* inShaderFileName, const wchar_t* inLibName, Shader& ioShader)
 {
-	ComPtr<IDxcBlob> blob = gCompileShader(inShaderFileName, "", "lib_6_6");
+	ComPtr<IDxcBlob> blob = gCompileShader(inShaderFileName, "", "lib_6_7");
 	if (blob == nullptr)
 		return false;
 
