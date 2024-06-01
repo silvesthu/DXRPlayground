@@ -6,6 +6,7 @@
 [shader("anyhit")]
 void AnyHit(inout RayPayload ioPayload, in BuiltInTriangleIntersectionAttributes inAttributes)
 {
-	if (inAttributes.barycentrics.x < 0.1)
+	float3 barycentrics = float3(1.0 - inAttributes.barycentrics.x - inAttributes.barycentrics.y, inAttributes.barycentrics.xy);
+	if (all(barycentrics > 0.01))
 		IgnoreHit();
 }

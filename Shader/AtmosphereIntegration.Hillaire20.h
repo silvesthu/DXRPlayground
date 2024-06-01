@@ -1012,6 +1012,10 @@ namespace AtmosphereIntegration { namespace Hillaire20 {
 
 void GetSkyRadiance(out float3 outSkyRadiance, out float3 outTransmittanceToTop)
 {
+#ifndef AtmosphereMode_Hillaire20
+	return;
+#endif // AtmosphereMode_Hillaire20
+
 	outSkyRadiance = 0;
 	outTransmittanceToTop = 1; // [TODO]
 

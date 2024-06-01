@@ -346,13 +346,13 @@ enum class ToneMappingMode : uint
 enum class AtmosphereMode : uint
 {
 	ConstantColor = 0,
-	Wilkie21,
+	Raymarch,
 
 	GENERATE_NEW_LINE_NAME,
 	
-	RaymarchAtmosphereOnly,
 	Bruneton17,
 	Hillaire20,
+	Wilkie21,
 
 	Count
 };
@@ -524,7 +524,7 @@ struct AtmosphereConstants
 	float						mSunAngularRadius				CONSTANT_DEFAULT(0);
 
 	uint						mHillaire20SkyViewInLuminance	CONSTANT_DEFAULT(0);
-	uint						mWilkie21SkyViewSplitScreen		CONSTANT_DEFAULT(0);
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 

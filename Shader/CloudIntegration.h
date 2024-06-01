@@ -48,8 +48,9 @@ void RaymarchCloud(out float3 outTransmittance, out float3 outLuminance)
 	outTransmittance = 1.0;
 	outLuminance = 0.0;
 
-	if (mConstants.mCloud.mMode == CloudMode::None)
-		return;
+#ifndef CloudMode_Noise
+	return;
+#endif // CloudMode_Noise
 
 	float3 accumulated_light = 0;
 	float accumulated_density = 0.0;

@@ -11,23 +11,15 @@
 #include <wrl.h>			// For ComPtr. See https://github.com/Microsoft/DirectXTK/wiki/ComPtr
 using Microsoft::WRL::ComPtr;
 #include <pix3.h>			// For PIXScopedEvent
-#include <DirectML.h>		// For DirectML
 
-#include <tchar.h>
 #include <string>
-#include <iostream>
 #include <fstream>
 #include <array>
 #include <vector>
 #include <memory>
 #include <functional>
-#include <type_traits>
-#include <locale>
-#include <codecvt>
 #include <filesystem>
 #include <span>
-#include <execution>
-#include <optional>
 
 #define GLM_FORCE_SILENT_WARNINGS
 #include "Thirdparty/glm/glm/gtx/transform.hpp"
@@ -259,13 +251,12 @@ extern ID3D12CommandQueue* 					gCommandQueue;
 extern ID3D12GraphicsCommandList4* 			gCommandList;
 
 extern ID3D12QueryHeap*						gQueryHeap;
-struct TimingStat
+struct Stats
 {
-	// [NOTE] Time might look longer than necessary if GPU is not full load, turn off Vsync to force it run full speed
-	float									mTimeInMSRayQuery = 0;
-	float									mTimeInMSHitShader = 0;
+	int										mInstructionCount = 0;
+	float									mTimeInMS = 0;				// [NOTE] Time might look longer than necessary if GPU is not full load, turn off Vsync to force it run full speed
 };
-extern TimingStat							gTimingStat;
+extern Stats								gStats;
 struct Timing
 {
 	UINT									mQueryHeapIndex = 0;
@@ -289,7 +280,6 @@ struct Timing
 	{
 		gCommandList->ResolveQueryData(gQueryHeap, D3D12_QUERY_TYPE_TIMESTAMP, 0, mQueryHeapIndex, inReadbackResource, 0);
 		mQueryHeapIndex = 0;
-		gTimingStat = {};
 	}
 };
 extern Timing								gTiming;

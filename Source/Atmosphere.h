@@ -443,9 +443,7 @@ public:
 			std::span<Texture> mValidationTextures				= std::span<Texture>(&mValidationSentinelTexture, &mValidationSentinelTexture);
 
 			bool mBakeRequested									= false;
-			bool mBakeHosek										= false;
-
-			int mSplitScreen									= 0;
+			bool mUseHosek										= false;
 
 			double mVisibility									= 0.0;
 			glm::dvec3 mHosekZenithSpectrum						= glm::dvec3(0.0);

@@ -25,9 +25,6 @@ void Atmosphere::Render()
 	case AtmosphereMode::Wilkie21:				mRuntime.mWilkie21.Render(mProfile); break;
 	default:									break;
 	}
-
-	if (mProfile.mMode != AtmosphereMode::Wilkie21 && mRuntime.mWilkie21.mSplitScreen != 0)
-		mRuntime.mWilkie21.Render(mProfile);
 }
 
 void Atmosphere::UpdateProfile()
@@ -50,7 +47,6 @@ void Atmosphere::UpdateProfile()
 	constants.mSunAngularRadius					= static_cast<float>(mProfile.kSunAngularRadius);
 
 	constants.mHillaire20SkyViewInLuminance		= mRuntime.mHillaire20.mSkyViewInLuminance;
-	constants.mWilkie21SkyViewSplitScreen		= mRuntime.mWilkie21.mSplitScreen;
 	constants.mAerialPerspective				= mRuntime.mAerialPerspective ? 1 : 0;
 	constants.mGroundAlbedo						= mProfile.mGroundAlbedo;
 	constants.mRuntimeGroundAlbedo				= mProfile.mRuntimeGroundAlbedo;
@@ -292,18 +288,25 @@ void Atmosphere::ImGuiShowMenus()
 				ImGui::SameLine();
 
 			if (ImGui::RadioButton(name.data(), static_cast<int>(mProfile.mMode) == i))
+			{
 				mProfile.mMode = static_cast<AtmosphereMode>(i);
+				gRenderer.mReloadShader = true;
+			}
 		}
 
 		{
 			ImGui::PushID("Preset");
 
+			ImGui::Text("Preset");
+			ImGui::SameLine();
 			SMALL_BUTTON(Profile::Preset::Bruneton17);
 			ImGui::SameLine();
 			SMALL_BUTTON(Profile::Preset::Hillaire20);
 
 			ImGui::PopID();
 		}
+
+		ImGui::Checkbox("Scene Unit is Kilometer, otherwise Meter", &mRuntime.mSceneInKilometer);
 
 		if (mProfile.mMode == AtmosphereMode::ConstantColor)
 		{
@@ -315,49 +318,47 @@ void Atmosphere::ImGuiShowMenus()
 			gAtmosphere.mRuntime.mBruneton17.mRecomputeRequested |= 
 				ImGui::SliderInt("Scattering Order", reinterpret_cast<int*>(&mRuntime.mBruneton17.mScatteringOrder), 1, 8);
 			ImGui::Checkbox("Recompute Every Frame", &mRuntime.mBruneton17.mRecomputeEveryFrame);
+
+			ImGui::Checkbox("Aerial Perspective", &mRuntime.mAerialPerspective);
 		}
 
-		ImGui::Checkbox("Scene Unit is Kilometer, otherwise Meter", &mRuntime.mSceneInKilometer);
-		ImGui::Checkbox("Aerial Perspective", &mRuntime.mAerialPerspective);
-		ImGui::Checkbox("[Hillaire20] SkyView in Luminance", &mRuntime.mHillaire20.mSkyViewInLuminance);
-		if (ImGui::Button("[Wilkie21] Bake -> Split Screen")) mRuntime.mWilkie21.mBakeRequested = true;
-		ImGui::SameLine();
-		if (ImGui::RadioButton("Off", mRuntime.mWilkie21.mSplitScreen == 0)) mRuntime.mWilkie21.mSplitScreen = 0;
-		ImGui::SameLine();
-		if (ImGui::RadioButton("Left", mRuntime.mWilkie21.mSplitScreen == 1)) mRuntime.mWilkie21.mSplitScreen = 1;
-		ImGui::SameLine();
-		if (ImGui::RadioButton("Right", mRuntime.mWilkie21.mSplitScreen == 2)) mRuntime.mWilkie21.mSplitScreen = 2;
-
-		ImGui::TreePop();
-	}
-
-	if (ImGui::TreeNodeEx("Wilkie21"))
-	{
-		ImGui::SliderDouble("Turbidity", &mProfile.mWilkie21.mTurbidity, 1.37, 3.7);
-		ImGui::InputDouble("Visibility", &mRuntime.mWilkie21.mVisibility, 0.0, 0.0, "%.3f", ImGuiInputTextFlags_ReadOnly);
-		ImGui::SliderDouble("Albedo", &mProfile.mWilkie21.mAlbedo, 0.0, 1.0);
-
-		if (ImGui::TreeNodeEx("Hosek", ImGuiTreeNodeFlags_DefaultOpen))
+		if (mProfile.mMode == AtmosphereMode::Hillaire20)
 		{
-			ImGui::InputDouble3("Zenith Spectrum (as XYZ)", &mRuntime.mWilkie21.mHosekZenithSpectrum.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
-			ImGui::InputDouble3("Zenith XYZ", &mRuntime.mWilkie21.mHosekZenithXYZ.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
-			ImGui::InputDouble3("Zenith RGB", &mRuntime.mWilkie21.mHosekZenithRGB.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
-			ImGui::InputDouble3("Solar Spectrum (as XYZ)", &mRuntime.mWilkie21.mHosekSolarSpectrum.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
-				
-			ImGui::TreePop();
+			gAtmosphere.mRuntime.mBruneton17.mRecomputeRequested |=
+				ImGui::SliderInt("Scattering Order", reinterpret_cast<int*>(&mRuntime.mBruneton17.mScatteringOrder), 1, 8);
+			ImGui::Checkbox("Recompute Every Frame", &mRuntime.mBruneton17.mRecomputeEveryFrame);
+
+			ImGui::Checkbox("SkyView in Luminance", &mRuntime.mHillaire20.mSkyViewInLuminance);
 		}
 
-		if (ImGui::TreeNodeEx("Prague", ImGuiTreeNodeFlags_DefaultOpen))
+		if (mProfile.mMode == AtmosphereMode::Wilkie21)
 		{
-			ImGui::InputDouble3("Zenith Spectrum (as XYZ)", &mRuntime.mWilkie21.mPragueZenithSpectrum.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
-			ImGui::InputDouble3("Zenith Spectrum (as RGB)", &mRuntime.mWilkie21.mPragueZenithRGB.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
-			ImGui::InputDouble3("Solar Spectrum (as XYZ)", &mRuntime.mWilkie21.mPragueSolarSpectrum.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
-			ImGui::InputDouble3("Transmittance (as XYZ)", &mRuntime.mWilkie21.mPragueTransmittance.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+			if (ImGui::Button("Bake")) mRuntime.mWilkie21.mBakeRequested = true;
+			ImGui::SliderDouble("Turbidity", &mProfile.mWilkie21.mTurbidity, 1.37, 3.7);
+			ImGui::InputDouble("Visibility", &mRuntime.mWilkie21.mVisibility, 0.0, 0.0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+			ImGui::SliderDouble("Albedo", &mProfile.mWilkie21.mAlbedo, 0.0, 1.0);
+			ImGui::Checkbox("Use Hosek", &mRuntime.mWilkie21.mUseHosek);
 
-			ImGui::TreePop();
+			if (ImGui::TreeNodeEx("Hosek", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				ImGui::InputDouble3("Zenith Spectrum (as XYZ)", &mRuntime.mWilkie21.mHosekZenithSpectrum.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+				ImGui::InputDouble3("Zenith XYZ", &mRuntime.mWilkie21.mHosekZenithXYZ.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+				ImGui::InputDouble3("Zenith RGB", &mRuntime.mWilkie21.mHosekZenithRGB.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+				ImGui::InputDouble3("Solar Spectrum (as XYZ)", &mRuntime.mWilkie21.mHosekSolarSpectrum.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+
+				ImGui::TreePop();
+			}
+
+			if (ImGui::TreeNodeEx("Prague", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				ImGui::InputDouble3("Zenith Spectrum (as XYZ)", &mRuntime.mWilkie21.mPragueZenithSpectrum.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+				ImGui::InputDouble3("Zenith Spectrum (as RGB)", &mRuntime.mWilkie21.mPragueZenithRGB.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+				ImGui::InputDouble3("Solar Spectrum (as XYZ)", &mRuntime.mWilkie21.mPragueSolarSpectrum.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+				ImGui::InputDouble3("Transmittance (as XYZ)", &mRuntime.mWilkie21.mPragueTransmittance.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+
+				ImGui::TreePop();
+			}
 		}
-
-		ImGui::Checkbox("Bake Hosek", &mRuntime.mWilkie21.mBakeHosek);
 
 		ImGui::TreePop();
 	}
@@ -780,6 +781,7 @@ void Atmosphere::Runtime::Wilkie21::Render(const Profile& inProfile)
 			}
 		};
 
+		mSkyView.mLoaded = false;
 		mSkyView.mUploadData.resize(mSkyView.GetSubresourceSize());
 		uint64_t* pixels = reinterpret_cast<uint64_t*>(mSkyView.mUploadData.data());
 	
@@ -804,7 +806,7 @@ void Atmosphere::Runtime::Wilkie21::Render(const Profile& inProfile)
 				arpragueskymodelground_compute_angles(sun_elevation, sun_azimuth, &view_direction[0], &up_direction[0], &theta, &gamma, &shadow);
 
 				Color::RGB luminance;
-				if (mBakeHosek)
+				if (mUseHosek)
 				{
 					luminance =
 						{ glm::vec3(
@@ -829,5 +831,6 @@ void Atmosphere::Runtime::Wilkie21::Render(const Profile& inProfile)
 		};
 	}
 
+	gRenderer.mAccumulationResetRequested = true;
 	mBakeRequested = false;
 }

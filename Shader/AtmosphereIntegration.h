@@ -142,7 +142,7 @@ void GetSunAndSkyIrradiance(float3 inHitPosition, float3 inNormal, out float3 ou
 	switch (mConstants.mAtmosphere.mMode)
 	{
     case AtmosphereMode::ConstantColor:				break; // Not supported
-	case AtmosphereMode::RaymarchAtmosphereOnly:	break; // Not supported
+	case AtmosphereMode::Raymarch:					break; // Not supported
 	case AtmosphereMode::Bruneton17: 				AtmosphereIntegration::Bruneton17::GetSunAndSkyIrradiance(inHitPosition, inNormal, outSunIrradiance, outSkyIrradiance); break;
 	case AtmosphereMode::Hillaire20: 				break; // [TODO]
 	default: break;
@@ -158,7 +158,7 @@ void GetSkyRadiance(out float3 outSkyRadiance, out float3 outTransmittanceToTop)
 	{
 	case AtmosphereMode::ConstantColor:				outSkyRadiance = mConstants.mAtmosphere.mConstantColor.xyz; break;
 	case AtmosphereMode::Wilkie21:					AtmosphereIntegration::Wilkie21::GetSkyRadiance(outSkyRadiance, outTransmittanceToTop); break;
-	case AtmosphereMode::RaymarchAtmosphereOnly:	AtmosphereIntegration::Raymarch::GetSkyRadiance(outSkyRadiance, outTransmittanceToTop); break;
+	case AtmosphereMode::Raymarch:					AtmosphereIntegration::Raymarch::GetSkyRadiance(outSkyRadiance, outTransmittanceToTop); break;
 	case AtmosphereMode::Bruneton17: 				AtmosphereIntegration::Bruneton17::GetSkyRadiance(outSkyRadiance, outTransmittanceToTop); break;
 	case AtmosphereMode::Hillaire20: 				AtmosphereIntegration::Hillaire20::GetSkyRadiance(outSkyRadiance, outTransmittanceToTop); break;
 	default: break;
@@ -177,7 +177,7 @@ void GetSkyLuminanceToPoint(out float3 outSkyLuminance, out float3 outTransmitta
     switch (mConstants.mAtmosphere.mMode)
     {
     case AtmosphereMode::ConstantColor:				break; // Not supported
-	case AtmosphereMode::RaymarchAtmosphereOnly:	break; // Not supported
+	case AtmosphereMode::Raymarch:					break; // Not supported
     case AtmosphereMode::Bruneton17: 				AtmosphereIntegration::Bruneton17::GetSkyRadianceToPoint(radiance, outTransmittance); break;
     case AtmosphereMode::Hillaire20: 				break; // [TODO]
     default: break;

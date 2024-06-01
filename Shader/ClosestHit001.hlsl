@@ -15,6 +15,7 @@ void ClosestHit001(inout RayPayload ioPayload, in BuiltInTriangleIntersectionAtt
 [shader("anyhit")]
 void AnyHit001(inout RayPayload ioPayload, in BuiltInTriangleIntersectionAttributes inAttributes)
 {
-	if (inAttributes.barycentrics.y > 0.5)
+	float3 barycentrics = float3(1.0 - inAttributes.barycentrics.x - inAttributes.barycentrics.y, inAttributes.barycentrics.xy);
+	if (all(barycentrics > 0.1))
 		IgnoreHit();
 }

@@ -369,14 +369,6 @@ static void sPrepareImGui()
 			ImGui::TreePop();
 		}
 
-		if (ImGui::TreeNodeEx("TimingStat"))
-		{
-			ImGui::InputFloat("RayQuery (ms)", &gTimingStat.mTimeInMSRayQuery, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
-			ImGui::InputFloat("HitShader (ms)", &gTimingStat.mTimeInMSHitShader, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
-
-			ImGui::TreePop();
-		}
-
 		if (ImGui::TreeNodeEx("Display"))
 		{
 			ImGui::Checkbox("Vsync", &gDisplaySettings.mVsync);
@@ -579,6 +571,13 @@ static void sPrepareImGui()
 					}
 					ImGui::EndTable();
 				}
+			}
+			ImGui::End();
+
+			if (ImGui::Begin("Stats"))
+			{
+				ImGui::InputInt("Instruction Count", &gStats.mInstructionCount, 0, 0, ImGuiInputTextFlags_ReadOnly);
+				ImGui::InputFloat("Time (ms)", &gStats.mTimeInMS, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
 			}
 			ImGui::End();
 		}
@@ -899,6 +898,8 @@ void sLoadScene()
 		gAtmosphere.mProfile.mConstantColor = gScene.GetSceneContent().mBackgroundColor;
 	}
 
+	gRenderer.mReloadShader = true;
+
 	sLoadCamera();
 }
 
@@ -1048,7 +1049,7 @@ void sRender()
 		gRenderer.Setup(gRenderer.mRuntime.mRayQueryShader.mData);
 		UINT64 timestamp = gTiming.TimestampBegin(frame_context.mQueryReadbackBufferPointer);
 		gCommandList->Dispatch((swap_chain_desc.Width + 7) / 8, (swap_chain_desc.Height + 7) / 8, 1);
-		gTiming.TimestampEnd(frame_context.mQueryReadbackBufferPointer, timestamp, gTimingStat.mTimeInMSRayQuery);
+		gTiming.TimestampEnd(frame_context.mQueryReadbackBufferPointer, timestamp, gStats.mTimeInMS);
 
 		gBarrierUAV(gCommandList, nullptr);
 	}
@@ -1083,9 +1084,7 @@ void sRender()
 		}
 
 		gRenderer.Setup(gRenderer.mRuntime.mLibShader.mData);
-		UINT64 timestamp = gTiming.TimestampBegin(frame_context.mQueryReadbackBufferPointer);
 		gCommandList->DispatchRays(&dispatch_rays_desc);
-		gTiming.TimestampEnd(frame_context.mQueryReadbackBufferPointer, timestamp, gTimingStat.mTimeInMSHitShader);
 
 		gBarrierUAV(gCommandList, nullptr);
 	}
