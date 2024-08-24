@@ -114,10 +114,10 @@ float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 	if (!debug_pixel)
 	{
 		if (coords.y == mConstants.mPixelDebugCoord.y)
-			if (abs(coords.x - mConstants.mPixelDebugCoord.x) < 10)
+			if (abs((int)coords.x - mConstants.mPixelDebugCoord.x) < 10)
 				color.xyz = float3(1, 0, 1);
 		if (coords.x == mConstants.mPixelDebugCoord.x)
-			if (abs(coords.y - mConstants.mPixelDebugCoord.y) < 10)
+			if (abs((int)coords.y - mConstants.mPixelDebugCoord.y) < 10)
 				color.xyz = float3(1, 0, 1);
 	}
 	

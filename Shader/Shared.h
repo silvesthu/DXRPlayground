@@ -251,6 +251,7 @@ enum class PixelDebugMode : uint
 	GENERATE_NEW_LINE_NAME,
 
 	LightIndex,
+	RISWeight,
 
 	GENERATE_NEW_LINE_NAME,
 
@@ -292,7 +293,7 @@ enum class SampleMode : uint
 enum class LightSampleMode : uint
 {
 	Uniform = 0,
-	Distance,
+	RIS,
 
 	Count,
 };
@@ -613,8 +614,13 @@ struct Constants
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
 	int2						mPixelDebugCoord				CONSTANT_DEFAULT(int2(-1, -1));
+	int							mPixelDebugLightIndex			CONSTANT_DEFAULT(0);
+	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+
 	PixelDebugMode				mPixelDebugMode					CONSTANT_DEFAULT(PixelDebugMode::Manual);
-	uint						mPixelDebugRecursion			CONSTANT_DEFAULT(0);
+	int							mPixelDebugRecursion			CONSTANT_DEFAULT(0);
+	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
 	AtmosphereConstants			mAtmosphere;
 	CloudConstants				mCloud;

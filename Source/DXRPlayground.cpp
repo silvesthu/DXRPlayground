@@ -175,8 +175,9 @@ static void sPrepareImGui()
 		if (ImGui::TreeNodeEx("Debug", ImGuiTreeNodeFlags_DefaultOpen))
 		{
 			ImGui::InputInt2("Coords", (int*)&gConstants.mPixelDebugCoord);
+			ImGui::SliderInt("Light Index", &gConstants.mPixelDebugLightIndex, 0, (int)gScene.GetSceneContent().mLights.size() - 1);
 			ImGui::InputFloat3("Pixel Value", &gGetFrameContext().mDebugReadbackBufferPointer->mPixelValue.x, "%.8f", ImGuiInputTextFlags_ReadOnly);
-			ImGui::SliderInt("ScreenDebug Recursion", reinterpret_cast<int*>(&gConstants.mPixelDebugRecursion), 0, 16);
+			ImGui::SliderInt("Recursion", &gConstants.mPixelDebugRecursion, 0, 16);
 			if (ImGui::TreeNodeEx("DebugValue For Each Recursion"))
 			{
 				for (int i = 0; i < static_cast<int>(PixelDebugMode::Count); i++)
@@ -1244,16 +1245,22 @@ static bool sCreateDeviceD3D(HWND hWnd)
 	if (D3D12CreateDevice(nullptr, feature_level, IID_PPV_ARGS(&gDevice)) != S_OK)
 		return false;
 
-	// Check shader model
+	// Check SM 6.7
 	D3D12_FEATURE_DATA_SHADER_MODEL shader_model = { D3D_SHADER_MODEL_6_7 };
 	if (FAILED(gDevice->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &shader_model, sizeof(shader_model)))
 		|| (shader_model.HighestShaderModel < D3D_SHADER_MODEL_6_7))
 		return false;
 
-	// Check DXR
+	// Check DXR, see https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html
 	D3D12_FEATURE_DATA_D3D12_OPTIONS5 options5 = {};
-	if (FAILED(gDevice->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &options5, sizeof(D3D12_FEATURE_DATA_D3D12_OPTIONS5)))
+	if (FAILED(gDevice->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &options5, sizeof(options5)))
 		|| options5.RaytracingTier < D3D12_RAYTRACING_TIER_1_1)
+		return false;
+
+	// Check EnhancedBarriers, see https://microsoft.github.io/DirectX-Specs/d3d/D3D12EnhancedBarriers.html
+	D3D12_FEATURE_DATA_D3D12_OPTIONS12 options12 = {};
+	if (FAILED(gDevice->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS12, &options12, sizeof(options12)))
+		|| !options12.EnhancedBarriersSupported)
 		return false;
 
 	// InfoQueue callback
