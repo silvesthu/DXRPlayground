@@ -64,6 +64,11 @@ float3x3 GenerateTangentSpace(float3 inNormal)
     return matrix;
 }
 
+float RGBToLuminance(float3 inColor)
+{
+    return dot(inColor.xyz, float3(0.299f, 0.587f, 0.114f));
+}
+
 // From https://www.shadertoy.com/view/lsdGzN
 float3 hsv2rgb( in float3 c )
 {

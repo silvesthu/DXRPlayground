@@ -171,13 +171,13 @@ void TraceRay(PixelContext inPixelContext)
 					uint light_index							= hit_context.LightIndex();
 					Light light									= Lights[light_index];
 
-					LightContext light_context					= LightEvaluation::GenerateContext(light, ray.Origin, path_context);
+					LightContext light_context					= LightEvaluation::GenerateContext(LightEvaluation::ContextType::Input, ray.Direction, light, ray.Origin, path_context);
 					float light_pdf								= light_context.mLPDF * LightEvaluation::SelectLightPDF(light_index, ray.Origin, path_context);
 					
 					float mis_weight							= max(0.0, MIS::PowerHeuristic(1, path_context.mPrevBSDFSamplePDF, 1, light_pdf));
 					path_context.mEmission						+= path_context.mThroughput * emission * mis_weight;
 					
-					DebugValue(PixelDebugMode::BSDF__MIS,		path_context.mRecursionDepth - 1 /* for prev BSDF hit */, float3(path_context.mPrevBSDFSamplePDF, light_pdf, mis_weight));
+					DebugValue(PixelDebugMode::BSDF_MIS,		path_context.mRecursionDepth - 1 /* for prev BSDF hit */, float3(path_context.mPrevBSDFSamplePDF, light_pdf, mis_weight));
 				}
 			}
 			else
@@ -198,7 +198,7 @@ void TraceRay(PixelContext inPixelContext)
 					// [TODO]
 					// ScreenReservoirUAV[inPixelContext.mPixelIndex.xy] = 0;
 					
-					LightContext light_context					= LightEvaluation::GenerateContext(light, hit_context.PositionWS(), path_context);					
+					LightContext light_context					= LightEvaluation::GenerateContext(LightEvaluation::ContextType::Random, 0, light, hit_context.PositionWS(), path_context);					
 					float light_pdf								= light_context.mLPDF * LightEvaluation::SelectLightPDF(light_index, hit_context.PositionWS(), path_context);
 					
 					if (light_pdf > 0)
@@ -324,7 +324,7 @@ void TraceRay(PixelContext inPixelContext)
 		path_context.mLightEmission				= 0;
 		
 		// Russian Roulette Depth
-		if (path_context.mRecursionDepth + 1 >= mConstants.mRussianRouletteDepth)
+		if (path_context.mRecursionDepth + 1 > mConstants.mRussianRouletteDepth)
 		{
 			// Probability can be chosen in almost any manner
 			// e.g. Fixed threshold

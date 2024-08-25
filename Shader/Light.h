@@ -13,7 +13,14 @@ struct LightContext
 
 namespace LightEvaluation
 {
-	LightContext GenerateContext(Light inLight, float3 inLitPositionWS, inout PathContext ioPathContext)
+	enum ContextType
+	{
+		Random,
+		Center,
+		Input,
+	};
+
+	LightContext GenerateContext(ContextType inContextType, float3 inL, Light inLight, float3 inLitPositionWS, inout PathContext ioPathContext)
 	{
 		const float3 vector_to_light			= inLight.mPosition - inLitPositionWS;
 		const float3 direction_to_light			= normalize(vector_to_light);
@@ -33,27 +40,41 @@ namespace LightEvaluation
 			// Position inside light is not proper handled
 			// See https://www.akalin.com/sampling-visible-sphere
 
-			float radius_squared = inLight.mHalfExtends.x * inLight.mHalfExtends.x;
+			float radius_squared				= inLight.mHalfExtends.x * inLight.mHalfExtends.x;
 			float distance_to_light_position_squared = dot(vector_to_light, vector_to_light);
-			float distance_to_light_position = sqrt(distance_to_light_position_squared);
+			float distance_to_light_position	= sqrt(distance_to_light_position_squared);
 
-			float sin_theta_max_squared = radius_squared / distance_to_light_position_squared;
-			float cos_theta_max = sqrt(1.0 - clamp(sin_theta_max_squared, 0.0, 1.0));
+			float sin_theta_max_squared			= radius_squared / distance_to_light_position_squared;
+			float cos_theta_max					= sqrt(1.0 - clamp(sin_theta_max_squared, 0.0, 1.0));
 
 			// The samples are distributed uniformly over the spherical cap
 			// So pdf is just one over area of it
-			light_context.mLPDF = 1.0 / (2.0 * MATH_PI * (1.0 - cos_theta_max));
+			light_context.mLPDF					= 1.0 / (2.0 * MATH_PI * (1.0 - cos_theta_max));
+
+			float xi1							= RandomFloat01(ioPathContext.mRandomState);
+			float xi2							= RandomFloat01(ioPathContext.mRandomState);
+
+			if (inContextType == ContextType::Center)
+			{
+				xi1								= 1.0;
+				xi2								= 1.0;
+			}
 
 			// Note uniform distribution is applied on cos_theta due to the form of spherical integration
-			float cos_theta = lerp(cos_theta_max, 1.0, RandomFloat01(ioPathContext.mRandomState));
-			float sin_theta_squared = 1.0 - cos_theta * cos_theta;
-			float sin_theta = sqrt(sin_theta_squared);
+			float cos_theta						= lerp(cos_theta_max, 1.0, xi1);
+			float sin_theta_squared				= 1.0 - cos_theta * cos_theta;
+			float sin_theta						= sqrt(sin_theta_squared);
 
-			float3x3 tangent_space = GenerateTangentSpace(direction_to_light);
+			float3x3 tangent_space				= GenerateTangentSpace(direction_to_light);
 
-			float phi = 2.0 * MATH_PI * RandomFloat01(ioPathContext.mRandomState);
+			float phi							= 2.0 * MATH_PI * xi2;
 
-			light_context.mL = (tangent_space[0] * cos(phi) + tangent_space[1] * sin(phi)) * sin_theta + tangent_space[2] * cos_theta;
+			light_context.mL					= (tangent_space[0] * cos(phi) + tangent_space[1] * sin(phi)) * sin_theta + tangent_space[2] * cos_theta;
+
+			if (inContextType == ContextType::Input)
+			{
+				light_context.mL				= inL;
+			}
 		}
 		break;
 		case LightType::Rectangle:
@@ -64,11 +85,26 @@ namespace LightEvaluation
 			float xi1							= RandomFloat01(ioPathContext.mRandomState);
 			float xi2							= RandomFloat01(ioPathContext.mRandomState);
 
+			if (inContextType == ContextType::Center)
+			{
+				xi1								= 0.5;
+				xi2								= 0.5;
+			}
+
 			float3 vector_to_sample				= vector_to_light;
 			vector_to_sample					+= inLight.mTangent * inLight.mHalfExtends.x * (xi1 * 2.0 - 1.0);
 			vector_to_sample					+= inLight.mBitangent * inLight.mHalfExtends.y * (xi2 * 2.0 - 1.0);
 
 			light_context.mL					= normalize(vector_to_sample);
+
+			if (inContextType == ContextType::Input)
+			{
+				// [TODO] Validate this
+
+				light_context.mL				= inL;
+				float t							= dot(-vector_to_light, inLight.mNormal) / dot(-light_context.mL, inLight.mNormal);
+				vector_to_sample				= light_context.mL * t;
+			}
 
 			float distance_to_sample_position	= length(vector_to_sample);
 			float surface_area					= 4.0 * inLight.mHalfExtends.x * inLight.mHalfExtends.y;
@@ -92,10 +128,12 @@ namespace LightEvaluation
 	float CalculateWeight(uint inLightIndex, float3 inLitPositionWS, inout PathContext ioPathContext)
 	{
 		// [NOTE] Use uniform weight here is effectively same as LightSampleMode::Uniform
-		// [TODO] Also weight on light luminance and BSDF
+		// [NOTE] minimal-sample in RTXDI merge light reservoir and brdf reservoir for initial sample
 
-		LightContext light_context = LightEvaluation::GenerateContext(Lights[inLightIndex], inLitPositionWS, ioPathContext);
-		return light_context.mLPDF <= 0.0 ? 0.0 : 1.0 / light_context.mLPDF;
+		// [TODO] Also weight on BSDF
+
+		LightContext light_context = LightEvaluation::GenerateContext(LightEvaluation::ContextType::Random, 0, Lights[inLightIndex], inLitPositionWS, ioPathContext);
+		return light_context.mLPDF <= 0.0 ? 0.0 : RGBToLuminance(Lights[inLightIndex].mEmission) / light_context.mLPDF;
 	}
 
 	uint SelectLight(float3 inLitPositionWS, inout PathContext ioPathContext)

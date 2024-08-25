@@ -266,7 +266,7 @@ enum class PixelDebugMode : uint
 
 	GENERATE_NEW_LINE_NAME,
 
-	BSDF__MIS,
+	BSDF_MIS,
 	Light_MIS,
 
 	Count
@@ -603,8 +603,8 @@ struct Constants
 	int							mDebugInstanceIndex				CONSTANT_DEFAULT(-1);
 	int							mDebugLightIndex				CONSTANT_DEFAULT(-1);
 
-	uint						mRecursionDepthCountMax			CONSTANT_DEFAULT(16);
-	uint						mRussianRouletteDepth			CONSTANT_DEFAULT(16);
+	uint						mRecursionDepthCountMax			CONSTANT_DEFAULT(1);
+	uint						mRussianRouletteDepth			CONSTANT_DEFAULT(1);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
