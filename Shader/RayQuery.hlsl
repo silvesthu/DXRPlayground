@@ -172,7 +172,7 @@ void TraceRay(PixelContext inPixelContext)
 					Light light									= Lights[light_index];
 
 					LightContext light_context					= LightEvaluation::GenerateContext(light, ray.Origin, path_context);
-					float light_pdf								= light_context.mLPDF * LightEvaluation::SelectLightPDF(light_index, ray.Origin, hit_context, path_context);
+					float light_pdf								= light_context.mLPDF * LightEvaluation::SelectLightPDF(light_index, ray.Origin, path_context);
 					
 					float mis_weight							= max(0.0, MIS::PowerHeuristic(1, path_context.mPrevBSDFSamplePDF, 1, light_pdf));
 					path_context.mEmission						+= path_context.mThroughput * emission * mis_weight;
@@ -199,7 +199,7 @@ void TraceRay(PixelContext inPixelContext)
 					// ScreenReservoirUAV[inPixelContext.mPixelIndex.xy] = 0;
 					
 					LightContext light_context					= LightEvaluation::GenerateContext(light, hit_context.PositionWS(), path_context);					
-					float light_pdf								= light_context.mLPDF * LightEvaluation::SelectLightPDF(light_index, hit_context.PositionWS(), hit_context, path_context);
+					float light_pdf								= light_context.mLPDF * LightEvaluation::SelectLightPDF(light_index, hit_context.PositionWS(), path_context);
 					
 					if (light_pdf > 0)
 					{

@@ -105,7 +105,7 @@ struct Renderer
 	bool										mAccumulationDone = false;
 	bool										mAccumulationFrameUnlimited = false;
 	bool										mAccumulationPaused = false;
-	uint32_t									mAccumulationFrameCount = 64;
+	uint32_t									mAccumulationFrameCount = 1;
 	bool										mAccumulationResetRequested = false;
 
 	int											mResizeWidth = 0;

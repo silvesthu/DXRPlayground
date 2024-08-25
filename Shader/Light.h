@@ -89,6 +89,15 @@ namespace LightEvaluation
 		return light_context;
 	}
 
+	float CalculateWeight(uint inLightIndex, float3 inLitPositionWS, inout PathContext ioPathContext)
+	{
+		// [NOTE] Use uniform weight here is effectively same as LightSampleMode::Uniform
+		// [TODO] Also weight on light luminance and BSDF
+
+		LightContext light_context = LightEvaluation::GenerateContext(Lights[inLightIndex], inLitPositionWS, ioPathContext);
+		return light_context.mLPDF <= 0.0 ? 0.0 : 1.0 / light_context.mLPDF;
+	}
+
 	uint SelectLight(float3 inLitPositionWS, inout PathContext ioPathContext)
 	{
 		switch (mConstants.mLightSampleMode)
@@ -98,9 +107,7 @@ namespace LightEvaluation
 			Reservoir reservoir = Reservoir::Generate();
 			for (uint light_index = 0; light_index < mConstants.mLightCount; light_index++)
 			{
-				LightContext light_context		= LightEvaluation::GenerateContext(Lights[light_index], inLitPositionWS, ioPathContext);
-				float weight					= light_context.mLPDF <= 0.0 ? 0.0 : 1.0 / light_context.mLPDF;
-
+				float weight = CalculateWeight(light_index, inLitPositionWS, ioPathContext);
 				reservoir.Update(light_index, weight, ioPathContext);
 			}
 			return reservoir.mLightIndex;
@@ -110,7 +117,7 @@ namespace LightEvaluation
 		}
 	}
 
-	float SelectLightPDF(uint inLightIndex, float3 inLitPositionWS, inout HitContext ioHitContext, inout PathContext ioPathContext)
+	float SelectLightPDF(uint inLightIndex, float3 inLitPositionWS, inout PathContext ioPathContext)
 	{
 		switch (mConstants.mLightSampleMode)
 		{
@@ -120,16 +127,14 @@ namespace LightEvaluation
 			Reservoir reservoir = Reservoir::Generate();
 			for (uint light_index = 0; light_index < mConstants.mLightCount; light_index++)
 			{
-				LightContext light_context		= LightEvaluation::GenerateContext(Lights[light_index], inLitPositionWS, ioPathContext);
-				float weight					= light_context.mLPDF <= 0.0 ? 0.0 : 1.0 / light_context.mLPDF;
-
-				// [TODO] Also weight on light luminance and BSDF
+				float weight = CalculateWeight(light_index, inLitPositionWS, ioPathContext);
 
 				if (mConstants.mPixelDebugLightIndex == light_index)
 					DebugValue(PixelDebugMode::RISWeight, ioPathContext.mRecursionDepth, weight);
 
 				if (inLightIndex == light_index)
-					selected_light_weight		= weight;
+					selected_light_weight = weight;
+
 				reservoir.Update(light_index, weight, ioPathContext);
 			}
 			return selected_light_weight / reservoir.mTotalWeight;
