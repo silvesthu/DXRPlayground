@@ -30,57 +30,60 @@ struct ScenePreset
 {
 #define SCENE_PRESET_MEMBER(type, name, default_value) MEMBER(ScenePreset, type, name, default_value)
 
-	SCENE_PRESET_MEMBER(const char*, 	Name, 					nullptr);
-	SCENE_PRESET_MEMBER(const char*, 	Path, 					nullptr);
-	SCENE_PRESET_MEMBER(glm::vec4, 		CameraPosition, 		glm::vec4(0, 1, 0, 1));
-	SCENE_PRESET_MEMBER(glm::vec4, 		CameraDirection, 		glm::vec4(0, 0, -1, 0));
-	SCENE_PRESET_MEMBER(float, 			HorizontalFovDegree, 	90);
-	SCENE_PRESET_MEMBER(glm::mat4x4, 	Transform, 				glm::mat4x4(1));
-	SCENE_PRESET_MEMBER(float, 			SunAzimuth, 			0);
-	SCENE_PRESET_MEMBER(float, 			SunZenith, 				glm::pi<float>() / 4.0f);
-	SCENE_PRESET_MEMBER(AtmosphereMode, Atmosphere,				AtmosphereMode::ConstantColor);
+	SCENE_PRESET_MEMBER(std::string_view, 	Name, 					"");
+	SCENE_PRESET_MEMBER(std::string_view, 	Path, 					"");
+	SCENE_PRESET_MEMBER(glm::vec4, 			CameraPosition, 		glm::vec4(0, 1, 0, 1));
+	SCENE_PRESET_MEMBER(glm::vec4, 			CameraDirection, 		glm::vec4(0, 0, -1, 0));
+	SCENE_PRESET_MEMBER(float, 				EmissionBoost, 			1.0f);														// As no auto exposure yet
+	SCENE_PRESET_MEMBER(float, 				HorizontalFovDegree, 	90);
+	SCENE_PRESET_MEMBER(glm::mat4x4, 		Transform, 				glm::mat4x4(1));
+	SCENE_PRESET_MEMBER(float, 				SunAzimuth, 			0);
+	SCENE_PRESET_MEMBER(float, 				SunZenith, 				glm::pi<float>() / 4.0f);
+	SCENE_PRESET_MEMBER(AtmosphereMode,		Atmosphere,				AtmosphereMode::ConstantColor);
 };
 
-enum class ScenePresetType
-{
-	None,
-
-	CornellBox,
-	CornellBoxDielectric,
-	CornellBoxTeapot,
-	CornellBoxMonkey,
-	VeachMIS,
-	VeachMISManyLight,
-	LivingRoom2,
-
-	Bruneton17,
-	Bruneton17_Artifact_Mu,
-	Hillaire20,
-
-	IES,
-
-	Count,
-};
-
-static ScenePresetType sCurrentScene = ScenePresetType::VeachMISManyLight;
-static ScenePresetType sPreviousScene = sCurrentScene;
-static ScenePreset kScenePresets[(int)ScenePresetType::Count] =
+static const std::array kScenePresets =
 {
 	ScenePreset().Name("None"),
-	ScenePreset().Name("CornellBox").Path("Asset/Comparison/benedikt-bitterli/cornell-box/scene_v3.xml"),
-	ScenePreset().Name("CornellBoxDielectric").Path("Asset/Comparison/benedikt-bitterli/cornell-box-dielectric/scene_v3.xml"),
-	ScenePreset().Name("CornellBoxTeapot").Path("Asset/Comparison/benedikt-bitterli/cornell-box-teapot/scene_v3.xml"),
-	ScenePreset().Name("CornellMonkey").Path("Asset/Comparison/benedikt-bitterli/cornell-box-monkey/scene_v3.xml"),
-	ScenePreset().Name("VeachMIS").Path("Asset/Comparison/benedikt-bitterli/veach-mis/scene_ggx_v3.xml"),
-	ScenePreset().Name("VeachMISManyLight").Path("Asset/Comparison/benedikt-bitterli/veach-mis-manylight/scene_ggx_v3.xml"),
-	ScenePreset().Name("LivingRoom2").Path("Asset/Comparison/benedikt-bitterli/living-room-2/scene_v3.xml"),
+
+	// Basics
+	ScenePreset().Name("CornellBox").Path("Asset/Comparison/benedikt-bitterli/cornell-box/scene_v3.xml").EmissionBoost(1E4f),
+	ScenePreset().Name("CornellBoxDielectric").Path("Asset/Comparison/benedikt-bitterli/cornell-box-dielectric/scene_v3.xml").EmissionBoost(1E4f),
+	ScenePreset().Name("CornellBoxTeapot").Path("Asset/Comparison/benedikt-bitterli/cornell-box-teapot/scene_v3.xml").EmissionBoost(1E4f),
+	ScenePreset().Name("CornellMonkey").Path("Asset/Comparison/benedikt-bitterli/cornell-box-monkey/scene_v3.xml").EmissionBoost(1E4f),
+
+	// MIS
+	ScenePreset().Name("VeachMIS").Path("Asset/Comparison/benedikt-bitterli/veach-mis/scene_ggx_v3.xml").EmissionBoost(1E4f),
+
+	// RIS and ReSTIR
+	ScenePreset().Name("VeachMISManyLight").Path("Asset/Comparison/benedikt-bitterli/veach-mis-manylight/scene_ggx_v3.xml").EmissionBoost(1E4f),
+	ScenePreset().Name("Arcade").Path("Asset/Comparison/RTXDI/Arcade/Arcade.gltf").CameraPosition(glm::vec4(-1.658f, 1.577f, 1.69f, 0.0f)).CameraDirection(glm::vec4(-0.9645f, 1.2672f, 1.0396f, 0.0f) - glm::vec4(-1.658f, 1.577f, 1.69f, 0.0f)).EmissionBoost(1E6f),
+
+	// Complex scenes
+	ScenePreset().Name("LivingRoom2").Path("Asset/Comparison/benedikt-bitterli/living-room-2/scene_v3.xml").EmissionBoost(1E4f),
 	
+	// Atmosphere
 	ScenePreset().Name("Bruneton17").Path("Asset/primitives/sphere.obj").CameraPosition(glm::vec4(0.0f, 0.0f, 9.0f, 0.0f)).CameraDirection(glm::vec4(0.0f, 0.0f, -1.0f, 0.0f)).Transform(glm::translate(glm::vec3(0.0f, 1.0f, 0.0f))).Atmosphere(AtmosphereMode::Bruneton17),
 	ScenePreset().Name("Bruneton17_Artifact_Mu").Path("Asset/primitives/sphere.obj").CameraPosition(glm::vec4(0.0f, 80.0f, 150.0f, 0.0f)).CameraDirection(glm::vec4(0.0f, 0.0f, -1.0f, 0.0f)).Transform(glm::scale(glm::vec3(100.0f, 100.0f, 100.0f))).Atmosphere(AtmosphereMode::Bruneton17),
 	ScenePreset().Name("Hillaire20").CameraPosition(glm::vec4(0.0f, 0.5, -1.0f, 0.0f)).CameraDirection(glm::vec4(0.0f, 0.0f, 1.0f, 0.0f)).HorizontalFovDegree(98.8514328f).Transform(glm::translate(glm::vec3(0.0f, 1.0f, 0.0f))).SunZenith(glm::pi<float>() / 2.0f - 0.45f).Atmosphere(AtmosphereMode::Hillaire20),
 
+	// IES
 	ScenePreset().Name("IES").Path("Asset/IES/007cfb11e343e2f42e3b476be4ab684e/scene_v3.xml"),
 };
+const ScenePreset& sFindScenePreset(const std::string_view inName)
+{
+	auto iter = std::find_if(kScenePresets.begin(), kScenePresets.end(), [&inName](const ScenePreset& inPreset) { return inPreset.mName == inName; });
+	if (iter == kScenePresets.end())
+		return kScenePresets.front();
+	else
+		return *iter;
+}
+int sFindScenePresetIndex(const std::string_view inName)
+{
+	return static_cast<int>(&sFindScenePreset(inName) - &kScenePresets.front());
+}
+static int sCurrentSceneIndex = sFindScenePresetIndex("Arcade");
+static int sPreviousSceneIndex = sCurrentSceneIndex;
 
 struct CameraSettings
 {
@@ -169,7 +172,7 @@ static void sPrepareImGui()
 			ImGui::SameLine();
 
 			if (ImGui::Button("Open Scene Folder"))
-				gOpenSceneFolder(kScenePresets[(int)sCurrentScene].mPath);
+				gOpenSceneFolder(kScenePresets[sCurrentSceneIndex].mPath);
 		}
 
 		if (ImGui::TreeNodeEx("Debug", ImGuiTreeNodeFlags_DefaultOpen))
@@ -310,6 +313,8 @@ static void sPrepareImGui()
 				ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mToneMappingMode), i);
 			}
 
+			ImGui::SliderFloat("Emission Boost", &gConstants.mEmissionBoost, 1E-16f, 1E16F);
+
 			ImGui::TreePop();
 		}
 
@@ -335,10 +340,10 @@ static void sPrepareImGui()
 
 		if (ImGui::TreeNodeEx("Scene"))
 		{
-			for (int i = 0; i < static_cast<int>(ScenePresetType::Count); i++)
+			for (int i = 0; i < kScenePresets.size(); i++)
 			{
-				if (kScenePresets[i].mPath == nullptr || std::filesystem::exists(kScenePresets[i].mPath))
-					ImGui::RadioButton(kScenePresets[i].mName, reinterpret_cast<int*>(&sCurrentScene), i);
+				if (std::filesystem::exists(kScenePresets[i].mPath))
+					ImGui::RadioButton(kScenePresets[i].mName.data(), &sCurrentSceneIndex, i);
 			}
 
 			ImGui::TreePop();
@@ -865,11 +870,10 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 
 void sLoadCamera()
 {
-	int current_scene_index = static_cast<int>(sCurrentScene);
-
-	gConstants.mCameraPosition = kScenePresets[current_scene_index].mCameraPosition;
-	gConstants.mCameraDirection = glm::normalize(kScenePresets[current_scene_index].mCameraDirection);
-	gCameraSettings.mHorizontalFovDegree = kScenePresets[current_scene_index].mHorizontalFovDegree;
+	gConstants.mCameraPosition = kScenePresets[sCurrentSceneIndex].mCameraPosition;
+	gConstants.mCameraDirection = glm::normalize(kScenePresets[sCurrentSceneIndex].mCameraDirection);
+	gConstants.mEmissionBoost = kScenePresets[sCurrentSceneIndex].mEmissionBoost;
+	gCameraSettings.mHorizontalFovDegree = kScenePresets[sCurrentSceneIndex].mHorizontalFovDegree;
 
 	if (gScene.GetSceneContent().mCameraTransform.has_value())
 	{
@@ -883,16 +887,14 @@ void sLoadCamera()
 
 void sLoadScene()
 {
-	int current_scene_index = static_cast<int>(sCurrentScene);
-
 	gScene.Unload();
-	gScene.Load(kScenePresets[current_scene_index].mPath, kScenePresets[current_scene_index].mTransform);
+	gScene.Load(kScenePresets[sCurrentSceneIndex].mPath, kScenePresets[sCurrentSceneIndex].mTransform);
 	gScene.Build();
 
-	gConstants.mSunAzimuth = kScenePresets[current_scene_index].mSunAzimuth;
-	gConstants.mSunZenith = kScenePresets[current_scene_index].mSunZenith;
+	gConstants.mSunAzimuth = kScenePresets[sCurrentSceneIndex].mSunAzimuth;
+	gConstants.mSunZenith = kScenePresets[sCurrentSceneIndex].mSunZenith;
 
-	gAtmosphere.mProfile.mMode = kScenePresets[current_scene_index].mAtmosphere;
+	gAtmosphere.mProfile.mMode = kScenePresets[sCurrentSceneIndex].mAtmosphere;
 	if (gScene.GetSceneContent().mAtmosphereMode.has_value())
 	{
 		gAtmosphere.mProfile.mMode = gScene.GetSceneContent().mAtmosphereMode.value();
@@ -927,9 +929,9 @@ void sRender()
 
 	// Update Scene
 	{
-		if (sPreviousScene != sCurrentScene)
+		if (sPreviousSceneIndex != sCurrentSceneIndex)
 		{
-			sPreviousScene = sCurrentScene;
+			sPreviousSceneIndex = sCurrentSceneIndex;
 
 			sWaitForGPU();
 			sLoadScene();

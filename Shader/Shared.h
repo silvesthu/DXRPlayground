@@ -40,7 +40,6 @@ using float4x4 = glm::mat4x4;
 #define GENERATE_NEW_LINE_NAME CONCAT(_Newline_, __LINE__)
 
 static const float MATH_PI						= 3.1415926535897932384626433832795f;
-static const float kEmissionBoostScale			= 1.0e4f;	// Boost emission to keep up with daylight
 static const float kPreExposure					= 1.0e-4f;	// Pre-exposure to improve float point precision
 
 // https://en.wikipedia.org/wiki/Luminous_efficacy
@@ -313,6 +312,8 @@ enum class BSDF : uint
 	// Plastic	
 	// Roughplastic
 
+	glTF,					// https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-material
+
 	Unsupported,			// Fallback to Diffuse
 
 	Count
@@ -387,25 +388,26 @@ struct InstanceData
 	uint						mLightIndex						CONSTANT_DEFAULT(0);
 
 	float						mRoughnessAlpha					CONSTANT_DEFAULT(0.0f);
-	float3						GENERATE_PAD_NAME				CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	uint						mNormalTextureIndex				CONSTANT_DEFAULT(0);
+	float2						GENERATE_PAD_NAME				CONSTANT_DEFAULT(float2(0.0f, 0.0f));
 
     float3						mAlbedo							CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	uint						mAlbedoTextureIndex				CONSTANT_DEFAULT(0);
 
     float3						mSpecularReflectance			CONSTANT_DEFAULT(float3(1.0f, 1.0f, 1.0f));
-	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	uint						mSpecularReflectanceTextureIndex CONSTANT_DEFAULT(0);
 
 	float3						mSpecularTransmittance			CONSTANT_DEFAULT(float3(1.0f, 1.0f, 1.0f));
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
 	float3						mEta							CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
-	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	float						mMetallic						CONSTANT_DEFAULT(0);
 
 	float3						mK								CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
     float3						mEmission						CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
-	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	uint						mEmissionTextureIndex			CONSTANT_DEFAULT(0);
 
 	float4x4					mTransform						CONSTANT_DEFAULT(float4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1));
 	float4x4					mInverseTranspose				CONSTANT_DEFAULT(float4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1));
@@ -583,7 +585,7 @@ struct Constants
 
 	float						mEV100							CONSTANT_DEFAULT(16.0f);
 	ToneMappingMode				mToneMappingMode				CONSTANT_DEFAULT(ToneMappingMode::Knarkowicz);
-	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	float						mEmissionBoost					CONSTANT_DEFAULT(1);
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
 	float						mSolarLuminanceScale			CONSTANT_DEFAULT(1.0f);

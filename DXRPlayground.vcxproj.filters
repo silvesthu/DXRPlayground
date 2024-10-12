@@ -192,6 +192,12 @@
     <ClInclude Include="Source\Renderer.inl">
       <Filter>Source</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Thirdparty\tinygltf\tiny_gltf.cc">
+      <Filter>Source\Thirdparty\tinygltf</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Thirdparty\tiny_gltf.h">
+      <Filter>Source\Thirdparty</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\DXRPlayground.cpp">
@@ -239,9 +245,6 @@
     <ClCompile Include="Source\Thirdparty\imgui\imgui_draw.cpp">
       <Filter>Source\Thirdparty\imgui</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Thirdparty\tinygltf\tiny_gltf.cc">
-      <Filter>Source\Thirdparty\tinygltf</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Thirdparty\ArPragueSkyModelGround\ArPragueSkyModelGround.cpp">
       <Filter>Source\Thirdparty\ArPragueSkyModelGround</Filter>
     </ClCompile>
@@ -253,6 +256,9 @@
     </ClCompile>
     <ClCompile Include="Source\Thirdparty\tinyxml2\tinyxml2.cpp">
       <Filter>Source\Thirdparty\tinyxml2</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Thirdparty.cpp">
+      <Filter>Source</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

@@ -6,10 +6,10 @@
 #include "Cloud.h"
 
 #include "Thirdparty/glm/glm/gtx/matrix_decompose.hpp"
-#include "Thirdparty/tinyobjloader/tiny_obj_loader.h"
 #include "Thirdparty/tinyxml2/tinyxml2.h"
-#include "Thirdparty/tinygltf/tiny_gltf.h"
 #include "Thirdparty/tinygltf/stb_image.h"
+#include "Thirdparty/tinyobjloader/tiny_obj_loader.h"
+#include "Thirdparty/tiny_gltf.h"
 
 Scene gScene;
 
@@ -157,18 +157,19 @@ bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransfor
 	uint32_t index = 0;
 	for (auto&& shape : reader.GetShapes())
 	{
+		uint32_t vertex_offset = static_cast<uint32_t>(ioSceneContent.mVertices.size());
 		uint32_t index_offset = static_cast<uint32_t>(ioSceneContent.mIndices.size());
 
-		const int kNumFaceVerticesTriangle = 3;
-		uint32_t index_count = static_cast<uint32_t>(shape.mesh.num_face_vertices.size()) * kNumFaceVerticesTriangle;
+		const int kVertexCountPerTriangle = 3;
+		uint32_t vertex_count = static_cast<uint32_t>(shape.mesh.num_face_vertices.size()) * kVertexCountPerTriangle;
+		uint32_t index_count = static_cast<uint32_t>(shape.mesh.num_face_vertices.size()) * kVertexCountPerTriangle;
+
 		for (size_t face_index = 0; face_index < shape.mesh.num_face_vertices.size(); face_index++)
 		{
-			assert(shape.mesh.num_face_vertices[face_index] == kNumFaceVerticesTriangle);
-			for (size_t vertex_index = 0; vertex_index < kNumFaceVerticesTriangle; vertex_index++)
+			assert(shape.mesh.num_face_vertices[face_index] == kVertexCountPerTriangle);
+			for (size_t vertex_index = 0; vertex_index < kVertexCountPerTriangle; vertex_index++)
 			{
-				// [TODO] This makes index trivial...
-
-				tinyobj::index_t idx = shape.mesh.indices[face_index * kNumFaceVerticesTriangle + vertex_index];
+				tinyobj::index_t idx = shape.mesh.indices[face_index * kVertexCountPerTriangle + vertex_index];
 				ioSceneContent.mIndices.push_back(static_cast<IndexType>(index++));
 
 				ioSceneContent.mVertices.push_back(VertexType(
@@ -232,8 +233,8 @@ bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransfor
 		
 		instance_data.mTransform = inTransform;
 		instance_data.mInverseTranspose = glm::transpose(glm::inverse(inTransform));
-		instance_data.mVertexOffset = 0; // All vertices share same buffer. Only works indices fit in IndexType...
-		instance_data.mVertexCount = index_count;
+		instance_data.mVertexOffset = vertex_offset;
+		instance_data.mVertexCount = vertex_count;
 		instance_data.mIndexOffset = index_offset;
 		instance_data.mIndexCount = index_count;
 		ioSceneContent.mInstanceDatas.push_back(instance_data);
@@ -346,7 +347,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 			{
 				std::filesystem::path path = inFilename;
 				path.replace_filename(std::filesystem::path(get_child_texture(local_bsdf, "map")));
-				bsdf_instance.mInstanceInfo.mBumpTexture = path;
+				bsdf_instance.mInstanceInfo.mNormalTexture = path;
 
 				local_bsdf = local_bsdf->FirstChildElement("bsdf");
 				local_type = local_bsdf->Attribute("type");
@@ -371,7 +372,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 				break;
 		}
 
-		auto load_reflectance				= [&]() { gFromString(get_child_value(local_bsdf, "reflectance").data(),				bsdf_instance.mInstanceData.mAlbedo); };
+		auto load_diffuse_reflectance		= [&]() { gFromString(get_child_value(local_bsdf, "reflectance").data(),				bsdf_instance.mInstanceData.mAlbedo); };
 		auto load_specular_reflectance		= [&]() { gFromString(get_child_value(local_bsdf, "specular_reflectance").data(),		bsdf_instance.mInstanceData.mSpecularReflectance); };
 		auto load_specular_transmittance	= [&]() { gFromString(get_child_value(local_bsdf, "specular_transmittance").data(),		bsdf_instance.mInstanceData.mSpecularTransmittance); };
 		auto load_eta						= [&]() { gFromString(get_child_value(local_bsdf, "eta").data(),						bsdf_instance.mInstanceData.mEta); };
@@ -387,10 +388,14 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 
 			std::filesystem::path path = inFilename;
 			path.replace_filename(std::filesystem::path(reflectance));
-			bsdf_instance.mInstanceInfo.mAlbedoTexture = reflectance.empty() ? "" : path;
 
 			if (reflectance.empty())
-				load_reflectance();
+				load_diffuse_reflectance();
+			else
+			{
+				bsdf_instance.mInstanceInfo.mAlbedoTexture = path;
+				bsdf_instance.mInstanceData.mAlbedo = glm::vec3(1.0f);
+			}
 		}
 		else if (local_type == "roughconductor")
 		{
@@ -632,13 +637,179 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 	return true;
 }
 
+bool Scene::LoadGLTF(const std::string& inFilename, SceneContent& ioSceneContent)
+{
+	using namespace tinygltf;
+	using namespace glm;
+
+	Model model;
+	TinyGLTF loader;
+	std::string err;
+	std::string warn;
+	bool ret = loader.LoadASCIIFromFile(&model, &err, &warn, inFilename);
+
+	if (!warn.empty())
+		gTrace(warn.c_str());
+
+	if (!err.empty())
+		gTrace(err.c_str());
+
+	if (!ret)
+	{
+		gTrace("Failed to parse glTF\n");
+		return ret;
+	}
+
+	auto visit_node = [&](Node& inNode, mat4x4 inParentMatrix)
+	{
+		mat4x4 matrix = inParentMatrix;
+
+		if (inNode.mesh == -1)
+			return matrix;
+
+		mat4x4 T = translate(vec3((float)inNode.translation[0], (float)inNode.translation[1], (float)inNode.translation[2]));
+		mat4x4 R = toMat4(quat((float)inNode.rotation[3], (float)inNode.rotation[0], (float)inNode.rotation[1], (float)inNode.rotation[2]));
+		mat4x4 S = scale(vec3((float)inNode.scale[0], (float)inNode.scale[1], (float)inNode.scale[2]));
+		matrix = T * R * S;
+
+		Mesh mesh = model.meshes[inNode.mesh];
+
+		for (auto&& primitive : mesh.primitives)
+		{
+			gAssert(primitive.mode == TINYGLTF_MODE_TRIANGLES);
+
+			auto position_attribute = primitive.attributes.find("POSITION");
+			gAssert(position_attribute != primitive.attributes.end());
+			auto normal_attribute = primitive.attributes.find("NORMAL");
+			gAssert(normal_attribute != primitive.attributes.end());
+			auto uv_attribute = primitive.attributes.find("TEXCOORD_0");
+			gAssert(uv_attribute != primitive.attributes.end());
+
+			Accessor position_accessor = model.accessors[position_attribute->second];
+			uint8* position_data = model.buffers[model.bufferViews[position_accessor.bufferView].buffer].data.data() + model.bufferViews[position_accessor.bufferView].byteOffset;
+			size_t position_stride = model.bufferViews[position_accessor.bufferView].byteStride;
+			position_stride = position_stride == 0 ? sizeof(vec3) : position_stride;
+			gAssert(position_accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT && position_accessor.type == TINYGLTF_TYPE_VEC3);
+			gAssert(position_stride * position_accessor.count == model.bufferViews[position_accessor.bufferView].byteLength);
+
+			Accessor normal_accessor = model.accessors[normal_attribute->second];
+			uint8* normal_data = model.buffers[model.bufferViews[normal_accessor.bufferView].buffer].data.data() + model.bufferViews[normal_accessor.bufferView].byteOffset;
+			size_t normal_stride = model.bufferViews[normal_accessor.bufferView].byteStride;
+			normal_stride = normal_stride == 0 ? sizeof(vec3) : normal_stride;
+			gAssert(normal_accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT && normal_accessor.type == TINYGLTF_TYPE_VEC3);
+			gAssert(normal_stride * normal_accessor.count == model.bufferViews[normal_accessor.bufferView].byteLength);
+
+			Accessor uv_accessor = model.accessors[uv_attribute->second];
+			uint8* uv_data = model.buffers[model.bufferViews[uv_accessor.bufferView].buffer].data.data() + model.bufferViews[uv_accessor.bufferView].byteOffset;
+			size_t uv_stride = model.bufferViews[uv_accessor.bufferView].byteStride;
+			uv_stride = uv_stride == 0 ? sizeof(vec2) : uv_stride;
+			gAssert(uv_accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT && uv_accessor.type == TINYGLTF_TYPE_VEC2);
+			gAssert(uv_stride * uv_accessor.count == model.bufferViews[uv_accessor.bufferView].byteLength);
+
+			gAssert(position_accessor.count == normal_accessor.count);
+			gAssert(position_accessor.count == uv_accessor.count);
+
+			uint vertex_offset = (uint)ioSceneContent.mVertices.size();
+			uint vertex_count = (uint)position_accessor.count;
+			for (uint i = 0; i < vertex_count; i++)
+			{
+				VertexType vertex;
+				memcpy(&vertex, position_data + i * position_stride, sizeof(VertexType));
+				ioSceneContent.mVertices.push_back(vertex);
+
+				NormalType normal;
+				memcpy(&normal, normal_data + i * normal_stride, sizeof(NormalType));
+				ioSceneContent.mNormals.push_back(normal);
+
+				UVType uv;
+				memcpy(&uv, uv_data + i * uv_stride, sizeof(UVType));
+				ioSceneContent.mUVs.push_back(uv);
+			}
+
+			gAssert(primitive.indices != -1);
+			Accessor index_accessor = model.accessors[primitive.indices];
+			uint8* index_data = model.buffers[model.bufferViews[index_accessor.bufferView].buffer].data.data() + model.bufferViews[index_accessor.bufferView].byteOffset;
+			size_t index_stride = model.bufferViews[index_accessor.bufferView].byteStride;
+			gAssert(index_accessor.type == TINYGLTF_TYPE_SCALAR && index_stride == 0);
+
+			uint index_offset = (uint)ioSceneContent.mIndices.size();
+			uint index_count = (uint)index_accessor.count;
+			for (uint i = 0; i < index_count; i++)
+			{
+				IndexType index;
+				if (index_accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
+					index = *reinterpret_cast<uint16*>(index_data + i * sizeof(uint16));
+				else if (index_accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
+					index = *reinterpret_cast<uint32*>(index_data + i * sizeof(uint32));
+				else
+					gAssert(false);
+				ioSceneContent.mIndices.push_back(index);
+			}
+
+			Material material = model.materials[primitive.material];
+
+			auto get_texture_path = [&](int inIndex)
+			{
+				if (inIndex == -1)
+					return std::filesystem::path();
+
+				std::filesystem::path path = inFilename;
+				path.replace_filename(std::filesystem::path(model.images[model.textures[inIndex].source].uri));
+				return path;
+			};
+			InstanceInfo instance_info =
+			{
+				.mName = std::format("{} - {} - {}", inNode.name, mesh.name, material.name),
+				.mMaterialName = material.name,
+				.mAlbedoTexture = get_texture_path(material.pbrMetallicRoughness.baseColorTexture.index),
+				.mNormalTexture = get_texture_path(material.normalTexture.index),
+				.mReflectanceTexture = get_texture_path(material.pbrMetallicRoughness.metallicRoughnessTexture.index),
+				.mRoughnessTexture = get_texture_path(material.pbrMetallicRoughness.metallicRoughnessTexture.index),
+				.mEmissiveTexture = get_texture_path(material.emissiveTexture.index),
+			};
+			ioSceneContent.mInstanceInfos.push_back(instance_info);
+
+			InstanceData instance_data =
+			{
+				.mBSDF = BSDF::glTF,
+				.mTwoSided = material.doubleSided,
+				.mRoughnessAlpha = static_cast<float>(material.pbrMetallicRoughness.roughnessFactor),
+				.mAlbedo = vec3(material.pbrMetallicRoughness.baseColorFactor[0], material.pbrMetallicRoughness.baseColorFactor[1], material.pbrMetallicRoughness.baseColorFactor[2]),
+				.mMetallic = static_cast<float>(material.pbrMetallicRoughness.metallicFactor),
+				.mEmission = vec3(material.emissiveFactor[0], material.emissiveFactor[1], material.emissiveFactor[2]),
+				.mTransform = matrix,
+				.mInverseTranspose = transpose(inverse(matrix)),
+				.mVertexOffset = vertex_offset,
+				.mVertexCount = vertex_count,
+				.mIndexOffset = index_offset,
+				.mIndexCount = index_count
+			};
+			ioSceneContent.mInstanceDatas.push_back(instance_data);
+		}
+
+		return matrix;
+	};
+
+	for (int node_index : model.scenes[model.defaultScene].nodes)
+	{
+		Node& node = model.nodes[node_index];
+
+		mat4x4 matrix = visit_node(node, mat4x4(1.0f));
+
+		for (int child_node_index : node.children)
+			visit_node(model.nodes[child_node_index], matrix);
+	}
+
+	return ret;
+}
+
 void Scene::FillDummyMaterial(InstanceInfo& ioInstanceInfo, InstanceData& ioInstanceData)
 {
 	ioInstanceInfo.mMaterialName = "DummyMaterial";
 	ioInstanceData.mBSDF = BSDF::Diffuse;
 }
 
-void Scene::Load(const char* inFilename, const glm::mat4x4& inTransform)
+void Scene::Load(const std::string_view& inFilePath, const glm::mat4x4& inTransform)
 {
 	LoadObj("Asset/primitives/cube.obj", glm::mat4x4(1.0f), false, mPrimitives.mCube);
 	LoadObj("Asset/primitives/rectangle.obj", glm::mat4x4(1.0f), false, mPrimitives.mRectangle);
@@ -646,24 +817,23 @@ void Scene::Load(const char* inFilename, const glm::mat4x4& inTransform)
 
 	mSceneContent = {}; // Reset
 
-	std::string filename_lower;
-	if (inFilename != nullptr)
-		filename_lower = inFilename;
-	filename_lower = gToLower(filename_lower);
-	
-	bool loaded = false;
-	bool try_load = std::filesystem::exists(filename_lower); 
-	
-	if (!loaded && try_load && filename_lower.ends_with(".obj"))
-		loaded |= LoadObj(filename_lower, inTransform, false, mSceneContent);
+	std::string filename_lower = gToLower(inFilePath);	
+	if (std::filesystem::exists(filename_lower))
+	{
+		bool loaded = false;
 
-	if (!loaded && try_load && filename_lower.ends_with(".xml"))
-		loaded |= LoadMitsuba(filename_lower, mSceneContent);
+		if (!loaded && filename_lower.ends_with(".obj"))
+			loaded |= LoadObj(filename_lower, inTransform, false, mSceneContent);
+
+		if (!loaded && filename_lower.ends_with(".xml"))
+			loaded |= LoadMitsuba(filename_lower, mSceneContent);
+
+		if (!loaded && filename_lower.ends_with(".gltf"))
+			loaded |= LoadGLTF(filename_lower, mSceneContent);
+	}
 	
 	if (mSceneContent.mInstanceDatas.empty())
-		loaded |= LoadDummy(mSceneContent);
-
-	assert(loaded);
+		LoadDummy(mSceneContent);
 
 	InitializeTextures();
 	InitializeBuffers();
@@ -708,26 +878,37 @@ void Scene::InitializeTextures()
 		InstanceInfo& instance_info = mSceneContent.mInstanceInfos[i];
 		InstanceData& instance_data = mSceneContent.mInstanceDatas[i];
 
-		if (instance_info.mAlbedoTexture.empty())
-			continue;
-
-		auto iter = texture_map.find(instance_info.mAlbedoTexture.string());
-		if (iter != texture_map.end())
+		auto get_texture_index = [&](const std::filesystem::path& inPath, bool inSRGB)
 		{
-			instance_data.mAlbedoTextureIndex = (uint)iter->second->mSRVIndex;
-			continue;
-		}
+			if (inPath.empty())
+				return 0u;
 
-		int x,y,n;
-		stbi_info(instance_info.mAlbedoTexture.string().c_str(), &x, &y, &n);
-		mTextures.push_back({});
-		Texture& texture = mTextures.back();
-		texture.Width(x).Height(y).Format(DXGI_FORMAT_R8G8B8A8_UNORM_SRGB).SRVIndex(ViewDescriptorIndex((uint)ViewDescriptorIndex::SceneAutoSRV + mNextSRVIndex++)).
-			Name(instance_info.mAlbedoTexture.filename().string().c_str()).
-			Path(instance_info.mAlbedoTexture.wstring());
-		texture_map[instance_info.mAlbedoTexture.string()] = &texture;
+			auto iter = texture_map.find(inPath.string());
+			if (iter != texture_map.end())
+			{
+				return (uint)iter->second->mSRVIndex;
+			}
 
-		instance_data.mAlbedoTextureIndex = (uint)texture.mSRVIndex;
+			int x = 0, y = 0, n = 0;
+			if (stbi_info(inPath.string().c_str(), &x, &y, &n) == 0)
+				return 0u;
+
+			mTextures.push_back({});
+			Texture& texture = mTextures.back();
+			texture.Width(x).Height(y).
+				Format(inSRGB ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM).
+				SRVIndex(ViewDescriptorIndex((uint)ViewDescriptorIndex::SceneAutoSRV + mNextSRVIndex++)).
+				Name(inPath.filename().string().c_str()).
+				Path(inPath.wstring());
+			texture_map[inPath.string()] = &texture;
+
+			return (uint)texture.mSRVIndex;
+		};
+
+		instance_data.mAlbedoTextureIndex						= get_texture_index(instance_info.mAlbedoTexture, true);
+		instance_data.mSpecularReflectanceTextureIndex			= get_texture_index(instance_info.mReflectanceTexture, false);
+		instance_data.mNormalTextureIndex						= get_texture_index(instance_info.mNormalTexture, false);
+		instance_data.mEmissionTextureIndex						= get_texture_index(instance_info.mEmissiveTexture, true);
 	}
 
 	for (auto&& texture : mTextures)

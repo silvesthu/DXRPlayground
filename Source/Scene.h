@@ -8,7 +8,10 @@ struct InstanceInfo
 	std::string mMaterialName;
 
 	std::filesystem::path mAlbedoTexture;
-	std::filesystem::path mBumpTexture;
+	std::filesystem::path mNormalTexture;
+	std::filesystem::path mReflectanceTexture;
+	std::filesystem::path mRoughnessTexture;
+	std::filesystem::path mEmissiveTexture;
 };
 
 class BLAS final
@@ -74,7 +77,7 @@ using TLASRef = std::shared_ptr<TLAS>;
 class Scene
 {
 public:
-	void Load(const char* inFilename, const glm::mat4x4& inTransform);
+	void Load(const std::string_view& inFilePath, const glm::mat4x4& inTransform);
 	void Unload();
 
 	void Build();
@@ -95,6 +98,7 @@ private:
 	bool LoadDummy(SceneContent& ioContext);
 	bool LoadObj(const std::string& inFilename, const glm::mat4x4& inTransform, bool inFlipV, SceneContent& ioContext);
 	bool LoadMitsuba(const std::string& inFilename, SceneContent& ioContext);
+	bool LoadGLTF(const std::string& inFilename, SceneContent& ioContext);
 
 	void FillDummyMaterial(InstanceInfo& ioInstanceInfo, InstanceData& ioInstanceData);
 	

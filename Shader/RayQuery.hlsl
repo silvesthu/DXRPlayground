@@ -132,7 +132,7 @@ void TraceRay(PixelContext inPixelContext)
 			}
 
 			// Emission
-			float3 emission = hit_context.Emission() * (kEmissionBoostScale * kPreExposure);
+			float3 emission = hit_context.Emission() * (mConstants.mEmissionBoost * kPreExposure);
 			{
 				if (dot(hit_context.mVertexNormalWS, -hit_context.mRayDirectionWS) < 0 && !hit_context.TwoSided())
 					emission = 0;
@@ -230,7 +230,7 @@ void TraceRay(PixelContext inPixelContext)
 							DebugValue(PixelDebugMode::Light_BSDF,	path_context.mRecursionDepth, float3(bsdf_result.mBSDF));
 							DebugValue(PixelDebugMode::Light_PDF,	path_context.mRecursionDepth, float3(light_pdf, 0, 0));
 
-							float3 luminance					= light.mEmission * (kEmissionBoostScale * kPreExposure);
+							float3 luminance					= light.mEmission * (mConstants.mEmissionBoost * kPreExposure);
 							float3 light_emission				= luminance * bsdf_result.mBSDF * abs(bsdf_context.mNdotL) / light_pdf;
 
 							if (mConstants.mSampleMode == SampleMode::MIS)

@@ -23,6 +23,7 @@ using Microsoft::WRL::ComPtr;
 
 #define GLM_FORCE_SILENT_WARNINGS
 #include "Thirdparty/glm/glm/gtx/transform.hpp"
+#include "Thirdparty/glm/glm/gtx/quaternion.hpp"
 #include "Thirdparty/nameof/include/nameof.hpp"
 #include "Thirdparty/DirectXTex/DirectXTex/DirectXTex.h"
 #include "Thirdparty/DirectXTex/DirectXTex/d3dx12.h"
@@ -53,9 +54,9 @@ constexpr inline T gMax(T lhs, T rhs)
 	return lhs > rhs ? lhs : rhs;
 }
 
-inline std::string gToLower(const std::string& inString)
+inline std::string gToLower(const std::string_view& inStringView)
 {
-	std::string result = inString;
+	std::string result(inStringView);
 	std::transform(result.begin(), result.end(), result.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
 	return result;
 }
@@ -101,13 +102,13 @@ inline void gOpenDumpFolder()
 	ShellExecuteA(nullptr, "open", command.string().c_str(), nullptr, nullptr, SW_SHOWDEFAULT);
 }
 
-inline void gOpenSceneFolder(const char* inSceneFile)
+inline void gOpenSceneFolder(const std::string_view inPath)
 {
 	std::filesystem::path command = "";
 	"";
 	command += std::filesystem::current_path();
 	command += "\\";
-	command += inSceneFile;
+	command += inPath;
 	command = command.parent_path();
 	ShellExecuteA(nullptr, "open", command.string().c_str(), nullptr, nullptr, SW_SHOWDEFAULT);
 }

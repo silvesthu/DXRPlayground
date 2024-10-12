@@ -26,11 +26,11 @@ struct HitContext
 	float			RoughnessAlpha()			{ return InstanceDatas[mInstanceID].mRoughnessAlpha; }
 	float3			Albedo()						
 	{
-		uint albedo_texture_index = InstanceDatas[mInstanceID].mAlbedoTextureIndex;
-		if (albedo_texture_index != (uint)ViewDescriptorIndex::Invalid)
+		uint texture_index = InstanceDatas[mInstanceID].mAlbedoTextureIndex;
+		if (texture_index != (uint)ViewDescriptorIndex::Invalid)
 		{
-			Texture2D<float4> albedo_texture	= ResourceDescriptorHeap[albedo_texture_index];
-			return albedo_texture.SampleLevel(BilinearWrapSampler, mUV, 0).rgb;
+			Texture2D<float4> texture	= ResourceDescriptorHeap[texture_index];
+			return texture.SampleLevel(BilinearWrapSampler, mUV, 0).rgb * InstanceDatas[mInstanceID].mAlbedo;
 		}
 		return InstanceDatas[mInstanceID].mAlbedo; 
 	}
@@ -38,7 +38,16 @@ struct HitContext
 	float3			SpecularTransmittance()		{ return InstanceDatas[mInstanceID].mSpecularTransmittance; }
 	float3			Eta()						{ return InstanceDatas[mInstanceID].mEta; }
 	float3			K()							{ return InstanceDatas[mInstanceID].mK; }
-	float3			Emission()					{ return InstanceDatas[mInstanceID].mEmission; }
+	float3			Emission()					
+	{
+		uint texture_index = InstanceDatas[mInstanceID].mEmissionTextureIndex;
+		if (texture_index != (uint)ViewDescriptorIndex::Invalid)
+		{
+			Texture2D<float4> texture = ResourceDescriptorHeap[texture_index];
+			return texture.SampleLevel(BilinearWrapSampler, mUV, 0).rgb * InstanceDatas[mInstanceID].mEmission;
+		}
+		return InstanceDatas[mInstanceID].mEmission; 
+	}
 
 	bool			DiracDeltaDistribution()
 	{
@@ -585,6 +594,7 @@ namespace BSDFEvaluation
 		case BSDF::Dielectric:					bsdf_context = Dielectric::GenerateContext(inHitContext, ioPathContext); break;
 		case BSDF::ThinDielectric:				bsdf_context = Dielectric::GenerateContext(inHitContext, ioPathContext); break;
 		case BSDF::RoughDielectric:				bsdf_context = RoughDielectric::GenerateContext(inHitContext, ioPathContext); break;
+		case BSDF::glTF:						bsdf_context = Diffuse::GenerateContext(inHitContext, ioPathContext); break;
 		default:								bsdf_context = Diffuse::GenerateContext(inHitContext, ioPathContext); break;
 		}
 
@@ -607,6 +617,7 @@ namespace BSDFEvaluation
 		case BSDF::Dielectric:					result = Dielectric::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
 		case BSDF::ThinDielectric:				result = Dielectric::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
 		case BSDF::RoughDielectric:				result = RoughDielectric::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
+		case BSDF::glTF:						result = Diffuse::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
 		case BSDF::Unsupported:					result = Diffuse::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
 		default:								result = Diffuse::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
 		}
