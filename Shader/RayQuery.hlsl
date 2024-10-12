@@ -93,7 +93,7 @@ void TraceRay(PixelContext inPixelContext)
 				// see https://github.com/microsoft/DirectX-Graphics-Samples/blob/master/Samples/Desktop/D3D12Raytracing/src/D3D12RaytracingSimpleLighting/Raytracing.hlsl for reference
 				uint kIndexCountPerTriangle		= 3;
 				uint base_index					= hit_context.mPrimitiveIndex * kIndexCountPerTriangle + InstanceDatas[hit_context.mInstanceID].mIndexOffset;
-				uint3 indices					= uint3(Indices[base_index], Indices[base_index + 1], Indices[base_index + 2]);
+				uint3 indices					= uint3(Indices[base_index], Indices[base_index + 1], Indices[base_index + 2]) + InstanceDatas[hit_context.mInstanceID].mVertexOffset;
 
 				float3 vertices[3]				= { Vertices[indices[0]], Vertices[indices[1]], Vertices[indices[2]] };
 				hit_context.mVertexPositionOS	= vertices[0] * hit_context.mBarycentrics.x + vertices[1] * hit_context.mBarycentrics.y + vertices[2] * hit_context.mBarycentrics.z;
@@ -269,7 +269,7 @@ void TraceRay(PixelContext inPixelContext)
 					continue_bounce								= true;
 				}
 			}
-
+			
 			// DebugMode
 			switch (mConstants.mDebugMode)
 			{
