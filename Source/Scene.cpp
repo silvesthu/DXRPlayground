@@ -10,6 +10,7 @@
 #include "Thirdparty/tinygltf/stb_image.h"
 #include "Thirdparty/tinyobjloader/tiny_obj_loader.h"
 #include "Thirdparty/tiny_gltf.h"
+#include "Thirdparty/cgltf/cgltf.h"
 
 Scene gScene;
 
@@ -639,78 +640,78 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 
 bool Scene::LoadGLTF(const std::string& inFilename, SceneContent& ioSceneContent)
 {
-	using namespace tinygltf;
 	using namespace glm;
 
-	Model model;
-	TinyGLTF loader;
-	std::string err;
-	std::string warn;
-	bool ret = loader.LoadASCIIFromFile(&model, &err, &warn, inFilename);
+	cgltf_options options = {};
+	cgltf_data* data = NULL;
+	cgltf_result result = cgltf_parse_file(&options, inFilename.c_str(), &data);
+	if (result != cgltf_result_success)
+		return false;
 
-	if (!warn.empty())
-		gTrace(warn.c_str());
-
-	if (!err.empty())
-		gTrace(err.c_str());
-
-	if (!ret)
+	result = cgltf_load_buffers(&options, data, inFilename.c_str());
+	if (result != cgltf_result_success)
 	{
-		gTrace("Failed to parse glTF\n");
-		return ret;
+		cgltf_free(data);
+		return false;
 	}
 
-	auto visit_node = [&](Node& inNode, mat4x4 inParentMatrix)
+	auto visit_node = [&](const cgltf_node* inNode, mat4x4 inParentMatrix)
 	{
 		mat4x4 matrix = inParentMatrix;
 
-		if (inNode.mesh == -1)
+		cgltf_mesh* mesh = inNode->mesh;
+		if (mesh == nullptr)
 			return matrix;
 
-		mat4x4 T = translate(vec3((float)inNode.translation[0], (float)inNode.translation[1], (float)inNode.translation[2]));
-		mat4x4 R = toMat4(quat((float)inNode.rotation[3], (float)inNode.rotation[0], (float)inNode.rotation[1], (float)inNode.rotation[2]));
-		mat4x4 S = scale(vec3((float)inNode.scale[0], (float)inNode.scale[1], (float)inNode.scale[2]));
+		gAssert(inNode->has_translation && inNode->has_rotation && inNode->has_scale);				
+		mat4x4 T = translate(vec3((float)inNode->translation[0], (float)inNode->translation[1], (float)inNode->translation[2]));
+		mat4x4 R = toMat4(quat((float)inNode->rotation[3], (float)inNode->rotation[0], (float)inNode->rotation[1], (float)inNode->rotation[2]));
+		mat4x4 S = scale(vec3((float)inNode->scale[0], (float)inNode->scale[1], (float)inNode->scale[2]));
 		matrix = T * R * S;
-
-		Mesh mesh = model.meshes[inNode.mesh];
-
-		for (auto&& primitive : mesh.primitives)
+		
+		for (const cgltf_primitive& primitive : std::span(mesh->primitives, mesh->primitives_count))
 		{
-			gAssert(primitive.mode == TINYGLTF_MODE_TRIANGLES);
+			gAssert(primitive.type == cgltf_primitive_type::cgltf_primitive_type_triangles);
 
-			auto position_attribute = primitive.attributes.find("POSITION");
-			gAssert(position_attribute != primitive.attributes.end());
-			auto normal_attribute = primitive.attributes.find("NORMAL");
-			gAssert(normal_attribute != primitive.attributes.end());
-			auto uv_attribute = primitive.attributes.find("TEXCOORD_0");
-			gAssert(uv_attribute != primitive.attributes.end());
+			const cgltf_accessor* position_accessor = nullptr;
+			const cgltf_accessor* normal_accessor = nullptr;
+			const cgltf_accessor* uv_accessor = nullptr;
+			for (const cgltf_attribute& attribute : std::span(primitive.attributes, primitive.attributes_count))
+			{
+				switch (attribute.type)
+				{
+				case cgltf_attribute_type_position:
+					gAssert(attribute.data->type == cgltf_type_vec3);
+					gAssert(attribute.data->component_type == cgltf_component_type_r_32f);
+					position_accessor = attribute.data;
+					break;
+				case cgltf_attribute_type_normal:
+					gAssert(attribute.data->type == cgltf_type_vec3);
+					gAssert(attribute.data->component_type == cgltf_component_type_r_32f);
+					normal_accessor = attribute.data;
+					break;
+				case cgltf_attribute_type_texcoord:
+					gAssert(attribute.data->type == cgltf_type_vec2);
+					gAssert(attribute.data->component_type == cgltf_component_type_r_32f);
+					if (attribute.index == 0)
+						uv_accessor = attribute.data;
+					break;
+				default:
+					break;
+				}
+			}
 
-			Accessor position_accessor = model.accessors[position_attribute->second];
-			uint8* position_data = model.buffers[model.bufferViews[position_accessor.bufferView].buffer].data.data() + model.bufferViews[position_accessor.bufferView].byteOffset;
-			size_t position_stride = model.bufferViews[position_accessor.bufferView].byteStride;
-			position_stride = position_stride == 0 ? sizeof(vec3) : position_stride;
-			gAssert(position_accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT && position_accessor.type == TINYGLTF_TYPE_VEC3);
-			gAssert(position_stride * position_accessor.count == model.bufferViews[position_accessor.bufferView].byteLength);
+			const uint8_t* position_data = (uint8_t*)position_accessor->buffer_view->buffer->data + position_accessor->buffer_view->offset + position_accessor->offset;
+			const size_t position_stride = position_accessor->buffer_view->stride != 0 ? position_accessor->buffer_view->stride : sizeof(vec3);
 
-			Accessor normal_accessor = model.accessors[normal_attribute->second];
-			uint8* normal_data = model.buffers[model.bufferViews[normal_accessor.bufferView].buffer].data.data() + model.bufferViews[normal_accessor.bufferView].byteOffset;
-			size_t normal_stride = model.bufferViews[normal_accessor.bufferView].byteStride;
-			normal_stride = normal_stride == 0 ? sizeof(vec3) : normal_stride;
-			gAssert(normal_accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT && normal_accessor.type == TINYGLTF_TYPE_VEC3);
-			gAssert(normal_stride * normal_accessor.count == model.bufferViews[normal_accessor.bufferView].byteLength);
+			const uint8_t* normal_data = (uint8_t*)normal_accessor->buffer_view->buffer->data + normal_accessor->buffer_view->offset + normal_accessor->offset;
+			const size_t normal_stride = normal_accessor->buffer_view->stride != 0 ? normal_accessor->buffer_view->stride : sizeof(vec3);
 
-			Accessor uv_accessor = model.accessors[uv_attribute->second];
-			uint8* uv_data = model.buffers[model.bufferViews[uv_accessor.bufferView].buffer].data.data() + model.bufferViews[uv_accessor.bufferView].byteOffset;
-			size_t uv_stride = model.bufferViews[uv_accessor.bufferView].byteStride;
-			uv_stride = uv_stride == 0 ? sizeof(vec2) : uv_stride;
-			gAssert(uv_accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT && uv_accessor.type == TINYGLTF_TYPE_VEC2);
-			gAssert(uv_stride * uv_accessor.count == model.bufferViews[uv_accessor.bufferView].byteLength);
-
-			gAssert(position_accessor.count == normal_accessor.count);
-			gAssert(position_accessor.count == uv_accessor.count);
+			const uint8_t* uv_data = (uint8_t*)uv_accessor->buffer_view->buffer->data + uv_accessor->buffer_view->offset + uv_accessor->offset;
+			const size_t uv_stride = uv_accessor->buffer_view->stride != 0 ? uv_accessor->buffer_view->stride : sizeof(vec2);
 
 			uint vertex_offset = (uint)ioSceneContent.mVertices.size();
-			uint vertex_count = (uint)position_accessor.count;
+			uint vertex_count = (uint)position_accessor->count;
 			for (uint i = 0; i < vertex_count; i++)
 			{
 				VertexType vertex;
@@ -726,57 +727,56 @@ bool Scene::LoadGLTF(const std::string& inFilename, SceneContent& ioSceneContent
 				ioSceneContent.mUVs.push_back(uv);
 			}
 
-			gAssert(primitive.indices != -1);
-			Accessor index_accessor = model.accessors[primitive.indices];
-			uint8* index_data = model.buffers[model.bufferViews[index_accessor.bufferView].buffer].data.data() + model.bufferViews[index_accessor.bufferView].byteOffset;
-			size_t index_stride = model.bufferViews[index_accessor.bufferView].byteStride;
-			gAssert(index_accessor.type == TINYGLTF_TYPE_SCALAR && index_stride == 0);
+			const cgltf_accessor* index_accessor = primitive.indices;
+			gAssert(index_accessor->type == cgltf_type_scalar);
+			const uint8_t* index_data = (uint8_t*)index_accessor->buffer_view->buffer->data + index_accessor->buffer_view->offset + index_accessor->offset;
 
 			uint index_offset = (uint)ioSceneContent.mIndices.size();
-			uint index_count = (uint)index_accessor.count;
+			uint index_count = (uint)index_accessor->count;
 			for (uint i = 0; i < index_count; i++)
 			{
 				IndexType index;
-				if (index_accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
-					index = *reinterpret_cast<uint16*>(index_data + i * sizeof(uint16));
-				else if (index_accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
-					index = *reinterpret_cast<uint32*>(index_data + i * sizeof(uint32));
+				if (index_accessor->component_type == cgltf_component_type_r_16u)
+					index = *reinterpret_cast<const uint16*>(index_data + i * sizeof(uint16));
+				else if (index_accessor->component_type == cgltf_component_type_r_32u)
+					index = *reinterpret_cast<const uint32*>(index_data + i * sizeof(uint32));
 				else
 					gAssert(false);
 				ioSceneContent.mIndices.push_back(index);
 			}
 
-			Material material = model.materials[primitive.material];
+			const cgltf_material* material = primitive.material;
 
-			auto get_texture_path = [&](int inIndex)
+			auto get_texture_path = [&](const cgltf_texture_view& inTextureView)
 			{
-				if (inIndex == -1)
+				if (inTextureView.texture == nullptr)
 					return std::filesystem::path();
 
 				std::filesystem::path path = inFilename;
-				path.replace_filename(std::filesystem::path(model.images[model.textures[inIndex].source].uri));
+				path.replace_filename(std::filesystem::path(inTextureView.texture->image->uri));
 				return path;
 			};
+
 			InstanceInfo instance_info =
 			{
-				.mName = std::format("{} - {} - {}", inNode.name, mesh.name, material.name),
-				.mMaterialName = material.name,
-				.mAlbedoTexture = get_texture_path(material.pbrMetallicRoughness.baseColorTexture.index),
-				.mNormalTexture = get_texture_path(material.normalTexture.index),
-				.mReflectanceTexture = get_texture_path(material.pbrMetallicRoughness.metallicRoughnessTexture.index),
-				.mRoughnessTexture = get_texture_path(material.pbrMetallicRoughness.metallicRoughnessTexture.index),
-				.mEmissiveTexture = get_texture_path(material.emissiveTexture.index),
+				.mName = std::format("{} - {} - {}", inNode->name, mesh->name, material->name),
+				.mMaterialName = material->name,
+				.mAlbedoTexture = get_texture_path(material->pbr_metallic_roughness.base_color_texture),
+				.mNormalTexture = get_texture_path(material->normal_texture),
+				.mReflectanceTexture = get_texture_path(material->pbr_metallic_roughness.metallic_roughness_texture),
+				.mRoughnessTexture = get_texture_path(material->pbr_metallic_roughness.metallic_roughness_texture),
+				.mEmissiveTexture = get_texture_path(material->emissive_texture),
 			};
 			ioSceneContent.mInstanceInfos.push_back(instance_info);
 
 			InstanceData instance_data =
 			{
 				.mBSDF = BSDF::glTF,
-				.mTwoSided = material.doubleSided,
-				.mRoughnessAlpha = static_cast<float>(material.pbrMetallicRoughness.roughnessFactor),
-				.mAlbedo = vec3(material.pbrMetallicRoughness.baseColorFactor[0], material.pbrMetallicRoughness.baseColorFactor[1], material.pbrMetallicRoughness.baseColorFactor[2]),
-				.mMetallic = static_cast<float>(material.pbrMetallicRoughness.metallicFactor),
-				.mEmission = vec3(material.emissiveFactor[0], material.emissiveFactor[1], material.emissiveFactor[2]),
+				.mTwoSided = static_cast<uint>(material->double_sided),
+				.mRoughnessAlpha = static_cast<float>(material->pbr_metallic_roughness.roughness_factor),
+				.mAlbedo = vec3(material->pbr_metallic_roughness.base_color_factor[0], material->pbr_metallic_roughness.base_color_factor[1], material->pbr_metallic_roughness.base_color_factor[2]),
+				.mMetallic = static_cast<float>(material->pbr_metallic_roughness.metallic_factor),
+				.mEmission = vec3(material->emissive_factor[0], material->emissive_factor[1], material->emissive_factor[2]),
 				.mTransform = matrix,
 				.mInverseTranspose = transpose(inverse(matrix)),
 				.mVertexOffset = vertex_offset,
@@ -790,17 +790,17 @@ bool Scene::LoadGLTF(const std::string& inFilename, SceneContent& ioSceneContent
 		return matrix;
 	};
 
-	for (int node_index : model.scenes[model.defaultScene].nodes)
+	for (cgltf_node* node : std::span(data->scene->nodes, data->scene->nodes_count))
 	{
-		Node& node = model.nodes[node_index];
-
 		mat4x4 matrix = visit_node(node, mat4x4(1.0f));
 
-		for (int child_node_index : node.children)
-			visit_node(model.nodes[child_node_index], matrix);
+		for (cgltf_node* child_node : std::span(node->children, node->children_count))
+			visit_node(child_node, matrix);
 	}
 
-	return ret;
+	cgltf_free(data);
+
+	return true;
 }
 
 void Scene::FillDummyMaterial(InstanceInfo& ioInstanceInfo, InstanceData& ioInstanceData)

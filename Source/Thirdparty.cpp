@@ -3,3 +3,6 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "Thirdparty/tinygltf/stb_image.h"
+
+#define CGLTF_IMPLEMENTATION
+#include "Thirdparty/cgltf/cgltf.h"
