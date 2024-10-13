@@ -26,6 +26,3 @@
 [submodule "Asset/UVChecker-map"]
 	path = Asset/UVChecker-map
 	url = https://github.com/Arahnoid/UVChecker-map.git
-[submodule "Source/Thirdparty/cgltf"]
-	path = Source/Thirdparty/cgltf
-	url = https://github.com/jkuhlmann/cgltf.git
