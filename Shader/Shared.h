@@ -27,10 +27,14 @@ using float4x3 = glm::mat4x3;
 using float4x4 = glm::mat4x4;
 
 #define CONSTANT_DEFAULT(x) = x
+#define RETURN_AS_REFERENCE &
+#define GET_COLUMN(x, i) x[i]
 
 #else
 
 #define CONSTANT_DEFAULT(x)
+#define RETURN_AS_REFERENCE
+#define GET_COLUMN(x, i) transpose(x)[i]
 
 #endif // __cplusplus
 
@@ -602,10 +606,24 @@ struct CloudConstants
 
 struct Constants
 {
-	float4						mCameraPosition					CONSTANT_DEFAULT(float4(0.0f, 0.0f, 0.0f, 0.0f));
-	float4						mCameraDirection				CONSTANT_DEFAULT(float4(0.0f, 0.0f, 1.0f, 0.0f));
-	float4						mCameraRightExtend				CONSTANT_DEFAULT(float4(1.0f, 0.0f, 0.0f, 0.0f));
-	float4						mCameraUpExtend					CONSTANT_DEFAULT(float4(0.0f, 1.0f, 0.0f, 0.0f));
+	// Right-handed Y-up
+	float4 RETURN_AS_REFERENCE	CameraRight()					{ return GET_COLUMN(mCameraTransform, 0); }
+	float4 RETURN_AS_REFERENCE	CameraUp()						{ return GET_COLUMN(mCameraTransform, 1); }
+	float4 RETURN_AS_REFERENCE	CameraFront()					{ return GET_COLUMN(mCameraTransform, 2); }
+	float4 RETURN_AS_REFERENCE	CameraPosition()				{ return GET_COLUMN(mCameraTransform, 3); }
+	float4x4					mCameraTransform				CONSTANT_DEFAULT(float4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1));
+	float						mCameraRightExtend				CONSTANT_DEFAULT(1.0f);
+	float						mCameraUpExtend					CONSTANT_DEFAULT(1.0f);
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	float						mCameraDistance					CONSTANT_DEFAULT(0);
+	float4x4					mViewMatrix						CONSTANT_DEFAULT(float4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1));
+	float4x4					mProjectionMatrix				CONSTANT_DEFAULT(float4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1));
+	float4x4					mViewProjectionMatrix			CONSTANT_DEFAULT(float4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1));
+
+	uint						mScreenWidth					CONSTANT_DEFAULT(0);
+	uint						mScreenHeight					CONSTANT_DEFAULT(0);
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
 	float						mEV100							CONSTANT_DEFAULT(16.0f);
 	ToneMappingMode				mToneMappingMode				CONSTANT_DEFAULT(ToneMappingMode::Knarkowicz);
@@ -674,6 +692,8 @@ struct LocalConstants
 	uint3						mPad							CONSTANT_DEFAULT(uint3(0, 0, 0));
 };
 
+#undef RETURN_AS_REFERENCE
+#undef GET_COLUMN
 #undef CONSTANT_DEFAULT
 #undef CONCAT
 #undef CONCAT_INNER

@@ -38,8 +38,8 @@ void TraceRay(PixelContext inPixelContext)
 	ndc_xy.y									= -ndc_xy.y;									// Flip y
 	
 	RayDesc ray;
-	ray.Origin									= mConstants.mCameraPosition.xyz;
-	ray.Direction								= normalize(mConstants.mCameraDirection.xyz + mConstants.mCameraRightExtend.xyz * ndc_xy.x + mConstants.mCameraUpExtend.xyz * ndc_xy.y);
+	ray.Origin									= mConstants.CameraPosition().xyz;
+	ray.Direction								= normalize(mConstants.CameraFront().xyz + mConstants.CameraRight().xyz * mConstants.mCameraRightExtend * ndc_xy.x + mConstants.CameraUp().xyz * mConstants.mCameraUpExtend * ndc_xy.y);
 	ray.TMin									= 0.001;
 	ray.TMax									= 100000;
 

@@ -106,10 +106,12 @@ struct Renderer
 	bool										mAccumulationDone = false;
 	bool										mAccumulationFrameUnlimited = false;
 	bool										mAccumulationPaused = false;
-	uint32_t									mAccumulationFrameCount = 1;
+	uint										mAccumulationFrameCount = 1;
 	bool										mAccumulationResetRequested = false;
 
-	int											mResizeWidth = 0;
-	int											mResizeHeight = 0;
+	uint										mScreenWidth = 0;
+	uint										mScreenHeight = 0;
+	uint										mResizeWidth = 0;
+	uint										mResizeHeight = 0;
 };
 extern Renderer									gRenderer;

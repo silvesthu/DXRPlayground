@@ -21,9 +21,7 @@ using Microsoft::WRL::ComPtr;
 #include <filesystem>
 #include <span>
 
-#define GLM_FORCE_SILENT_WARNINGS
-#include "Thirdparty/glm/glm/gtx/transform.hpp"
-#include "Thirdparty/glm/glm/gtx/quaternion.hpp"
+#include "Thirdparty/glm.h"
 #include "Thirdparty/nameof/include/nameof.hpp"
 #include "Thirdparty/DirectXTex/DirectXTex/DirectXTex.h"
 #include "Thirdparty/DirectXTex/DirectXTex/d3dx12.h"

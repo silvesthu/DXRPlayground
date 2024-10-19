@@ -817,7 +817,7 @@ void SkyViewLut(
 	float2 pixPos = inDispatchThreadID.xy + 0.5; 		// half pixel offset
 	float2 uv = pixPos / dimensions;
 
-	float3 camera_position = mConstants.mCameraPosition.xyz * mConstants.mAtmosphere.mSceneScale;
+	float3 camera_position = mConstants.CameraPosition().xyz * mConstants.mAtmosphere.mSceneScale;
 	camera_position.y = max(camera_position.y, 1.0 * mConstants.mAtmosphere.mSceneScale); // Keep observer position above ground
 	float3 WorldPos = camera_position - PlanetCenter();
 	float viewHeight = length(WorldPos);
@@ -894,20 +894,20 @@ void CameraVolumes(
 	float2 d = ((pixPos / dims) * 2.f - 1.f); // 0~1 => -1~1
 	d.y = -d.y;
 
-	float3 right = mConstants.mCameraRightExtend.xyz;
-	float3 up = mConstants.mCameraUpExtend.xyz;
+	float3 right = mConstants.CameraRight().xyz * mConstants.mCameraRightExtend;
+	float3 up = mConstants.CameraUp().xyz * mConstants.mCameraUpExtend;
 
 	// Debug
 	right = -right; // handness?
 
-	float3 WorldDir = normalize(mConstants.mCameraDirection.xyz + right * d.x + up * d.y);
+	float3 WorldDir = normalize(mConstants.CameraFront().xyz + right * d.x + up * d.y);
 	WorldDir.xyz = WorldDir.xzy; // Y-up to Z-up
 	float3 SunDir = mConstants.mSunDirection.xzy; // Y-up to Z-up
 
 	// Debug
 	float3 WorldDir_Raw = WorldDir;
 
-	float3 camera = mConstants.mCameraPosition.xzy; // Y-up to Z-up
+	float3 camera = mConstants.CameraPosition().xzy; // Y-up to Z-up
 
 	// Debug
 	camera.xy = 0; // flat
@@ -1001,7 +1001,7 @@ void CameraVolumes(
 	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(WorldPos, 1.0); // match
 	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(SunDir, 1.0); // match
 	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(SampleCountIni.xxx, 1.0); // match
-	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(mConstants.mCameraDirection.xzy, 1.0); // match
+	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(mConstants.CameraFront().xzy, 1.0); // match
 	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(WorldDir_Raw, 1.0); // match	
 	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(newWorldPos, 1.0); // almost match
 	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(WorldDir, 1.0); // match

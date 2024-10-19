@@ -1001,7 +1001,7 @@ void Scene::InitializeBuffers()
 
 	{
 		desc_uav.Width = sizeof(EncodedTriangleLight) * gMax(1u, mSceneContent.mTriangleLightsCount); // Avoid zero byte buffer
-		gValidate(gDevice->CreateCommittedResource(&props_default, D3D12_HEAP_FLAG_NONE, &desc_uav, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&mBuffers.mEncodedTriangleLights)));
+		gValidate(gDevice->CreateCommittedResource(&props_default, D3D12_HEAP_FLAG_NONE, &desc_uav, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mBuffers.mEncodedTriangleLights)));
 		gSetName(mBuffers.mEncodedTriangleLights, "Scene.", "mBuffers.mEncodedTriangleLights", "");
 
 		// Write, Read on GPU

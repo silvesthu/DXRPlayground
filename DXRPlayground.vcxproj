@@ -12,6 +12,23 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Source\ImGuizmo\ImGuizmoExt.h" />
+    <ClInclude Include="Source\Thirdparty\glm.h" />
+    <ClInclude Include="Source\Thirdparty\ImGuizmo\example\ImApp.h" />
+    <ClInclude Include="Source\Thirdparty\ImGuizmo\example\imconfig.h" />
+    <ClInclude Include="Source\Thirdparty\ImGuizmo\example\imgui.h" />
+    <ClInclude Include="Source\Thirdparty\ImGuizmo\example\imgui_internal.h" />
+    <ClInclude Include="Source\Thirdparty\ImGuizmo\example\imstb_rectpack.h" />
+    <ClInclude Include="Source\Thirdparty\ImGuizmo\example\imstb_textedit.h" />
+    <ClInclude Include="Source\Thirdparty\ImGuizmo\example\imstb_truetype.h" />
+    <ClInclude Include="Source\Thirdparty\ImGuizmo\example\stb_image.h" />
+    <ClInclude Include="Source\Thirdparty\ImGuizmo\GraphEditor.h" />
+    <ClInclude Include="Source\Thirdparty\ImGuizmo\ImCurveEdit.h" />
+    <ClInclude Include="Source\Thirdparty\ImGuizmo\ImGradient.h" />
+    <ClInclude Include="Source\Thirdparty\ImGuizmo\ImGuizmo.h" />
+    <ClInclude Include="Source\Thirdparty\ImGuizmo\ImSequencer.h" />
+    <ClInclude Include="Source\Thirdparty\ImGuizmo\ImZoomSlider.h" />
+    <ClInclude Include="Source\Thirdparty\imgui_config.h" />
     <ClInclude Include="Source\Thirdparty\tiny_gltf.h" />
     <CopyFileToFolders Include="Shader\ClosestHit.h" />
     <CopyFileToFolders Include="Shader\Light.h" />
@@ -79,6 +96,7 @@
     <ClCompile Include="Source\Color.cpp" />
     <ClCompile Include="Source\Common.cpp" />
     <ClCompile Include="Source\DXRPlayground.cpp" />
+    <ClCompile Include="Source\ImGuizmo\ImGuizmoExt.cpp" />
     <ClCompile Include="Source\ImGui\imgui_impl_dx12.cpp" />
     <ClCompile Include="Source\ImGui\imgui_impl_helper.cpp" />
     <ClCompile Include="Source\ImGui\imgui_impl_win32.cpp" />
@@ -87,6 +105,23 @@
     <ClCompile Include="Source\Thirdparty.cpp" />
     <ClCompile Include="Source\Thirdparty\ArHosekSkyModel\ArHosekSkyModel.cpp" />
     <ClCompile Include="Source\Thirdparty\ArPragueSkyModelGround\ArPragueSkyModelGround.cpp" />
+    <ClInclude Include="Source\Thirdparty\ImGuizmo\example\imgui.cpp" />
+    <ClInclude Include="Source\Thirdparty\ImGuizmo\example\imgui_demo.cpp" />
+    <ClInclude Include="Source\Thirdparty\ImGuizmo\example\imgui_draw.cpp" />
+    <ClInclude Include="Source\Thirdparty\ImGuizmo\example\imgui_tables.cpp" />
+    <ClInclude Include="Source\Thirdparty\ImGuizmo\example\imgui_widgets.cpp" />
+    <ClInclude Include="Source\Thirdparty\ImGuizmo\example\main.cpp" />
+    <ClCompile Include="Source\Thirdparty\ImGuizmo\GraphEditor.cpp">
+      <WarningLevel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Level3</WarningLevel>
+      <WarningLevel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Level3</WarningLevel>
+    </ClCompile>
+    <ClCompile Include="Source\Thirdparty\ImGuizmo\ImCurveEdit.cpp" />
+    <ClCompile Include="Source\Thirdparty\ImGuizmo\ImGradient.cpp" />
+    <ClInclude Include="Source\Thirdparty\ImGuizmo\ImGuizmo.cpp">
+      <WarningLevel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Level3</WarningLevel>
+      <WarningLevel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Level3</WarningLevel>
+    </ClInclude>
+    <ClCompile Include="Source\Thirdparty\ImGuizmo\ImSequencer.cpp" />
     <ClCompile Include="Source\Thirdparty\imgui\imgui.cpp" />
     <ClCompile Include="Source\Thirdparty\imgui\imgui_demo.cpp" />
     <ClCompile Include="Source\Thirdparty\imgui\imgui_draw.cpp" />
@@ -237,13 +272,13 @@
     <LinkIncremental>true</LinkIncremental>
     <CopyFileBeforeTargets>Run</CopyFileBeforeTargets>
     <LibraryPath>$(ProjectDir)Source\Thirdparty\DirectXTex\DirectXTex\Bin\Desktop_2022_Win10\x64\$(Configuration);$(LibraryPath)</LibraryPath>
-    <IncludePath>$(ProjectDir)Source\Thirdparty\imgui;$(IncludePath)</IncludePath>
+    <IncludePath>C:\Data\Projects\DXRPlayground\Source\Thirdparty\imgui;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <CopyFileBeforeTargets>Run</CopyFileBeforeTargets>
     <LibraryPath>$(ProjectDir)Source\Thirdparty\DirectXTex\DirectXTex\Bin\Desktop_2022_Win10\x64\$(Configuration);$(LibraryPath)</LibraryPath>
-    <IncludePath>$(ProjectDir)Source\Thirdparty\imgui;$(IncludePath)</IncludePath>
+    <IncludePath>C:\Data\Projects\DXRPlayground\Source\Thirdparty\imgui;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -252,7 +287,7 @@
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_DEBUG;_CONSOLE;STBI_MSC_SECURE_CRT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>IMGUI_USER_CONFIG="../imgui_config.h";_CRT_SECURE_NO_WARNINGS;_DEBUG;_CONSOLE;STBI_MSC_SECURE_CRT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <TreatWarningAsError>true</TreatWarningAsError>
       <DisableLanguageExtensions>false</DisableLanguageExtensions>
@@ -281,7 +316,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;NDEBUG;_CONSOLE;STBI_MSC_SECURE_CRT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>IMGUI_USER_CONFIG="../imgui_config.h";_CRT_SECURE_NO_WARNINGS;NDEBUG;_CONSOLE;STBI_MSC_SECURE_CRT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <TreatWarningAsError>true</TreatWarningAsError>

@@ -50,6 +50,9 @@ void Renderer::InitializeScreenSizeTextures()
 
 	for (auto&& screen_texture : mRuntime.mScreenTextures)
 		screen_texture.Width(swap_chain_desc.Width).Height(swap_chain_desc.Height).Initialize();
+
+	mScreenWidth = swap_chain_desc.Width;
+	mScreenHeight = swap_chain_desc.Height;
 }
 
 void Renderer::FinalizeScreenSizeTextures()

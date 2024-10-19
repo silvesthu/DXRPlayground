@@ -10,6 +10,7 @@
 
 #include "ImGui/imgui_impl_win32.h"
 #include "ImGui/imgui_impl_dx12.h"
+#include "ImGuizmo/ImGuizmoExt.h"
 
 #pragma warning(push)
 #pragma warning(disable: 4068)
@@ -88,7 +89,8 @@ static int sPreviousSceneIndex = sCurrentSceneIndex;
 
 struct CameraSettings
 {
-	glm::vec2		mMoveRotateSpeed = glm::vec2(0.1f, 0.01f);
+	float			mMoveSpeed = 0.1f;
+	float			mRotateSpeed = 0.01f;
 	float			mHorizontalFovDegree = 90.0f;
 
 	struct ExposureControl
@@ -125,6 +127,8 @@ static void sDumpLuminance()
 	gDumpTextureProxy.mName = "Luminance";
 	gDumpTexture = &gDumpTextureProxy;
 }
+static void sPrepareImGui();
+static void sPrepareImGuizmo();
 static void sRender();
 static LRESULT WINAPI sWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -150,14 +154,10 @@ static void sPrepareImGui()
 
 			ImGui::SameLine();
 
-			if (ImGui::Button("Copy Camera"))
+			if (ImGui::Button("Copy Mitsuba Camera"))
 			{
-				// Matrix for Mitsuba3
-				glm::mat4x4 camera_transform = glm::mat4x4(1.0f);
-				camera_transform[3] = gConstants.mCameraPosition;
-				camera_transform[2] = gConstants.mCameraDirection;
-				camera_transform[1] = glm::normalize(gConstants.mCameraUpExtend);
-				camera_transform[0] = -glm::normalize(gConstants.mCameraRightExtend);
+				glm::mat4x4 camera_transform = gConstants.mCameraTransform;
+				camera_transform[0] = -camera_transform[0];
 				ImGui::SetClipboardText(gToString(camera_transform).c_str());
 			}
 		}
@@ -268,8 +268,8 @@ static void sPrepareImGui()
 		{
 			auto align_right = [](float pivot = ImGui::GetCursorPosX()) { ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.65f - (ImGui::GetCursorPosX() - pivot)); };
 
-			ImGui::InputFloat3("Position", (float*)&gConstants.mCameraPosition);
-			ImGui::InputFloat3("Direction", (float*)&gConstants.mCameraDirection);
+			ImGui::InputFloat3("Position", (float*)&gConstants.mCameraTransform[3]);
+			ImGui::InputFloat3("Direction", (float*)&gConstants.mCameraTransform[2], "%.3f", ImGuiInputTextFlags_ReadOnly);
 			ImGui::SliderFloat("Horz Fov", (float*)&gCameraSettings.mHorizontalFovDegree, 30.0f, 160.0f);
 
 			ImGui::PushID("Aperture");
@@ -610,18 +610,35 @@ static void sPrepareImGui()
 	ImGui::End();
 }
 
+void sPrepareImGuizmo()
+{
+	ImGuiIO& io = ImGui::GetIO();
+	ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
+
+	float axis_length = 48.0f;
+	glm::vec2 axis_center = glm::vec2(64.0f, io.DisplaySize.y - 64.0f);
+	glm::vec4 x_vector = gConstants.mViewMatrix * glm::vec4(axis_length, 0, 0, 0);
+	glm::vec4 y_vector = gConstants.mViewMatrix * glm::vec4(0, axis_length, 0, 0);
+	glm::vec4 z_vector = gConstants.mViewMatrix * glm::vec4(0, 0, axis_length, 0);
+	glm::vec2 x_axis = axis_center + glm::vec2(x_vector.x, -x_vector.y);
+	glm::vec2 y_axis = axis_center + glm::vec2(y_vector.x, -y_vector.y);
+	glm::vec2 z_axis = axis_center + glm::vec2(z_vector.x, -z_vector.y);
+	ImGuizmo::GetDrawlist()->AddLine(axis_center, x_axis, ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 0.0f, 0.0f, 1.0f)), 5.0f);
+	ImGuizmo::GetDrawlist()->AddLine(axis_center, y_axis, ImGui::ColorConvertFloat4ToU32(ImVec4(0.0f, 1.0f, 0.0f, 1.0f)), 5.0f);
+	ImGuizmo::GetDrawlist()->AddLine(axis_center, z_axis, ImGui::ColorConvertFloat4ToU32(ImVec4(0.0f, 0.0f, 1.0f, 1.0f)), 5.0f);
+}
+
 static void sUpdate()
 {
 	// Resize
 	if (gRenderer.mResizeWidth != 0)
 	{
-		RECT rect = { 0, 0, gRenderer.mResizeWidth, gRenderer.mResizeHeight };
+		RECT rect = { 0, 0, (LONG)gRenderer.mResizeWidth, (LONG)gRenderer.mResizeHeight };
 		AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, false);
 		::SetWindowPos(::GetActiveWindow(), NULL, 0, 0, rect.right - rect.left, rect.bottom - rect.top, SWP_NOMOVE | SWP_NOOWNERZORDER | SWP_NOZORDER);
 
 		gRenderer.mResizeWidth = 0;
 		gRenderer.mResizeHeight = 0;
-
 	}
 
 	// Reload
@@ -657,47 +674,46 @@ static void sUpdate()
 
 		if (mouse_delta.x != 0 || mouse_delta.y != 0) // otherwise result of glm::normalize might oscillate
 		{
-			glm::vec4 front = gConstants.mCameraDirection;
-			glm::vec4 right = glm::vec4(glm::normalize(glm::cross(glm::vec3(front), glm::vec3(0, 1, 0))), 0);
-			glm::vec4 up = glm::vec4(glm::normalize(glm::cross(glm::vec3(right), glm::vec3(front))), 0);
+			glm::vec4 front						= gConstants.CameraFront();
+			glm::vec4 right						= glm::vec4(glm::normalize(glm::cross(glm::vec3(gConstants.CameraFront()), glm::vec3(0, 1, 0))), 0);
+			glm::vec4 up						= glm::vec4(glm::normalize(glm::cross(glm::vec3(right), glm::vec3(gConstants.CameraFront()))), 0);
 
-			front = glm::rotate(-mouse_delta.x * gCameraSettings.mMoveRotateSpeed.y, glm::vec3(up)) * front;
-			front = glm::rotate(-mouse_delta.y * gCameraSettings.mMoveRotateSpeed.y, glm::vec3(right)) * front;
+			front								= glm::rotate(-mouse_delta.x * gCameraSettings.mRotateSpeed, glm::vec3(up)) * front;
+			front								= glm::rotate(-mouse_delta.y * gCameraSettings.mRotateSpeed, glm::vec3(right)) * front;
 
-			gConstants.mCameraDirection = glm::normalize(front);
+			gConstants.CameraFront()			= glm::normalize(front);
+			gConstants.CameraRight()			= glm::normalize(glm::vec4(glm::cross(glm::vec3(gConstants.CameraFront()), glm::vec3(0, 1, 0)), 0));
+			gConstants.CameraUp()				= glm::normalize(glm::vec4(glm::cross(glm::vec3(gConstants.CameraRight()), glm::vec3(gConstants.CameraFront())), 0));
 		}
-
-		if (glm::isnan(gConstants.mCameraDirection.x))
-			gConstants.mCameraDirection = glm::vec4(0, 0, 1, 0);
 	}
 
 	// Move Camera
 	{
 		float frame_speed_scale = ImGui::GetIO().DeltaTime / (1.0f / 60.0f);
-		float move_speed = gCameraSettings.mMoveRotateSpeed.x * frame_speed_scale;
+		float move_speed = gCameraSettings.mMoveSpeed * frame_speed_scale;
 		if (ImGui::GetIO().KeyShift)
 			move_speed *= 20.0f;
 		if (ImGui::GetIO().KeyCtrl)
 			move_speed *= 0.1f;
 
 		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_W))
-			gConstants.mCameraPosition += gConstants.mCameraDirection * move_speed;
+			gConstants.mCameraTransform[3] += gConstants.mCameraTransform[2] * move_speed;
 		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_S))
-			gConstants.mCameraPosition -= gConstants.mCameraDirection * move_speed;
+			gConstants.mCameraTransform[3] -= gConstants.mCameraTransform[2] * move_speed;
 
-		glm::vec4 right = glm::vec4(glm::normalize(glm::cross(glm::vec3(gConstants.mCameraDirection), glm::vec3(0, 1, 0))), 0);
+		glm::vec4 right = glm::vec4(glm::normalize(glm::cross(glm::vec3(gConstants.mCameraTransform[2]), glm::vec3(0, 1, 0))), 0);
 
 		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_A))
-			gConstants.mCameraPosition -= right * move_speed;
+			gConstants.mCameraTransform[3] -= right * move_speed;
 		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_D))
-			gConstants.mCameraPosition += right * move_speed;
+			gConstants.mCameraTransform[3] += right * move_speed;
 
-		glm::vec4 up = glm::vec4(glm::normalize(glm::cross(glm::vec3(right), glm::vec3(gConstants.mCameraDirection))), 0);
+		glm::vec4 up = glm::vec4(glm::normalize(glm::cross(glm::vec3(right), glm::vec3(gConstants.mCameraTransform[2]))), 0);
 
 		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_Q))
-			gConstants.mCameraPosition -= up * move_speed;
+			gConstants.mCameraTransform[3] -= up * move_speed;
 		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_E))
-			gConstants.mCameraPosition += up * move_speed;
+			gConstants.mCameraTransform[3] += up * move_speed;
 
 		if (ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_F5))
 			sLoadShader();
@@ -721,17 +737,19 @@ static void sUpdate()
 			gConstants.mPixelDebugCoord += int2(1, 0);
 	}
 
-	// Frustum
+	// Setup matrices
 	{
-		// Right-handed Y-up
+		float fov_radian						= gCameraSettings.mHorizontalFovDegree * glm::pi<float>() / 180.0f;
+		float horizontal_tan					= glm::tan(fov_radian * 0.5f);
+		gConstants.mCameraRightExtend			= horizontal_tan;
+		gConstants.mCameraUpExtend				= horizontal_tan * (gDisplaySettings.mRenderResolution.y * 1.0f / gDisplaySettings.mRenderResolution.x);
 
-		float horizontal_tan = glm::tan(gCameraSettings.mHorizontalFovDegree * 0.5f * glm::pi<float>() / 180.0f);
+		gConstants.mScreenWidth					= gRenderer.mScreenWidth;
+		gConstants.mScreenHeight				= gRenderer.mScreenHeight;
 
-		glm::vec4 right = glm::vec4(glm::normalize(glm::cross(glm::vec3(gConstants.mCameraDirection), glm::vec3(0, 1, 0))), 0);
-		gConstants.mCameraRightExtend = right * horizontal_tan;
-
-		glm::vec4 up = glm::vec4(glm::normalize(glm::cross(glm::vec3(right), glm::vec3(gConstants.mCameraDirection))), 0);
-		gConstants.mCameraUpExtend = up * horizontal_tan * (gDisplaySettings.mRenderResolution.y * 1.0f / gDisplaySettings.mRenderResolution.x);
+		gConstants.mViewMatrix					= glm::transpose(gConstants.mCameraTransform);
+		gConstants.mProjectionMatrix			= glm::perspectiveFov(horizontal_tan, (float)gConstants.mScreenWidth, (float)gConstants.mScreenHeight, 0.01f, 10000.0f);
+		gConstants.mViewProjectionMatrix		= gConstants.mProjectionMatrix * gConstants.mViewMatrix;
 	}
 
 	gAtmosphere.Update();
@@ -859,6 +877,7 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 		ImGui_ImplDX12_NewFrame();
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
+		ImGuizmo::BeginFrame();
 
 		sUpdate();
 		sRender();
@@ -889,16 +908,20 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 
 void sLoadCamera()
 {
-	gConstants.mCameraPosition = kScenePresets[sCurrentSceneIndex].mCameraPosition;
-	gConstants.mCameraDirection = glm::normalize(kScenePresets[sCurrentSceneIndex].mCameraDirection);
-	gConstants.mEmissionBoost = kScenePresets[sCurrentSceneIndex].mEmissionBoost;
-	gCameraSettings.mHorizontalFovDegree = kScenePresets[sCurrentSceneIndex].mHorizontalFovDegree;
+	gConstants.CameraPosition()					= kScenePresets[sCurrentSceneIndex].mCameraPosition;
+	gConstants.CameraFront()					= kScenePresets[sCurrentSceneIndex].mCameraDirection;
+	gConstants.mEmissionBoost					= kScenePresets[sCurrentSceneIndex].mEmissionBoost;
+	gCameraSettings.mHorizontalFovDegree		= kScenePresets[sCurrentSceneIndex].mHorizontalFovDegree;
 
 	if (gScene.GetSceneContent().mCameraTransform.has_value())
 	{
-		gConstants.mCameraPosition = gScene.GetSceneContent().mCameraTransform.value()[3];
-		gConstants.mCameraDirection = gScene.GetSceneContent().mCameraTransform.value()[2];
+		gConstants.CameraPosition()				= gScene.GetSceneContent().mCameraTransform.value()[3];
+		gConstants.CameraFront()				= gScene.GetSceneContent().mCameraTransform.value()[2];
 	}
+
+	gConstants.CameraFront()					= glm::normalize(gConstants.CameraFront());
+	gConstants.CameraUp()						= float4(0, 1, 0, 0);
+	gConstants.CameraRight()					= float4(glm::cross(float3(gConstants.CameraFront()), float3(gConstants.CameraUp())), 0.0f);
 
 	if (gScene.GetSceneContent().mFov.has_value())
 		gCameraSettings.mHorizontalFovDegree = gScene.GetSceneContent().mFov.value();
@@ -1003,8 +1026,11 @@ void sRender()
 			sConstantsCopy = gConstants;
 			gRenderer.mAccumulationResetRequested = false;
 		}
-		
-		memcpy(frame_context.mConstantUploadBufferPointer, &gConstants, sizeof(gConstants));
+
+		{
+			Constants gpu_constants = gConstants;
+			memcpy(frame_context.mConstantUploadBufferPointer, &gpu_constants, sizeof(gConstants));
+		}
 
 		{
 			if (!gRenderer.mAccumulationPaused)
@@ -1172,6 +1198,8 @@ SkipRender:
 		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "ImGui");
 
 		sPrepareImGui(); // Keep this right before render to get latest data
+
+		sPrepareImGuizmo();
 
 		ImGui::Render();
 

@@ -17,8 +17,8 @@
 
 #define DXRPLAYGROUND_IMGUI
 
-#include "imgui.h"      // IMGUI_IMPL_API
-#include <dxgiformat.h> // DXGI_FORMAT
+#include "../Thirdparty/imgui/imgui.h"      // IMGUI_IMPL_API
+#include <dxgiformat.h>                     // DXGI_FORMAT
 
 struct ID3D12Device;
 struct ID3D12DescriptorHeap;
