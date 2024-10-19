@@ -91,7 +91,6 @@ void TraceRay(PixelContext inPixelContext)
 			{
 				// Only support 32bit index for simplicity
 				// see https://github.com/microsoft/DirectX-Graphics-Samples/blob/master/Samples/Desktop/D3D12Raytracing/src/D3D12RaytracingSimpleLighting/Raytracing.hlsl for reference
-				uint kIndexCountPerTriangle		= 3;
 				uint base_index					= hit_context.mPrimitiveIndex * kIndexCountPerTriangle + InstanceDatas[hit_context.mInstanceID].mIndexOffset;
 				uint3 indices					= uint3(Indices[base_index], Indices[base_index + 1], Indices[base_index + 2]) + InstanceDatas[hit_context.mInstanceID].mVertexOffset;
 

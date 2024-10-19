@@ -39,6 +39,8 @@ using float4x4 = glm::mat4x4;
 #define GENERATE_PAD_NAME CONCAT(mPad_, __LINE__)
 #define GENERATE_NEW_LINE_NAME CONCAT(_Newline_, __LINE__)
 
+static const uint kIndexCountPerTriangle		= 3;
+
 static const float MATH_PI						= 3.1415926535897932384626433832795f;
 static const float kPreExposure					= 1.0e-4f;	// Pre-exposure to improve float point precision
 
@@ -87,6 +89,7 @@ enum class ViewDescriptorIndex : uint
 	RaytraceNormalsSRV,
 	RaytraceUVsSRV,
 	RaytraceLightsSRV,
+	RaytraceEncodedTriangleLightsUAV,
 
 	// [Bruneton17]
 	Bruneton17TransmittanceUAV,
@@ -164,6 +167,7 @@ enum class RootParameterIndex : uint
 {
 	Constants = 0,				// ROOT_SIGNATURE_COMMON
 
+	ConstantsPrepareLights = 1,	// ROOT_SIGNATURE_PREPARE_LIGHTS
 	ConstantsDiff = 1,			// ROOT_SIGNATURE_DIFF
 	ConstantsAtmosphere = 1,	// ROOT_SIGNATURE_ATMOSPHERE
 };
@@ -287,6 +291,15 @@ enum class SampleMode : uint
 	MIS,
 
 	Count
+};
+
+enum class LightSourceMode : uint
+{
+	Emitter = 0,
+	TriangleLights,
+	Both,
+
+	Count,
 };
 
 enum class LightSampleMode : uint
@@ -438,6 +451,17 @@ struct Light
 
 	float3						mEmission						CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+};
+
+// Based on RAB_LightInfo in RTXDI
+struct EncodedTriangleLight
+{
+	float3						mPosition						CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+	uint						mExtends						CONSTANT_DEFAULT(0);											// 2x float16
+
+	uint2						mEmission						CONSTANT_DEFAULT(uint2(0, 0));									// fp16x4
+	uint						mTangent						CONSTANT_DEFAULT(0);											// oct-encoded
+	uint						mBitangent						CONSTANT_DEFAULT(0);											// oct-encoded
 };
 
 struct RayState
@@ -593,10 +617,15 @@ struct Constants
 	float						mSunZenith						CONSTANT_DEFAULT(MATH_PI / 4.0f);
 	float						mTime							CONSTANT_DEFAULT(0);
 
-	uint						mLightCount						CONSTANT_DEFAULT(0);
 	OffsetMode					mOffsetMode						CONSTANT_DEFAULT(OffsetMode::HalfPixel);
 	SampleMode					mSampleMode						CONSTANT_DEFAULT(SampleMode::MIS);
+	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+
+	uint						mLightCount						CONSTANT_DEFAULT(0);
+	LightSourceMode				mLightSourceMode				CONSTANT_DEFAULT(LightSourceMode::Emitter);
 	LightSampleMode				mLightSampleMode				CONSTANT_DEFAULT(LightSampleMode::Uniform);
+	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
 	float4						mSunDirection					CONSTANT_DEFAULT(float4(1.0f, 0.0f, 0.0f, 0.0f));
 

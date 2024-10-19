@@ -5,6 +5,16 @@
 #include "Common.h"
 #include "Reservoir.h"
 
+struct TriangleLight
+{
+	float3			mPosition;
+	float3			mEdge1;
+	float3			mEdge2;
+	float3			mEmission;
+	float3			mNormal;
+	float			mSurfaceArea;
+};
+
 struct LightContext
 {
 	float3	mL;

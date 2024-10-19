@@ -340,6 +340,9 @@
     <CopyFileToFolders Include="Shader\Reservoir.h">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
+    <CopyFileToFolders Include="Shader\PrepareLights.hlsl">
+      <Filter>Shader</Filter>
+    </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

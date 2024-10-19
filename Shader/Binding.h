@@ -27,7 +27,16 @@ ConstantBuffer<Constants> mConstants : register(b0, space0);
 #endif // USE_DYNAMIC_RESOURCE_CBV
 
 #define ROOT_SIGNATURE_COMMON \
-"RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0)" \
+"RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0), CBV(b1, space = 0)" \
+ROOT_SIGNATURE_SAMPLER
+
+cbuffer RootConstantsPrepareLights : register(b0, space1)
+{
+	uint mInstanceDataIndex;
+	uint mTriangleLightsOffset;
+};
+#define ROOT_SIGNATURE_PREPARE_LIGHTS \
+"RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0), RootConstants(num32BitConstants=2, b0, space = 1)" \
 ROOT_SIGNATURE_SAMPLER
 
 cbuffer RootConstantsDiff : register(b0, space1)
@@ -65,6 +74,7 @@ static StructuredBuffer<float3> Vertices = ResourceDescriptorHeap[(uint)ViewDesc
 static StructuredBuffer<float3> Normals = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::RaytraceNormalsSRV];
 static StructuredBuffer<float2> UVs = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::RaytraceUVsSRV];
 static StructuredBuffer<Light> Lights = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::RaytraceLightsSRV];
+static RWStructuredBuffer<EncodedTriangleLight> EncodedTriangleLights = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::RaytraceEncodedTriangleLightsUAV];
 
 static RWStructuredBuffer<Debug> BufferDebugUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::BufferDebugUAV];
 

@@ -34,6 +34,7 @@ struct ScenePreset
 	SCENE_PRESET_MEMBER(std::string_view, 	Path, 					"");
 	SCENE_PRESET_MEMBER(glm::vec4, 			CameraPosition, 		glm::vec4(0, 1, 0, 1));
 	SCENE_PRESET_MEMBER(glm::vec4, 			CameraDirection, 		glm::vec4(0, 0, -1, 0));
+	SCENE_PRESET_MEMBER(LightSourceMode,	LightSource, 			LightSourceMode::Emitter);
 	SCENE_PRESET_MEMBER(float, 				EmissionBoost, 			1.0f);														// As no auto exposure yet
 	SCENE_PRESET_MEMBER(float, 				HorizontalFovDegree, 	90);
 	SCENE_PRESET_MEMBER(glm::mat4x4, 		Transform, 				glm::mat4x4(1));
@@ -82,7 +83,7 @@ int sFindScenePresetIndex(const std::string_view inName)
 {
 	return static_cast<int>(&sFindScenePreset(inName) - &kScenePresets.front());
 }
-static int sCurrentSceneIndex = sFindScenePresetIndex("Arcade");
+static int sCurrentSceneIndex = sFindScenePresetIndex("CornellBox");
 static int sPreviousSceneIndex = sCurrentSceneIndex;
 
 struct CameraSettings
@@ -223,6 +224,14 @@ static void sPrepareImGui()
 				const auto& name = nameof::nameof_enum(static_cast<SampleMode>(i));
 				ImGui::SameLine();
 				ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mSampleMode), i);
+			}
+
+			ImGui::Text("Light Source Mode");
+			for (int i = 0; i < static_cast<int>(LightSourceMode::Count); i++)
+			{
+				const auto& name = nameof::nameof_enum(static_cast<LightSourceMode>(i));
+				ImGui::SameLine();
+				ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mLightSourceMode), i);
 			}
 
 			ImGui::Text("Light Sample Mode");
@@ -429,6 +438,8 @@ static void sPrepareImGui()
 					"Emission",
 					"RoughnessAlpha",
 					"Opacity",
+					"VertexCount",
+					"PrimitiveCount",
 				};
 				int column_count = (int)std::size(columns);
 
@@ -509,6 +520,14 @@ static void sPrepareImGui()
 						ImGui::TableSetColumnIndex(column_index++);
 						std::string opacity = std::format("{:.2f}", instance_data.mOpacity);
 						ImGui::Text(opacity.c_str());
+
+						ImGui::TableSetColumnIndex(column_index++);
+						std::string vertex_count = std::format("{}", instance_data.mVertexCount);
+						ImGui::Text(vertex_count.c_str());
+
+						ImGui::TableSetColumnIndex(column_index++);
+						std::string index_count = std::format("{}", instance_data.mIndexCount / kIndexCountPerTriangle);
+						ImGui::Text(index_count.c_str());
 
 						gAssert(column_index == column_count);
 					}
@@ -950,7 +969,7 @@ void sRender()
 											(gCameraSettings.mExposureControl.mAperture * gCameraSettings.mExposureControl.mAperture) / 
 											(1.0f / gCameraSettings.mExposureControl.mInvShutterSpeed) * 100.0f / gCameraSettings.mExposureControl.mSensitivity);
 			gConstants.mSunDirection	= glm::vec4(0,1,0,0) * glm::rotate(gConstants.mSunZenith, glm::vec3(0, 0, 1)) * glm::rotate(gConstants.mSunAzimuth + glm::pi<float>() / 2.0f, glm::vec3(0, 1, 0));
-			gConstants.mLightCount		= (glm::uint)gScene.GetSceneContent().mLights.size();
+			gConstants.mLightCount		= gConstants.mLightSourceMode != LightSourceMode::TriangleLights ? (glm::uint)gScene.GetSceneContent().mLights.size() : 0;
 
 			if (ImGui::IsMouseDown(ImGuiMouseButton_Middle))
 				gConstants.mPixelDebugCoord	= glm::uvec2(static_cast<uint32_t>(ImGui::GetMousePos().x), (uint32_t)ImGui::GetMousePos().y);
@@ -1038,6 +1057,22 @@ void sRender()
 
 		gRenderer.Setup(gRenderer.mRuntime.mClearShader.mData);
 		gCommandList->Dispatch((Debug::kValueArraySize + 63) / 64, 1, 1);
+
+		gBarrierUAV(gCommandList, nullptr);
+	}
+
+	// PrepareLights
+	{
+		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "PrepareLights");
+
+		for (const SceneContent::TriangleLightsInfo info : gScene.GetSceneContent().mTriangleLightsInfos)
+		{
+			const InstanceData& instance_data = gScene.GetSceneContent().mInstanceDatas[info.mInstanceDataIndex];
+			gRenderer.Setup(gRenderer.mRuntime.mPrepareLightsShader.mData);
+			uint constants[] = { info.mInstanceDataIndex, info.mTriangleLightsOffset };
+			gCommandList->SetComputeRoot32BitConstants((int)RootParameterIndex::ConstantsPrepareLights, 2, &constants, 0);
+			gCommandList->Dispatch((instance_data.mIndexCount / kIndexCountPerTriangle + 63) / 64, 1, 1);
+		}
 
 		gBarrierUAV(gCommandList, nullptr);
 	}

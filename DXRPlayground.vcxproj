@@ -195,6 +195,11 @@
   <ItemGroup>
     <Manifest Include="dpi.manifest" />
   </ItemGroup>
+  <ItemGroup>
+    <CopyFileToFolders Include="Shader\PrepareLights.hlsl">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <ProjectGuid>{1296E4A0-1F08-493D-8453-CD5EF53FF812}</ProjectGuid>

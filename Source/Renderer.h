@@ -7,6 +7,7 @@ struct Renderer
 	struct Runtime : RuntimeBase<Runtime>
 	{
 		Shader									mRayQueryShader				= Shader().FileName("Shader/RayQuery.hlsl").CSName("RayQueryCS");
+		Shader									mPrepareLightsShader		= Shader().FileName("Shader/PrepareLights.hlsl").CSName("PrepareLightsCS");
 		Shader									mClearShader				= Shader().FileName("Shader/Composite.hlsl").CSName("ClearCS");
 		Shader									mDiffTexture2DShader		= Shader().FileName("Shader/DiffTexture.hlsl").CSName("DiffTexture2DShader");
 		Shader									mDiffTexture3DShader		= Shader().FileName("Shader/DiffTexture.hlsl").CSName("DiffTexture3DShader");

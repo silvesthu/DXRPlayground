@@ -785,6 +785,12 @@ bool Scene::LoadGLTF(const std::string& inFilename, SceneContent& ioSceneContent
 					.mIndexCount = index_count
 				};
 				ioSceneContent.mInstanceDatas.push_back(instance_data);
+
+				if (glm::compMax(instance_data.mEmission) > 0.0f)
+				{
+					ioSceneContent.mTriangleLightsInfos.push_back({ static_cast<uint>(ioSceneContent.mInstanceDatas.size()) - 1, ioSceneContent.mTriangleLightsCount, });
+					ioSceneContent.mTriangleLightsCount += index_count / kIndexCountPerTriangle;
+				}
 			}
 
 			return matrix;
@@ -838,7 +844,7 @@ void Scene::Load(const std::string_view& inFilePath, const glm::mat4x4& inTransf
 	InitializeTextures();
 	InitializeBuffers();
 	InitializeAccelerationStructures();
-	InitializeShaderResourceViews();
+	InitializeViews();
 }
 
 void Scene::Unload()
@@ -917,63 +923,65 @@ void Scene::InitializeTextures()
 
 void Scene::InitializeBuffers()
 {
-	D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(0);
-	D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
+	D3D12_RESOURCE_DESC desc_upload = gGetBufferResourceDesc(0);
+	D3D12_RESOURCE_DESC desc_uav = gGetUAVResourceDesc(0);
+	D3D12_HEAP_PROPERTIES props_upload = gGetUploadHeapProperties();
+	D3D12_HEAP_PROPERTIES props_default = gGetDefaultHeapProperties();
 
 	gAssert(mSceneContent.mIndices.size() <= size_t(1) + std::numeric_limits<IndexType>::max());
 
 	{
-		desc.Width = sizeof(IndexType) * mSceneContent.mIndices.size();
-		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mBuffers.mIndices)));
+		desc_upload.Width = sizeof(IndexType) * mSceneContent.mIndices.size();
+		gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mBuffers.mIndices)));
 		gSetName(mBuffers.mIndices, "Scene.", "mBuffers.mIndices", "");
 
 		uint8_t* pData = nullptr;
 		mBuffers.mIndices->Map(0, nullptr, reinterpret_cast<void**>(&pData));
-		memcpy(pData, mSceneContent.mIndices.data(), desc.Width);
+		memcpy(pData, mSceneContent.mIndices.data(), desc_upload.Width);
 		mBuffers.mIndices->Unmap(0, nullptr);
 	}
 
 	{
-		desc.Width = sizeof(VertexType) * mSceneContent.mVertices.size();
-		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mBuffers.mVertices)));
+		desc_upload.Width = sizeof(VertexType) * mSceneContent.mVertices.size();
+		gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mBuffers.mVertices)));
 		gSetName(mBuffers.mVertices, "Scene.", "mBuffers.mVertices", "");
 
 		uint8_t* pData = nullptr;
 		mBuffers.mVertices->Map(0, nullptr, reinterpret_cast<void**>(&pData));
-		memcpy(pData, mSceneContent.mVertices.data(), desc.Width);
+		memcpy(pData, mSceneContent.mVertices.data(), desc_upload.Width);
 		mBuffers.mVertices->Unmap(0, nullptr);
 	}
 
 	{
-		desc.Width = sizeof(NormalType) * mSceneContent.mNormals.size();
-		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mBuffers.mNormals)));
+		desc_upload.Width = sizeof(NormalType) * mSceneContent.mNormals.size();
+		gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mBuffers.mNormals)));
 		gSetName(mBuffers.mNormals, "Scene.", "mBuffers.mNormals", "");
 
 		uint8_t* pData = nullptr;
 		mBuffers.mNormals->Map(0, nullptr, reinterpret_cast<void**>(&pData));
-		memcpy(pData, mSceneContent.mNormals.data(), desc.Width);
+		memcpy(pData, mSceneContent.mNormals.data(), desc_upload.Width);
 		mBuffers.mNormals->Unmap(0, nullptr);
 	}
 
 	{
-		desc.Width = sizeof(UVType) * mSceneContent.mUVs.size();
-		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mBuffers.mUVs)));
+		desc_upload.Width = sizeof(UVType) * mSceneContent.mUVs.size();
+		gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mBuffers.mUVs)));
 		gSetName(mBuffers.mUVs, "Scene.", "mBuffers.mUVs", "");
 
 		uint8_t* pData = nullptr;
 		mBuffers.mUVs->Map(0, nullptr, reinterpret_cast<void**>(&pData));
-		memcpy(pData, mSceneContent.mUVs.data(), desc.Width);
+		memcpy(pData, mSceneContent.mUVs.data(), desc_upload.Width);
 		mBuffers.mUVs->Unmap(0, nullptr);
 	}
 
 	{
-		desc.Width = sizeof(InstanceData) * mSceneContent.mInstanceDatas.size();
-		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mBuffers.mInstanceDatas)));
+		desc_upload.Width = sizeof(InstanceData) * mSceneContent.mInstanceDatas.size();
+		gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mBuffers.mInstanceDatas)));
 		gSetName(mBuffers.mInstanceDatas, "Scene.", "mBuffers.mInstanceDatas", "");
 
 		uint8_t* pData = nullptr;
 		mBuffers.mInstanceDatas->Map(0, nullptr, reinterpret_cast<void**>(&pData));
-		memcpy(pData, mSceneContent.mInstanceDatas.data(), desc.Width);
+		memcpy(pData, mSceneContent.mInstanceDatas.data(), desc_upload.Width);
 		mBuffers.mInstanceDatas->Unmap(0, nullptr);
 	}
 
@@ -981,14 +989,22 @@ void Scene::InitializeBuffers()
 		std::vector<Light> dummy; dummy.push_back({}); // Avoid zero byte buffer
 		std::vector<Light>& lights = mSceneContent.mLights.empty() ? dummy : mSceneContent.mLights;
 
-		desc.Width = sizeof(Light) * lights.size();
-		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mBuffers.mLights)));
+		desc_upload.Width = sizeof(Light) * lights.size();
+		gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mBuffers.mLights)));
 		gSetName(mBuffers.mLights, "Scene.", "mBuffers.mLights", "");
 
 		uint8_t* pData = nullptr;
 		mBuffers.mLights->Map(0, nullptr, reinterpret_cast<void**>(&pData));
-		memcpy(pData, lights.data(), desc.Width);
+		memcpy(pData, lights.data(), desc_upload.Width);
 		mBuffers.mLights->Unmap(0, nullptr);
+	}
+
+	{
+		desc_uav.Width = sizeof(EncodedTriangleLight) * gMax(1u, mSceneContent.mTriangleLightsCount); // Avoid zero byte buffer
+		gValidate(gDevice->CreateCommittedResource(&props_default, D3D12_HEAP_FLAG_NONE, &desc_uav, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&mBuffers.mEncodedTriangleLights)));
+		gSetName(mBuffers.mEncodedTriangleLights, "Scene.", "mBuffers.mEncodedTriangleLights", "");
+
+		// Write, Read on GPU
 	}
 }
 
@@ -1018,37 +1034,52 @@ void Scene::InitializeAccelerationStructures()
 	mTLAS->Initialize("Default", instance_descs);
 }
 
-void Scene::InitializeShaderResourceViews()
+void Scene::InitializeViews()
 {
 	auto create_acceleration_structure_SRV = [](ID3D12Resource* inResource, ViewDescriptorIndex inViewDescriptorIndex)
-		{
-			D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
-			desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			desc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
-			desc.RaytracingAccelerationStructure.Location = inResource->GetGPUVirtualAddress();
+	{
+		D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
+		desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		desc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
+		desc.RaytracingAccelerationStructure.Location = inResource->GetGPUVirtualAddress();
 
-			for (int i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
-				gDevice->CreateShaderResourceView(nullptr, &desc, gFrameContexts[i].mViewDescriptorHeap.GetHandle(inViewDescriptorIndex));
-		};
+		for (int i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
+			gDevice->CreateShaderResourceView(nullptr, &desc, gFrameContexts[i].mViewDescriptorHeap.GetHandle(inViewDescriptorIndex));
+	};
 	create_acceleration_structure_SRV(mTLAS->GetResource(), ViewDescriptorIndex::RaytraceTLASSRV);
 
 	auto create_buffer_SRV = [](ID3D12Resource* inResource, int inStride, ViewDescriptorIndex inViewDescriptorIndex)
-		{
-			D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
-			D3D12_RESOURCE_DESC resource_desc = inResource->GetDesc();
-			desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-			desc.Buffer.NumElements = static_cast<UINT>(resource_desc.Width / inStride);
-			desc.Buffer.StructureByteStride = inStride;
-			desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+	{
+		D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
+		D3D12_RESOURCE_DESC resource_desc = inResource->GetDesc();
+		desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+		desc.Buffer.NumElements = static_cast<UINT>(resource_desc.Width / inStride);
+		desc.Buffer.StructureByteStride = inStride;
+		desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
 
-			for (int i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
-				gDevice->CreateShaderResourceView(inResource, &desc, gFrameContexts[i].mViewDescriptorHeap.GetHandle(inViewDescriptorIndex));
-		};
+		for (int i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
+			gDevice->CreateShaderResourceView(inResource, &desc, gFrameContexts[i].mViewDescriptorHeap.GetHandle(inViewDescriptorIndex));
+	};
 	create_buffer_SRV(mBuffers.mInstanceDatas.Get(), sizeof(InstanceData), ViewDescriptorIndex::RaytraceInstanceDataSRV);
 	create_buffer_SRV(mBuffers.mIndices.Get(), sizeof(IndexType), ViewDescriptorIndex::RaytraceIndicesSRV);
 	create_buffer_SRV(mBuffers.mVertices.Get(), sizeof(VertexType), ViewDescriptorIndex::RaytraceVerticesSRV);
 	create_buffer_SRV(mBuffers.mNormals.Get(), sizeof(NormalType), ViewDescriptorIndex::RaytraceNormalsSRV);
 	create_buffer_SRV(mBuffers.mUVs.Get(), sizeof(UVType), ViewDescriptorIndex::RaytraceUVsSRV);
 	create_buffer_SRV(mBuffers.mLights.Get(), sizeof(Light), ViewDescriptorIndex::RaytraceLightsSRV);
+
+	auto create_buffer_UAV = [](ID3D12Resource* inResource, int inStride, ViewDescriptorIndex inViewDescriptorIndex)
+	{
+		D3D12_UNORDERED_ACCESS_VIEW_DESC desc = {};
+		desc.Format = DXGI_FORMAT_UNKNOWN;
+		desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+		desc.Buffer.NumElements = 1;
+		desc.Buffer.StructureByteStride = inStride;
+		desc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
+
+		for (int i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
+			gDevice->CreateUnorderedAccessView(inResource, nullptr, &desc, gFrameContexts[i].mViewDescriptorHeap.GetHandle(inViewDescriptorIndex));
+	};
+
+	create_buffer_UAV(mBuffers.mEncodedTriangleLights.Get(), sizeof(EncodedTriangleLight), ViewDescriptorIndex::RaytraceEncodedTriangleLightsUAV);
 }

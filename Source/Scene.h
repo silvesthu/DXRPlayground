@@ -40,20 +40,28 @@ using UVType = glm::vec2;
 
 struct SceneContent
 {
-	std::vector<IndexType>							mIndices;
-	std::vector<VertexType>							mVertices;
-	std::vector<NormalType>							mNormals;
-	std::vector<UVType>								mUVs;
+	std::vector<IndexType>						mIndices;
+	std::vector<VertexType>						mVertices;
+	std::vector<NormalType>						mNormals;
+	std::vector<UVType>							mUVs;
 
-	std::vector<InstanceInfo>						mInstanceInfos;
-	std::vector<InstanceData>						mInstanceDatas;
-	std::vector<Light>								mLights;
+	std::vector<InstanceInfo>					mInstanceInfos;
+	std::vector<InstanceData>					mInstanceDatas;
+	std::vector<Light>							mLights;
 
-	std::optional<glm::mat4x4>						mCameraTransform;
-	std::optional<float>							mFov;
+	struct TriangleLightsInfo
+	{
+		uint									mInstanceDataIndex;
+		uint									mTriangleLightsOffset;
+	};
+	std::vector<TriangleLightsInfo>				mTriangleLightsInfos;
+	uint										mTriangleLightsCount = 0;
 
-	std::optional<AtmosphereMode>					mAtmosphereMode;
-	glm::vec4										mBackgroundColor = glm::vec4(0.0f);
+	std::optional<glm::mat4x4>					mCameraTransform;
+	std::optional<float>						mFov;
+
+	std::optional<AtmosphereMode>				mAtmosphereMode;
+	glm::vec4									mBackgroundColor = glm::vec4(0.0f);
 };
 
 class TLAS final
@@ -105,7 +113,7 @@ private:
 	void InitializeTextures();
 	void InitializeBuffers();
 	void InitializeAccelerationStructures();
-	void InitializeShaderResourceViews();
+	void InitializeViews();
 
 	struct Primitives
 	{
@@ -129,6 +137,7 @@ private:
 
 		ComPtr<ID3D12Resource>				mInstanceDatas;
 		ComPtr<ID3D12Resource>				mLights;
+		ComPtr<ID3D12Resource>				mEncodedTriangleLights;
 	};
 	Buffers									mBuffers;
 
