@@ -93,10 +93,6 @@ float3 in_scatter(float3 o, float3 dir, float2 e, float3 l)
 
 void GetSkyRadiance(out float3 sky_radiance, out float3 transmittance_to_top)
 {
-#ifndef AtmosphereMode_Raymarch
-	return;
-#endif // AtmosphereMode_Raymarch
-
 	sky_radiance = 0;
 	transmittance_to_top = 1;
 

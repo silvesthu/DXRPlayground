@@ -14,7 +14,7 @@ void RayGeneration()
 
 	RayDesc ray;
 	ray.Origin									= mConstants.CameraPosition().xyz;
-	ray.Direction								= normalize(mConstants.CameraFront().xyz + mConstants.CameraRight().xyz * mConstants.mCameraRightExtend * ndc_xy.x + mConstants.CameraUp().xyz * mConstants.mCameraUpExtend * ndc_xy.y);
+	ray.Direction								= normalize(mConstants.CameraFront().xyz + mConstants.CameraLeft().xyz * mConstants.mCameraLeftExtend * ndc_xy.x + mConstants.CameraUp().xyz * mConstants.mCameraUpExtend * ndc_xy.y);
 	ray.TMin									= 0.001;
 	ray.TMax									= 100000;
 

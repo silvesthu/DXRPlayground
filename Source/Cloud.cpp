@@ -65,8 +65,15 @@ void Cloud::ImGuiShowMenus()
 			if (i != 0)
 				ImGui::SameLine();
 			if (ImGui::RadioButton(name.data(), (int)gCloud.mProfile.mMode == i))
+			{
 				gCloud.mProfile.mMode = static_cast<CloudMode>(i);
+				if (!gCloud.mProfile.mDynamicModeSwitch)
+					gRenderer.mReloadShader = true;
+			}
 		}
+
+		if (ImGui::Checkbox("Dynamic Mode Switch", &gCloud.mProfile.mDynamicModeSwitch))
+			gRenderer.mReloadShader = true;
 
 		ImGui::SliderFloat3("Wind", &gCloud.mProfile.mWind[0], 0.0f, 100.0f);
 

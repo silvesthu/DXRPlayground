@@ -33,13 +33,12 @@ ComPtr<ID3D12Resource>				gConstantBuffer = nullptr;
 ComPtr<ID3D12Resource>				gDebugBuffer = nullptr;
 
 // Frame
-FrameContext						gFrameContexts[NUM_FRAMES_IN_FLIGHT] = {};
+FrameContext						gFrameContexts[kFrameInFlightCount] = {};
 uint32_t							gFrameIndex = 0;
-Constants							gConstants = {};
 
-// Capture
-Texture*							gDumpTexture = nullptr;
-Texture								gDumpTextureProxy = {};
+// CPU
+CPUContext							gCPUContext;
+Constants							gConstants = {};
 
 int Texture::GetPixelSize() const
 {
@@ -53,16 +52,35 @@ uint64_t Texture::GetSubresourceSize() const
 
 void Texture::Initialize()
 {
-	D3D12_RESOURCE_DESC resource_desc = gGetTextureResourceDesc(mWidth, mHeight, mDepth, mFormat);
-	D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
+	bool has_uav								= mUAVIndex != ViewDescriptorIndex::Invalid;
+	bool has_rtv								= mRTVIndex != RTVDescriptorIndex::Invalid && mRTVIndex != RTVDescriptorIndex::BackBuffer0;
+	bool has_dsv								= mDSVIndex != DSVDescriptorIndex::Invalid;
 
-	gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mResource)));
-	gSetName(mResource, "Texture.", mName, "");
+	D3D12_RESOURCE_DESC resource_desc			= {};
+	resource_desc.DepthOrArraySize				= (UINT16)mDepth;
+	resource_desc.Dimension						= mDepth == 1 ? D3D12_RESOURCE_DIMENSION_TEXTURE2D : D3D12_RESOURCE_DIMENSION_TEXTURE3D;
+	resource_desc.Format						= mFormat;
+	resource_desc.Flags							= (has_uav ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS : D3D12_RESOURCE_FLAG_NONE) | 
+												  (has_rtv ? D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET : D3D12_RESOURCE_FLAG_NONE) |
+												  (has_dsv ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_NONE);
+	resource_desc.Width							= mWidth;
+	resource_desc.Height						= mHeight;
+	resource_desc.Layout						= D3D12_TEXTURE_LAYOUT_UNKNOWN;
+	resource_desc.MipLevels						= 1;
+	resource_desc.SampleDesc.Count				= 1;
+
+	D3D12_HEAP_PROPERTIES props					= gGetDefaultHeapProperties();
+
+	if (mRTVIndex != RTVDescriptorIndex::BackBuffer0)
+	{
+		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mResource)));
+		gSetName(mResource, "Texture.", mName, "");
+	}
 
 	// SRV
 	gAssert(mSRVIndex != ViewDescriptorIndex::Invalid); // Need SRV for visualization
 	{
-		for (int i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
+		for (int i = 0; i < kFrameInFlightCount; i++)
 		{
 			D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
 			desc.Format = mSRVFormat != DXGI_FORMAT_UNKNOWN ? mSRVFormat : mFormat;
@@ -75,9 +93,9 @@ void Texture::Initialize()
 	}
 
 	// UAV
-	if (mUAVIndex != ViewDescriptorIndex::Invalid)
+	if (has_uav)
 	{
-		for (int i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
+		for (int i = 0; i < kFrameInFlightCount; i++)
 		{
 			D3D12_UNORDERED_ACCESS_VIEW_DESC desc = {};
 			if (resource_desc.DepthOrArraySize == 1)
@@ -95,6 +113,36 @@ void Texture::Initialize()
 			}
 			gDevice->CreateUnorderedAccessView(mResource.Get(), nullptr, &desc, gFrameContexts[i].mViewDescriptorHeap.GetHandle(mUAVIndex));
 		}
+	}
+
+	// RTV
+	if (has_rtv)
+	{
+		D3D12_RENDER_TARGET_VIEW_DESC desc = {};
+		desc.Format = mFormat;
+		if (resource_desc.DepthOrArraySize == 1)
+		{
+			desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+			desc.Texture2D.MipSlice = 0;
+			desc.Texture2D.PlaneSlice = 0;
+		}
+		else
+		{
+			desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE3D;
+			desc.Texture3D.MipSlice = 0;
+			desc.Texture3D.FirstWSlice = 0;
+			desc.Texture3D.WSize = resource_desc.DepthOrArraySize;
+		}
+		gDevice->CreateRenderTargetView(mResource.Get(), &desc, gCPUContext.mRTVDescriptorHeap.GetHandle(mRTVIndex));
+	}
+
+	// DSV
+	if (has_dsv)
+	{
+		D3D12_DEPTH_STENCIL_VIEW_DESC desc = {};
+		desc.Format = mFormat;
+		desc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+		gDevice->CreateDepthStencilView(mResource.Get(), &desc, gCPUContext.mDSVDescriptorHeap.GetHandle(mDSVIndex));
 	}
 
 	// UIScale
@@ -245,7 +293,7 @@ namespace ImGui
 					ImGui::Text(sTexture->mName.c_str());
 
 					if (ImGui::Button("Dump"))
-						gDumpTexture = sTexture;
+						gCPUContext.mDumpTextureRef = sTexture;
 
 					ImGui::Separator();
 

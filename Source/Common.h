@@ -235,15 +235,6 @@ inline void gSetName(ComPtr<T>& inObject, std::string_view inPrefix, std::string
 	gSetName(inObject, gToWString(inPrefix), gToWString(inName), gToWString(inSuffix));
 }
 
-// System
-enum
-{
-	NUM_FRAMES_IN_FLIGHT = 2,
-	NUM_BACK_BUFFERS = 2,
-
-	NUM_TIMESTAMP_COUNT = 1024,
-};
-
 extern ID3D12Device7*						gDevice;
 extern ID3D12DescriptorHeap* 				gRTVDescriptorHeap;
 extern ID3D12CommandQueue* 					gCommandQueue;
@@ -318,15 +309,17 @@ struct DescriptorHeap
 
 		Reset();
 
+		bool shader_visible = mType == D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV || mType == D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER;
+
 		D3D12_DESCRIPTOR_HEAP_DESC desc = {};
 		desc.NumDescriptors = mCount;
 		desc.Type = mType;
-		desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+		desc.Flags = shader_visible ?  D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 		gValidate(gDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&mHeap)));
 
 		mIncrementSize = gDevice->GetDescriptorHandleIncrementSize(mType);
 		mCPUHandleStart = mHeap->GetCPUDescriptorHandleForHeapStart();
-		mGPUHandleStart = mHeap->GetGPUDescriptorHandleForHeapStart();
+		mGPUHandleStart = shader_visible ? mHeap->GetGPUDescriptorHandleForHeapStart() : D3D12_GPU_DESCRIPTOR_HANDLE { 0 };
 
 		gAssert((mIncrementSize & ImGui_ImplDX12_ImTextureID_Mask_3D) == 0);
 		gAssert((mGPUHandleStart.ptr & ImGui_ImplDX12_ImTextureID_Mask_3D) == 0);
@@ -369,6 +362,8 @@ struct Shader
 	SHADER_MEMBER(const wchar_t*, ClosestHitName, nullptr);
 	SHADER_MEMBER(const wchar_t*, IntersectionName, nullptr);
 	SHADER_MEMBER(const Shader*, RootSignatureReference, nullptr);
+	SHADER_MEMBER(DXGI_FORMAT, RTVFormat, DXGI_FORMAT_UNKNOWN);
+	SHADER_MEMBER(DXGI_FORMAT, DSVFormat, DXGI_FORMAT_UNKNOWN);
 	const wchar_t* HitName() const { return mAnyHitName != nullptr ? mAnyHitName : (mClosestHitName != nullptr ? mClosestHitName : mIntersectionName); }
 	const std::wstring HitGroupName() const { if (HitName() == nullptr) return L""; std::wstring name = HitName(); name += L"Group"; return name; }
 
@@ -406,6 +401,8 @@ struct Texture
 	TEXTURE_MEMBER(ViewDescriptorIndex,		UAVIndex,		ViewDescriptorIndex::Invalid);
 	TEXTURE_MEMBER(ViewDescriptorIndex,		SRVIndex,		ViewDescriptorIndex::Invalid);
 	TEXTURE_MEMBER(DXGI_FORMAT,				SRVFormat,		DXGI_FORMAT_UNKNOWN);
+	TEXTURE_MEMBER(RTVDescriptorIndex,		RTVIndex,		RTVDescriptorIndex::Invalid);
+	TEXTURE_MEMBER(DSVDescriptorIndex,		DSVIndex,		DSVDescriptorIndex::Invalid);
 
 	Texture& Dimension(glm::uvec3 dimension) 
 	{
@@ -500,11 +497,26 @@ struct FrameContext
 };
 extern FrameContext							gFrameContexts[];
 extern uint32_t								gFrameIndex;
-inline FrameContext&						gGetFrameContext() { return gFrameContexts[gFrameIndex % NUM_FRAMES_IN_FLIGHT]; }
+inline FrameContext&						gGetFrameContext() { return gFrameContexts[gFrameIndex % kFrameInFlightCount]; }
 
-extern Texture*								gDumpTexture;
-extern Texture								gDumpTextureProxy;
+struct CPUContext
+{
+	DescriptorHeap<RTVDescriptorIndex>		mRTVDescriptorHeap{ .mType = D3D12_DESCRIPTOR_HEAP_TYPE_RTV, .mCount = 128 };
+	DescriptorHeap<DSVDescriptorIndex>		mDSVDescriptorHeap{ .mType = D3D12_DESCRIPTOR_HEAP_TYPE_DSV, .mCount = 128 };
 
+	Texture*								mDumpTextureRef = nullptr;
+	Texture									mDumpTextureProxy = {};
+
+	void Reset()
+	{
+		mRTVDescriptorHeap.Reset();
+		mDSVDescriptorHeap.Reset();
+
+		mDumpTextureRef = nullptr;
+		mDumpTextureProxy = {};
+	}
+};
+extern CPUContext							gCPUContext;
 extern Constants							gConstants;
 
 inline void gBarrierTransition(ID3D12GraphicsCommandList4* inCommandList, ID3D12Resource* inResource, D3D12_RESOURCE_STATES inBeforeState, D3D12_RESOURCE_STATES inAfterState)
@@ -588,21 +600,6 @@ inline D3D12_RESOURCE_DESC gGetBufferResourceDesc(UINT64 width)
 	desc.MipLevels = 1;
 	desc.SampleDesc.Count = 1;
 	desc.SampleDesc.Quality = 0;
-	return desc;
-}
-
-inline D3D12_RESOURCE_DESC gGetTextureResourceDesc(UINT width, UINT height, UINT depth, DXGI_FORMAT format)
-{
-	D3D12_RESOURCE_DESC desc = {};
-	desc.DepthOrArraySize = (UINT16)depth;
-	desc.Dimension = depth == 1 ? D3D12_RESOURCE_DIMENSION_TEXTURE2D : D3D12_RESOURCE_DIMENSION_TEXTURE3D;
-	desc.Format = format;
-	desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-	desc.Width = width;
-	desc.Height = height;
-	desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-	desc.MipLevels = 1;
-	desc.SampleDesc.Count = 1;
 	return desc;
 }
 

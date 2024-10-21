@@ -1,5 +1,16 @@
 #include "Shared.h"
 
+AtmosphereMode GetAtmosphereMode()
+{
+#ifdef kAtmosphereMode
+	// Static
+	return kAtmosphereMode;
+#else
+	// Dynamic
+	return mConstants.mAtmosphere.mMode;
+#endif // kAtmosphereMode
+}
+
 // Altitude -> Density
 float GetLayerDensity(DensityProfileLayer layer, float altitude)
 {
@@ -139,9 +150,9 @@ void GetSunAndSkyIrradiance(float3 inHitPosition, float3 inNormal, out float3 ou
 	outSunIrradiance = 0;
 	outSkyIrradiance = 0;
 
-	switch (mConstants.mAtmosphere.mMode)
+	switch (GetAtmosphereMode())
 	{
-    case AtmosphereMode::ConstantColor:				break; // Not supported
+	case AtmosphereMode::ConstantColor:				break; // Not supported
 	case AtmosphereMode::Raymarch:					break; // Not supported
 	case AtmosphereMode::Bruneton17: 				AtmosphereIntegration::Bruneton17::GetSunAndSkyIrradiance(inHitPosition, inNormal, outSunIrradiance, outSkyIrradiance); break;
 	case AtmosphereMode::Hillaire20: 				break; // [TODO]
@@ -154,7 +165,7 @@ void GetSkyRadiance(out float3 outSkyRadiance, out float3 outTransmittanceToTop)
 	outSkyRadiance = 0;
 	outTransmittanceToTop = 1;
 
-	switch (mConstants.mAtmosphere.mMode)
+	switch (GetAtmosphereMode())
 	{
 	case AtmosphereMode::ConstantColor:				outSkyRadiance = mConstants.mAtmosphere.mConstantColor.xyz; break;
 	case AtmosphereMode::Wilkie21:					AtmosphereIntegration::Wilkie21::GetSkyRadiance(outSkyRadiance, outTransmittanceToTop); break;
@@ -174,14 +185,14 @@ void GetSkyLuminanceToPoint(out float3 outSkyLuminance, out float3 outTransmitta
 		return;
 
 	float3 radiance = 0;
-    switch (mConstants.mAtmosphere.mMode)
-    {
-    case AtmosphereMode::ConstantColor:				break; // Not supported
+	switch (GetAtmosphereMode())
+	{
+	case AtmosphereMode::ConstantColor:				break; // Not supported
 	case AtmosphereMode::Raymarch:					break; // Not supported
-    case AtmosphereMode::Bruneton17: 				AtmosphereIntegration::Bruneton17::GetSkyRadianceToPoint(radiance, outTransmittance); break;
-    case AtmosphereMode::Hillaire20: 				break; // [TODO]
-    default: break;
-    }
+	case AtmosphereMode::Bruneton17: 				AtmosphereIntegration::Bruneton17::GetSkyRadianceToPoint(radiance, outTransmittance); break;
+	case AtmosphereMode::Hillaire20: 				break; // [TODO]
+	default: break;
+	}
 
 	outSkyLuminance = radiance * kSolarKW2LM * kPreExposure * mConstants.mSolarLuminanceScale;
 }
@@ -209,7 +220,7 @@ float3 GetSkyLuminance()
 	}
 
 	// Sun
-	if (mConstants.mAtmosphere.mMode != AtmosphereMode::ConstantColor &&
+	if (GetAtmosphereMode() != AtmosphereMode::ConstantColor &&
 		dot(PlanetRayDirection(), GetSunDirection()) > cos(mConstants.mAtmosphere.mSunAngularRadius))
 	{
 		// https://en.wikipedia.org/wiki/Solid_angle#Celestial_objects

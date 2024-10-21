@@ -4,6 +4,9 @@ struct PixelContext
 {
 	uint3	mPixelIndex;
 	uint3	mPixelTotal;
+
+	bool	mOutputDepth;
+	float	mDepth;
 };
 
 // [TODO] Remove these

@@ -283,6 +283,7 @@ float3 F_Conductor_Mitsuba(float3 inEta, float3 inK, float inCosThetaI)
 
 static float3       sDebugModeValue = 0;
 static float4       sDebugValue = 0;
+static bool         sDebugValueUpdated = false;
 static uint3        sDebugDispatchRaysIndex;
 static uint3        sDebugDispatchRaysDimensions;
 
@@ -307,6 +308,24 @@ void DebugValue(PixelDebugMode inPixelDebugMode, uint inRecursionDepth, float3 i
             BufferDebugUAV[0].mPixelValueArray[inRecursionDepth] = float4(inValue, 1.0); // 1.0 indicate value is written
 
         if (mConstants.mPixelDebugRecursion == inRecursionDepth)
+        {
             sDebugValue = float4(inValue, 1.0); // fill alpha to show on ImGui
+            sDebugValueUpdated = true;
+        }
     }
+}
+
+void DebugValue(float3 inValue)
+{
+    sDebugValue = float4(inValue, 1.0); // fill alpha to show on ImGui
+    sDebugValueUpdated = true;
+}
+
+// Generate screen space triangle
+// From https://anteru.net/blog/2012/minimal-setup-screen-space-quads-no-buffers-layouts-required/
+float4 ScreenspaceTriangleVS(uint id : SV_VertexID) : SV_POSITION
+{
+    float x = float((id & 2) << 1) - 1.0;
+    float y = 1.0 - float((id & 1) << 2);
+    return float4(x, y, 0, 1);
 }

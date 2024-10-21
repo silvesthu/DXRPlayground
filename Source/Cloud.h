@@ -9,16 +9,17 @@ class Cloud
 public:
 	struct Profile
 	{
-		CloudMode mMode = CloudMode::None;
-		glm::vec3 mWind = glm::vec3(0.0f, 0.0f, 0.0f);
+		CloudMode mMode											= CloudMode::None;
+		bool mDynamicModeSwitch									= false;
+		glm::vec3 mWind											= glm::vec3(0.0f, 0.0f, 0.0f);
 
 		struct RaymarchReference
 		{
 			static void Default(Profile& profile)
 			{
-				profile.mRaymarch.mSampleCount = 80;
-				profile.mRaymarch.mLightSampleCount = 16;
-				profile.mRaymarch.mLightSampleLength = 0.01f; // km
+				profile.mRaymarch.mSampleCount					= 80;
+				profile.mRaymarch.mLightSampleCount				= 16;
+				profile.mRaymarch.mLightSampleLength			= 0.01f; // km
 			}
 		};
 		CloudConstants::RayMarch mRaymarch;
@@ -28,8 +29,8 @@ public:
 			static void Schneider15(Profile& profile)
 			{
 				// page 73
-				profile.mGeometry.mStrato = 1.5; // km
-				profile.mGeometry.mCirro = 4.0; // km
+				profile.mGeometry.mStrato						= 1.5; // km
+				profile.mGeometry.mCirro						= 4.0; // km
 			}
 		};
 		CloudConstants::Geometry mGeometry;
@@ -38,9 +39,9 @@ public:
 		{
 			static void Default(Profile& profile)
 			{
-				profile.mShapeNoise.mFrequency = 0.02f;
-				profile.mShapeNoise.mPower = 60.0f;
-				profile.mShapeNoise.mScale = 1.0f;
+				profile.mShapeNoise.mFrequency					= 0.02f;
+				profile.mShapeNoise.mPower						= 60.0f;
+				profile.mShapeNoise.mScale						= 1.0f;
 			}
 		};
 		CloudConstants::ShapeNoise mShapeNoise;

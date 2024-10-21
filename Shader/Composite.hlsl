@@ -73,15 +73,6 @@ float3 RemoveSRGBCurve( float3 x )
     return select(x < 0.04045, x / 12.92, pow( (x + 0.055) / 1.055, 2.4 ));
 }
 
-// Generate screen space triangle
-// From https://anteru.net/blog/2012/minimal-setup-screen-space-quads-no-buffers-layouts-required/
-float4 ScreenspaceTriangleVS(uint id : SV_VertexID) : SV_POSITION
-{
-	float x = float ((id & 2) << 1) - 1.0;
-	float y = 1.0 - float ((id & 1) << 2);
-	return float4 (x, y, 0, 1);
-}
-
 [RootSignature(ROOT_SIGNATURE_COMMON)]
 float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 {

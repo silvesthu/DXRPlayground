@@ -426,6 +426,16 @@ ComPtr<IDxcBlob> gCompileShader(const char* inFilename, const char* inEntryPoint
 	shader_stream << shader_file.rdbuf();
 	std::string shader_string = shader_stream.str();
 
+	{
+		// AtmosphereMode
+		if (!gAtmosphere.mProfile.mDynamicModeSwitch)
+			shader_string = std::format("#define k{} {}::{}\n", nameof::nameof_enum_type<AtmosphereMode>(), nameof::nameof_enum_type<AtmosphereMode>(), nameof::nameof_enum(gAtmosphere.mProfile.mMode)) + shader_string;
+
+		// CloudMode
+		if (!gCloud.mProfile.mDynamicModeSwitch)
+			shader_string = std::format("#define k{} {}::{}\n", nameof::nameof_enum_type<CloudMode>(), nameof::nameof_enum_type<CloudMode>(), nameof::nameof_enum(gCloud.mProfile.mMode)) + shader_string;
+	}
+
 	IDxcBlobEncoding* blob_encoding;
 	gValidate(DxcUtils->CreateBlobFromPinned(shader_string.c_str(), static_cast<uint32_t>(shader_string.length()), CP_UTF8, &blob_encoding));
 
@@ -558,12 +568,14 @@ bool gCreateVSPSPipelineState(const char* inShaderFileName, const char* inVSName
 	pipeline_state_desc.pRootSignature = ioShader.mData.mRootSignature.Get();
 	pipeline_state_desc.RasterizerState = rasterizer_desc;
 	pipeline_state_desc.BlendState = blend_desc;
-	pipeline_state_desc.DepthStencilState.DepthEnable = FALSE;
-	pipeline_state_desc.DepthStencilState.StencilEnable = FALSE;
+	pipeline_state_desc.DepthStencilState.DepthEnable = TRUE;
+	pipeline_state_desc.DepthStencilState.DepthWriteMask = ioShader.mDSVFormat != DXGI_FORMAT_UNKNOWN ? D3D12_DEPTH_WRITE_MASK_ALL : D3D12_DEPTH_WRITE_MASK_ZERO;
+	pipeline_state_desc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_ALWAYS;
 	pipeline_state_desc.SampleMask = UINT_MAX;
 	pipeline_state_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-	pipeline_state_desc.NumRenderTargets = 1;
-	pipeline_state_desc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+	pipeline_state_desc.NumRenderTargets = ioShader.mRTVFormat != DXGI_FORMAT_UNKNOWN ? 1 : 0;
+	pipeline_state_desc.RTVFormats[0] = ioShader.mRTVFormat;
+	pipeline_state_desc.DSVFormat = ioShader.mDSVFormat;
 	pipeline_state_desc.SampleDesc.Count = 1;
 
 	if (FAILED(gDevice->CreateGraphicsPipelineState(&pipeline_state_desc, IID_PPV_ARGS(&ioShader.mData.mPipelineState))))

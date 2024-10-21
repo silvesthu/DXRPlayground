@@ -37,16 +37,23 @@ void Renderer::ImGuiShowTextures()
 
 void Renderer::InitializeScreenSizeTextures()
 {
-	for (int i = 0; i < NUM_BACK_BUFFERS; i++)
-	{
-		gSwapChain->GetBuffer(i, IID_PPV_ARGS(mRuntime.mBackBuffers[i].GetAddressOf()));
-		std::wstring name = L"BackBuffer_" + std::to_wstring(i);
-		mRuntime.mBackBuffers[i]->SetName(name.c_str());
-		gDevice->CreateRenderTargetView(mRuntime.mBackBuffers[i].Get(), nullptr, mRuntime.mBufferBufferRTVs[i]);
-	}
-
 	DXGI_SWAP_CHAIN_DESC1 swap_chain_desc;
 	gSwapChain->GetDesc1(&swap_chain_desc);
+
+	for (int i = 0; i < kFrameInFlightCount; i++)
+	{
+		gSwapChain->GetBuffer(i, IID_PPV_ARGS(mRuntime.mBackBuffers[i].mResource.GetAddressOf()));
+		std::wstring name = gToWString(mRuntime.mBackBuffers[i].mName + gToString(i));
+		mRuntime.mBackBuffers[i].mResource->SetName(name.c_str());
+
+		mRuntime.mBackBuffers[i].mWidth = swap_chain_desc.Width;
+		mRuntime.mBackBuffers[i].mHeight = swap_chain_desc.Height;
+		mRuntime.mBackBuffers[i].mFormat = swap_chain_desc.Format;
+
+		RTVDescriptorIndex index = RTVDescriptorIndex((uint)mRuntime.mBackBuffers[i].mRTVIndex);
+		D3D12_CPU_DESCRIPTOR_HANDLE handle = gCPUContext.mRTVDescriptorHeap.GetHandle(index);
+		gDevice->CreateRenderTargetView(mRuntime.mBackBuffers[i].mResource.Get(), nullptr, handle);
+	}
 
 	for (auto&& screen_texture : mRuntime.mScreenTextures)
 		screen_texture.Width(swap_chain_desc.Width).Height(swap_chain_desc.Height).Initialize();
@@ -57,8 +64,8 @@ void Renderer::InitializeScreenSizeTextures()
 
 void Renderer::FinalizeScreenSizeTextures()
 {
-	for (int i = 0; i < NUM_BACK_BUFFERS; i++)
-		mRuntime.mBackBuffers[i] = nullptr;
+	for (int i = 0; i < kFrameInFlightCount; i++)
+		mRuntime.mBackBuffers[i].mResource = nullptr;
 }
 
 void Renderer::InitializeShaders()

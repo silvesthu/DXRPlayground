@@ -1019,13 +1019,6 @@ void GetCombinedScattering(float r, float mu, float mu_s, float nu, bool ray_r_m
 
 void GetSkyRadiance(out float3 outSkyRadiance, out float3 outTransmittanceToTop)
 {
-#ifndef AtmosphereMode_Bruneton17
-	return;
-#endif // AtmosphereMode_Bruneton17
-
-	outSkyRadiance = 0;
-	outTransmittanceToTop = 1;
-
 	float3 camera = PlanetRayOrigin() - PlanetCenter();
 	float3 view_ray = PlanetRayDirection();
 	float3 sun_direction = GetSunDirection();
@@ -1079,13 +1072,6 @@ void GetSkyRadiance(out float3 outSkyRadiance, out float3 outTransmittanceToTop)
 
 void GetSkyRadianceToPoint(out float3 outSkyRadiance, out float3 outTransmittance)
 {
-#ifndef AtmosphereMode_Bruneton17
-	return;
-#endif // AtmosphereMode_Bruneton17
-
-	outSkyRadiance = 0;
-	outTransmittance = 1;
-
 	float3 hit_position = PlanetRayHitPosition() - PlanetCenter();
 	float3 camera = PlanetRayOrigin() - PlanetCenter();
 	float3 sun_direction = GetSunDirection();
@@ -1165,10 +1151,6 @@ void GetSkyRadianceToPoint(out float3 outSkyRadiance, out float3 outTransmittanc
 
 void GetSunAndSkyIrradiance(float3 inHitPosition, float3 inNormal, out float3 outSunIrradiance, out float3 outSkyIrradiance)
 {
-#ifndef AtmosphereMode_Bruneton17
-	return;
-#endif // AtmosphereMode_Bruneton17
-
 	float3 local_position = inHitPosition - PlanetCenter();
 	float3 sun_direction = GetSunDirection();
 

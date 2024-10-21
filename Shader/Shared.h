@@ -29,12 +29,25 @@ using float4x4 = glm::mat4x4;
 #define CONSTANT_DEFAULT(x) = x
 #define RETURN_AS_REFERENCE &
 #define GET_COLUMN(x, i) x[i]
+#define ENUM_CLASS_OPERATOR(T)									\
+inline constexpr T operator&(T inContainer, T inValue)			\
+{																\
+	using U = std::underlying_type_t<T>;						\
+	return (T)((U)inContainer & (U)inValue);					\
+}																\
+																\
+inline constexpr T operator|(T inContainer, T inValue)			\
+{																\
+	using U = std::underlying_type_t<T>;						\
+	return (T)((U)inContainer | (U)inValue);					\
+}																\
 
 #else
 
 #define CONSTANT_DEFAULT(x)
 #define RETURN_AS_REFERENCE
 #define GET_COLUMN(x, i) transpose(x)[i]
+#define ENUM_CLASS_OPERATOR(T)
 
 #endif // __cplusplus
 
@@ -55,10 +68,31 @@ static const float kKW2W						= 1000.0f;
 static const float kSolarKW2LM					= kKW2W * kSolarLuminousEfficacy;
 static const float kSolarLM2KW					= 1.0f / kSolarKW2LM;
 
-// Persistent Descriptor Heap Entries
+static const uint kFrameInFlightCount			= 2;
+static const uint kTimestampCount				= 1024;
+
+enum class RTVDescriptorIndex : uint
+{
+	Invalid = 0,
+
+	BackBuffer0,
+	BackBuffer1,
+
+	Count,
+};
+
+enum class DSVDescriptorIndex : uint
+{
+	Invalid = 0,
+
+	ScreenDepth,
+
+	Count,
+};
+
 enum class ViewDescriptorIndex : uint
 {
-	Invalid,
+	Invalid = 0,
 
 	// [ImGui]
 	ImGuiFont,
@@ -69,10 +103,11 @@ enum class ViewDescriptorIndex : uint
 	Constants,
 
 	// [Screen]
-	ScreenColorUAV,
 	ScreenColorSRV,
-	ScreenDebugUAV,
+	ScreenColorUAV,
 	ScreenDebugSRV,
+	ScreenDebugUAV,
+	ScreenDepthSRV,
 	ScreenReservoirSRV,
 	ScreenReservoirUAV,
 
@@ -155,8 +190,7 @@ enum class ViewDescriptorIndex : uint
 
 	Count,
 
-	SceneAutoSRV = Count,
-	// Indices after this are allocated incrementally by Scene
+	SceneAutoSRV = Count,		// Indices started from this are allocated incrementally by Scene
 };
 
 enum class SamplerDescriptorIndex : uint
@@ -568,7 +602,7 @@ struct AtmosphereConstants
 
 struct CloudConstants
 {
-	CloudMode					mMode							CONSTANT_DEFAULT(CloudMode::Noise);
+	CloudMode					mMode							CONSTANT_DEFAULT(CloudMode::None);
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
@@ -607,18 +641,21 @@ struct CloudConstants
 struct Constants
 {
 	// Right-handed Y-up
-	float4 RETURN_AS_REFERENCE	CameraRight()					{ return GET_COLUMN(mCameraTransform, 0); }
+	float4 RETURN_AS_REFERENCE	CameraLeft()					{ return GET_COLUMN(mCameraTransform, 0); }
 	float4 RETURN_AS_REFERENCE	CameraUp()						{ return GET_COLUMN(mCameraTransform, 1); }
 	float4 RETURN_AS_REFERENCE	CameraFront()					{ return GET_COLUMN(mCameraTransform, 2); }
 	float4 RETURN_AS_REFERENCE	CameraPosition()				{ return GET_COLUMN(mCameraTransform, 3); }
 	float4x4					mCameraTransform				CONSTANT_DEFAULT(float4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1));
-	float						mCameraRightExtend				CONSTANT_DEFAULT(1.0f);
+	float						mCameraLeftExtend				CONSTANT_DEFAULT(-1.0f);
 	float						mCameraUpExtend					CONSTANT_DEFAULT(1.0f);
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 	float						mCameraDistance					CONSTANT_DEFAULT(0);
 	float4x4					mViewMatrix						CONSTANT_DEFAULT(float4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1));
 	float4x4					mProjectionMatrix				CONSTANT_DEFAULT(float4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1));
 	float4x4					mViewProjectionMatrix			CONSTANT_DEFAULT(float4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1));
+	float4x4					mInverseViewMatrix				CONSTANT_DEFAULT(float4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1));
+	float4x4					mInverseProjectionMatrix		CONSTANT_DEFAULT(float4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1));
+	float4x4					mInverseViewProjectionMatrix	CONSTANT_DEFAULT(float4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1));
 
 	uint						mScreenWidth					CONSTANT_DEFAULT(0);
 	uint						mScreenHeight					CONSTANT_DEFAULT(0);
@@ -675,6 +712,14 @@ struct Constants
 	CloudConstants				mCloud;
 };
 
+struct RayInspection
+{
+	static const int			kSize = 64;
+
+	float4						mPositionWS[kSize];
+	float4						mNormalWS[kSize];
+};
+
 struct Debug
 {
 	static const int			kValueArraySize					= 16;
@@ -692,8 +737,9 @@ struct LocalConstants
 	uint3						mPad							CONSTANT_DEFAULT(uint3(0, 0, 0));
 };
 
-#undef RETURN_AS_REFERENCE
+#undef ENUM_CLASS_OPERATOR
 #undef GET_COLUMN
+#undef RETURN_AS_REFERENCE
 #undef CONSTANT_DEFAULT
 #undef CONCAT
 #undef CONCAT_INNER

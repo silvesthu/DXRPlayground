@@ -1,5 +1,15 @@
+#include "Shared.h"
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+CloudMode GetCloudMode()
+{
+#ifdef kCloudMode
+	// Static
+	return kCloudMode;
+#else
+	// Dynamic
+	return mConstants.mCloud.mMode;
+#endif // kloudMode
+}
 
 // [Schneider16]
 float SampleCloudDensity(float3 p, bool sample_coarse)
@@ -48,9 +58,12 @@ void RaymarchCloud(out float3 outTransmittance, out float3 outLuminance)
 	outTransmittance = 1.0;
 	outLuminance = 0.0;
 
-#ifndef CloudMode_Noise
-	return;
-#endif // CloudMode_Noise
+	switch (GetCloudMode())
+	{
+	case CloudMode::None: return;
+	case CloudMode::Noise: break;
+	default: return;
+	}
 
 	float3 accumulated_light = 0;
 	float accumulated_density = 0.0;
@@ -103,13 +116,6 @@ void RaymarchCloud(out float3 outTransmittance, out float3 outLuminance)
 
 	if (range.x > 1000)
 		return;
-
-	switch (mConstants.mDebugMode)
-	{
-	case DebugMode::None:	break;
-	case DebugMode::Cloud:	outTransmittance = 0.0; outLuminance = float3(range, 0); return;
-	default:				break;
-	}
 
 	int sample_count = mConstants.mCloud.mRaymarch.mSampleCount;
 	float step_length = (range.y - range.x) / sample_count;

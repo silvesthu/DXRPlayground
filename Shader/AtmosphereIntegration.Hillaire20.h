@@ -894,7 +894,7 @@ void CameraVolumes(
 	float2 d = ((pixPos / dims) * 2.f - 1.f); // 0~1 => -1~1
 	d.y = -d.y;
 
-	float3 right = mConstants.CameraRight().xyz * mConstants.mCameraRightExtend;
+	float3 right = mConstants.CameraLeft().xyz * mConstants.mCameraLeftExtend;
 	float3 up = mConstants.CameraUp().xyz * mConstants.mCameraUpExtend;
 
 	// Debug
@@ -1012,10 +1012,6 @@ namespace AtmosphereIntegration { namespace Hillaire20 {
 
 void GetSkyRadiance(out float3 outSkyRadiance, out float3 outTransmittanceToTop)
 {
-#ifndef AtmosphereMode_Hillaire20
-	return;
-#endif // AtmosphereMode_Hillaire20
-
 	outSkyRadiance = 0;
 	outTransmittanceToTop = 1; // [TODO]
 

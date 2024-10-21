@@ -1043,7 +1043,7 @@ void Scene::InitializeViews()
 		desc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
 		desc.RaytracingAccelerationStructure.Location = inResource->GetGPUVirtualAddress();
 
-		for (int i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
+		for (int i = 0; i < kFrameInFlightCount; i++)
 			gDevice->CreateShaderResourceView(nullptr, &desc, gFrameContexts[i].mViewDescriptorHeap.GetHandle(inViewDescriptorIndex));
 	};
 	create_acceleration_structure_SRV(mTLAS->GetResource(), ViewDescriptorIndex::RaytraceTLASSRV);
@@ -1058,7 +1058,7 @@ void Scene::InitializeViews()
 		desc.Buffer.StructureByteStride = inStride;
 		desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
 
-		for (int i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
+		for (int i = 0; i < kFrameInFlightCount; i++)
 			gDevice->CreateShaderResourceView(inResource, &desc, gFrameContexts[i].mViewDescriptorHeap.GetHandle(inViewDescriptorIndex));
 	};
 	create_buffer_SRV(mBuffers.mInstanceDatas.Get(), sizeof(InstanceData), ViewDescriptorIndex::RaytraceInstanceDataSRV);
@@ -1077,7 +1077,7 @@ void Scene::InitializeViews()
 		desc.Buffer.StructureByteStride = inStride;
 		desc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
 
-		for (int i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
+		for (int i = 0; i < kFrameInFlightCount; i++)
 			gDevice->CreateUnorderedAccessView(inResource, nullptr, &desc, gFrameContexts[i].mViewDescriptorHeap.GetHandle(inViewDescriptorIndex));
 	};
 

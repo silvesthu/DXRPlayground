@@ -2,16 +2,19 @@
 
 #include "Common.h"
 
+static constexpr DXGI_FORMAT					kBackBufferFormat			= DXGI_FORMAT_R8G8B8A8_UNORM;
+
 struct Renderer
 {
 	struct Runtime : RuntimeBase<Runtime>
 	{
 		Shader									mRayQueryShader				= Shader().FileName("Shader/RayQuery.hlsl").CSName("RayQueryCS");
+		Shader									mDepthShader				= Shader().FileName("Shader/RayQuery.hlsl").VSName("ScreenspaceTriangleVS").PSName("DepthPS").DSVFormat(DXGI_FORMAT_D32_FLOAT);
 		Shader									mPrepareLightsShader		= Shader().FileName("Shader/PrepareLights.hlsl").CSName("PrepareLightsCS");
 		Shader									mClearShader				= Shader().FileName("Shader/Composite.hlsl").CSName("ClearCS");
 		Shader									mDiffTexture2DShader		= Shader().FileName("Shader/DiffTexture.hlsl").CSName("DiffTexture2DShader");
 		Shader									mDiffTexture3DShader		= Shader().FileName("Shader/DiffTexture.hlsl").CSName("DiffTexture3DShader");
-		Shader									mCompositeShader			= Shader().FileName("Shader/Composite.hlsl").VSName("ScreenspaceTriangleVS").PSName("CompositePS");
+		Shader									mCompositeShader			= Shader().FileName("Shader/Composite.hlsl").VSName("ScreenspaceTriangleVS").PSName("CompositePS").RTVFormat(kBackBufferFormat);
 		Shader									mSentinelShader				= Shader();
 		std::span<Shader>						mShaders					= std::span<Shader>(&mRayQueryShader, &mSentinelShader);
 
@@ -30,6 +33,7 @@ struct Renderer
 
 		Texture									mScreenColorTexture			= Texture().Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(ViewDescriptorIndex::ScreenColorUAV).SRVIndex(ViewDescriptorIndex::ScreenColorSRV).Name("Renderer.ScreenColorTexture");
 		Texture									mScreenDebugTexture			= Texture().Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(ViewDescriptorIndex::ScreenDebugUAV).SRVIndex(ViewDescriptorIndex::ScreenDebugSRV).Name("Renderer.ScreenDebugTexture");
+		Texture									mScreenDepthTexture			= Texture().Format(DXGI_FORMAT_D32_FLOAT).DSVIndex(DSVDescriptorIndex::ScreenDepth).SRVIndex(ViewDescriptorIndex::ScreenDepthSRV).SRVFormat(DXGI_FORMAT_R32_FLOAT).Name("Renderer.ScreenDepthTexture");
 		Texture									mScreenReservoirTexture		= Texture().Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(ViewDescriptorIndex::ScreenReservoirUAV).SRVIndex(ViewDescriptorIndex::ScreenReservoirSRV).Name("Renderer.ScreenReservoirTexture");
 
 		Texture									mScreenSentinelTexture;
@@ -41,8 +45,9 @@ struct Renderer
 		Texture									mSentinelTexture;
 		std::span<Texture>						mTextures = std::span<Texture>(&mUVCheckerMap, &mSentinelTexture);
 
-		ComPtr<ID3D12Resource>					mBackBuffers[NUM_BACK_BUFFERS] = {};
-		D3D12_CPU_DESCRIPTOR_HANDLE				mBufferBufferRTVs[NUM_BACK_BUFFERS] = {};
+		Texture									mBackBuffers[kFrameInFlightCount] = { 
+																			Texture().Format(kBackBufferFormat).RTVIndex(RTVDescriptorIndex::BackBuffer0).Name("Renderer.BackBuffer0"),
+																			Texture().Format(kBackBufferFormat).RTVIndex(RTVDescriptorIndex::BackBuffer1).Name("Renderer.BackBuffer1") };
 	};
 	Runtime mRuntime;
 

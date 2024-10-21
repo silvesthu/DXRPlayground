@@ -9,22 +9,22 @@
 #include "AtmosphereIntegration.h"
 #include "CloudIntegration.h"
 
-void TraceRay(PixelContext inPixelContext)
+void TraceRay(inout PixelContext ioPixelContext)
 {
 	DebugValueInit();
 	
 	// Initialize on first frame
 	if (mConstants.mCurrentFrameIndex == 0)
 	{
-		ScreenReservoirUAV[inPixelContext.mPixelIndex.xy]		= 0;
+		ScreenReservoirUAV[ioPixelContext.mPixelIndex.xy]		= 0;
 	}
 
 	// From https://www.shadertoy.com/view/tsBBWW
 	// [TODO] Need proper noise
-	uint random_state							= uint(uint(inPixelContext.mPixelIndex.x) * uint(1973) + uint(inPixelContext.mPixelIndex.y) * uint(9277) + uint(mConstants.mCurrentFrameIndex) * uint(26699)) | uint(1);
+	uint random_state							= uint(uint(ioPixelContext.mPixelIndex.x) * uint(1973) + uint(ioPixelContext.mPixelIndex.y) * uint(9277) + uint(mConstants.mCurrentFrameIndex) * uint(26699)) | uint(1);
 
-	float2 screen_coords						= float2(inPixelContext.mPixelIndex.xy);
-	float2 screen_size							= float2(inPixelContext.mPixelTotal.xy);
+	float2 screen_coords						= float2(ioPixelContext.mPixelIndex.xy);
+	float2 screen_size							= float2(ioPixelContext.mPixelTotal.xy);
 
 	switch (mConstants.mOffsetMode)
 	{
@@ -37,9 +37,15 @@ void TraceRay(PixelContext inPixelContext)
 	float2 ndc_xy								= ((screen_coords / screen_size) * 2.f - 1.f);	// [0,1] => [-1,1]
 	ndc_xy.y									= -ndc_xy.y;									// Flip y
 	
+	// [TODO] Fix fov first
+	float4 point_on_near_plane					= mul(mConstants.mInverseViewProjectionMatrix, float4(ndc_xy, 1.0, 1.0));
+	point_on_near_plane.xyzw					/= point_on_near_plane.w;
+	float3 ray_direction						= normalize(point_on_near_plane.xyz);
+
 	RayDesc ray;
 	ray.Origin									= mConstants.CameraPosition().xyz;
-	ray.Direction								= normalize(mConstants.CameraFront().xyz + mConstants.CameraRight().xyz * mConstants.mCameraRightExtend * ndc_xy.x + mConstants.CameraUp().xyz * mConstants.mCameraUpExtend * ndc_xy.y);
+	// ray.Direction								= ray_direction;
+	ray.Direction								= normalize(mConstants.CameraFront().xyz + mConstants.CameraLeft().xyz * mConstants.mCameraLeftExtend * ndc_xy.x + mConstants.CameraUp().xyz * mConstants.mCameraUpExtend * ndc_xy.y);
 	ray.TMin									= 0.001;
 	ray.TMax									= 100000;
 
@@ -66,6 +72,25 @@ void TraceRay(PixelContext inPixelContext)
 		uint ray_instance_mask					= 0xffffffff;
 		query.TraceRayInline(RaytracingScene, additional_ray_flags, ray_instance_mask, ray);
 		query.Proceed();
+		
+		if (ioPixelContext.mOutputDepth)
+		{
+			if (query.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
+			{
+				float4 position_ws = float4(ray.Origin + ray.Direction * query.CommittedRayT(), 1.0);
+				float4 position_ps = mul(mConstants.mViewProjectionMatrix, position_ws);
+				float4 position_ndc = position_ps.xyzw / position_ps.w;
+				
+				ioPixelContext.mDepth = position_ndc.z;
+				// DebugValue(position_ndc.xyz);
+			}
+			else
+			{
+				ioPixelContext.mDepth = 1.0;
+				// DebugValue(0);
+			}
+			return;
+		}
 		
 		if (query.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
 		{
@@ -109,7 +134,7 @@ void TraceRay(PixelContext inPixelContext)
 			// HitConext is constructed, fill the debug values
 			{
 				// Report InstanceID of instance at PixelDebugCoord
-				if (inPixelContext.mPixelIndex.x == mConstants.mPixelDebugCoord.x && inPixelContext.mPixelIndex.y == mConstants.mPixelDebugCoord.y && path_context.mRecursionDepth == 0)
+				if (ioPixelContext.mPixelIndex.x == mConstants.mPixelDebugCoord.x && ioPixelContext.mPixelIndex.y == mConstants.mPixelDebugCoord.y && path_context.mRecursionDepth == 0)
 					BufferDebugUAV[0].mPixelInstanceID			= hit_context.mInstanceID;
 				
 				DebugValue(PixelDebugMode::PositionWS, path_context.mRecursionDepth, float3(hit_context.PositionWS()));
@@ -195,7 +220,7 @@ void TraceRay(PixelContext inPixelContext)
 					DebugValue(PixelDebugMode::LightIndex, path_context.mRecursionDepth, light_index);
 					
 					// [TODO]
-					// ScreenReservoirUAV[inPixelContext.mPixelIndex.xy] = 0;
+					// ScreenReservoirUAV[ioPixelContext.mPixelIndex.xy] = 0;
 					
 					LightContext light_context					= LightEvaluation::GenerateContext(LightEvaluation::ContextType::Random, 0, light, hit_context.PositionWS(), path_context);					
 					float light_pdf								= light_context.mLPDF * LightEvaluation::SelectLightPDF(light_index, hit_context.PositionWS(), path_context);
@@ -348,7 +373,7 @@ void TraceRay(PixelContext inPixelContext)
 	// Accumulation
 	{
 		float3 current_output					= path_context.mEmission;
-		float3 previous_output					= ScreenColorUAV[inPixelContext.mPixelIndex.xy].xyz;
+		float3 previous_output					= ScreenColorUAV[ioPixelContext.mPixelIndex.xy].xyz;
 		previous_output							= max(0, previous_output); // Eliminate nan
 		float3 mixed_output						= lerp(previous_output, current_output, mConstants.mCurrentFrameWeight);
 
@@ -358,8 +383,10 @@ void TraceRay(PixelContext inPixelContext)
 		if (mConstants.mDebugMode == DebugMode::RecursionDepth)
 			mixed_output						= path_context.mRecursionDepth;
 
-		ScreenColorUAV[inPixelContext.mPixelIndex.xy] = float4(mixed_output, 1);
-		ScreenDebugUAV[inPixelContext.mPixelIndex.xy] = sDebugValue;
+		ScreenColorUAV[ioPixelContext.mPixelIndex.xy] = float4(mixed_output, 1);
+		
+		if (sDebugValueUpdated)
+			ScreenDebugUAV[ioPixelContext.mPixelIndex.xy] = sDebugValue;
 	}
 }
 
@@ -378,8 +405,28 @@ void RayQueryCS(
 	sDebugDispatchRaysIndex.xyz					= inDispatchThreadID.xyz;
 	sDebugDispatchRaysDimensions				= uint3(output_dimensions.xy, 1);
 	
-	PixelContext pixel_context;
+	PixelContext pixel_context					= (PixelContext)0;
 	pixel_context.mPixelIndex					= inDispatchThreadID.xyz;
 	pixel_context.mPixelTotal					= uint3(output_dimensions.xy, 1);
 	TraceRay(pixel_context);
+}
+
+[RootSignature(ROOT_SIGNATURE_COMMON)]
+void DepthPS(
+	float4 inPosition : SV_POSITION,
+	out float outDepth : SV_DEPTH)
+{
+	uint2 output_dimensions;
+	ScreenColorUAV.GetDimensions(output_dimensions.x, output_dimensions.y);
+	
+	PixelContext pixel_context					= (PixelContext)0;
+	pixel_context.mPixelIndex					= uint3(inPosition.xy, 1);
+	pixel_context.mPixelTotal					= uint3(output_dimensions.xy, 1);
+	pixel_context.mOutputDepth					= true;
+	TraceRay(pixel_context);
+	
+	outDepth = pixel_context.mDepth;
+	
+	if (sDebugValueUpdated)
+		ScreenDebugUAV[inPosition.xy]			= sDebugValue;
 }

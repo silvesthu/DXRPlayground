@@ -290,9 +290,13 @@ void Atmosphere::ImGuiShowMenus()
 			if (ImGui::RadioButton(name.data(), static_cast<int>(mProfile.mMode) == i))
 			{
 				mProfile.mMode = static_cast<AtmosphereMode>(i);
-				gRenderer.mReloadShader = true;
+				if (!gAtmosphere.mProfile.mDynamicModeSwitch)
+					gRenderer.mReloadShader = true;
 			}
 		}
+
+		if (ImGui::Checkbox("Dynamic Mode Switch", &gAtmosphere.mProfile.mDynamicModeSwitch))
+			gRenderer.mReloadShader = true;
 
 		{
 			ImGui::PushID("Preset");

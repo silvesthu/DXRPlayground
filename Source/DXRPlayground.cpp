@@ -123,9 +123,9 @@ static void sLoadCamera();
 static void sLoadScene();
 static void sDumpLuminance()
 {
-	gDumpTextureProxy.mResource = gRenderer.mRuntime.mScreenColorTexture.mResource;
-	gDumpTextureProxy.mName = "Luminance";
-	gDumpTexture = &gDumpTextureProxy;
+	gCPUContext.mDumpTextureProxy.mResource = gRenderer.mRuntime.mScreenColorTexture.mResource;
+	gCPUContext.mDumpTextureProxy.mName = "Luminance";
+	gCPUContext.mDumpTextureRef = &gCPUContext.mDumpTextureProxy;
 }
 static void sPrepareImGui();
 static void sPrepareImGuizmo();
@@ -616,16 +616,18 @@ void sPrepareImGuizmo()
 	ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
 
 	float axis_length = 48.0f;
-	glm::vec2 axis_center = glm::vec2(64.0f, io.DisplaySize.y - 64.0f);
+	float2 axis_center = float2(64.0f, io.DisplaySize.y - 64.0f);
 	glm::vec4 x_vector = gConstants.mViewMatrix * glm::vec4(axis_length, 0, 0, 0);
 	glm::vec4 y_vector = gConstants.mViewMatrix * glm::vec4(0, axis_length, 0, 0);
 	glm::vec4 z_vector = gConstants.mViewMatrix * glm::vec4(0, 0, axis_length, 0);
-	glm::vec2 x_axis = axis_center + glm::vec2(x_vector.x, -x_vector.y);
-	glm::vec2 y_axis = axis_center + glm::vec2(y_vector.x, -y_vector.y);
-	glm::vec2 z_axis = axis_center + glm::vec2(z_vector.x, -z_vector.y);
+	float2 x_axis = axis_center + float2(x_vector.x, -x_vector.y);
+	float2 y_axis = axis_center + float2(y_vector.x, -y_vector.y);
+	float2 z_axis = axis_center + float2(z_vector.x, -z_vector.y);
+	float2 xz_axis = axis_center + (float2(x_vector.x, -x_vector.y) + float2(z_vector.x, -z_vector.y)) / float2(glm::sqrt(2.0f));
 	ImGuizmo::GetDrawlist()->AddLine(axis_center, x_axis, ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 0.0f, 0.0f, 1.0f)), 5.0f);
 	ImGuizmo::GetDrawlist()->AddLine(axis_center, y_axis, ImGui::ColorConvertFloat4ToU32(ImVec4(0.0f, 1.0f, 0.0f, 1.0f)), 5.0f);
 	ImGuizmo::GetDrawlist()->AddLine(axis_center, z_axis, ImGui::ColorConvertFloat4ToU32(ImVec4(0.0f, 0.0f, 1.0f, 1.0f)), 5.0f);
+	ImGuizmo::GetDrawlist()->AddLine(axis_center, xz_axis, ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 0.0f, 1.0f, 1.0f)), 2.0f);
 }
 
 static void sUpdate()
@@ -674,16 +676,16 @@ static void sUpdate()
 
 		if (mouse_delta.x != 0 || mouse_delta.y != 0) // otherwise result of glm::normalize might oscillate
 		{
-			glm::vec4 front						= gConstants.CameraFront();
-			glm::vec4 right						= glm::vec4(glm::normalize(glm::cross(glm::vec3(gConstants.CameraFront()), glm::vec3(0, 1, 0))), 0);
-			glm::vec4 up						= glm::vec4(glm::normalize(glm::cross(glm::vec3(right), glm::vec3(gConstants.CameraFront()))), 0);
+			float4 front						= gConstants.CameraFront();
+			float4 left							= float4(glm::normalize(glm::cross(float3(0, 1, 0), float3(gConstants.CameraFront()))), 0);
+			float4 up							= float4(glm::normalize(glm::cross(float3(gConstants.CameraFront()), float3(left))), 0);
 
-			front								= glm::rotate(-mouse_delta.x * gCameraSettings.mRotateSpeed, glm::vec3(up)) * front;
-			front								= glm::rotate(-mouse_delta.y * gCameraSettings.mRotateSpeed, glm::vec3(right)) * front;
+			front								= glm::rotate(-mouse_delta.x * gCameraSettings.mRotateSpeed, float3(up)) * front;
+			front								= glm::rotate(mouse_delta.y * gCameraSettings.mRotateSpeed, float3(left)) * front;
 
 			gConstants.CameraFront()			= glm::normalize(front);
-			gConstants.CameraRight()			= glm::normalize(glm::vec4(glm::cross(glm::vec3(gConstants.CameraFront()), glm::vec3(0, 1, 0)), 0));
-			gConstants.CameraUp()				= glm::normalize(glm::vec4(glm::cross(glm::vec3(gConstants.CameraRight()), glm::vec3(gConstants.CameraFront())), 0));
+			gConstants.CameraLeft()				= glm::normalize(float4(glm::cross(float3(0, 1, 0), float3(gConstants.CameraFront())), 0));
+			gConstants.CameraUp()				= glm::normalize(float4(glm::cross(float3(gConstants.CameraFront()), float3(gConstants.CameraLeft())), 0));
 		}
 	}
 
@@ -697,23 +699,23 @@ static void sUpdate()
 			move_speed *= 0.1f;
 
 		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_W))
-			gConstants.mCameraTransform[3] += gConstants.mCameraTransform[2] * move_speed;
+			gConstants.CameraPosition() += gConstants.CameraFront() * move_speed;
 		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_S))
-			gConstants.mCameraTransform[3] -= gConstants.mCameraTransform[2] * move_speed;
+			gConstants.CameraPosition() -= gConstants.CameraFront() * move_speed;
 
-		glm::vec4 right = glm::vec4(glm::normalize(glm::cross(glm::vec3(gConstants.mCameraTransform[2]), glm::vec3(0, 1, 0))), 0);
+		glm::vec4 left = glm::vec4(glm::normalize(glm::cross(glm::vec3(0, 1, 0), glm::vec3(gConstants.CameraFront()))), 0);
 
 		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_A))
-			gConstants.mCameraTransform[3] -= right * move_speed;
+			gConstants.CameraPosition() += left * move_speed;
 		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_D))
-			gConstants.mCameraTransform[3] += right * move_speed;
+			gConstants.CameraPosition() -= left * move_speed;
 
-		glm::vec4 up = glm::vec4(glm::normalize(glm::cross(glm::vec3(right), glm::vec3(gConstants.mCameraTransform[2]))), 0);
+		glm::vec4 up = glm::vec4(glm::normalize(glm::cross(glm::vec3(left), glm::vec3(gConstants.CameraFront()))), 0);
 
 		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_Q))
-			gConstants.mCameraTransform[3] -= up * move_speed;
+			gConstants.CameraPosition() += up * move_speed;
 		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_E))
-			gConstants.mCameraTransform[3] += up * move_speed;
+			gConstants.CameraPosition() -= up * move_speed;
 
 		if (ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_F5))
 			sLoadShader();
@@ -739,17 +741,23 @@ static void sUpdate()
 
 	// Setup matrices
 	{
-		float fov_radian						= gCameraSettings.mHorizontalFovDegree * glm::pi<float>() / 180.0f;
-		float horizontal_tan					= glm::tan(fov_radian * 0.5f);
-		gConstants.mCameraRightExtend			= horizontal_tan;
+		float horizontal_fov_radian				= gCameraSettings.mHorizontalFovDegree * glm::pi<float>() / 180.0f;
+		float horizontal_tan					= glm::tan(horizontal_fov_radian * 0.5f);
+		gConstants.mCameraLeftExtend			= -horizontal_tan;
 		gConstants.mCameraUpExtend				= horizontal_tan * (gDisplaySettings.mRenderResolution.y * 1.0f / gDisplaySettings.mRenderResolution.x);
 
 		gConstants.mScreenWidth					= gRenderer.mScreenWidth;
 		gConstants.mScreenHeight				= gRenderer.mScreenHeight;
 
-		gConstants.mViewMatrix					= glm::transpose(gConstants.mCameraTransform);
-		gConstants.mProjectionMatrix			= glm::perspectiveFov(horizontal_tan, (float)gConstants.mScreenWidth, (float)gConstants.mScreenHeight, 0.01f, 10000.0f);
+		float vertical_tan						= horizontal_tan * (gDisplaySettings.mRenderResolution.y * 1.0f / gDisplaySettings.mRenderResolution.x);
+		float vertical_fov_radian				= glm::atan(vertical_tan) * 2.0f;
+		gConstants.mViewMatrix					= glm::lookAtRH(float3(gConstants.CameraPosition()), float3(gConstants.CameraPosition() + gConstants.CameraFront()), float3(gConstants.CameraUp()));
+		gConstants.mProjectionMatrix			= glm::perspectiveFovRH_ZO(vertical_fov_radian, (float)gConstants.mScreenWidth, (float)gConstants.mScreenHeight, 0.1f, 1000.0f);
 		gConstants.mViewProjectionMatrix		= gConstants.mProjectionMatrix * gConstants.mViewMatrix;
+
+		gConstants.mInverseViewMatrix			= glm::inverse(gConstants.mViewMatrix);
+		gConstants.mInverseProjectionMatrix		= glm::inverse(gConstants.mProjectionMatrix);
+		gConstants.mInverseViewProjectionMatrix = glm::inverse(gConstants.mViewProjectionMatrix);
 	}
 
 	gAtmosphere.Update();
@@ -787,7 +795,7 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 
 	ImGui_ImplDX12_CreateShaderResourceViewCallback = [](ID3D12Resource* resource, D3D12_SHADER_RESOURCE_VIEW_DESC& desc)
 	{
-		for (glm::uint i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
+		for (glm::uint i = 0; i < kFrameInFlightCount; i++)
 		{
 			gDevice->CreateShaderResourceView(resource, &desc, gFrameContexts[i].mViewDescriptorHeap.GetHandle(ViewDescriptorIndex::ImGuiFont));
 
@@ -803,7 +811,7 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 
 	// Setup Platform/Renderer bindings
 	ImGui_ImplWin32_Init(hwnd);
-	ImGui_ImplDX12_Init(gDevice, NUM_FRAMES_IN_FLIGHT, DXGI_FORMAT_R8G8B8A8_UNORM, nullptr, {}, {});
+	ImGui_ImplDX12_Init(gDevice, kFrameInFlightCount, DXGI_FORMAT_R8G8B8A8_UNORM, nullptr, {}, {});
 	{
 		// DPI
 		UINT dpi = GetDpiForWindow(hwnd);
@@ -921,7 +929,7 @@ void sLoadCamera()
 
 	gConstants.CameraFront()					= glm::normalize(gConstants.CameraFront());
 	gConstants.CameraUp()						= float4(0, 1, 0, 0);
-	gConstants.CameraRight()					= float4(glm::cross(float3(gConstants.CameraFront()), float3(gConstants.CameraUp())), 0.0f);
+	gConstants.CameraLeft()						= float4(glm::cross(float3(gConstants.CameraUp()), float3(gConstants.CameraFront())), 0.0f);
 
 	if (gScene.GetSceneContent().mFov.has_value())
 		gCameraSettings.mHorizontalFovDegree = gScene.GetSceneContent().mFov.value();
@@ -952,11 +960,10 @@ void sRender()
 {
 	// Frame Context
 	sWaitForFrameContext();
-	FrameContext& frame_context = gGetFrameContext();
-	uint32_t frame_index = gSwapChain->GetCurrentBackBufferIndex();
-	ID3D12Resource* back_buffer = gRenderer.mRuntime.mBackBuffers[frame_index].Get();
-	D3D12_CPU_DESCRIPTOR_HANDLE& back_buffer_RTV = gRenderer.mRuntime.mBufferBufferRTVs[frame_index];
-
+	FrameContext& frame_context									= gGetFrameContext();
+	uint32_t back_buffer_index									= gSwapChain->GetCurrentBackBufferIndex();
+	ID3D12Resource* back_buffer									= gRenderer.mRuntime.mBackBuffers[back_buffer_index].mResource.Get();
+	
 	if (DX12_ENABLE_PIX_CAPTURE)
 	{
 		if (gFrameIndex == 1) // PIXGpuCaptureNextFrames will capture the second frame, so skip the first one
@@ -1087,6 +1094,40 @@ void sRender()
 		gBarrierUAV(gCommandList, nullptr);
 	}
 
+	// Depth
+	{
+		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Depth");
+
+		BarrierScope depth_scope(gCommandList, gRenderer.mRuntime.mScreenDepthTexture.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+
+		D3D12_VIEWPORT viewport =
+		{
+			.TopLeftX = 0.0f,
+			.TopLeftY = 0.0f,
+			.Width = static_cast<float>(gRenderer.mScreenWidth),
+			.Height = static_cast<float>(gRenderer.mScreenHeight),
+			.MinDepth = 0.0f,
+			.MaxDepth = 1.0f,
+		};
+		gCommandList->RSSetViewports(1, &viewport);
+		D3D12_RECT rect =
+		{
+			.left = 0,
+			.top = 0,
+			.right = static_cast<LONG>(gRenderer.mScreenWidth),
+			.bottom = static_cast<LONG>(gRenderer.mScreenHeight),
+		};
+		gCommandList->RSSetScissorRects(1, &rect);
+		D3D12_CPU_DESCRIPTOR_HANDLE depth_cpu_handle = gCPUContext.mDSVDescriptorHeap.GetHandle(gRenderer.mRuntime.mScreenDepthTexture.mDSVIndex);
+		gCommandList->OMSetRenderTargets(0, nullptr, false, &depth_cpu_handle);
+		gCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+		gRenderer.Setup(gRenderer.mRuntime.mDepthShader);
+		gCommandList->DrawInstanced(3, 1, 0, 0);
+
+		gBarrierUAV(gCommandList, nullptr);
+	}
+
 	// PrepareLights
 	{
 		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "PrepareLights");
@@ -1159,23 +1200,26 @@ void sRender()
 
 		gBarrierTransition(gCommandList, back_buffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
-		// Draw
-		D3D12_RESOURCE_DESC desc = back_buffer->GetDesc();
-		D3D12_VIEWPORT viewport = {};
-		viewport.Width = static_cast<float>(desc.Width);
-		viewport.Height = static_cast<float>(desc.Height);
-		viewport.MinDepth = 0.0f;
-		viewport.MaxDepth = 1.0f;
-		viewport.TopLeftX = 0.0f;
-		viewport.TopLeftY = 0.0f;
+		D3D12_VIEWPORT viewport =
+		{
+			.TopLeftX = 0.0f,
+			.TopLeftY = 0.0f,
+			.Width = static_cast<float>(gRenderer.mScreenWidth),
+			.Height = static_cast<float>(gRenderer.mScreenHeight),
+			.MinDepth = 0.0f,
+			.MaxDepth = 1.0f,
+		};
 		gCommandList->RSSetViewports(1, &viewport);
-		D3D12_RECT rect = {};
-		rect.left = 0;
-		rect.top = 0;
-		rect.right = static_cast<LONG>(desc.Width);
-		rect.bottom = static_cast<LONG>(desc.Height);
+		D3D12_RECT rect =
+		{
+			.left = 0,
+			.top = 0,
+			.right = static_cast<LONG>(gRenderer.mScreenWidth),
+			.bottom = static_cast<LONG>(gRenderer.mScreenHeight),
+		};
 		gCommandList->RSSetScissorRects(1, &rect);
-		gCommandList->OMSetRenderTargets(1, &back_buffer_RTV, false, nullptr);
+		D3D12_CPU_DESCRIPTOR_HANDLE back_buffer_cpu_handle = gCPUContext.mRTVDescriptorHeap.GetHandle(gRenderer.mRuntime.mBackBuffers[back_buffer_index].mRTVIndex);
+		gCommandList->OMSetRenderTargets(1, &back_buffer_cpu_handle, false, nullptr);
 		gCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 		gRenderer.Setup(gRenderer.mRuntime.mCompositeShader);
@@ -1203,7 +1247,8 @@ SkipRender:
 
 		ImGui::Render();
 
-		gCommandList->OMSetRenderTargets(1, &back_buffer_RTV, false, nullptr);
+		D3D12_CPU_DESCRIPTOR_HANDLE back_buffer_cpu_handle = gCPUContext.mRTVDescriptorHeap.GetHandle(gRenderer.mRuntime.mBackBuffers[back_buffer_index].mRTVIndex);
+		gCommandList->OMSetRenderTargets(1, &back_buffer_cpu_handle, false, nullptr);
 
 		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), gCommandList);
 	}
@@ -1221,17 +1266,17 @@ SkipRender:
 
 	// Dump Texture
 	{
-		if (gDumpTexture != nullptr && gDumpTexture->mResource != nullptr)
+		if (gCPUContext.mDumpTextureRef != nullptr && gCPUContext.mDumpTextureRef->mResource != nullptr)
 		{
 			DirectX::ScratchImage image;
-			DirectX::CaptureTexture(gCommandQueue, gDumpTexture->mResource.Get(), false, image, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COMMON);
+			DirectX::CaptureTexture(gCommandQueue, gCPUContext.mDumpTextureRef->mResource.Get(), false, image, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COMMON);
 
 			std::filesystem::path path = gCreateDumpFolder();
-			path += gDumpTexture->mName;
+			path += gCPUContext.mDumpTextureRef->mName;
 			path += ".dds";
 			DirectX::SaveToDDSFile(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::DDS_FLAGS_NONE, path.c_str());
 
-			gDumpTexture = nullptr;
+			gCPUContext.mDumpTextureRef = nullptr;
 		}
 	}
 
@@ -1274,10 +1319,10 @@ static bool sCreateDeviceD3D(HWND hWnd)
 	DXGI_SWAP_CHAIN_DESC1 sd = {};
 	{
 		ZeroMemory(&sd, sizeof(sd));
-		sd.BufferCount = NUM_BACK_BUFFERS;
+		sd.BufferCount = kFrameInFlightCount;
 		sd.Width = 0;
 		sd.Height = 0;
-		sd.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		sd.Format = kBackBufferFormat;
 		sd.Flags = DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT | DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
 		sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 		sd.SampleDesc.Count = 1;
@@ -1340,27 +1385,6 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		}
 	}
 
-	// RTV Descriptor Heap
-	{
-		D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-		desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-		desc.NumDescriptors = NUM_BACK_BUFFERS;
-		desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-		desc.NodeMask = 1;
-		if (gDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&gRTVDescriptorHeap)) != S_OK)
-			return false;
-
-		gRTVDescriptorHeap->SetName(L"RTVDescriptorHeap");
-
-		SIZE_T rtvDescriptorSize = gDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = gRTVDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-		for (UINT i = 0; i < NUM_BACK_BUFFERS; i++)
-		{
-			gRenderer.mRuntime.mBufferBufferRTVs[i] = rtvHandle;
-			rtvHandle.ptr += rtvDescriptorSize;
-		}
-	}
-
 	// CommandQueue
 	{
 		D3D12_COMMAND_QUEUE_DESC desc = {};
@@ -1372,8 +1396,8 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		gCommandQueue->GetTimestampFrequency(&gTiming.mTimestampFrequency);
 	}
 
-	// Constants
-	for (glm::uint i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
+	// FrameContext
+	for (glm::uint i = 0; i < kFrameInFlightCount; i++)
 	{
 		std::wstring name;
 
@@ -1432,7 +1456,7 @@ static bool sCreateDeviceD3D(HWND hWnd)
 
 		// ReadbackBuffer - Query
 		{
-			D3D12_RESOURCE_DESC resource_desc = gGetBufferResourceDesc(gAlignUp(sizeof(UINT64) * NUM_TIMESTAMP_COUNT, (UINT64)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
+			D3D12_RESOURCE_DESC resource_desc = gGetBufferResourceDesc(gAlignUp(sizeof(UINT64) * kTimestampCount, (UINT64)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
 			D3D12_HEAP_PROPERTIES props = gGetReadbackHeapProperties();
 
 			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&gFrameContexts[i].mQueryReadbackBuffer)));
@@ -1444,9 +1468,22 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		}
 	}
 
-	// Constants (GPU)
+	// CPUContext
 	{
-		// Buffer
+		std::wstring name;
+
+		gCPUContext.mRTVDescriptorHeap.Initialize();
+		name = L"CPUContext.RTVDescriptorHeap";
+		gCPUContext.mRTVDescriptorHeap.mHeap->SetName(name.c_str());
+
+		gCPUContext.mDSVDescriptorHeap.Initialize();
+		name = L"CPUContext.DSVDescriptorHeap";
+		gCPUContext.mDSVDescriptorHeap.mHeap->SetName(name.c_str());
+	}
+
+	// Buffers
+	{
+		// Constants
 		{
 			D3D12_RESOURCE_DESC resource_desc = gGetBufferResourceDesc(gAlignUp(static_cast<UINT>(sizeof(Constants)), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
 			D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
@@ -1458,10 +1495,11 @@ static bool sCreateDeviceD3D(HWND hWnd)
 			D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
 			desc.SizeInBytes = static_cast<UINT>(resource_desc.Width);
 			desc.BufferLocation = gConstantBuffer->GetGPUVirtualAddress();
-			for (int i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
+			for (int i = 0; i < kFrameInFlightCount; i++)
 				gDevice->CreateConstantBufferView(&desc, gFrameContexts[i].mViewDescriptorHeap.GetHandle(ViewDescriptorIndex::Constants));
 		}
 
+		// Debug
 		{
 			D3D12_RESOURCE_DESC resource_desc = gGetBufferResourceDesc(gAlignUp(static_cast<UINT>(sizeof(Debug)), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
 			D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
@@ -1478,7 +1516,7 @@ static bool sCreateDeviceD3D(HWND hWnd)
 			desc.Buffer.NumElements = 1;
 			desc.Buffer.StructureByteStride = sizeof(Debug);
 			desc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
-			for (int i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
+			for (int i = 0; i < kFrameInFlightCount; i++)
 				gDevice->CreateUnorderedAccessView(gDebugBuffer.Get(), nullptr, &desc, gFrameContexts[i].mViewDescriptorHeap.GetHandle(ViewDescriptorIndex::BufferDebugUAV));
 		}
 	}
@@ -1486,7 +1524,7 @@ static bool sCreateDeviceD3D(HWND hWnd)
 	gValidate(gDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, gFrameContexts[0].mCommandAllocator.Get(), nullptr, IID_PPV_ARGS(&gCommandList)));
 	gCommandList->SetName(L"gCommandList");
 
-	D3D12_QUERY_HEAP_DESC query_heap_desc = { .Type = D3D12_QUERY_HEAP_TYPE_TIMESTAMP, .Count = NUM_TIMESTAMP_COUNT };
+	D3D12_QUERY_HEAP_DESC query_heap_desc = { .Type = D3D12_QUERY_HEAP_TYPE_TIMESTAMP, .Count = kTimestampCount };
 	gValidate(gDevice->CreateQueryHeap(&query_heap_desc, IID_PPV_ARGS(&gQueryHeap)));
 	gQueryHeap->SetName(L"gQueryHeap");
 
@@ -1513,7 +1551,7 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		// Fullscreen -> Windowed cause crash on resource reference in WM_SIZE handling, disable fullscreen for now
 		dxgi_factory->MakeWindowAssociation(hWnd, DXGI_MWA_NO_ALT_ENTER);
 
-		gSwapChain->SetMaximumFrameLatency(NUM_BACK_BUFFERS);
+		gSwapChain->SetMaximumFrameLatency(kFrameInFlightCount);
 		gSwapChainWaitableObject = gSwapChain->GetFrameLatencyWaitableObject();
 	}
 
@@ -1525,8 +1563,10 @@ static void sCleanupDeviceD3D()
 	gSafeRelease(gSwapChain);
 	gSafeCloseHandle(gSwapChainWaitableObject);
 
-	for (UINT i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
+	for (UINT i = 0; i < kFrameInFlightCount; i++)
 		gFrameContexts[i].Reset();
+
+	gCPUContext.Reset();
 
 	gConstantBuffer = nullptr;
 	gDebugBuffer = nullptr;
