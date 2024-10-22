@@ -28,10 +28,6 @@ HANDLE                       		gSwapChainWaitableObject = nullptr;
 
 HMODULE								gPIXHandle = nullptr;
 
-// Application
-ComPtr<ID3D12Resource>				gConstantBuffer = nullptr;
-ComPtr<ID3D12Resource>				gDebugBuffer = nullptr;
-
 // Frame
 FrameContext						gFrameContexts[kFrameInFlightCount] = {};
 uint32_t							gFrameIndex = 0;
@@ -39,6 +35,76 @@ uint32_t							gFrameIndex = 0;
 // CPU
 CPUContext							gCPUContext;
 Constants							gConstants = {};
+
+void Buffer::Initialize()
+{
+	uint byte_count = gAlignUp(mByteCount, static_cast<uint>(D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
+
+	if (mGPU)
+	{
+		D3D12_RESOURCE_DESC resource_desc = gGetBufferResourceDesc(byte_count);
+		D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
+
+		if (mUAVIndex != ViewDescriptorIndex::Invalid)
+			resource_desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+
+		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mResource)));
+		gSetName(mResource, "Buffer.", mName, "");
+
+		if (mCBVIndex != ViewDescriptorIndex::Invalid)
+		{
+			D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
+			desc.SizeInBytes = byte_count;
+			desc.BufferLocation = mResource->GetGPUVirtualAddress();
+		
+			for (int i = 0; i < kFrameInFlightCount; i++)
+				gDevice->CreateConstantBufferView(&desc, gFrameContexts[i].mViewDescriptorHeap.GetCPUHandle(mCBVIndex));
+		}
+	
+		if (mUAVIndex != ViewDescriptorIndex::Invalid)
+		{
+			D3D12_UNORDERED_ACCESS_VIEW_DESC desc = {};
+			desc.Format = DXGI_FORMAT_UNKNOWN;
+			desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+			desc.Buffer.NumElements = 1;
+			desc.Buffer.StructureByteStride = byte_count;
+			desc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
+
+			for (int i = 0; i < kFrameInFlightCount; i++)
+				gDevice->CreateUnorderedAccessView(mResource.Get(), nullptr, &desc, gFrameContexts[i].mViewDescriptorHeap.GetCPUHandle(mUAVIndex));
+		}
+	}
+
+	if (mUpload)
+	{
+		for (int i = 0; i < kFrameInFlightCount; i++)
+		{
+			D3D12_RESOURCE_DESC upload_resource_desc = gGetBufferResourceDesc(byte_count);
+			D3D12_HEAP_PROPERTIES upload_props = gGetUploadHeapProperties();
+
+			gValidate(gDevice->CreateCommittedResource(&upload_props, D3D12_HEAP_FLAG_NONE, &upload_resource_desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mUploadResource[i])));
+			gSetName(mUploadResource[i], "Buffer.", mName, ".Upload" + gToString(i));
+
+			// Persistent map - https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12resource-map#advanced-usage-models
+			mUploadResource[i]->Map(0, nullptr, reinterpret_cast<void**>(&mUploadPointer[i]));
+		}
+	}
+
+	if (mReadback)
+	{
+		for (int i = 0; i < kFrameInFlightCount; i++)
+		{
+			D3D12_RESOURCE_DESC readback_resource_desc = gGetBufferResourceDesc(byte_count);
+			D3D12_HEAP_PROPERTIES readback_props = gGetReadbackHeapProperties();
+
+			gValidate(gDevice->CreateCommittedResource(&readback_props, D3D12_HEAP_FLAG_NONE, &readback_resource_desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&mReadbackResource[i])));
+			gSetName(mReadbackResource[i], "Buffer.", mName, ".Readback" + gToString(i));
+
+			// Persistent map - https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12resource-map#advanced-usage-models
+			mReadbackResource[i]->Map(0, nullptr, reinterpret_cast<void**>(&mReadbackPointer[i]));
+		}
+	}
+}
 
 int Texture::GetPixelSize() const
 {
@@ -88,7 +154,7 @@ void Texture::Initialize()
 			desc.Texture2D.MipLevels = (UINT)-1;
 			desc.Texture2D.MostDetailedMip = 0;
 			desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			gDevice->CreateShaderResourceView(mResource.Get(), &desc, gFrameContexts[i].mViewDescriptorHeap.GetHandle(mSRVIndex));
+			gDevice->CreateShaderResourceView(mResource.Get(), &desc, gFrameContexts[i].mViewDescriptorHeap.GetCPUHandle(mSRVIndex));
 		}
 	}
 
@@ -111,7 +177,8 @@ void Texture::Initialize()
 				desc.Texture3D.FirstWSlice = 0;
 				desc.Texture3D.WSize = resource_desc.DepthOrArraySize;
 			}
-			gDevice->CreateUnorderedAccessView(mResource.Get(), nullptr, &desc, gFrameContexts[i].mViewDescriptorHeap.GetHandle(mUAVIndex));
+			gDevice->CreateUnorderedAccessView(mResource.Get(), nullptr, &desc, gFrameContexts[i].mViewDescriptorHeap.GetCPUHandle(mUAVIndex));
+			gDevice->CreateUnorderedAccessView(mResource.Get(), nullptr, &desc, gFrameContexts[i].mClearDescriptorHeap.GetCPUHandle(mUAVIndex));
 		}
 	}
 
@@ -133,7 +200,7 @@ void Texture::Initialize()
 			desc.Texture3D.FirstWSlice = 0;
 			desc.Texture3D.WSize = resource_desc.DepthOrArraySize;
 		}
-		gDevice->CreateRenderTargetView(mResource.Get(), &desc, gCPUContext.mRTVDescriptorHeap.GetHandle(mRTVIndex));
+		gDevice->CreateRenderTargetView(mResource.Get(), &desc, gCPUContext.mRTVDescriptorHeap.GetCPUHandle(mRTVIndex));
 	}
 
 	// DSV
@@ -142,7 +209,7 @@ void Texture::Initialize()
 		D3D12_DEPTH_STENCIL_VIEW_DESC desc = {};
 		desc.Format = mFormat;
 		desc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-		gDevice->CreateDepthStencilView(mResource.Get(), &desc, gCPUContext.mDSVDescriptorHeap.GetHandle(mDSVIndex));
+		gDevice->CreateDepthStencilView(mResource.Get(), &desc, gCPUContext.mDSVDescriptorHeap.GetCPUHandle(mDSVIndex));
 	}
 
 	// UIScale

@@ -891,16 +891,13 @@ void CameraVolumes(
 	float2 pixPos = inDispatchThreadID.xy + 0.5; // half pixel offset
 	float2 dims = float2(32, 32);
 
-	float2 d = ((pixPos / dims) * 2.f - 1.f); // 0~1 => -1~1
-	d.y = -d.y;
-
-	float3 right = mConstants.CameraLeft().xyz * mConstants.mCameraLeftExtend;
-	float3 up = mConstants.CameraUp().xyz * mConstants.mCameraUpExtend;
-
-	// Debug
-	right = -right; // handness?
-
-	float3 WorldDir = normalize(mConstants.CameraFront().xyz + right * d.x + up * d.y);
+	float2 ndc_xy								= ((pixPos / dims) * 2.f - 1.f);										// [0,1] => [-1,1]
+	ndc_xy.y									= -ndc_xy.y;															// Flip y
+	float4 point_on_near_plane					= mul(mConstants.mInverseProjectionMatrix, float4(ndc_xy, 0.0, 1.0));
+	float3 ray_direction_vs						= normalize(point_on_near_plane.xyz / point_on_near_plane.w);
+	float3 ray_direction_ws						= mul(mConstants.mInverseViewMatrix, float4(ray_direction_vs, 0.0)).xyz;
+	
+	float3 WorldDir = ray_direction_ws;
 	WorldDir.xyz = WorldDir.xzy; // Y-up to Z-up
 	float3 SunDir = mConstants.mSunDirection.xzy; // Y-up to Z-up
 

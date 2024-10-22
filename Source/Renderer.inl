@@ -353,7 +353,7 @@ ShaderTable gCreateShaderTable(const Shader& inShader)
 			shader_table_entries.push_back({});
 			memcpy(&shader_table_entries.back().mShaderIdentifier, state_object_properties->GetShaderIdentifier(gRenderer.mRuntime.mRayGenerationShader.mRayGenerationName), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 			shader_table_entries.back().mLocalConstants.mShaderIndex = static_cast<uint32_t>(shader_table_entries.size() - 1);
-			shader_table_entries.back().mLocalCBV = gConstantBuffer->GetGPUVirtualAddress();
+			shader_table_entries.back().mLocalCBV = gRenderer.mRuntime.mConstantsBuffer.mResource->GetGPUVirtualAddress();
 			shader_table_entries.back().mLocalSRVs = gGetFrameContext().mViewDescriptorHeap.GetGPUHandle(ViewDescriptorIndex::Invalid);
 
 			shader_table.mRayGenCount = shader_table_entries.size() - shader_table.mRayGenOffset;
@@ -366,7 +366,7 @@ ShaderTable gCreateShaderTable(const Shader& inShader)
 			shader_table_entries.push_back({});
 			memcpy(&shader_table_entries.back().mShaderIdentifier, state_object_properties->GetShaderIdentifier(gRenderer.mRuntime.mMissShader.mMissName), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 			shader_table_entries.back().mLocalConstants.mShaderIndex = static_cast<uint32_t>(shader_table_entries.size() - 1);
-			shader_table_entries.back().mLocalCBV = gConstantBuffer->GetGPUVirtualAddress();
+			shader_table_entries.back().mLocalCBV = gRenderer.mRuntime.mConstantsBuffer.mResource->GetGPUVirtualAddress();
 			shader_table_entries.back().mLocalSRVs = gGetFrameContext().mViewDescriptorHeap.GetGPUHandle(ViewDescriptorIndex::Invalid);
 
 			shader_table.mMissCount = shader_table_entries.size() - shader_table.mMissOffset;
@@ -382,7 +382,7 @@ ShaderTable gCreateShaderTable(const Shader& inShader)
 				shader_table_entries.push_back({});
 				memcpy(&shader_table_entries.back().mShaderIdentifier, state_object_properties->GetShaderIdentifier(shader.HitGroupName().c_str()), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 				shader_table_entries.back().mLocalConstants.mShaderIndex = static_cast<uint32_t>(shader_table_entries.size() - 1);
-				shader_table_entries.back().mLocalCBV = gConstantBuffer->GetGPUVirtualAddress();
+				shader_table_entries.back().mLocalCBV = gRenderer.mRuntime.mConstantsBuffer.mResource->GetGPUVirtualAddress();
 				shader_table_entries.back().mLocalSRVs = gGetFrameContext().mViewDescriptorHeap.GetGPUHandle(ViewDescriptorIndex::Invalid);
 			}
 
@@ -569,10 +569,10 @@ bool gCreateVSPSPipelineState(const char* inShaderFileName, const char* inVSName
 	pipeline_state_desc.RasterizerState = rasterizer_desc;
 	pipeline_state_desc.BlendState = blend_desc;
 	pipeline_state_desc.DepthStencilState.DepthEnable = TRUE;
-	pipeline_state_desc.DepthStencilState.DepthWriteMask = ioShader.mDSVFormat != DXGI_FORMAT_UNKNOWN ? D3D12_DEPTH_WRITE_MASK_ALL : D3D12_DEPTH_WRITE_MASK_ZERO;
-	pipeline_state_desc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+	pipeline_state_desc.DepthStencilState.DepthWriteMask = ioShader.mDepthWrite ? D3D12_DEPTH_WRITE_MASK_ALL : D3D12_DEPTH_WRITE_MASK_ZERO;
+	pipeline_state_desc.DepthStencilState.DepthFunc = ioShader.mDepthFunc;
 	pipeline_state_desc.SampleMask = UINT_MAX;
-	pipeline_state_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	pipeline_state_desc.PrimitiveTopologyType = ioShader.mTopology;
 	pipeline_state_desc.NumRenderTargets = ioShader.mRTVFormat != DXGI_FORMAT_UNKNOWN ? 1 : 0;
 	pipeline_state_desc.RTVFormats[0] = ioShader.mRTVFormat;
 	pipeline_state_desc.DSVFormat = ioShader.mDSVFormat;

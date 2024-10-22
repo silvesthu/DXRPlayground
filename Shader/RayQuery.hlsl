@@ -34,18 +34,15 @@ void TraceRay(inout PixelContext ioPixelContext)
 	default: break;
 	}
 
-	float2 ndc_xy								= ((screen_coords / screen_size) * 2.f - 1.f);	// [0,1] => [-1,1]
-	ndc_xy.y									= -ndc_xy.y;									// Flip y
-	
-	// [TODO] Fix fov first
-	float4 point_on_near_plane					= mul(mConstants.mInverseViewProjectionMatrix, float4(ndc_xy, 1.0, 1.0));
-	point_on_near_plane.xyzw					/= point_on_near_plane.w;
-	float3 ray_direction						= normalize(point_on_near_plane.xyz);
+	float2 ndc_xy								= ((screen_coords / screen_size) * 2.f - 1.f);							// [0,1] => [-1,1]
+	ndc_xy.y									= -ndc_xy.y;															// Flip y
+	float4 point_on_near_plane					= mul(mConstants.mInverseProjectionMatrix, float4(ndc_xy, 0.0, 1.0));
+	float3 ray_direction_vs						= normalize(point_on_near_plane.xyz / point_on_near_plane.w);
+	float3 ray_direction_ws						= mul(mConstants.mInverseViewMatrix, float4(ray_direction_vs, 0.0)).xyz;
 
 	RayDesc ray;
 	ray.Origin									= mConstants.CameraPosition().xyz;
-	// ray.Direction								= ray_direction;
-	ray.Direction								= normalize(mConstants.CameraFront().xyz + mConstants.CameraLeft().xyz * mConstants.mCameraLeftExtend * ndc_xy.x + mConstants.CameraUp().xyz * mConstants.mCameraUpExtend * ndc_xy.y);
+	ray.Direction								= ray_direction_ws;
 	ray.TMin									= 0.001;
 	ray.TMax									= 100000;
 
@@ -112,6 +109,10 @@ void TraceRay(inout PixelContext ioPixelContext)
 			hit_context.mRayTCurrent			= query.CommittedRayT();
 			hit_context.mBarycentrics			= float3(1.0 - attributes.barycentrics.x - attributes.barycentrics.y, attributes.barycentrics.x, attributes.barycentrics.y);
 
+			// Ray inspection
+			if (ioPixelContext.mPixelIndex.x == mConstants.mPixelDebugCoord.x && ioPixelContext.mPixelIndex.y == mConstants.mPixelDebugCoord.y)
+				RayInspectionUAV[0].mPositionWS[path_context.mRecursionDepth] = float4(hit_context.PositionWS(), 1.0);
+
 			// Vertex attributes
 			{
 				// Only support 32bit index for simplicity
@@ -135,7 +136,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 			{
 				// Report InstanceID of instance at PixelDebugCoord
 				if (ioPixelContext.mPixelIndex.x == mConstants.mPixelDebugCoord.x && ioPixelContext.mPixelIndex.y == mConstants.mPixelDebugCoord.y && path_context.mRecursionDepth == 0)
-					BufferDebugUAV[0].mPixelInstanceID			= hit_context.mInstanceID;
+					PixelInspectionUAV[0].mPixelInstanceID			= hit_context.mInstanceID;
 				
 				DebugValue(PixelDebugMode::PositionWS, path_context.mRecursionDepth, float3(hit_context.PositionWS()));
 				DebugValue(PixelDebugMode::DirectionWS, path_context.mRecursionDepth, float3(hit_context.DirectionWS()));

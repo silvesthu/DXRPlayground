@@ -7,11 +7,14 @@ void Renderer::Initialize()
 {
 	gInitializeDxcInterfaces();
 
-	InitializeShaders();
-	InitializeScreenSizeTextures();
-
 	for (auto&& texture : mRuntime.mTextures)
 		texture.Initialize();
+	
+	for (auto&& buffer : mRuntime.mBuffers)
+		buffer.Initialize();
+
+	InitializeShaders();
+	InitializeScreenSizeTextures();
 }
 
 void Renderer::Finalize()
@@ -51,7 +54,7 @@ void Renderer::InitializeScreenSizeTextures()
 		mRuntime.mBackBuffers[i].mFormat = swap_chain_desc.Format;
 
 		RTVDescriptorIndex index = RTVDescriptorIndex((uint)mRuntime.mBackBuffers[i].mRTVIndex);
-		D3D12_CPU_DESCRIPTOR_HANDLE handle = gCPUContext.mRTVDescriptorHeap.GetHandle(index);
+		D3D12_CPU_DESCRIPTOR_HANDLE handle = gCPUContext.mRTVDescriptorHeap.GetCPUHandle(index);
 		gDevice->CreateRenderTargetView(mRuntime.mBackBuffers[i].mResource.Get(), nullptr, handle);
 	}
 

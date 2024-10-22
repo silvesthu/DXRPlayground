@@ -296,16 +296,16 @@ void DebugModeValue(DebugMode inDebugMode, float3 inValue)
 void DebugValueInit()
 {
     if (sDebugDispatchRaysIndex.x == mConstants.mPixelDebugCoord.x && sDebugDispatchRaysIndex.y == mConstants.mPixelDebugCoord.y)
-        for (int i = 0; i < Debug::kValueArraySize; i++)
-            BufferDebugUAV[0].mPixelValueArray[i] = 0;
+        for (int i = 0; i < PixelInspection::kArraySize; i++)
+            PixelInspectionUAV[0].mPixelValueArray[i] = 0;
 }
 
 void DebugValue(PixelDebugMode inPixelDebugMode, uint inRecursionDepth, float3 inValue)
 {
     if (mConstants.mPixelDebugMode == inPixelDebugMode)
     {
-        if (sDebugDispatchRaysIndex.x == mConstants.mPixelDebugCoord.x && sDebugDispatchRaysIndex.y == mConstants.mPixelDebugCoord.y && inRecursionDepth < Debug::kValueArraySize)
-            BufferDebugUAV[0].mPixelValueArray[inRecursionDepth] = float4(inValue, 1.0); // 1.0 indicate value is written
+        if (sDebugDispatchRaysIndex.x == mConstants.mPixelDebugCoord.x && sDebugDispatchRaysIndex.y == mConstants.mPixelDebugCoord.y && inRecursionDepth < PixelInspection::kArraySize)
+            PixelInspectionUAV[0].mPixelValueArray[inRecursionDepth] = float4(inValue, 1.0); // 1.0 indicate value is written
 
         if (mConstants.mPixelDebugRecursion == inRecursionDepth)
         {

@@ -76,7 +76,8 @@ static StructuredBuffer<float2> UVs = ResourceDescriptorHeap[(uint)ViewDescripto
 static StructuredBuffer<Light> Lights = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::RaytraceLightsSRV];
 static RWStructuredBuffer<EncodedTriangleLight> EncodedTriangleLights = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::RaytraceEncodedTriangleLightsUAV];
 
-static RWStructuredBuffer<Debug> BufferDebugUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::BufferDebugUAV];
+static RWStructuredBuffer<PixelInspection> PixelInspectionUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::PixelInspectionUAV];
+static RWStructuredBuffer<RayInspection> RayInspectionUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RayInspectionUAV];
 
 static Texture2D<float4> UVCheckerMap = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::UVCheckerMap];
 static Texture2D<float4> IESSRV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::IESSRV];

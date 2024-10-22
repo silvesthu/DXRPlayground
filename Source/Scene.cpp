@@ -1044,7 +1044,7 @@ void Scene::InitializeViews()
 		desc.RaytracingAccelerationStructure.Location = inResource->GetGPUVirtualAddress();
 
 		for (int i = 0; i < kFrameInFlightCount; i++)
-			gDevice->CreateShaderResourceView(nullptr, &desc, gFrameContexts[i].mViewDescriptorHeap.GetHandle(inViewDescriptorIndex));
+			gDevice->CreateShaderResourceView(nullptr, &desc, gFrameContexts[i].mViewDescriptorHeap.GetCPUHandle(inViewDescriptorIndex));
 	};
 	create_acceleration_structure_SRV(mTLAS->GetResource(), ViewDescriptorIndex::RaytraceTLASSRV);
 
@@ -1059,7 +1059,7 @@ void Scene::InitializeViews()
 		desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
 
 		for (int i = 0; i < kFrameInFlightCount; i++)
-			gDevice->CreateShaderResourceView(inResource, &desc, gFrameContexts[i].mViewDescriptorHeap.GetHandle(inViewDescriptorIndex));
+			gDevice->CreateShaderResourceView(inResource, &desc, gFrameContexts[i].mViewDescriptorHeap.GetCPUHandle(inViewDescriptorIndex));
 	};
 	create_buffer_SRV(mBuffers.mInstanceDatas.Get(), sizeof(InstanceData), ViewDescriptorIndex::RaytraceInstanceDataSRV);
 	create_buffer_SRV(mBuffers.mIndices.Get(), sizeof(IndexType), ViewDescriptorIndex::RaytraceIndicesSRV);
@@ -1078,7 +1078,7 @@ void Scene::InitializeViews()
 		desc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
 
 		for (int i = 0; i < kFrameInFlightCount; i++)
-			gDevice->CreateUnorderedAccessView(inResource, nullptr, &desc, gFrameContexts[i].mViewDescriptorHeap.GetHandle(inViewDescriptorIndex));
+			gDevice->CreateUnorderedAccessView(inResource, nullptr, &desc, gFrameContexts[i].mViewDescriptorHeap.GetCPUHandle(inViewDescriptorIndex));
 	};
 
 	create_buffer_UAV(mBuffers.mEncodedTriangleLights.Get(), sizeof(EncodedTriangleLight), ViewDescriptorIndex::RaytraceEncodedTriangleLightsUAV);

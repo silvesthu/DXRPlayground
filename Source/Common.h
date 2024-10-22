@@ -288,6 +288,7 @@ struct DescriptorHeap
 {
 	D3D12_DESCRIPTOR_HEAP_TYPE				mType = D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES;
 	int										mCount = 0; // [TODO] Support dynamic range when necessary
+	bool									mForceCPU = false;
 
 	ComPtr<ID3D12DescriptorHeap>			mHeap;
 	SIZE_T									mIncrementSize;
@@ -309,7 +310,7 @@ struct DescriptorHeap
 
 		Reset();
 
-		bool shader_visible = mType == D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV || mType == D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER;
+		bool shader_visible = !mForceCPU && mType == D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV || mType == D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER;
 
 		D3D12_DESCRIPTOR_HEAP_DESC desc = {};
 		desc.NumDescriptors = mCount;
@@ -325,7 +326,7 @@ struct DescriptorHeap
 		gAssert((mGPUHandleStart.ptr & ImGui_ImplDX12_ImTextureID_Mask_3D) == 0);
 	}
 
-	D3D12_CPU_DESCRIPTOR_HANDLE GetHandle(DescriptorIndex inIndex)
+	D3D12_CPU_DESCRIPTOR_HANDLE GetCPUHandle(DescriptorIndex inIndex)
 	{
 		D3D12_CPU_DESCRIPTOR_HANDLE handle = {};
 		handle = mCPUHandleStart;
@@ -362,6 +363,9 @@ struct Shader
 	SHADER_MEMBER(const wchar_t*, ClosestHitName, nullptr);
 	SHADER_MEMBER(const wchar_t*, IntersectionName, nullptr);
 	SHADER_MEMBER(const Shader*, RootSignatureReference, nullptr);
+	SHADER_MEMBER(D3D12_PRIMITIVE_TOPOLOGY_TYPE, Topology, D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+	SHADER_MEMBER(bool, DepthWrite, false);
+	SHADER_MEMBER(D3D12_COMPARISON_FUNC, DepthFunc, D3D12_COMPARISON_FUNC_ALWAYS);
 	SHADER_MEMBER(DXGI_FORMAT, RTVFormat, DXGI_FORMAT_UNKNOWN);
 	SHADER_MEMBER(DXGI_FORMAT, DSVFormat, DXGI_FORMAT_UNKNOWN);
 	const wchar_t* HitName() const { return mAnyHitName != nullptr ? mAnyHitName : (mClosestHitName != nullptr ? mClosestHitName : mIntersectionName); }
@@ -385,6 +389,29 @@ struct Shader
 		ComPtr<ID3D12StateObject>					mStateObject;
 	};
 	Data mData;
+};
+
+struct Buffer
+{
+#define BUFFER_MEMBER(type, name, default_value) MEMBER(Buffer, type, name, default_value)
+
+	BUFFER_MEMBER(uint,						ByteCount,		0);
+	BUFFER_MEMBER(std::string,				Name,			"");
+	BUFFER_MEMBER(ViewDescriptorIndex,		CBVIndex,		ViewDescriptorIndex::Invalid);
+	BUFFER_MEMBER(ViewDescriptorIndex,		UAVIndex,		ViewDescriptorIndex::Invalid);
+	BUFFER_MEMBER(bool,						GPU,			true);
+	BUFFER_MEMBER(bool,						Upload,			false);
+	BUFFER_MEMBER(bool,						Readback,		false);
+	
+	void Initialize();
+	template <typename T>
+	T* ReadbackAs(uint inFrameContextIndex) { return static_cast<T*>(mReadbackPointer[inFrameContextIndex]); }
+
+	ComPtr<ID3D12Resource>					mResource;
+	ComPtr<ID3D12Resource>					mUploadResource[kFrameInFlightCount];
+	void*									mUploadPointer[kFrameInFlightCount] = { nullptr };
+	ComPtr<ID3D12Resource>					mReadbackResource[kFrameInFlightCount];
+	void*									mReadbackPointer[kFrameInFlightCount] = { nullptr };
 };
 
 struct Texture
@@ -460,44 +487,31 @@ public:
 	RuntimeBase& operator=(const RuntimeBase&&) = delete;
 };
 
-extern ComPtr<ID3D12Resource>				gConstantBuffer;
-extern ComPtr<ID3D12Resource>				gDebugBuffer;
-
 struct FrameContext
 {
 	ComPtr<ID3D12CommandAllocator>			mCommandAllocator;
 
-	ComPtr<ID3D12Resource>					mConstantUploadBuffer;
-	Constants*								mConstantUploadBufferPointer = nullptr;
-
-	ComPtr<ID3D12Resource>					mQueryReadbackBuffer;
-	UINT64*									mQueryReadbackBufferPointer = nullptr;
-
-	ComPtr<ID3D12Resource>					mDebugReadbackBuffer;
-	Debug*									mDebugReadbackBufferPointer = nullptr;
-
 	uint64_t								mFenceValue = 0;
 
-	DescriptorHeap<ViewDescriptorIndex>		mViewDescriptorHeap		{ .mType = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, .mCount = 4096 };
-	DescriptorHeap<SamplerDescriptorIndex>	mSamplerDescriptorHeap	{ .mType = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, .mCount = 128 };
+	DescriptorHeap<ViewDescriptorIndex>		mViewDescriptorHeap			{ .mType = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, .mCount = 4096 };
+	DescriptorHeap<SamplerDescriptorIndex>	mSamplerDescriptorHeap		{ .mType = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, .mCount = 128 };
+
+	// For ClearUnorderedAccessViewFloat, what is the best practice for this? Create on the fly?
+	DescriptorHeap<ViewDescriptorIndex>		mClearDescriptorHeap		{ .mType = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, .mCount = 4096, .mForceCPU = true };
 
 	void Reset()
 	{
 		mCommandAllocator					= nullptr;
-		mConstantUploadBuffer				= nullptr;
-		mConstantUploadBufferPointer		= nullptr;
-		mQueryReadbackBuffer				= nullptr;
-		mQueryReadbackBufferPointer			= nullptr;
-		mDebugReadbackBuffer				= nullptr;
-		mDebugReadbackBufferPointer			= nullptr;
 		mFenceValue							= 0;
 		mViewDescriptorHeap.Reset();
 		mSamplerDescriptorHeap.Reset();
+		mClearDescriptorHeap.Reset();
 	}
 };
 extern FrameContext							gFrameContexts[];
 extern uint32_t								gFrameIndex;
-inline FrameContext&						gGetFrameContext() { return gFrameContexts[gFrameIndex % kFrameInFlightCount]; }
+inline uint32_t								gGetFrameContextIndex() { return gFrameIndex % kFrameInFlightCount; }
+inline FrameContext&						gGetFrameContext() { return gFrameContexts[gGetFrameContextIndex()]; }
 
 struct CPUContext
 {

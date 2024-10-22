@@ -77,12 +77,16 @@ float3 RemoveSRGBCurve( float3 x )
 float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 {
 	RWTexture2D<float4> screen_color = ResourceDescriptorHeap[(int)ViewDescriptorIndex::ScreenColorUAV];
+	RWTexture2D<float4> screen_debug = ResourceDescriptorHeap[(int)ViewDescriptorIndex::ScreenDebugUAV];
 
 	uint2 coords = (uint2)position.xy;
 	float4 color = screen_color[position.xy];
 	bool debug_pixel = all(coords == mConstants.mPixelDebugCoord);
 	if (debug_pixel)
-		BufferDebugUAV[0].mPixelValue = color;
+	{
+		PixelInspectionUAV[0].mPixelValue = color;
+		PixelInspectionUAV[0].mDebugValue = screen_debug[position.xy];
+	}
 	
 	// For visualization
 	switch (mConstants.mDebugMode)
@@ -126,12 +130,33 @@ void ClearCS(
 {
 	if (inDispatchThreadID.x == 0)
 	{
-		BufferDebugUAV[0].mPixelValue = 0;
-		BufferDebugUAV[0].mPixelInstanceID = -1;
+		PixelInspectionUAV[0].mPixelValue = 0;
+		PixelInspectionUAV[0].mDebugValue = 0;
+		PixelInspectionUAV[0].mPixelInstanceID = -1;
 	}
 
-	if (inDispatchThreadID.x < Debug::kValueArraySize)
+	if (inDispatchThreadID.x < PixelInspection::kArraySize)
 	{
-		BufferDebugUAV[0].mPixelValueArray[inDispatchThreadID.x] = 0;
+		PixelInspectionUAV[0].mPixelValueArray[inDispatchThreadID.x] = 0;
 	}
+
+	if (inDispatchThreadID.x < RayInspection::kArraySize)
+	{
+		RayInspectionUAV[0].mPositionWS[inDispatchThreadID.x] = 0;
+		RayInspectionUAV[0].mNormalWS[inDispatchThreadID.x] = 0;
+	}
+}
+
+float4 LineVS(uint inVertexID : SV_VertexID) : SV_POSITION
+{
+	float4 position_ws = RayInspectionUAV[0].mPositionWS[inVertexID];
+	float4 position_ps = mul(mConstants.mViewProjectionMatrix, position_ws);
+	position_ps = position_ps / position_ps.w; 
+	return position_ps;
+}
+
+[RootSignature(ROOT_SIGNATURE_COMMON)]
+float4 LinePS(float4 position : SV_POSITION) : SV_TARGET
+{
+	return 1.0;
 }

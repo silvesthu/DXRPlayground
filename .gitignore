@@ -26,3 +26,6 @@ bld/
 [Bb]in/
 [Oo]bj/
 [Ll]og/
+
+#Rider
+.idea/

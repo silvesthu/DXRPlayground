@@ -180,7 +180,8 @@ static void sPrepareImGui()
 		{
 			ImGui::InputInt2("Coords", (int*)&gConstants.mPixelDebugCoord);
 			ImGui::SliderInt("Light Index", &gConstants.mPixelDebugLightIndex, 0, (int)gScene.GetSceneContent().mLights.size() - 1);
-			ImGui::InputFloat3("Pixel Value", &gGetFrameContext().mDebugReadbackBufferPointer->mPixelValue.x, "%.8f", ImGuiInputTextFlags_ReadOnly);
+			ImGui::InputFloat3("Pixel Value", &gRenderer.mRuntime.mPixelInspectionBuffer.ReadbackAs<PixelInspection>(gGetFrameContextIndex())->mPixelValue.x, "%.8f", ImGuiInputTextFlags_ReadOnly);
+			ImGui::InputFloat3("Debug Value", &gRenderer.mRuntime.mPixelInspectionBuffer.ReadbackAs<PixelInspection>(gGetFrameContextIndex())->mDebugValue.x, "%.8f", ImGuiInputTextFlags_ReadOnly);
 			ImGui::SliderInt("Recursion", &gConstants.mPixelDebugRecursion, 0, 16);
 			if (ImGui::TreeNodeEx("DebugValue For Each Recursion"))
 			{
@@ -199,8 +200,8 @@ static void sPrepareImGui()
 					ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mPixelDebugMode), i);
 				}
 
-				for (int i = 0; i < Debug::kValueArraySize; i++)
-					ImGui::InputFloat4(std::to_string(i).c_str(), &gGetFrameContext().mDebugReadbackBufferPointer->mPixelValueArray[i].x, "%.8f", ImGuiInputTextFlags_ReadOnly);
+				for (int i = 0; i < PixelInspection::kArraySize; i++)
+					ImGui::InputFloat4(std::to_string(i).c_str(), &gRenderer.mRuntime.mPixelInspectionBuffer.ReadbackAs<PixelInspection>(gGetFrameContextIndex())->mPixelValueArray[i].x, "%.8f", ImGuiInputTextFlags_ReadOnly);
 
 				ImGui::TreePop();
 			}
@@ -467,7 +468,7 @@ static void sPrepareImGui()
 						if (ImGui::Selectable(std::to_string(row).c_str(), row == gConstants.mDebugInstanceIndex, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_SelectOnNav))
 							gConstants.mDebugInstanceIndex = row;
 
-						if (row == gGetFrameContext().mDebugReadbackBufferPointer->mPixelInstanceID)
+						if (row == gRenderer.mRuntime.mPixelInspectionBuffer.ReadbackAs<PixelInspection>(gGetFrameContextIndex())->mPixelInstanceID)
 							ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, ImGui::GetColorU32(ImVec4(0.8f, 0.2f, 0.2f, 0.8f)));
 
 						ImGui::TableSetColumnIndex(column_index++);
@@ -570,7 +571,7 @@ static void sPrepareImGui()
 						if (ImGui::Selectable(std::to_string(row).c_str(), row == gConstants.mDebugLightIndex, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_SelectOnNav))
 							gConstants.mDebugLightIndex = row;
 
-						if ((int)light.mInstanceID == gGetFrameContext().mDebugReadbackBufferPointer->mPixelInstanceID)
+						if (static_cast<int>(light.mInstanceID) == gRenderer.mRuntime.mPixelInspectionBuffer.ReadbackAs<PixelInspection>(gGetFrameContextIndex())->mPixelInstanceID)
 							ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, ImGui::GetColorU32(ImVec4(0.8f, 0.2f, 0.2f, 0.8f)));
 
 						ImGui::TableSetColumnIndex(column_index++);
@@ -741,16 +742,14 @@ static void sUpdate()
 
 	// Setup matrices
 	{
-		float horizontal_fov_radian				= gCameraSettings.mHorizontalFovDegree * glm::pi<float>() / 180.0f;
-		float horizontal_tan					= glm::tan(horizontal_fov_radian * 0.5f);
-		gConstants.mCameraLeftExtend			= -horizontal_tan;
-		gConstants.mCameraUpExtend				= horizontal_tan * (gDisplaySettings.mRenderResolution.y * 1.0f / gDisplaySettings.mRenderResolution.x);
-
 		gConstants.mScreenWidth					= gRenderer.mScreenWidth;
 		gConstants.mScreenHeight				= gRenderer.mScreenHeight;
 
+		float horizontal_fov_radian				= gCameraSettings.mHorizontalFovDegree * glm::pi<float>() / 180.0f;
+		float horizontal_tan					= glm::tan(horizontal_fov_radian * 0.5f);
 		float vertical_tan						= horizontal_tan * (gDisplaySettings.mRenderResolution.y * 1.0f / gDisplaySettings.mRenderResolution.x);
 		float vertical_fov_radian				= glm::atan(vertical_tan) * 2.0f;
+		
 		gConstants.mViewMatrix					= glm::lookAtRH(float3(gConstants.CameraPosition()), float3(gConstants.CameraPosition() + gConstants.CameraFront()), float3(gConstants.CameraUp()));
 		gConstants.mProjectionMatrix			= glm::perspectiveFovRH_ZO(vertical_fov_radian, (float)gConstants.mScreenWidth, (float)gConstants.mScreenHeight, 0.1f, 1000.0f);
 		gConstants.mViewProjectionMatrix		= gConstants.mProjectionMatrix * gConstants.mViewMatrix;
@@ -797,15 +796,15 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 	{
 		for (glm::uint i = 0; i < kFrameInFlightCount; i++)
 		{
-			gDevice->CreateShaderResourceView(resource, &desc, gFrameContexts[i].mViewDescriptorHeap.GetHandle(ViewDescriptorIndex::ImGuiFont));
+			gDevice->CreateShaderResourceView(resource, &desc, gFrameContexts[i].mViewDescriptorHeap.GetCPUHandle(ViewDescriptorIndex::ImGuiFont));
 
 			D3D12_SHADER_RESOURCE_VIEW_DESC null_desc = {};
 			null_desc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
 			null_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 			null_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			gDevice->CreateShaderResourceView(nullptr, &null_desc, gFrameContexts[i].mViewDescriptorHeap.GetHandle(ViewDescriptorIndex::ImGuiNull2D));
+			gDevice->CreateShaderResourceView(nullptr, &null_desc, gFrameContexts[i].mViewDescriptorHeap.GetCPUHandle(ViewDescriptorIndex::ImGuiNull2D));
 			null_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
-			gDevice->CreateShaderResourceView(nullptr, &null_desc, gFrameContexts[i].mViewDescriptorHeap.GetHandle(ViewDescriptorIndex::ImGuiNull3D));
+			gDevice->CreateShaderResourceView(nullptr, &null_desc, gFrameContexts[i].mViewDescriptorHeap.GetCPUHandle(ViewDescriptorIndex::ImGuiNull3D));
 		}
 	};
 
@@ -1036,7 +1035,7 @@ void sRender()
 
 		{
 			Constants gpu_constants = gConstants;
-			memcpy(frame_context.mConstantUploadBufferPointer, &gpu_constants, sizeof(gConstants));
+			memcpy(gRenderer.mRuntime.mConstantsBuffer.mUploadPointer[gGetFrameContextIndex()], &gpu_constants, sizeof(gConstants));
 		}
 
 		{
@@ -1051,9 +1050,9 @@ void sRender()
 			gConstants.mCurrentFrameIndex = gMin(gConstants.mCurrentFrameIndex, accumulation_frame_count - 1);
 		}
 
-		gBarrierTransition(gCommandList, gConstantBuffer.Get(), D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, D3D12_RESOURCE_STATE_COPY_DEST);
-		gCommandList->CopyResource(gConstantBuffer.Get(), frame_context.mConstantUploadBuffer.Get());
-		gBarrierTransition(gCommandList, gConstantBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+		gBarrierTransition(gCommandList, gRenderer.mRuntime.mConstantsBuffer.mResource.Get(), D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, D3D12_RESOURCE_STATE_COPY_DEST);
+		gCommandList->CopyResource(gRenderer.mRuntime.mConstantsBuffer.mResource.Get(), gRenderer.mRuntime.mConstantsBuffer.mUploadResource[gGetFrameContextIndex()].Get());
+		gBarrierTransition(gCommandList, gRenderer.mRuntime.mConstantsBuffer.mResource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 	}
 
 	// Renderer
@@ -1088,12 +1087,15 @@ void sRender()
 	{
 		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Clear");
 
-		gRenderer.Setup(gRenderer.mRuntime.mClearShader.mData);
-		gCommandList->Dispatch((Debug::kValueArraySize + 63) / 64, 1, 1);
+		gRenderer.Setup(gRenderer.mRuntime.mClearShader);
+		gCommandList->Dispatch(gAlignUp(PixelInspection::kArraySize, 64u), 1, 1);
+
+		BarrierScope depth_scope(gCommandList, gRenderer.mRuntime.mScreenDebugTexture.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		gRenderer.ClearUnorderedAccessViewFloat(gRenderer.mRuntime.mScreenDebugTexture);
 
 		gBarrierUAV(gCommandList, nullptr);
 	}
-
+	
 	// Depth
 	{
 		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Depth");
@@ -1118,7 +1120,7 @@ void sRender()
 			.bottom = static_cast<LONG>(gRenderer.mScreenHeight),
 		};
 		gCommandList->RSSetScissorRects(1, &rect);
-		D3D12_CPU_DESCRIPTOR_HANDLE depth_cpu_handle = gCPUContext.mDSVDescriptorHeap.GetHandle(gRenderer.mRuntime.mScreenDepthTexture.mDSVIndex);
+		D3D12_CPU_DESCRIPTOR_HANDLE depth_cpu_handle = gCPUContext.mDSVDescriptorHeap.GetCPUHandle(gRenderer.mRuntime.mScreenDepthTexture.mDSVIndex);
 		gCommandList->OMSetRenderTargets(0, nullptr, false, &depth_cpu_handle);
 		gCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
@@ -1135,10 +1137,10 @@ void sRender()
 		for (const SceneContent::TriangleLightsInfo info : gScene.GetSceneContent().mTriangleLightsInfos)
 		{
 			const InstanceData& instance_data = gScene.GetSceneContent().mInstanceDatas[info.mInstanceDataIndex];
-			gRenderer.Setup(gRenderer.mRuntime.mPrepareLightsShader.mData);
+			gRenderer.Setup(gRenderer.mRuntime.mPrepareLightsShader);
 			uint constants[] = { info.mInstanceDataIndex, info.mTriangleLightsOffset };
 			gCommandList->SetComputeRoot32BitConstants((int)RootParameterIndex::ConstantsPrepareLights, 2, &constants, 0);
-			gCommandList->Dispatch((instance_data.mIndexCount / kIndexCountPerTriangle + 63) / 64, 1, 1);
+			gCommandList->Dispatch(gAlignUp(instance_data.mIndexCount / kIndexCountPerTriangle, 64u), 1, 1);
 		}
 
 		gBarrierUAV(gCommandList, nullptr);
@@ -1151,10 +1153,10 @@ void sRender()
 		DXGI_SWAP_CHAIN_DESC1 swap_chain_desc;
 		gSwapChain->GetDesc1(&swap_chain_desc);
 
-		gRenderer.Setup(gRenderer.mRuntime.mRayQueryShader.mData);
-		UINT64 timestamp = gTiming.TimestampBegin(frame_context.mQueryReadbackBufferPointer);
-		gCommandList->Dispatch((swap_chain_desc.Width + 7) / 8, (swap_chain_desc.Height + 7) / 8, 1);
-		gTiming.TimestampEnd(frame_context.mQueryReadbackBufferPointer, timestamp, gStats.mTimeInMS);
+		UINT64 timestamp = gTiming.TimestampBegin(gRenderer.mRuntime.mQueryBuffer.ReadbackAs<UINT64>(gGetFrameContextIndex()));
+		gRenderer.Setup(gRenderer.mRuntime.mRayQueryShader);
+		gCommandList->Dispatch(gAlignUp(swap_chain_desc.Width,  8u), gAlignUp(swap_chain_desc.Height, 8u), 1);
+		gTiming.TimestampEnd(gRenderer.mRuntime.mQueryBuffer.ReadbackAs<UINT64>(gGetFrameContextIndex()), timestamp, gStats.mTimeInMS);
 
 		gBarrierUAV(gCommandList, nullptr);
 	}
@@ -1188,7 +1190,7 @@ void sRender()
 			dispatch_rays_desc.HitGroupTable.SizeInBytes = gRenderer.mRuntime.mLibShaderTable.mEntrySize * gRenderer.mRuntime.mLibShaderTable.mHitGroupCount;
 		}
 
-		gRenderer.Setup(gRenderer.mRuntime.mLibShader.mData);
+		gRenderer.Setup(gRenderer.mRuntime.mLibShader);
 		gCommandList->DispatchRays(&dispatch_rays_desc);
 
 		gBarrierUAV(gCommandList, nullptr);
@@ -1199,6 +1201,7 @@ void sRender()
 		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Composite");
 
 		gBarrierTransition(gCommandList, back_buffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		BarrierScope depth_scope(gCommandList, gRenderer.mRuntime.mScreenDepthTexture.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_DEPTH_READ);
 
 		D3D12_VIEWPORT viewport =
 		{
@@ -1218,21 +1221,26 @@ void sRender()
 			.bottom = static_cast<LONG>(gRenderer.mScreenHeight),
 		};
 		gCommandList->RSSetScissorRects(1, &rect);
-		D3D12_CPU_DESCRIPTOR_HANDLE back_buffer_cpu_handle = gCPUContext.mRTVDescriptorHeap.GetHandle(gRenderer.mRuntime.mBackBuffers[back_buffer_index].mRTVIndex);
-		gCommandList->OMSetRenderTargets(1, &back_buffer_cpu_handle, false, nullptr);
-		gCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		D3D12_CPU_DESCRIPTOR_HANDLE back_buffer_cpu_handle = gCPUContext.mRTVDescriptorHeap.GetCPUHandle(gRenderer.mRuntime.mBackBuffers[back_buffer_index].mRTVIndex);
+		D3D12_CPU_DESCRIPTOR_HANDLE depth_cpu_handle = gCPUContext.mDSVDescriptorHeap.GetCPUHandle(gRenderer.mRuntime.mScreenDepthTexture.mDSVIndex);
+		gCommandList->OMSetRenderTargets(1, &back_buffer_cpu_handle, false, &depth_cpu_handle);
 
+		gCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		gRenderer.Setup(gRenderer.mRuntime.mCompositeShader);
 		gCommandList->DrawInstanced(3, 1, 0, 0);
+
+		gCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINESTRIP);
+		gRenderer.Setup(gRenderer.mRuntime.mLineShader);
+		gCommandList->DrawInstanced(RayInspection::kArraySize, 1, 0, 0);
 	}
 
 	// Readback
 	{
 		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Readback");
 
-		gBarrierTransition(gCommandList, gDebugBuffer.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_SOURCE);
-		gCommandList->CopyResource(frame_context.mDebugReadbackBuffer.Get(), gDebugBuffer.Get());
-		gBarrierTransition(gCommandList, gDebugBuffer.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COMMON);
+		gBarrierTransition(gCommandList, gRenderer.mRuntime.mPixelInspectionBuffer.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_SOURCE);
+		gCommandList->CopyResource(gRenderer.mRuntime.mPixelInspectionBuffer.mReadbackResource[gGetFrameContextIndex()].Get(), gRenderer.mRuntime.mPixelInspectionBuffer.mResource.Get());
+		gBarrierTransition(gCommandList, gRenderer.mRuntime.mPixelInspectionBuffer.mResource.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COMMON);
 	}
 
 SkipRender:
@@ -1247,7 +1255,7 @@ SkipRender:
 
 		ImGui::Render();
 
-		D3D12_CPU_DESCRIPTOR_HANDLE back_buffer_cpu_handle = gCPUContext.mRTVDescriptorHeap.GetHandle(gRenderer.mRuntime.mBackBuffers[back_buffer_index].mRTVIndex);
+		D3D12_CPU_DESCRIPTOR_HANDLE back_buffer_cpu_handle = gCPUContext.mRTVDescriptorHeap.GetCPUHandle(gRenderer.mRuntime.mBackBuffers[back_buffer_index].mRTVIndex);
 		gCommandList->OMSetRenderTargets(1, &back_buffer_cpu_handle, false, nullptr);
 
 		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), gCommandList);
@@ -1255,7 +1263,7 @@ SkipRender:
 
 	// Frame End
 	{
-		gTiming.FrameEnd(frame_context.mQueryReadbackBuffer.Get());
+		gTiming.FrameEnd(gRenderer.mRuntime.mQueryBuffer.mReadbackResource[gGetFrameContextIndex()].Get());
 
 		gBarrierTransition(gCommandList, back_buffer, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
 		gCommandList->Close();
@@ -1418,6 +1426,10 @@ static bool sCreateDeviceD3D(HWND hWnd)
 			name = L"FrameContext.SamplerDescriptorHeap_" + std::to_wstring(i);
 			gFrameContexts[i].mSamplerDescriptorHeap.mHeap->SetName(name.c_str());
 
+			gFrameContexts[i].mClearDescriptorHeap.Initialize();
+			name = L"FrameContext.ClearDescriptorHeap_" + std::to_wstring(i);
+			gFrameContexts[i].mClearDescriptorHeap.mHeap->SetName(name.c_str());
+
 			D3D12_SAMPLER_DESC sampler_descs[] =
 			{
 				{.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR, .AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP, .AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP, .AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP, .MipLODBias = 0, .MaxAnisotropy = 0, .ComparisonFunc = D3D12_COMPARISON_FUNC_NONE, .BorderColor = {0,0,0,0}, .MinLOD = 0, .MaxLOD = D3D12_FLOAT32_MAX },
@@ -1425,46 +1437,7 @@ static bool sCreateDeviceD3D(HWND hWnd)
 			};
 			static_assert(ARRAYSIZE(sampler_descs) == (int)SamplerDescriptorIndex::Count);
 			for (int sampler_index = 0; sampler_index < (int)SamplerDescriptorIndex::Count; sampler_index++)
-				gDevice->CreateSampler(&sampler_descs[sampler_index], gFrameContexts[i].mSamplerDescriptorHeap.GetHandle((SamplerDescriptorIndex)sampler_index));
-		}
-
-		// UploadBuffer
-		{
-			D3D12_RESOURCE_DESC resource_desc = gGetBufferResourceDesc(gAlignUp(static_cast<UINT>(sizeof(Constants)), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
-			D3D12_HEAP_PROPERTIES props = gGetUploadHeapProperties();
-
-			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&gFrameContexts[i].mConstantUploadBuffer)));
-			name = L"FrameContext.ConstantUploadBuffer_" + std::to_wstring(i);
-			gFrameContexts[i].mConstantUploadBuffer->SetName(name.c_str());
-
-			// Persistent map - https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12resource-map#advanced-usage-models
-			gFrameContexts[i].mConstantUploadBuffer->Map(0, nullptr, (void**)&gFrameContexts[i].mConstantUploadBufferPointer);
-		}
-
-		// ReadbackBuffer - Debug
-		{
-			D3D12_RESOURCE_DESC resource_desc = gGetBufferResourceDesc(gAlignUp(sizeof(Debug), (UINT64)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
-			D3D12_HEAP_PROPERTIES props = gGetReadbackHeapProperties();
-
-			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&gFrameContexts[i].mDebugReadbackBuffer)));
-			name = L"FrameContext.DebugReadbackBuffer_" + std::to_wstring(i);
-			gFrameContexts[i].mDebugReadbackBuffer->SetName(name.c_str());
-
-			// Persistent map - https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12resource-map#advanced-usage-models
-			gFrameContexts[i].mDebugReadbackBuffer->Map(0, nullptr, (void**)&gFrameContexts[i].mDebugReadbackBufferPointer);
-		}
-
-		// ReadbackBuffer - Query
-		{
-			D3D12_RESOURCE_DESC resource_desc = gGetBufferResourceDesc(gAlignUp(sizeof(UINT64) * kTimestampCount, (UINT64)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
-			D3D12_HEAP_PROPERTIES props = gGetReadbackHeapProperties();
-
-			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&gFrameContexts[i].mQueryReadbackBuffer)));
-			name = L"FrameContext.QueryReadbackBuffer_" + std::to_wstring(i);
-			gFrameContexts[i].mQueryReadbackBuffer->SetName(name.c_str());
-
-			// Persistent map - https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12resource-map#advanced-usage-models
-			gFrameContexts[i].mQueryReadbackBuffer->Map(0, nullptr, (void**)&gFrameContexts[i].mQueryReadbackBufferPointer);
+				gDevice->CreateSampler(&sampler_descs[sampler_index], gFrameContexts[i].mSamplerDescriptorHeap.GetCPUHandle((SamplerDescriptorIndex)sampler_index));
 		}
 	}
 
@@ -1479,46 +1452,6 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		gCPUContext.mDSVDescriptorHeap.Initialize();
 		name = L"CPUContext.DSVDescriptorHeap";
 		gCPUContext.mDSVDescriptorHeap.mHeap->SetName(name.c_str());
-	}
-
-	// Buffers
-	{
-		// Constants
-		{
-			D3D12_RESOURCE_DESC resource_desc = gGetBufferResourceDesc(gAlignUp(static_cast<UINT>(sizeof(Constants)), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
-			D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
-
-			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&gConstantBuffer)));
-			std::wstring name = L"ConstantBuffer";
-			gConstantBuffer->SetName(name.c_str());
-
-			D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
-			desc.SizeInBytes = static_cast<UINT>(resource_desc.Width);
-			desc.BufferLocation = gConstantBuffer->GetGPUVirtualAddress();
-			for (int i = 0; i < kFrameInFlightCount; i++)
-				gDevice->CreateConstantBufferView(&desc, gFrameContexts[i].mViewDescriptorHeap.GetHandle(ViewDescriptorIndex::Constants));
-		}
-
-		// Debug
-		{
-			D3D12_RESOURCE_DESC resource_desc = gGetBufferResourceDesc(gAlignUp(static_cast<UINT>(sizeof(Debug)), (UINT)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
-			D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
-
-			resource_desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-
-			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&gDebugBuffer)));
-			std::wstring name = L"DebugBuffer";
-			gDebugBuffer->SetName(name.c_str());			
-
-			D3D12_UNORDERED_ACCESS_VIEW_DESC desc = {};
-			desc.Format = DXGI_FORMAT_UNKNOWN;
-			desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-			desc.Buffer.NumElements = 1;
-			desc.Buffer.StructureByteStride = sizeof(Debug);
-			desc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
-			for (int i = 0; i < kFrameInFlightCount; i++)
-				gDevice->CreateUnorderedAccessView(gDebugBuffer.Get(), nullptr, &desc, gFrameContexts[i].mViewDescriptorHeap.GetHandle(ViewDescriptorIndex::BufferDebugUAV));
-		}
 	}
 
 	gValidate(gDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, gFrameContexts[0].mCommandAllocator.Get(), nullptr, IID_PPV_ARGS(&gCommandList)));
@@ -1567,9 +1500,6 @@ static void sCleanupDeviceD3D()
 		gFrameContexts[i].Reset();
 
 	gCPUContext.Reset();
-
-	gConstantBuffer = nullptr;
-	gDebugBuffer = nullptr;
 
 	gSafeRelease(gDevice);
 	gSafeRelease(gCommandQueue);

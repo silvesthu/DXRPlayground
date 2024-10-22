@@ -9,12 +9,13 @@ struct Renderer
 	struct Runtime : RuntimeBase<Runtime>
 	{
 		Shader									mRayQueryShader				= Shader().FileName("Shader/RayQuery.hlsl").CSName("RayQueryCS");
-		Shader									mDepthShader				= Shader().FileName("Shader/RayQuery.hlsl").VSName("ScreenspaceTriangleVS").PSName("DepthPS").DSVFormat(DXGI_FORMAT_D32_FLOAT);
+		Shader									mDepthShader				= Shader().FileName("Shader/RayQuery.hlsl").VSName("ScreenspaceTriangleVS").PSName("DepthPS").DepthWrite(true).DSVFormat(DXGI_FORMAT_D32_FLOAT);
 		Shader									mPrepareLightsShader		= Shader().FileName("Shader/PrepareLights.hlsl").CSName("PrepareLightsCS");
 		Shader									mClearShader				= Shader().FileName("Shader/Composite.hlsl").CSName("ClearCS");
 		Shader									mDiffTexture2DShader		= Shader().FileName("Shader/DiffTexture.hlsl").CSName("DiffTexture2DShader");
 		Shader									mDiffTexture3DShader		= Shader().FileName("Shader/DiffTexture.hlsl").CSName("DiffTexture3DShader");
-		Shader									mCompositeShader			= Shader().FileName("Shader/Composite.hlsl").VSName("ScreenspaceTriangleVS").PSName("CompositePS").RTVFormat(kBackBufferFormat);
+		Shader									mLineShader					= Shader().FileName("Shader/Composite.hlsl").VSName("LineVS").PSName("LinePS").Topology(D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE).DepthFunc(D3D12_COMPARISON_FUNC_LESS).RTVFormat(kBackBufferFormat).DSVFormat(DXGI_FORMAT_D32_FLOAT);
+		Shader									mCompositeShader			= Shader().FileName("Shader/Composite.hlsl").VSName("ScreenspaceTriangleVS").PSName("CompositePS").RTVFormat(kBackBufferFormat).DSVFormat(DXGI_FORMAT_D32_FLOAT);
 		Shader									mSentinelShader				= Shader();
 		std::span<Shader>						mShaders					= std::span<Shader>(&mRayQueryShader, &mSentinelShader);
 
@@ -37,17 +38,25 @@ struct Renderer
 		Texture									mScreenReservoirTexture		= Texture().Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(ViewDescriptorIndex::ScreenReservoirUAV).SRVIndex(ViewDescriptorIndex::ScreenReservoirSRV).Name("Renderer.ScreenReservoirTexture");
 
 		Texture									mScreenSentinelTexture;
-		std::span<Texture>						mScreenTextures = std::span<Texture>(&mScreenColorTexture, &mScreenSentinelTexture);
+		std::span<Texture>						mScreenTextures				= std::span<Texture>(&mScreenColorTexture, &mScreenSentinelTexture);
 
-		Texture									mUVCheckerMap = Texture().Width(1024).Height(1024).Format(DXGI_FORMAT_R8G8B8A8_UNORM_SRGB).SRVIndex(ViewDescriptorIndex::UVCheckerMap).Name("Renderer.UVCheckerMap").Path(L"Asset/UVChecker-map/UVCheckerMaps/UVCheckerMap01-1024.png");
-		Texture									mIESTexture = Texture().Width(256).Height(16).Format(DXGI_FORMAT_R32_FLOAT).SRVIndex(ViewDescriptorIndex::IESSRV).Name("Renderer.IES").Path(L"Asset/IES/007cfb11e343e2f42e3b476be4ab684e/IES.hdr");
+		Texture									mUVCheckerMap				= Texture().Width(1024).Height(1024).Format(DXGI_FORMAT_R8G8B8A8_UNORM_SRGB).SRVIndex(ViewDescriptorIndex::UVCheckerMap).Name("Renderer.UVCheckerMap").Path(L"Asset/UVChecker-map/UVCheckerMaps/UVCheckerMap01-1024.png");
+		Texture									mIESTexture					= Texture().Width(256).Height(16).Format(DXGI_FORMAT_R32_FLOAT).SRVIndex(ViewDescriptorIndex::IESSRV).Name("Renderer.IES").Path(L"Asset/IES/007cfb11e343e2f42e3b476be4ab684e/IES.hdr");
 
 		Texture									mSentinelTexture;
-		std::span<Texture>						mTextures = std::span<Texture>(&mUVCheckerMap, &mSentinelTexture);
+		std::span<Texture>						mTextures					= std::span<Texture>(&mUVCheckerMap, &mSentinelTexture);
 
 		Texture									mBackBuffers[kFrameInFlightCount] = { 
 																			Texture().Format(kBackBufferFormat).RTVIndex(RTVDescriptorIndex::BackBuffer0).Name("Renderer.BackBuffer0"),
 																			Texture().Format(kBackBufferFormat).RTVIndex(RTVDescriptorIndex::BackBuffer1).Name("Renderer.BackBuffer1") };
+
+		Buffer									mConstantsBuffer			= Buffer().ByteCount(sizeof(Constants)).CBVIndex(ViewDescriptorIndex::ConstantsCBV).Name("Constants").Upload(true);
+		Buffer									mPixelInspectionBuffer		= Buffer().ByteCount(sizeof(PixelInspection)).UAVIndex(ViewDescriptorIndex::PixelInspectionUAV).Name("PixelInspection").Readback(true);
+		Buffer									mRayInspectionBuffer		= Buffer().ByteCount(sizeof(RayInspection)).UAVIndex(ViewDescriptorIndex::RayInspectionUAV).Name("RayInspection");
+		Buffer									mQueryBuffer				= Buffer().ByteCount(sizeof(UINT64) * kTimestampCount).Name("Query").GPU(false).Readback(true);
+
+		Buffer									mSentinelBuffer;
+		std::span<Buffer>						mBuffers					= std::span<Buffer>(&mConstantsBuffer, &mSentinelBuffer);
 	};
 	Runtime mRuntime;
 
@@ -70,12 +79,7 @@ struct Renderer
 	void										InitializeShaders();
 	void										FinalizeShaders();
 
-	void										Setup(const Shader& inShader)
-	{
-		Setup(inShader.mData, inShader.mCSName == nullptr);
-	}
-
-	void										Setup(const Shader::Data& inShaderData, bool inGraphics = false)
+	void										SetHeaps()
 	{
 		// Heaps of Dynamic Resources needs to be set before RootSignature
 		// See https://microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_6_DynamicResources.html#setdescriptorheaps-and-setrootsignature
@@ -85,22 +89,37 @@ struct Renderer
 			gGetFrameContext().mSamplerDescriptorHeap.mHeap.Get(),
 		};
 		gCommandList->SetDescriptorHeaps(ARRAYSIZE(bindless_heaps), bindless_heaps);
+	}
 
-		if (inGraphics)
-			gCommandList->SetGraphicsRootSignature(inShaderData.mRootSignature.Get());
-		else
-			gCommandList->SetComputeRootSignature(inShaderData.mRootSignature.Get());
+	void										ClearUnorderedAccessViewFloat(const Texture& inTexture)
+	{
+		SetHeaps();
+		
+		D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle = gGetFrameContext().mViewDescriptorHeap.GetGPUHandle(inTexture.mUAVIndex);
+		D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle = gGetFrameContext().mClearDescriptorHeap.GetCPUHandle(inTexture.mUAVIndex);
+		float4 clear_value = { 0, 0, 0, 0 };
+		gCommandList->ClearUnorderedAccessViewFloat(gpu_handle, cpu_handle, inTexture.mResource.Get(), &clear_value.x, 0, nullptr);
+	}
 
-		if (inShaderData.mStateObject != nullptr)
-			gCommandList->SetPipelineState1(inShaderData.mStateObject.Get());
+	void										Setup(const Shader& inShader)
+	{
+		SetHeaps();
+
+		if (inShader.mCSName == nullptr)
+			gCommandList->SetGraphicsRootSignature(inShader.mData.mRootSignature.Get());
 		else
-			gCommandList->SetPipelineState(inShaderData.mPipelineState.Get());
+			gCommandList->SetComputeRootSignature(inShader.mData.mRootSignature.Get());
+
+		if (inShader.mData.mStateObject != nullptr)
+			gCommandList->SetPipelineState1(inShader.mData.mStateObject.Get());
+		else
+			gCommandList->SetPipelineState(inShader.mData.mPipelineState.Get());
 
 		// Root parameters need to be set after RootSignature
-		if (inGraphics)
-			gCommandList->SetGraphicsRootConstantBufferView((int)RootParameterIndex::Constants, gConstantBuffer->GetGPUVirtualAddress());
+		if (inShader.mCSName == nullptr)
+			gCommandList->SetGraphicsRootConstantBufferView((int)RootParameterIndex::Constants, mRuntime.mConstantsBuffer.mResource->GetGPUVirtualAddress());
 		else
-			gCommandList->SetComputeRootConstantBufferView((int)RootParameterIndex::Constants, gConstantBuffer->GetGPUVirtualAddress());
+			gCommandList->SetComputeRootConstantBufferView((int)RootParameterIndex::Constants, mRuntime.mConstantsBuffer.mResource->GetGPUVirtualAddress());
 	}
 
 	bool										mReloadShader = false;

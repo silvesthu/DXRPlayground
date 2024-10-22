@@ -112,7 +112,9 @@ enum class ViewDescriptorIndex : uint
 	ScreenReservoirUAV,
 
 	// [Debug]
-	BufferDebugUAV,
+	ConstantsCBV,
+	PixelInspectionUAV,
+	RayInspectionUAV,
 
 	// [UVCheckerMaps]
 	UVCheckerMap,
@@ -646,10 +648,6 @@ struct Constants
 	float4 RETURN_AS_REFERENCE	CameraFront()					{ return GET_COLUMN(mCameraTransform, 2); }
 	float4 RETURN_AS_REFERENCE	CameraPosition()				{ return GET_COLUMN(mCameraTransform, 3); }
 	float4x4					mCameraTransform				CONSTANT_DEFAULT(float4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1));
-	float						mCameraLeftExtend				CONSTANT_DEFAULT(-1.0f);
-	float						mCameraUpExtend					CONSTANT_DEFAULT(1.0f);
-	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
-	float						mCameraDistance					CONSTANT_DEFAULT(0);
 	float4x4					mViewMatrix						CONSTANT_DEFAULT(float4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1));
 	float4x4					mProjectionMatrix				CONSTANT_DEFAULT(float4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1));
 	float4x4					mViewProjectionMatrix			CONSTANT_DEFAULT(float4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1));
@@ -712,23 +710,24 @@ struct Constants
 	CloudConstants				mCloud;
 };
 
-struct RayInspection
+struct PixelInspection
 {
-	static const int			kSize = 64;
-
-	float4						mPositionWS[kSize];
-	float4						mNormalWS[kSize];
-};
-
-struct Debug
-{
-	static const int			kValueArraySize					= 16;
+	static const uint			kArraySize						= 16;
 
 	float4						mPixelValue						CONSTANT_DEFAULT(float4(0.0f, 0.0f, 0.0f, 0.0f));
-	float4						mPixelValueArray[kValueArraySize];
+	float4						mDebugValue						CONSTANT_DEFAULT(float4(0.0f, 0.0f, 0.0f, 0.0f));
+	float4						mPixelValueArray[kArraySize];
 
 	int							mPixelInstanceID				CONSTANT_DEFAULT(-1);
 	uint3						GENERATE_PAD_NAME				CONSTANT_DEFAULT(uint3(0, 0, 0));
+};
+
+struct RayInspection
+{
+	static const uint			kArraySize						= 16;
+
+	float4						mPositionWS[kArraySize];
+	float4						mNormalWS[kArraySize];
 };
 
 struct LocalConstants
