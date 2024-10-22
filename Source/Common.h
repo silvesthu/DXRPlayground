@@ -35,9 +35,15 @@ using Microsoft::WRL::ComPtr;
 #define UNUSED(_VAR) ((void)(_VAR))
 
 template <typename T>
+constexpr inline T gAlignUpDiv(T value, T alignment)
+{
+	return (value + alignment - 1) / alignment;
+}
+
+template <typename T>
 constexpr inline T gAlignUp(T value, T alignment)
 {
-	return (((value + alignment - 1) / alignment) * alignment);
+	return gAlignUpDiv(value, alignment) * alignment;
 }
 
 template <typename T>

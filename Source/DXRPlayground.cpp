@@ -1088,7 +1088,7 @@ void sRender()
 		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Clear");
 
 		gRenderer.Setup(gRenderer.mRuntime.mClearShader);
-		gCommandList->Dispatch(gAlignUp(PixelInspection::kArraySize, 64u), 1, 1);
+		gCommandList->Dispatch(gAlignUpDiv(PixelInspection::kArraySize, 64u), 1, 1);
 
 		BarrierScope depth_scope(gCommandList, gRenderer.mRuntime.mScreenDebugTexture.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		gRenderer.ClearUnorderedAccessViewFloat(gRenderer.mRuntime.mScreenDebugTexture);
@@ -1140,7 +1140,7 @@ void sRender()
 			gRenderer.Setup(gRenderer.mRuntime.mPrepareLightsShader);
 			uint constants[] = { info.mInstanceDataIndex, info.mTriangleLightsOffset };
 			gCommandList->SetComputeRoot32BitConstants((int)RootParameterIndex::ConstantsPrepareLights, 2, &constants, 0);
-			gCommandList->Dispatch(gAlignUp(instance_data.mIndexCount / kIndexCountPerTriangle, 64u), 1, 1);
+			gCommandList->Dispatch(gAlignUpDiv(instance_data.mIndexCount / kIndexCountPerTriangle, 64u), 1, 1);
 		}
 
 		gBarrierUAV(gCommandList, nullptr);
@@ -1155,7 +1155,7 @@ void sRender()
 
 		UINT64 timestamp = gTiming.TimestampBegin(gRenderer.mRuntime.mQueryBuffer.ReadbackAs<UINT64>(gGetFrameContextIndex()));
 		gRenderer.Setup(gRenderer.mRuntime.mRayQueryShader);
-		gCommandList->Dispatch(gAlignUp(swap_chain_desc.Width,  8u), gAlignUp(swap_chain_desc.Height, 8u), 1);
+		gCommandList->Dispatch(gAlignUpDiv(swap_chain_desc.Width, 8u), gAlignUpDiv(swap_chain_desc.Height, 8u), 1);
 		gTiming.TimestampEnd(gRenderer.mRuntime.mQueryBuffer.ReadbackAs<UINT64>(gGetFrameContextIndex()), timestamp, gStats.mTimeInMS);
 
 		gBarrierUAV(gCommandList, nullptr);
