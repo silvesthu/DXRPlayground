@@ -63,6 +63,7 @@ static const std::array kScenePresets =
 
 	// Complex scenes
 	ScenePreset().Name("LivingRoom2").Path("Asset/Comparison/benedikt-bitterli/living-room-2/scene_v3.xml").EmissionBoost(1E4f),
+	ScenePreset().Name("VeachAjar").Path("Asset/Comparison/benedikt-bitterli/veach-ajar/scene_v3.xml").EmissionBoost(1E4f),
 	
 	// Atmosphere
 	ScenePreset().Name("Bruneton17").Path("Asset/primitives/sphere.obj").CameraPosition(glm::vec4(0.0f, 0.0f, 9.0f, 0.0f)).CameraDirection(glm::vec4(0.0f, 0.0f, -1.0f, 0.0f)).Transform(glm::translate(glm::vec3(0.0f, 1.0f, 0.0f))).Atmosphere(AtmosphereMode::Bruneton17),
@@ -485,12 +486,13 @@ static void sPrepareImGui()
 						ImGui::TableSetColumnIndex(column_index++);
 						std::string albedo = std::format("{:.2f} {:.2f} {:.2f}", instance_data.mAlbedo.x, instance_data.mAlbedo.y, instance_data.mAlbedo.z);
 						albedo = instance_data.mAlbedo != InstanceData().mAlbedo ? albedo : "";
-						albedo = instance_info.mAlbedoTexture.empty() ? albedo : (instance_info.mAlbedoTexture.filename().string() + " (" + std::to_string(instance_data.mAlbedoTextureIndex) + ")");
+						albedo = instance_info.mAlbedoTexture.empty() ? albedo : (instance_info.mAlbedoTexture.filename().string() + " (" + std::to_string(instance_data.mAlbedoTexture.mTextureIndex) + ", " + std::to_string(instance_data.mAlbedoTexture.mSamplerIndex) + ")");
 						ImGui::Text(albedo.c_str());
 
 						ImGui::TableSetColumnIndex(column_index++);
-						std::string reflectance = std::format("{:.2f} {:.2f} {:.2f}", instance_data.mSpecularReflectance.x, instance_data.mSpecularReflectance.y, instance_data.mSpecularReflectance.z);
-						reflectance = instance_data.mSpecularReflectance != InstanceData().mSpecularReflectance ? reflectance : "";
+						std::string reflectance = std::format("{:.2f} {:.2f} {:.2f}", instance_data.mReflectance.x, instance_data.mReflectance.y, instance_data.mReflectance.z);
+						reflectance = instance_data.mReflectance != InstanceData().mReflectance ? reflectance : "";
+						reflectance = instance_info.mReflectanceTexture.empty() ? reflectance : (instance_info.mReflectanceTexture.filename().string() + " (" + std::to_string(instance_data.mReflectanceTexture.mTextureIndex) + ", " + std::to_string(instance_data.mReflectanceTexture.mSamplerIndex) + ")");
 						ImGui::Text(reflectance.c_str());
 
 						ImGui::TableSetColumnIndex(column_index++);
@@ -511,6 +513,7 @@ static void sPrepareImGui()
 						ImGui::TableSetColumnIndex(column_index++);
 						std::string emission = std::format("{:.2f} {:.2f} {:.2f}", instance_data.mEmission.x, instance_data.mEmission.y, instance_data.mEmission.z);
 						emission = instance_data.mEmission != InstanceData().mEmission ? emission : "";
+						emission = instance_info.mEmissionTexture.empty() ? emission : (instance_info.mEmissionTexture.filename().string() + " (" + std::to_string(instance_data.mEmissionTexture.mTextureIndex) + ", " + std::to_string(instance_data.mEmissionTexture.mSamplerIndex) + ")");
 						ImGui::Text(emission.c_str());
 
 						ImGui::TableSetColumnIndex(column_index++);
@@ -818,7 +821,7 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 		ImGui::GetStyle().ScaleAllSizes(scale / ImGui::gDpiScale);
 		ImGui::gDpiScale = scale;
 
-		// Font [TODO] This should also update on WM_DPICHANGED, which requires rebuild of font texture
+		// [TODO] This should also update on WM_DPICHANGED, which requires rebuild of font texture
 		std::filesystem::path font_path = "C:\\Windows\\Fonts\\Consola.ttf";
 		ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path.string().c_str(), 13 * scale, nullptr, nullptr);
 		ImGui::GetIO().Fonts->Build();
@@ -1081,6 +1084,18 @@ void sRender()
 		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Cloud");
 
 		gCloud.Render();
+	}
+
+	// Generator
+	{
+		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Generator");
+
+		gRenderer.Setup(gRenderer.mRuntime.mGeneratorShader);
+
+		BarrierScope scope(gCommandList, gRenderer.mRuntime.mGeneratorTexture.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		gCommandList->Dispatch(gAlignUpDiv(gRenderer.mRuntime.mGeneratorTexture.mWidth, 8u), gAlignUpDiv(gRenderer.mRuntime.mGeneratorTexture.mHeight, 8u), 1);
+		
+		gBarrierUAV(gCommandList, nullptr);
 	}
 
 	// Clear
@@ -1434,6 +1449,8 @@ static bool sCreateDeviceD3D(HWND hWnd)
 			{
 				{.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR, .AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP, .AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP, .AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP, .MipLODBias = 0, .MaxAnisotropy = 0, .ComparisonFunc = D3D12_COMPARISON_FUNC_NONE, .BorderColor = {0,0,0,0}, .MinLOD = 0, .MaxLOD = D3D12_FLOAT32_MAX },
 				{.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR, .AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP, .AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP, .AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP, .MipLODBias = 0, .MaxAnisotropy = 0, .ComparisonFunc = D3D12_COMPARISON_FUNC_NONE, .BorderColor = {0,0,0,0}, .MinLOD = 0, .MaxLOD = D3D12_FLOAT32_MAX },
+				{.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT, .AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP, .AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP, .AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP, .MipLODBias = 0, .MaxAnisotropy = 0, .ComparisonFunc = D3D12_COMPARISON_FUNC_NONE, .BorderColor = {0,0,0,0}, .MinLOD = 0, .MaxLOD = D3D12_FLOAT32_MAX },
+				{.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT, .AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP, .AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP, .AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP, .MipLODBias = 0, .MaxAnisotropy = 0, .ComparisonFunc = D3D12_COMPARISON_FUNC_NONE, .BorderColor = {0,0,0,0}, .MinLOD = 0, .MaxLOD = D3D12_FLOAT32_MAX },
 			};
 			static_assert(ARRAYSIZE(sampler_descs) == (int)SamplerDescriptorIndex::Count);
 			for (int sampler_index = 0; sampler_index < (int)SamplerDescriptorIndex::Count; sampler_index++)

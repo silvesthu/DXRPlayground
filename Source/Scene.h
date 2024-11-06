@@ -7,11 +7,22 @@ struct InstanceInfo
 	std::string mName;
 	std::string mMaterialName;
 
-	std::filesystem::path mAlbedoTexture;
-	std::filesystem::path mNormalTexture;
-	std::filesystem::path mReflectanceTexture;
-	std::filesystem::path mRoughnessTexture;
-	std::filesystem::path mEmissiveTexture;
+	struct Texture
+	{
+		bool empty() const { return mPath.empty(); }
+		std::filesystem::path filename() const { return mPath.filename(); }
+		std::string string() const { return mPath.string(); }
+		std::wstring wstring() const { return mPath.wstring(); }
+		
+		std::filesystem::path mPath;
+		bool mPointSampler = false;
+	};
+
+	Texture mAlbedoTexture;
+	Texture mNormalTexture;
+	Texture mReflectanceTexture;
+	Texture mRoughnessTexture;
+	Texture mEmissionTexture;
 };
 
 class BLAS final

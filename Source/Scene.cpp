@@ -10,6 +10,7 @@
 #include "Thirdparty/tinygltf/stb_image.h"
 #include "Thirdparty/tinyobjloader/tiny_obj_loader.h"
 #include "Thirdparty/tiny_gltf.h"
+#include "Thirdparty/tinyexr.h"
 
 Scene gScene;
 
@@ -224,7 +225,7 @@ bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransfor
 			instance_data.mOpacity = 1.0f;
 			instance_data.mEmission = glm::vec3(material.emission[0], material.emission[1], material.emission[2]);
 			instance_data.mRoughnessAlpha = material.roughness; // To match Mitsuba2 and PBRT (remaproughness = false)
-			instance_data.mSpecularReflectance = glm::vec3(material.specular[0], material.specular[1], material.specular[2]);
+			instance_data.mReflectance = glm::vec3(material.specular[0], material.specular[1], material.specular[2]);
 			instance_data.mSpecularTransmittance = glm::vec3(material.transmittance[0], material.transmittance[1], material.transmittance[2]);
 		}
 
@@ -276,6 +277,15 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 				return std::string_view();
 
 			return get_child_value(child, "filename");
+		};
+
+	static auto get_child_sampler = [](tinyxml2::XMLElement* inElement, const char* inName)
+		{
+			tinyxml2::XMLElement* child = get_first_child_element_by_name(inElement, inName);
+			if (child == nullptr)
+				return std::string_view();
+
+			return get_child_value(child, "filter_type");
 		};
 
 	static auto null_to_empty = [](const char* str)
@@ -347,7 +357,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 				{
 					std::filesystem::path path = inFilename;
 					path.replace_filename(std::filesystem::path(get_child_texture(local_bsdf, "map")));
-					bsdf_instance.mInstanceInfo.mNormalTexture = path;
+					bsdf_instance.mInstanceInfo.mNormalTexture = { .mPath = path };
 
 					local_bsdf = local_bsdf->FirstChildElement("bsdf");
 					local_type = local_bsdf->Attribute("type");
@@ -373,7 +383,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 		}
 
 		auto load_diffuse_reflectance = [&]() { gFromString(get_child_value(local_bsdf, "reflectance").data(), bsdf_instance.mInstanceData.mAlbedo); };
-		auto load_specular_reflectance = [&]() { gFromString(get_child_value(local_bsdf, "specular_reflectance").data(), bsdf_instance.mInstanceData.mSpecularReflectance); };
+		auto load_specular_reflectance = [&]() { gFromString(get_child_value(local_bsdf, "specular_reflectance").data(), bsdf_instance.mInstanceData.mReflectance); };
 		auto load_specular_transmittance = [&]() { gFromString(get_child_value(local_bsdf, "specular_transmittance").data(), bsdf_instance.mInstanceData.mSpecularTransmittance); };
 		auto load_eta = [&]() { gFromString(get_child_value(local_bsdf, "eta").data(), bsdf_instance.mInstanceData.mEta); };
 		auto load_k = [&]() { gFromString(get_child_value(local_bsdf, "k").data(), bsdf_instance.mInstanceData.mK); };
@@ -385,6 +395,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 			bsdf_instance.mInstanceData.mBSDF = BSDF::Diffuse;
 
 			std::string_view reflectance = get_child_texture(local_bsdf, "reflectance");
+			std::string_view sampler = get_child_sampler(local_bsdf, "reflectance");
 
 			std::filesystem::path path = inFilename;
 			path.replace_filename(std::filesystem::path(reflectance));
@@ -393,7 +404,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 				load_diffuse_reflectance();
 			else
 			{
-				bsdf_instance.mInstanceInfo.mAlbedoTexture = path;
+				bsdf_instance.mInstanceInfo.mAlbedoTexture = { .mPath = path, .mPointSampler = sampler == "nearest" };
 				bsdf_instance.mInstanceData.mAlbedo = glm::vec3(1.0f);
 			}
 		}
@@ -403,13 +414,27 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 
 			// [TODO] Support beckmann
 			// [TODO] Support sample_visible
-			gAssert(std::string_view(get_child_value(local_bsdf, "distribution")) == "ggx");
+			// Treat as ggx for now
+			// gAssert(std::string_view(get_child_value(local_bsdf, "distribution")) == "ggx");
+			
 			load_alpha();
 
 			load_eta();
 			load_k();
+			
+			std::string_view specular_reflectance = get_child_texture(local_bsdf, "specular_reflectance");
+			std::string_view sampler = get_child_sampler(local_bsdf, "specular_reflectance");
 
-			load_specular_reflectance();
+			std::filesystem::path path = inFilename;
+			path.replace_filename(std::filesystem::path(specular_reflectance));
+
+			if (specular_reflectance.empty())
+				load_specular_reflectance();
+			else
+			{
+				bsdf_instance.mInstanceInfo.mReflectanceTexture = { .mPath = path, .mPointSampler = sampler == "nearest" };
+				bsdf_instance.mInstanceData.mReflectance = glm::vec3(1.0f);
+			}
 		}
 		else if (local_type == "dielectric")
 		{
@@ -765,7 +790,7 @@ bool Scene::LoadGLTF(const std::string& inFilename, SceneContent& ioSceneContent
 					.mNormalTexture = get_texture_path(material.normalTexture.index),
 					.mReflectanceTexture = get_texture_path(material.pbrMetallicRoughness.metallicRoughnessTexture.index),
 					.mRoughnessTexture = get_texture_path(material.pbrMetallicRoughness.metallicRoughnessTexture.index),
-					.mEmissiveTexture = get_texture_path(material.emissiveTexture.index),
+					.mEmissionTexture = get_texture_path(material.emissiveTexture.index),
 				};
 				ioSceneContent.mInstanceInfos.push_back(instance_info);
 
@@ -884,37 +909,52 @@ void Scene::InitializeTextures()
 		InstanceInfo& instance_info = mSceneContent.mInstanceInfos[i];
 		InstanceData& instance_data = mSceneContent.mInstanceDatas[i];
 
-		auto get_texture_index = [&](const std::filesystem::path& inPath, bool inSRGB)
+		auto get_texture_index = [&](InstanceInfo::Texture& inTexture, bool inSRGB) -> TextureInfo
 			{
-				if (inPath.empty())
-					return 0u;
+				if (inTexture.empty())
+					return {};
 
-				auto iter = texture_map.find(inPath.string());
+				uint sampler_index = inTexture.mPointSampler ? (uint)SamplerDescriptorIndex::PointWrap : (uint)SamplerDescriptorIndex::BilinearWrap;
+
+				auto iter = texture_map.find(inTexture.string());
 				if (iter != texture_map.end())
 				{
-					return (uint)iter->second->mSRVIndex;
+					return { .mTextureIndex = (uint)iter->second->mSRVIndex, .mSamplerIndex = sampler_index };
 				}
 
+				DXGI_FORMAT format = inSRGB ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM;
 				int x = 0, y = 0, n = 0;
-				if (stbi_info(inPath.string().c_str(), &x, &y, &n) == 0)
-					return 0u;
+				float* exr_data = nullptr;
+				if (inTexture.string().ends_with(".exr"))
+				{
+					const char* err = nullptr;
+					if (LoadEXR(&exr_data, &x, &y, inTexture.string().c_str(), &err) != TINYEXR_SUCCESS)
+						return {};
+					format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+				}
+				else
+				{
+					if (stbi_info(inTexture.string().c_str(), &x, &y, &n) == 0)
+						return {};
+				}
 
 				mTextures.push_back({});
 				Texture& texture = mTextures.back();
 				texture.Width(x).Height(y).
-					Format(inSRGB ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM).
+					Format(format).
 					SRVIndex(ViewDescriptorIndex((uint)ViewDescriptorIndex::SceneAutoSRV + mNextSRVIndex++)).
-					Name(inPath.filename().string().c_str()).
-					Path(inPath.wstring());
-				texture_map[inPath.string()] = &texture;
+					Name(inTexture.filename().string().c_str()).
+					Path(inTexture.wstring());
+				texture.mEXRData = exr_data;
+				texture_map[inTexture.string()] = &texture;
 
-				return (uint)texture.mSRVIndex;
+				return { .mTextureIndex = (uint)texture.mSRVIndex, .mSamplerIndex = sampler_index };
 			};
 
-		instance_data.mAlbedoTextureIndex = get_texture_index(instance_info.mAlbedoTexture, true);
-		instance_data.mSpecularReflectanceTextureIndex = get_texture_index(instance_info.mReflectanceTexture, false);
-		instance_data.mNormalTextureIndex = get_texture_index(instance_info.mNormalTexture, false);
-		instance_data.mEmissionTextureIndex = get_texture_index(instance_info.mEmissiveTexture, true);
+		instance_data.mAlbedoTexture = get_texture_index(instance_info.mAlbedoTexture, true);
+		instance_data.mReflectanceTexture = get_texture_index(instance_info.mReflectanceTexture, false);
+		instance_data.mNormalTexture = get_texture_index(instance_info.mNormalTexture, false);
+		instance_data.mEmissionTexture = get_texture_index(instance_info.mEmissionTexture, true);
 	}
 
 	for (auto&& texture : mTextures)

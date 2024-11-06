@@ -254,12 +254,24 @@ void Texture::Update()
 			float* data = stbi_loadf(mPath.string().c_str(), &x, &y, &n, color_count);
 
 			mUploadData.resize(GetSubresourceSize());
-			uint8_t* pixels = reinterpret_cast<uint8_t*>(mUploadData.data());
-			uint32_t byte_count = x * y * 4;
+			size_t byte_count = x * y * 4;
 			gAssert(byte_count <= mUploadData.size());
-			memcpy(pixels, data, byte_count);
+			memcpy(mUploadData.data(), data, byte_count);
 
 			stbi_image_free(data);
+		}
+		else if (extension == ".exr")
+		{
+			int color_count = (int)(DirectX::BitsPerPixel(mFormat) / DirectX::BitsPerColor(mFormat));
+			gAssert(1 <= color_count && color_count <= 4);
+
+			size_t byte_per_pixel = DirectX::BitsPerPixel(mFormat) / 8;
+			gAssert(mEXRData != nullptr);
+			size_t byte_count = mWidth * mHeight * byte_per_pixel;
+			mUploadData.resize(byte_count);
+			memcpy(mUploadData.data(), mEXRData, byte_count);
+
+			free(mEXRData); // from LoadEXR (TinyEXR)
 		}
 		else
 		{
@@ -270,10 +282,9 @@ void Texture::Update()
 			unsigned char* data = stbi_load(mPath.string().c_str(), &x, &y, &n, color_count);
 
 			mUploadData.resize(GetSubresourceSize());
-			uint8_t* pixels = reinterpret_cast<uint8_t*>(mUploadData.data());
-			uint32_t byte_count = x * y * 4;
+			size_t byte_count = x * y * 4;
 			gAssert(byte_count <= mUploadData.size());
-			memcpy(pixels, data, byte_count);
+			memcpy(mUploadData.data(), data, byte_count);
 
 			stbi_image_free(data);
 		}

@@ -1,0 +1,1 @@
+magick Renderer.Generator.dds checkerboard.exr

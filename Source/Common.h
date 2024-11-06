@@ -457,6 +457,7 @@ struct Texture
 	int mSubresourceCount = 1; // TODO: Support multiple subresources
 	bool mLoaded = false;
 	std::vector<uint8_t> mUploadData;
+	float* mEXRData = nullptr;
 };
 
 struct ShaderTable

@@ -16,7 +16,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 	// Initialize on first frame
 	if (mConstants.mCurrentFrameIndex == 0)
 	{
-		ScreenReservoirUAV[ioPixelContext.mPixelIndex.xy]		= 0;
+		ScreenReservoirUAV[ioPixelContext.mPixelIndex.xy] = 0;
 	}
 
 	// From https://www.shadertoy.com/view/tsBBWW
@@ -299,14 +299,14 @@ void TraceRay(inout PixelContext ioPixelContext)
 			switch (mConstants.mDebugMode)
 			{
 			case DebugMode::None:				break;
-			case DebugMode::Barycentrics: 		path_context.mEmission = hit_context.mBarycentrics; continue_bounce = false; break;
+			case DebugMode::Barycentrics: 		path_context.mEmission = hit_context.Barycentrics(); continue_bounce = false; break;
 			case DebugMode::Position: 			path_context.mEmission = hit_context.PositionWS(); continue_bounce = false; break;
-			case DebugMode::Normal: 			path_context.mEmission = hit_context.mVertexNormalWS; continue_bounce = false; break;
-			case DebugMode::UV:					path_context.mEmission = float3(hit_context.mUV, 0.0); continue_bounce = false; break;
+			case DebugMode::Normal: 			path_context.mEmission = hit_context.NormalWS(); continue_bounce = false; break;
+			case DebugMode::UV:					path_context.mEmission = float3(hit_context.UV(), 0.0); continue_bounce = false; break;
 			case DebugMode::Albedo: 			path_context.mEmission = hit_context.Albedo(); continue_bounce = false; break;
-			case DebugMode::Reflectance: 		path_context.mEmission = InstanceDatas[hit_context.mInstanceID].mSpecularReflectance; continue_bounce = false; break;
-			case DebugMode::Emission: 			path_context.mEmission = InstanceDatas[hit_context.mInstanceID].mEmission; continue_bounce = false; break;
-			case DebugMode::RoughnessAlpha: 	path_context.mEmission = InstanceDatas[hit_context.mInstanceID].mRoughnessAlpha; continue_bounce = false; break;
+			case DebugMode::Reflectance: 		path_context.mEmission = hit_context.SpecularReflectance(); continue_bounce = false; break;
+			case DebugMode::Emission: 			path_context.mEmission = hit_context.Emission(); continue_bounce = false; break;
+			case DebugMode::RoughnessAlpha: 	path_context.mEmission = hit_context.RoughnessAlpha(); continue_bounce = false; break;
 			case DebugMode::RecursionDepth:		continue_bounce = true; break;
 			default:							path_context.mEmission = sDebugModeValue; continue_bounce = false; break;
 			}

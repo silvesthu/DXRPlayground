@@ -26,25 +26,40 @@ struct HitContext
 	float			RoughnessAlpha()			{ return InstanceDatas[mInstanceID].mRoughnessAlpha; }
 	float3			Albedo()						
 	{
-		uint texture_index = InstanceDatas[mInstanceID].mAlbedoTextureIndex;
+		uint texture_index = InstanceDatas[mInstanceID].mAlbedoTexture.mTextureIndex;
+		uint sampler_index = InstanceDatas[mInstanceID].mAlbedoTexture.mSamplerIndex;
 		if (texture_index != (uint)ViewDescriptorIndex::Invalid)
 		{
 			Texture2D<float4> texture	= ResourceDescriptorHeap[texture_index];
-			return texture.SampleLevel(BilinearWrapSampler, mUV, 0).rgb * InstanceDatas[mInstanceID].mAlbedo;
+			SamplerState sampler = SamplerDescriptorHeap[sampler_index];
+			return texture.SampleLevel(sampler, mUV, 0).rgb * InstanceDatas[mInstanceID].mAlbedo;
 		}
 		return InstanceDatas[mInstanceID].mAlbedo; 
 	}
-	float3			SpecularReflectance()		{ return InstanceDatas[mInstanceID].mSpecularReflectance; }
+	float3			SpecularReflectance()
+	{
+		uint texture_index = InstanceDatas[mInstanceID].mReflectanceTexture.mTextureIndex;
+		uint sampler_index = InstanceDatas[mInstanceID].mReflectanceTexture.mSamplerIndex;
+		if (texture_index != (uint)ViewDescriptorIndex::Invalid)
+		{
+			Texture2D<float4> texture = ResourceDescriptorHeap[texture_index];
+			SamplerState sampler = SamplerDescriptorHeap[sampler_index];
+			return texture.SampleLevel(sampler, mUV, 0).rgb * InstanceDatas[mInstanceID].mReflectance;
+		}
+		return InstanceDatas[mInstanceID].mReflectance;
+	}
 	float3			SpecularTransmittance()		{ return InstanceDatas[mInstanceID].mSpecularTransmittance; }
 	float3			Eta()						{ return InstanceDatas[mInstanceID].mEta; }
 	float3			K()							{ return InstanceDatas[mInstanceID].mK; }
 	float3			Emission()					
 	{
-		uint texture_index = InstanceDatas[mInstanceID].mEmissionTextureIndex;
+		uint texture_index = InstanceDatas[mInstanceID].mEmissionTexture.mTextureIndex;
+		uint sampler_index = InstanceDatas[mInstanceID].mEmissionTexture.mSamplerIndex;
 		if (texture_index != (uint)ViewDescriptorIndex::Invalid)
 		{
 			Texture2D<float4> texture = ResourceDescriptorHeap[texture_index];
-			return texture.SampleLevel(BilinearWrapSampler, mUV, 0).rgb * InstanceDatas[mInstanceID].mEmission;
+			SamplerState sampler = SamplerDescriptorHeap[sampler_index];
+			return texture.SampleLevel(sampler, mUV, 0).rgb * InstanceDatas[mInstanceID].mEmission;
 		}
 		return InstanceDatas[mInstanceID].mEmission; 
 	}
@@ -74,6 +89,8 @@ struct HitContext
 
 		return normal;
 	}
+	float3			Barycentrics()				{ return mBarycentrics; }
+	float2			UV()						{ return mUV; }
 	float			NdotV()						{ return dot(NormalWS(), ViewWS()); }
 
 	uint			mInstanceID;

@@ -116,8 +116,12 @@ enum class ViewDescriptorIndex : uint
 	PixelInspectionUAV,
 	RayInspectionUAV,
 
-	// [UVCheckerMaps]
-	UVCheckerMap,
+	// [UVChecker]
+	UVCheckerSRV,
+
+	// [Generator]
+	GeneratorSRV,
+	GeneratorUAV,
 
 	// [Misc]
 	IESSRV,
@@ -199,6 +203,9 @@ enum class SamplerDescriptorIndex : uint
 {
 	BilinearClamp = 0,
 	BilinearWrap,
+
+	PointClamp,
+	PointWrap,
 
 	Count,
 };
@@ -431,6 +438,13 @@ enum class CloudMode  : uint
 	Count
 };
 
+struct TextureInfo
+{
+	uint						mTextureIndex : 16				CONSTANT_DEFAULT((uint)ViewDescriptorIndex::Invalid);
+	uint						mSamplerIndex : 4				CONSTANT_DEFAULT((uint)SamplerDescriptorIndex::BilinearWrap);
+	uint						mUnused	: 12					CONSTANT_DEFAULT(0);
+};
+
 struct InstanceData
 {
 	// [TODO] Split material
@@ -441,14 +455,14 @@ struct InstanceData
 	uint						mLightIndex						CONSTANT_DEFAULT(0);
 
 	float						mRoughnessAlpha					CONSTANT_DEFAULT(0.0f);
-	uint						mNormalTextureIndex				CONSTANT_DEFAULT(0);
+	TextureInfo					mNormalTexture;
 	float2						GENERATE_PAD_NAME				CONSTANT_DEFAULT(float2(0.0f, 0.0f));
 
     float3						mAlbedo							CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
-	uint						mAlbedoTextureIndex				CONSTANT_DEFAULT(0);
+	TextureInfo					mAlbedoTexture;
 
-    float3						mSpecularReflectance			CONSTANT_DEFAULT(float3(1.0f, 1.0f, 1.0f));
-	uint						mSpecularReflectanceTextureIndex CONSTANT_DEFAULT(0);
+    float3						mReflectance					CONSTANT_DEFAULT(float3(1.0f, 1.0f, 1.0f));
+	TextureInfo					mReflectanceTexture;
 
 	float3						mSpecularTransmittance			CONSTANT_DEFAULT(float3(1.0f, 1.0f, 1.0f));
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
@@ -460,7 +474,7 @@ struct InstanceData
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
     float3						mEmission						CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
-	uint						mEmissionTextureIndex			CONSTANT_DEFAULT(0);
+	TextureInfo					mEmissionTexture;
 
 	float4x4					mTransform						CONSTANT_DEFAULT(float4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1));
 	float4x4					mInverseTranspose				CONSTANT_DEFAULT(float4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1));

@@ -29,6 +29,8 @@
     <ClInclude Include="Source\Thirdparty\ImGuizmo\ImSequencer.h" />
     <ClInclude Include="Source\Thirdparty\ImGuizmo\ImZoomSlider.h" />
     <ClInclude Include="Source\Thirdparty\imgui_config.h" />
+    <ClInclude Include="Source\Thirdparty\tinyexr.h" />
+    <ClInclude Include="Source\Thirdparty\tinyexr\tinyexr.h" />
     <ClInclude Include="Source\Thirdparty\tiny_gltf.h" />
     <CopyFileToFolders Include="Shader\ClosestHit.h" />
     <CopyFileToFolders Include="Shader\Light.h" />
@@ -102,7 +104,6 @@
     <ClCompile Include="Source\ImGui\imgui_impl_win32.cpp" />
     <ClCompile Include="Source\Renderer.cpp" />
     <ClCompile Include="Source\Scene.cpp" />
-    <ClCompile Include="Source\Thirdparty.cpp" />
     <ClCompile Include="Source\Thirdparty\ArHosekSkyModel\ArHosekSkyModel.cpp" />
     <ClCompile Include="Source\Thirdparty\ArPragueSkyModelGround\ArPragueSkyModelGround.cpp" />
     <ClInclude Include="Source\Thirdparty\ImGuizmo\example\imgui.cpp" />
@@ -128,6 +129,7 @@
     <ClCompile Include="Source\Thirdparty\imgui\imgui_tables.cpp" />
     <ClCompile Include="Source\Thirdparty\imgui\imgui_widgets.cpp" />
     <ClInclude Include="Source\Thirdparty\tinygltf\tiny_gltf.cc" />
+    <ClCompile Include="Source\Thirdparty\Thirdparty.cpp" />
     <ClCompile Include="Source\Thirdparty\tinyobjloader\tiny_obj_loader.cc">
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4244</DisableSpecificWarnings>
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4244</DisableSpecificWarnings>

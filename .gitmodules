@@ -29,3 +29,6 @@
 [submodule "Source/Thirdparty/ImGuizmo"]
 	path = Source/Thirdparty/ImGuizmo
 	url = https://github.com/CedricGuillemet/ImGuizmo.git
+[submodule "Source/Thirdparty/tinyexr"]
+	path = Source/Thirdparty/tinyexr
+	url = https://github.com/syoyo/tinyexr.git

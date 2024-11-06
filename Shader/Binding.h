@@ -3,16 +3,7 @@
 
 // #define USE_DYNAMIC_RESOURCE_CBV		// About 2x slower
 #define USE_DYNAMIC_RESOURCE_SRV_UAV	// [TODO] Always enabled, need alternative implementation for comparison
-// #define USE_DYNAMIC_RESOURCE_SAMPLER	// About the same with 2 samplers
-
-// Common
-#ifdef USE_DYNAMIC_RESOURCE_SAMPLER
-#define ROOT_SIGNATURE_SAMPLER
-#else
-#define ROOT_SIGNATURE_SAMPLER \
-", StaticSampler(s0, filter = FILTER_MIN_MAG_MIP_LINEAR, addressU = TEXTURE_ADDRESS_CLAMP, addressV = TEXTURE_ADDRESS_CLAMP, addressW = TEXTURE_ADDRESS_CLAMP)"	\
-", StaticSampler(s1, filter = FILTER_MIN_MAG_MIP_LINEAR, addressU = TEXTURE_ADDRESS_WRAP, addressV = TEXTURE_ADDRESS_WRAP, addressW = TEXTURE_ADDRESS_WRAP)"
-#endif // USE_DYNAMIC_RESOURCE_SAMPLER
+#define USE_DYNAMIC_RESOURCE_SAMPLER	// [TODO] Always enabled, need alternative implementation for comparison
 
 // CBV
 #ifdef USE_DYNAMIC_RESOURCE_CBV
@@ -27,8 +18,7 @@ ConstantBuffer<Constants> mConstants : register(b0, space0);
 #endif // USE_DYNAMIC_RESOURCE_CBV
 
 #define ROOT_SIGNATURE_COMMON \
-"RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0), CBV(b1, space = 0)" \
-ROOT_SIGNATURE_SAMPLER
+"RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0), CBV(b1, space = 0)" 
 
 cbuffer RootConstantsPrepareLights : register(b0, space1)
 {
@@ -36,8 +26,7 @@ cbuffer RootConstantsPrepareLights : register(b0, space1)
 	uint mTriangleLightsOffset;
 };
 #define ROOT_SIGNATURE_PREPARE_LIGHTS \
-"RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0), RootConstants(num32BitConstants=2, b0, space = 1)" \
-ROOT_SIGNATURE_SAMPLER
+"RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0), RootConstants(num32BitConstants=2, b0, space = 1)"
 
 cbuffer RootConstantsDiff : register(b0, space1)
 {
@@ -46,16 +35,14 @@ cbuffer RootConstantsDiff : register(b0, space1)
 	uint mOutputIndex;
 };
 #define ROOT_SIGNATURE_DIFF \
-"RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0), RootConstants(num32BitConstants=3, b0, space = 1)" \
-ROOT_SIGNATURE_SAMPLER
+"RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0), RootConstants(num32BitConstants=3, b0, space = 1)"
 
 cbuffer RootConstantsAtmosphere : register(b0, space2)
 {
 	uint mScatteringOrder;
 }
 #define ROOT_SIGNATURE_ATMOSPHERE \
-"RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0), RootConstants(num32BitConstants=1, b0, space = 2)" \
-ROOT_SIGNATURE_SAMPLER
+"RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0), RootConstants(num32BitConstants=1, b0, space = 2)"
 
 // Local Root Parameters, see also ShaderTableEntry, gCreateLocalRootSignature
 ConstantBuffer<LocalConstants> mLocalConstants : register(b0, space100);
@@ -79,7 +66,7 @@ static RWStructuredBuffer<EncodedTriangleLight> EncodedTriangleLights = Resource
 static RWStructuredBuffer<PixelInspection> PixelInspectionUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::PixelInspectionUAV];
 static RWStructuredBuffer<RayInspection> RayInspectionUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RayInspectionUAV];
 
-static Texture2D<float4> UVCheckerMap = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::UVCheckerMap];
+static Texture2D<float4> UVCheckerMap = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::UVCheckerSRV];
 static Texture2D<float4> IESSRV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::IESSRV];
 
 static Texture2D<float4> TransmittanceSRV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Bruneton17TransmittanceSRV];
@@ -116,10 +103,7 @@ static RWTexture2D<float4> ScreenDebugUAV = ResourceDescriptorHeap[(uint)ViewDes
 static RWTexture2D<float4> ScreenReservoirUAV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::ScreenReservoirUAV];
 
 // Samplers Helper
-#ifdef USE_DYNAMIC_RESOURCE_SAMPLER
 static SamplerState BilinearClampSampler = SamplerDescriptorHeap[(uint)SamplerDescriptorIndex::BilinearClamp];
 static SamplerState BilinearWrapSampler = SamplerDescriptorHeap[(uint)SamplerDescriptorIndex::BilinearWrap];
-#else
-SamplerState BilinearClampSampler : register(s0);
-SamplerState BilinearWrapSampler : register(s1);
-#endif // USE_DYNAMIC_RESOURCE_SAMPLER
+static SamplerState PointClampSampler = SamplerDescriptorHeap[(uint)SamplerDescriptorIndex::PointClamp];
+static SamplerState PointWrapSampler = SamplerDescriptorHeap[(uint)SamplerDescriptorIndex::PointWrap];
