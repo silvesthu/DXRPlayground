@@ -61,6 +61,9 @@ static const std::array kScenePresets =
 	ScenePreset().Name("VeachMISManyLight").Path("Asset/Comparison/benedikt-bitterli/veach-mis-manylight/scene_ggx_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("Arcade").Path("Asset/Comparison/RTXDI/Arcade/Arcade.gltf").CameraPosition(glm::vec4(-1.658f, 1.577f, 1.69f, 0.0f)).CameraDirection(glm::vec4(-0.9645f, 1.2672f, 1.0396f, 0.0f) - glm::vec4(-1.658f, 1.577f, 1.69f, 0.0f)).EmissionBoost(1E6f),
 
+	// Simple scenes
+	ScenePreset().Name("Dragon").Path("Asset/Comparison/benedikt-bitterli/dragon/scene_v3.xml").EmissionBoost(1E4f),
+	
 	// Complex scenes
 	ScenePreset().Name("LivingRoom2").Path("Asset/Comparison/benedikt-bitterli/living-room-2/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("VeachAjar").Path("Asset/Comparison/benedikt-bitterli/veach-ajar/scene_v3.xml").EmissionBoost(1E4f),
