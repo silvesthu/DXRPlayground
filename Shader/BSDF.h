@@ -273,14 +273,13 @@ namespace BSDFEvaluation
 			result.mEta							= 1.0;
 
 			if (inHitContext.BSDF() == BSDF::Unsupported)
-			{
 				result.mBSDF					= float3(1, 0, 1) / MATH_PI;
-			}
+
+			if (inBSDFContext.mNdotL < 0 || inBSDFContext.mNdotV < 0 || inBSDFContext.mHdotL < 0 || inBSDFContext.mHdotV < 0)
+				result.mBSDF					= 0;
 
 			if (mConstants.mDebugInstanceIndex == inHitContext.mInstanceID && mConstants.mDebugInstanceMode == DebugInstanceMode::Barycentrics)
-			{
 				result.mBSDF					= 0.0;
-			}
 
 			return result;
 		}
@@ -317,10 +316,11 @@ namespace BSDFEvaluation
 			result.mBSDFSamplePDF				= 1.0;
 			result.mEta							= 1.0;
 
+			if (inBSDFContext.mNdotL < 0 || inBSDFContext.mNdotV < 0 || inBSDFContext.mHdotL < 0 || inBSDFContext.mHdotV < 0)
+				result.mBSDF					= 0;
+
 			if (mConstants.mDebugInstanceIndex == inHitContext.mInstanceID && mConstants.mDebugInstanceMode == DebugInstanceMode::Reflection)
-			{
 				result.mBSDF					= 1.0;
-			}
 
 			return result;
 		}
@@ -514,13 +514,9 @@ namespace BSDFEvaluation
 			bool selected_r						= inBSDFContext.mLobe0Selected;
 
 			if (inBSDFContext.mMode == BSDFContext::Mode::BSDF)
-			{
 				DebugValue(PixelDebugMode::BSDF__I, ioPathContext.mRecursionDepth, float3(selected_r ? 0 : 1, 0, 0));
-			}
 			else
-			{
 				DebugValue(PixelDebugMode::Light_I, ioPathContext.mRecursionDepth, float3(selected_r ? 0 : 1, 0, 0));
-			}
 
 			if (selected_r)
 			{
