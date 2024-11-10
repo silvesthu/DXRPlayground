@@ -32,3 +32,6 @@
 [submodule "Source/Thirdparty/tinyexr"]
 	path = Source/Thirdparty/tinyexr
 	url = https://github.com/syoyo/tinyexr.git
+[submodule "Source/Thirdparty/SHforHLSL"]
+	path = Source/Thirdparty/SHforHLSL
+	url = https://github.com/TheRealMJP/SHforHLSL.git
