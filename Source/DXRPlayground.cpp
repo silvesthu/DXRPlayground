@@ -20,12 +20,14 @@
 extern "C" { __declspec(dllexport) extern const UINT			D3D12SDKVersion = 614; }
 extern "C" { __declspec(dllexport) extern const char8_t*		D3D12SDKPath = u8".\\D3D12\\"; }
 
-#define DX12_ENABLE_DEBUG_LAYER			(1)
+#define DX12_ENABLE_DEBUG_LAYER			(0)
 #define DX12_ENABLE_GBV					(0)
 #define DX12_ENABLE_INFO_QUEUE_CALLBACK (0)
 #define DX12_ENABLE_PIX_CAPTURE			(0)
 
-static const wchar_t*					kApplicationTitleW = L"DXR Playground";
+static const wchar_t*											kApplicationTitleW = L"DXR Playground";
+static const std::wstring										kINIPathStringW = std::filesystem::absolute(L"DXRPlayground.ini").wstring();
+static const wchar_t*											kINIPathW = kINIPathStringW.c_str();
 
 struct ScenePreset
 {
@@ -89,7 +91,7 @@ int sFindScenePresetIndex(const std::string_view inName)
 {
 	return static_cast<int>(&sFindScenePreset(inName) - &kScenePresets.front());
 }
-static int sCurrentSceneIndex = sFindScenePresetIndex("CornellBox");
+static int sCurrentSceneIndex = sFindScenePresetIndex("Arcade");
 static int sPreviousSceneIndex = sCurrentSceneIndex;
 
 struct CameraSettings
@@ -777,9 +779,12 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 	WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, sWndProc, 0L, 0L, GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, kApplicationTitleW, nullptr };
 	::RegisterClassEx(&wc);
 
+	int window_x = GetPrivateProfileInt(L"Main", L"Window_X", 100, kINIPathW);
+	int window_y = GetPrivateProfileInt(L"Main", L"Window_Y", 100, kINIPathW);
+
 	RECT rect = { 0, 0, 1920, 1080 };
 	AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, false);
-	HWND hwnd = ::CreateWindow(wc.lpszClassName, kApplicationTitleW, WS_OVERLAPPEDWINDOW, 100, 100, rect.right - rect.left, rect.bottom - rect.top, nullptr, nullptr, wc.hInstance, nullptr);
+	HWND hwnd = ::CreateWindow(wc.lpszClassName, kApplicationTitleW, WS_OVERLAPPEDWINDOW, window_x, window_y, rect.right - rect.left, rect.bottom - rect.top, nullptr, nullptr, wc.hInstance, nullptr);
 
 	// Initialize Direct3D
 	if (!sCreateDeviceD3D(hwnd))
@@ -1622,6 +1627,19 @@ static LRESULT WINAPI sWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam
 			return 0;
 		break;
 	case WM_DESTROY:
+		{
+			auto SetPrivateProfileInt = [](LPCWSTR lpAppName, LPCWSTR lpKeyName, INT nValue, LPCWSTR lpFileName)
+			{
+				wchar_t buffer[16];
+				_itow_s(nValue, buffer, std::size(buffer), 10);
+				return WritePrivateProfileString(lpAppName, lpKeyName, buffer, lpFileName) != 0;
+			};
+			RECT rect_for_ini;
+			gAssert(::GetWindowRect(hWnd, &rect_for_ini));
+			SetPrivateProfileInt(L"Main", L"Window_X", rect_for_ini.left, kINIPathW);
+			SetPrivateProfileInt(L"Main", L"Window_Y", rect_for_ini.top, kINIPathW);
+			WritePrivateProfileString(NULL, NULL, NULL, kINIPathW); // Flush
+		}		
 		::PostQuitMessage(0);
 		return 0;
 	}

@@ -380,7 +380,8 @@ ShaderTable gCreateShaderTable(const Shader& inShader)
 			for (const Shader& shader : gRenderer.mRuntime.mHitGroupShaders)
 			{
 				shader_table_entries.push_back({});
-				memcpy(&shader_table_entries.back().mShaderIdentifier, state_object_properties->GetShaderIdentifier(shader.HitGroupName().c_str()), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+				void* shader_identifier = state_object_properties->GetShaderIdentifier(shader.HitGroupName().c_str());
+				memcpy(&shader_table_entries.back().mShaderIdentifier, shader_identifier, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 				shader_table_entries.back().mLocalConstants.mShaderIndex = static_cast<uint32_t>(shader_table_entries.size() - 1);
 				shader_table_entries.back().mLocalCBV = gRenderer.mRuntime.mConstantsBuffer.mResource->GetGPUVirtualAddress();
 				shader_table_entries.back().mLocalSRVs = gGetFrameContext().mViewDescriptorHeap.GetGPUHandle(ViewDescriptorIndex::Invalid);

@@ -222,7 +222,7 @@ inline void gValidate(HRESULT hr)
 	if (FAILED(hr))
 	{
 		char message[512];
-		FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, nullptr, hr, 0, message, ARRAYSIZE(message), nullptr);
+		FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, nullptr, hr, 0, message, std::size(message), nullptr);
 		OutputDebugStringA(message);
 		assert(false);
 	}
