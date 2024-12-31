@@ -775,12 +775,13 @@ static void sUpdate()
 // Main code
 int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLine*/, int /*nCmdShow*/)
 {
+	// INI
+	int window_x = GetPrivateProfileInt(L"Main", L"Window_X", 100, kINIPathW);
+	int window_y = GetPrivateProfileInt(L"Main", L"Window_Y", 100, kINIPathW);
+	
 	// Create application window
 	WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, sWndProc, 0L, 0L, GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, kApplicationTitleW, nullptr };
 	::RegisterClassEx(&wc);
-
-	int window_x = GetPrivateProfileInt(L"Main", L"Window_X", 100, kINIPathW);
-	int window_y = GetPrivateProfileInt(L"Main", L"Window_Y", 100, kINIPathW);
 
 	RECT rect = { 0, 0, 1920, 1080 };
 	AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, false);
@@ -1461,7 +1462,7 @@ static bool sCreateDeviceD3D(HWND hWnd)
 				{.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT, .AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP, .AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP, .AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP, .MipLODBias = 0, .MaxAnisotropy = 0, .ComparisonFunc = D3D12_COMPARISON_FUNC_NONE, .BorderColor = {0,0,0,0}, .MinLOD = 0, .MaxLOD = D3D12_FLOAT32_MAX },
 				{.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT, .AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP, .AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP, .AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP, .MipLODBias = 0, .MaxAnisotropy = 0, .ComparisonFunc = D3D12_COMPARISON_FUNC_NONE, .BorderColor = {0,0,0,0}, .MinLOD = 0, .MaxLOD = D3D12_FLOAT32_MAX },
 			};
-			static_assert(ARRAYSIZE(sampler_descs) == (int)SamplerDescriptorIndex::Count);
+			static_assert(gArraySize(sampler_descs) == (int)SamplerDescriptorIndex::Count);
 			for (int sampler_index = 0; sampler_index < (int)SamplerDescriptorIndex::Count; sampler_index++)
 				gDevice->CreateSampler(&sampler_descs[sampler_index], gFrameContexts[i].mSamplerDescriptorHeap.GetCPUHandle((SamplerDescriptorIndex)sampler_index));
 		}
@@ -1628,6 +1629,7 @@ static LRESULT WINAPI sWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam
 		break;
 	case WM_DESTROY:
 		{
+			// INI
 			auto SetPrivateProfileInt = [](LPCWSTR lpAppName, LPCWSTR lpKeyName, INT nValue, LPCWSTR lpFileName)
 			{
 				wchar_t buffer[16];

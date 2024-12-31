@@ -58,6 +58,22 @@ constexpr inline T gMax(T lhs, T rhs)
 	return lhs > rhs ? lhs : rhs;
 }
 
+template <typename T, size_t N>
+struct ArraySizeHelper {
+	using type = typename std::conditional<
+		(N <= std::numeric_limits<uint32_t>::max()),
+		uint32_t,
+		uint64_t
+	>::type;
+	static constexpr type value = static_cast<type>(N);
+};
+
+template<typename T, size_t N>
+constexpr typename ArraySizeHelper<T, N>::type gArraySize(const T (&)[N])
+{
+	return ArraySizeHelper<T, N>::value;
+}
+
 inline std::string gToLower(const std::string_view& inStringView)
 {
 	std::string result(inStringView);

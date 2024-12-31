@@ -291,7 +291,7 @@ ComPtr<ID3D12RootSignature> gCreateLocalRootSignature()
 	ComPtr<ID3D12RootSignature> local_root_signature = gCreateRootSignature(
 		D3D12_ROOT_SIGNATURE_DESC
 		{
-			.NumParameters = ARRAYSIZE(local_root_parameters),
+			.NumParameters = gArraySize(local_root_parameters),
 			.pParameters = local_root_parameters,
 			.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE,
 		});

@@ -90,7 +90,7 @@ struct Renderer
 			gGetFrameContext().mViewDescriptorHeap.mHeap.Get(),
 			gGetFrameContext().mSamplerDescriptorHeap.mHeap.Get(),
 		};
-		gCommandList->SetDescriptorHeaps(ARRAYSIZE(bindless_heaps), bindless_heaps);
+		gCommandList->SetDescriptorHeaps(gArraySize(bindless_heaps), bindless_heaps);
 	}
 
 	void										ClearUnorderedAccessViewFloat(const Texture& inTexture)
