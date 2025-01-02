@@ -134,7 +134,11 @@ enum class ViewDescriptorIndex : uint
 	RaytraceNormalsSRV,
 	RaytraceUVsSRV,
 	RaytraceLightsSRV,
-	RaytraceEncodedTriangleLightsUAV,
+
+	// [RTXDI]
+	TaskBufferSRV,
+	LightDataBufferSRV,
+	LightDataBufferUAV,
 
 	// [Bruneton17]
 	Bruneton17TransmittanceUAV,
@@ -507,15 +511,24 @@ struct Light
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 };
 
-// Based on RAB_LightInfo in RTXDI
-struct EncodedTriangleLight
+// RTXDI - minimal-sample
+struct PrepareLightsTask
 {
-	float3						mPosition						CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
-	uint						mExtends						CONSTANT_DEFAULT(0);											// 2x float16
+	uint 						mInstanceIndex;
+	uint 						mGeometryIndex;
+	uint 						mTriangleCount;
+	uint 						mLightBufferOffset;
+};
 
-	uint2						mEmission						CONSTANT_DEFAULT(uint2(0, 0));									// fp16x4
-	uint						mTangent						CONSTANT_DEFAULT(0);											// oct-encoded
-	uint						mBitangent						CONSTANT_DEFAULT(0);											// oct-encoded
+// RTXDI - minimal-sample
+struct RAB_LightInfo
+{
+	float3						mCenter;
+	uint						mScalars;						// 2x float16
+
+	uint2						mRadiance;						// fp16x4
+	uint						mDirection1;					// oct-encoded
+	uint						mDirection2;					// oct-encoded
 };
 
 struct RayState

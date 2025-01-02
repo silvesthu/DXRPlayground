@@ -257,6 +257,8 @@ inline void gSetName(ComPtr<T>& inObject, std::string_view inPrefix, std::string
 	gSetName(inObject, gToWString(inPrefix), gToWString(inName), gToWString(inSuffix));
 }
 
+constexpr int								kVertexCountPerTriangle = 3;
+
 extern ID3D12Device7*						gDevice;
 extern ID3D12DescriptorHeap* 				gRTVDescriptorHeap;
 extern ID3D12CommandQueue* 					gCommandQueue;

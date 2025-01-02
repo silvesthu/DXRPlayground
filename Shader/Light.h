@@ -5,14 +5,29 @@
 #include "Common.h"
 #include "Reservoir.h"
 
+// RTXDI - minimal-sample
+// For computation (RAB_LightInfo is for storage)
 struct TriangleLight
 {
-	float3			mPosition;
+	float3			mBase;
 	float3			mEdge1;
 	float3			mEdge2;
-	float3			mEmission;
+	float3			mRadiance;
 	float3			mNormal;
 	float			mSurfaceArea;
+
+	RAB_LightInfo Store()
+	{
+		RAB_LightInfo lightInfo = (RAB_LightInfo)0;
+
+		lightInfo.mRadiance		= Pack_R16G16B16A16_FLOAT(float4(mRadiance, 0));
+		lightInfo.mCenter		= mBase + (mEdge1 + mEdge2) / 3.0;
+		lightInfo.mDirection1	= ndirToOctUnorm32(normalize(mEdge1));
+		lightInfo.mDirection2	= ndirToOctUnorm32(normalize(mEdge2));
+		lightInfo.mScalars		= f32tof16(length(mEdge1)) | (f32tof16(length(mEdge2)) << 16);
+        
+		return lightInfo;
+	}
 };
 
 struct LightContext

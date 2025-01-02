@@ -1,5 +1,8 @@
 #pragma once
 
+#include "packing.hlsli"
+#include "utils.hlsli"
+
 #include "RayQuery.h"
 
 template <typename T> T fmadd(T inA, T inB, T inC)              { return inA * inB + inC; }

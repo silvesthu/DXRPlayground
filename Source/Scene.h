@@ -58,15 +58,16 @@ struct SceneContent
 
 	std::vector<InstanceInfo>					mInstanceInfos;
 	std::vector<InstanceData>					mInstanceDatas;
-	std::vector<Light>							mLights;
 
-	struct TriangleLightsInfo
+	struct EmissiveInstance
 	{
-		uint									mInstanceDataIndex;
-		uint									mTriangleLightsOffset;
+		uint									mInstanceIndex;
+		uint									mTriangleOffset;
 	};
-	std::vector<TriangleLightsInfo>				mTriangleLightsInfos;
-	uint										mTriangleLightsCount = 0;
+	std::vector<EmissiveInstance>				mEmissiveInstances;
+	uint										mEmissiveTriangleCount = 0;
+
+	std::vector<Light>							mLights;
 
 	std::optional<glm::mat4x4>					mCameraTransform;
 	std::optional<float>						mFov;
@@ -111,6 +112,8 @@ public:
 	int GetLightCount() const									{ return static_cast<int>(mSceneContent.mLights.size()); }
 	const Light& GetLight(int inIndex) const					{ return mSceneContent.mLights[inIndex]; }
 
+	int GetPrepareLightsTaskCount() const						{ return static_cast<int>(mBuffers.mTaskBufferCPU.size()); }
+
 	void ImGuiShowTextures()									{ ImGui::Textures(mTextures, "Scene", ImGuiTreeNodeFlags_None); }
 
 private:
@@ -148,7 +151,11 @@ private:
 
 		ComPtr<ID3D12Resource>				mInstanceDatas;
 		ComPtr<ID3D12Resource>				mLights;
-		ComPtr<ID3D12Resource>				mEncodedTriangleLights;
+
+		// RTXDI
+		ComPtr<ID3D12Resource>				mTaskBuffer;
+		std::vector<PrepareLightsTask>		mTaskBufferCPU; // CPU copy for debugging
+		ComPtr<ID3D12Resource>				mLightDataBuffer;
 	};
 	Buffers									mBuffers;
 

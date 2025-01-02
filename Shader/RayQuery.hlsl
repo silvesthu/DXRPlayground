@@ -104,39 +104,22 @@ void TraceRay(inout PixelContext ioPixelContext)
 			HitContext hit_context				= (HitContext)0;
 			hit_context.mInstanceID				= query.CommittedInstanceID();
 			hit_context.mPrimitiveIndex			= query.CommittedPrimitiveIndex();
+			hit_context.mBarycentrics			= float3(1.0 - attributes.barycentrics.x - attributes.barycentrics.y, attributes.barycentrics.x, attributes.barycentrics.y);
 			hit_context.mRayOriginWS			= ray.Origin;
 			hit_context.mRayDirectionWS			= ray.Direction;
 			hit_context.mRayTCurrent			= query.CommittedRayT();
-			hit_context.mBarycentrics			= float3(1.0 - attributes.barycentrics.x - attributes.barycentrics.y, attributes.barycentrics.x, attributes.barycentrics.y);
 
 			// Ray inspection
 			if (ioPixelContext.mPixelIndex.x == mConstants.mPixelDebugCoord.x && ioPixelContext.mPixelIndex.y == mConstants.mPixelDebugCoord.y)
 				RayInspectionUAV[0].mPositionWS[path_context.mRecursionDepth] = float4(hit_context.PositionWS(), 1.0);
 
-			// Vertex attributes
+			// HitContext
 			{
-				// Only support 32bit index for simplicity
-				// see https://github.com/microsoft/DirectX-Graphics-Samples/blob/master/Samples/Desktop/D3D12Raytracing/src/D3D12RaytracingSimpleLighting/Raytracing.hlsl for reference
-				uint base_index					= hit_context.mPrimitiveIndex * kIndexCountPerTriangle + InstanceDatas[hit_context.mInstanceID].mIndexOffset;
-				uint3 indices					= uint3(Indices[base_index], Indices[base_index + 1], Indices[base_index + 2]) + InstanceDatas[hit_context.mInstanceID].mVertexOffset;
-
-				float3 vertices[3]				= { Vertices[indices[0]], Vertices[indices[1]], Vertices[indices[2]] };
-				hit_context.mVertexPositionOS	= vertices[0] * hit_context.mBarycentrics.x + vertices[1] * hit_context.mBarycentrics.y + vertices[2] * hit_context.mBarycentrics.z;
-
-				float3 normals[3]				= { Normals[indices[0]], Normals[indices[1]], Normals[indices[2]] };
-				float3 normal					= normalize(normals[0] * hit_context.mBarycentrics.x + normals[1] * hit_context.mBarycentrics.y + normals[2] * hit_context.mBarycentrics.z);
-				hit_context.mVertexNormalOS		= normal;
-				hit_context.mVertexNormalWS		= normalize(mul((float3x3) InstanceDatas[hit_context.mInstanceID].mInverseTranspose, normal)); // Allow non-uniform scale
-
-				float2 uvs[3]					= { UVs[indices[0]], UVs[indices[1]], UVs[indices[2]] };
-				hit_context.mUV					= uvs[0] * hit_context.mBarycentrics.x + uvs[1] * hit_context.mBarycentrics.y + uvs[2] * hit_context.mBarycentrics.z;
-			}
-			
-			// HitConext is constructed, fill the debug values
-			{
+				hit_context.LoadVertex();
+				
 				// Report InstanceID of instance at PixelDebugCoord
 				if (ioPixelContext.mPixelIndex.x == mConstants.mPixelDebugCoord.x && ioPixelContext.mPixelIndex.y == mConstants.mPixelDebugCoord.y && path_context.mRecursionDepth == 0)
-					PixelInspectionUAV[0].mPixelInstanceID			= hit_context.mInstanceID;
+					PixelInspectionUAV[0].mPixelInstanceID = hit_context.mInstanceID;
 				
 				DebugValue(PixelDebugMode::PositionWS, path_context.mRecursionDepth, float3(hit_context.PositionWS()));
 				DebugValue(PixelDebugMode::DirectionWS, path_context.mRecursionDepth, float3(hit_context.DirectionWS()));

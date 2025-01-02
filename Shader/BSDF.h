@@ -3,9 +3,36 @@
 #include "Binding.h"
 #include "Common.h"
 
-// Context information about the hit point
-struct HitContext
+// Context information about a point on surface
+struct SurfaceContext
 {
+	InstanceData	InstanceData()				{ return InstanceDatas[mInstanceID]; }
+	
+	void			LoadVertex()
+	{
+		// Only support 32bit index for simplicity
+		// see https://github.com/microsoft/DirectX-Graphics-Samples/blob/master/Samples/Desktop/D3D12Raytracing/src/D3D12RaytracingSimpleLighting/Raytracing.hlsl for reference
+		uint base_index					= mPrimitiveIndex * kIndexCountPerTriangle + InstanceData().mIndexOffset;
+		uint3 indices					= uint3(Indices[base_index], Indices[base_index + 1], Indices[base_index + 2]) + InstanceData().mVertexOffset;
+
+		mVertexPositions[0]				= Vertices[indices[0]];
+		mVertexPositions[1]				= Vertices[indices[1]];
+		mVertexPositions[2]				= Vertices[indices[2]];
+		mVertexPositionOS				= mVertexPositions[0] * mBarycentrics.x + mVertexPositions[1] * mBarycentrics.y + mVertexPositions[2] * mBarycentrics.z;
+
+		mVertexNormals[0]				= Normals[indices[0]];
+		mVertexNormals[1]				= Normals[indices[1]];
+		mVertexNormals[2]				= Normals[indices[2]];
+		float3 normal					= normalize(mVertexNormals[0] * mBarycentrics.x + mVertexNormals[1] * mBarycentrics.y + mVertexNormals[2] * mBarycentrics.z);
+		mVertexNormalOS					= normal;
+		mVertexNormalWS					= normalize(mul((float3x3) InstanceData().mInverseTranspose, normal)); // Allow non-uniform scale
+
+		mVertexUVs[0]					= UVs[indices[0]];
+		mVertexUVs[1]					= UVs[indices[1]];
+		mVertexUVs[2]					= UVs[indices[2]];
+		mUV								= mVertexUVs[0] * mBarycentrics.x + mVertexUVs[1] * mBarycentrics.y + mVertexUVs[2] * mBarycentrics.z;
+	}
+	
 	BSDF			BSDF()
 	{
 		if (mConstants.mDebugInstanceIndex == mInstanceID)
@@ -18,50 +45,50 @@ struct HitContext
 			}
 		}
 
-		return InstanceDatas[mInstanceID].mBSDF;
+		return InstanceData().mBSDF;
 	}
-	uint			TwoSided()					{ return InstanceDatas[mInstanceID].mTwoSided; }
-	float			Opacity()					{ return InstanceDatas[mInstanceID].mOpacity; }
-	uint			LightIndex()				{ return InstanceDatas[mInstanceID].mLightIndex; }
-	float			RoughnessAlpha()			{ return InstanceDatas[mInstanceID].mRoughnessAlpha; }
+	uint			TwoSided()					{ return InstanceData().mTwoSided; }
+	float			Opacity()					{ return InstanceData().mOpacity; }
+	uint			LightIndex()				{ return InstanceData().mLightIndex; }
+	float			RoughnessAlpha()			{ return InstanceData().mRoughnessAlpha; }
 	float3			Albedo()						
 	{
-		uint texture_index = InstanceDatas[mInstanceID].mAlbedoTexture.mTextureIndex;
-		uint sampler_index = InstanceDatas[mInstanceID].mAlbedoTexture.mSamplerIndex;
+		uint texture_index = InstanceData().mAlbedoTexture.mTextureIndex;
+		uint sampler_index = InstanceData().mAlbedoTexture.mSamplerIndex;
 		if (texture_index != (uint)ViewDescriptorIndex::Invalid)
 		{
-			Texture2D<float4> texture	= ResourceDescriptorHeap[texture_index];
+			Texture2D<float4> texture = ResourceDescriptorHeap[texture_index];
 			SamplerState sampler = SamplerDescriptorHeap[sampler_index];
-			return texture.SampleLevel(sampler, mUV, 0).rgb * InstanceDatas[mInstanceID].mAlbedo;
+			return texture.SampleLevel(sampler, mUV, 0).rgb * InstanceData().mAlbedo;
 		}
-		return InstanceDatas[mInstanceID].mAlbedo; 
+		return InstanceData().mAlbedo; 
 	}
 	float3			SpecularReflectance()
 	{
-		uint texture_index = InstanceDatas[mInstanceID].mReflectanceTexture.mTextureIndex;
-		uint sampler_index = InstanceDatas[mInstanceID].mReflectanceTexture.mSamplerIndex;
+		uint texture_index = InstanceData().mReflectanceTexture.mTextureIndex;
+		uint sampler_index = InstanceData().mReflectanceTexture.mSamplerIndex;
 		if (texture_index != (uint)ViewDescriptorIndex::Invalid)
 		{
 			Texture2D<float4> texture = ResourceDescriptorHeap[texture_index];
 			SamplerState sampler = SamplerDescriptorHeap[sampler_index];
-			return texture.SampleLevel(sampler, mUV, 0).rgb * InstanceDatas[mInstanceID].mReflectance;
+			return texture.SampleLevel(sampler, mUV, 0).rgb * InstanceData().mReflectance;
 		}
-		return InstanceDatas[mInstanceID].mReflectance;
+		return InstanceData().mReflectance;
 	}
-	float3			SpecularTransmittance()		{ return InstanceDatas[mInstanceID].mSpecularTransmittance; }
-	float3			Eta()						{ return InstanceDatas[mInstanceID].mEta; }
-	float3			K()							{ return InstanceDatas[mInstanceID].mK; }
+	float3			SpecularTransmittance()		{ return InstanceData().mSpecularTransmittance; }
+	float3			Eta()						{ return InstanceData().mEta; }
+	float3			K()							{ return InstanceData().mK; }
 	float3			Emission()					
 	{
-		uint texture_index = InstanceDatas[mInstanceID].mEmissionTexture.mTextureIndex;
-		uint sampler_index = InstanceDatas[mInstanceID].mEmissionTexture.mSamplerIndex;
+		uint texture_index = InstanceData().mEmissionTexture.mTextureIndex;
+		uint sampler_index = InstanceData().mEmissionTexture.mSamplerIndex;
 		if (texture_index != (uint)ViewDescriptorIndex::Invalid)
 		{
 			Texture2D<float4> texture = ResourceDescriptorHeap[texture_index];
 			SamplerState sampler = SamplerDescriptorHeap[sampler_index];
-			return texture.SampleLevel(sampler, mUV, 0).rgb * InstanceDatas[mInstanceID].mEmission;
+			return texture.SampleLevel(sampler, mUV, 0).rgb * InstanceData().mEmission;
 		}
-		return InstanceDatas[mInstanceID].mEmission; 
+		return InstanceData().mEmission; 
 	}
 
 	bool			DiracDeltaDistribution()
@@ -75,6 +102,27 @@ struct HitContext
 		}
 	}
 
+	float3			Barycentrics()				{ return mBarycentrics; }
+	float2			UV()						{ return mUV; }
+
+	uint			mInstanceID;
+	uint			mPrimitiveIndex;
+	float3			mBarycentrics;
+
+	// Vertex Attributes
+	float3			mVertexPositions[3];
+	float3			mVertexNormals[3];
+	float2			mVertexUVs[3];
+
+	// Interpolated Vertex Attributes
+	float3			mVertexPositionOS;
+	float3			mVertexNormalOS;
+	float3			mVertexNormalWS;
+	float2			mUV;
+};
+
+struct HitContext : SurfaceContext
+{
 	float3			PositionWS()				{ return mRayOriginWS + mRayDirectionWS * mRayTCurrent; }
 	float3			DirectionWS()				{ return mRayDirectionWS; }
 	float3			ViewWS()					{ return -mRayDirectionWS; }
@@ -89,23 +137,11 @@ struct HitContext
 
 		return normal;
 	}
-	float3			Barycentrics()				{ return mBarycentrics; }
-	float2			UV()						{ return mUV; }
 	float			NdotV()						{ return dot(NormalWS(), ViewWS()); }
-
-	uint			mInstanceID;
-	uint			mPrimitiveIndex;
 
 	float3			mRayOriginWS;
 	float3			mRayDirectionWS;
 	float			mRayTCurrent;
-
-	float3			mBarycentrics;
-	float2			mUV;
-	float3			mVertexPositionOS;
-	float3			mVertexNormalOS;
-
-	float3			mVertexNormalWS;
 };
 
 // Context information for BSDF evalution at the hit point
@@ -594,6 +630,36 @@ namespace BSDFEvaluation
 		}
 	}
 
+	namespace glTF
+	{
+		// [TODO] Add GGX Specular to match RTXDI
+		
+		BSDFContext GenerateContext(HitContext inHitContext, inout PathContext ioPathContext)
+		{
+			float3x3 tangent_space				= GenerateTangentSpace(inHitContext.NormalWS());
+			float3 randome_direction			= RandomCosineDirection(ioPathContext.mRandomState);
+			float3 L							= normalize(randome_direction.x * tangent_space[0] + randome_direction.y * tangent_space[1] + randome_direction.z * tangent_space[2]);
+
+			return BSDFContext::Generate(BSDFContext::Mode::BSDF, L, inHitContext);
+		}
+
+		BSDFResult Evaluate(inout BSDFContext inBSDFContext, HitContext inHitContext, inout PathContext ioPathContext)
+		{
+			BSDFResult result;
+			result.mBSDF						= inHitContext.Albedo() / MATH_PI;
+			result.mBSDFSamplePDF				= max(0, inBSDFContext.mNdotL) / MATH_PI;
+			result.mEta							= 1.0;
+
+			if (inBSDFContext.mNdotL < 0 || inBSDFContext.mNdotV < 0 || inBSDFContext.mHdotL < 0 || inBSDFContext.mHdotV < 0)
+				result.mBSDF					= 0;
+
+			if (mConstants.mDebugInstanceIndex == inHitContext.mInstanceID && mConstants.mDebugInstanceMode == DebugInstanceMode::Barycentrics)
+				result.mBSDF					= 0.0;
+
+			return result;
+		}
+	};
+
 	BSDFContext GenerateContext(HitContext inHitContext, inout PathContext ioPathContext)
 	{
 		BSDFContext bsdf_context;
@@ -607,7 +673,7 @@ namespace BSDFEvaluation
 		case BSDF::Dielectric:					bsdf_context = Dielectric::GenerateContext(inHitContext, ioPathContext); break;
 		case BSDF::ThinDielectric:				bsdf_context = Dielectric::GenerateContext(inHitContext, ioPathContext); break;
 		case BSDF::RoughDielectric:				bsdf_context = RoughDielectric::GenerateContext(inHitContext, ioPathContext); break;
-		case BSDF::glTF:						bsdf_context = Diffuse::GenerateContext(inHitContext, ioPathContext); break;
+		case BSDF::glTF:						bsdf_context = glTF::GenerateContext(inHitContext, ioPathContext); break;
 		default:								bsdf_context = Diffuse::GenerateContext(inHitContext, ioPathContext); break;
 		}
 
@@ -630,7 +696,7 @@ namespace BSDFEvaluation
 		case BSDF::Dielectric:					result = Dielectric::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
 		case BSDF::ThinDielectric:				result = Dielectric::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
 		case BSDF::RoughDielectric:				result = RoughDielectric::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
-		case BSDF::glTF:						result = Diffuse::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
+		case BSDF::glTF:						result = glTF::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
 		case BSDF::Unsupported:					result = Diffuse::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
 		default:								result = Diffuse::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
 		}

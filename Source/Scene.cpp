@@ -160,8 +160,7 @@ bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransfor
 	{
 		uint32_t vertex_offset = static_cast<uint32_t>(ioSceneContent.mVertices.size());
 		uint32_t index_offset = static_cast<uint32_t>(ioSceneContent.mIndices.size());
-
-		const int kVertexCountPerTriangle = 3;
+		
 		uint32_t vertex_count = static_cast<uint32_t>(shape.mesh.num_face_vertices.size()) * kVertexCountPerTriangle;
 		uint32_t index_count = static_cast<uint32_t>(shape.mesh.num_face_vertices.size()) * kVertexCountPerTriangle;
 
@@ -233,7 +232,7 @@ bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransfor
 		ioSceneContent.mInstanceInfos.push_back(instance_info);
 
 		instance_data.mTransform = inTransform;
-		instance_data.mInverseTranspose = glm::transpose(glm::inverse(inTransform));
+		instance_data.mInverseTranspose = glm::transpose(glm::inverse(inTransform)); // [TODO] use adjugate transpose
 		instance_data.mVertexOffset = vertex_offset;
 		instance_data.mVertexCount = vertex_count;
 		instance_data.mIndexOffset = index_offset;
@@ -774,14 +773,14 @@ bool Scene::LoadGLTF(const std::string& inFilename, SceneContent& ioSceneContent
 				Material material = model.materials[primitive.material];
 
 				auto get_texture_path = [&](int inIndex)
-					{
-						if (inIndex == -1)
-							return std::filesystem::path();
+				{
+					if (inIndex == -1)
+						return std::filesystem::path();
 
-						std::filesystem::path path = inFilename;
-						path.replace_filename(std::filesystem::path(model.images[model.textures[inIndex].source].uri));
-						return path;
-					};
+					std::filesystem::path path = inFilename;
+					path.replace_filename(std::filesystem::path(model.images[model.textures[inIndex].source].uri));
+					return path;
+				};
 				InstanceInfo instance_info =
 				{
 					.mName = std::format("{} - {} - {}", inNode.name, mesh.name, material.name),
@@ -813,8 +812,8 @@ bool Scene::LoadGLTF(const std::string& inFilename, SceneContent& ioSceneContent
 
 				if (glm::compMax(instance_data.mEmission) > 0.0f)
 				{
-					ioSceneContent.mTriangleLightsInfos.push_back({ static_cast<uint>(ioSceneContent.mInstanceDatas.size()) - 1, ioSceneContent.mTriangleLightsCount, });
-					ioSceneContent.mTriangleLightsCount += index_count / kIndexCountPerTriangle;
+					ioSceneContent.mEmissiveInstances.push_back({ static_cast<uint>(ioSceneContent.mInstanceDatas.size()) - 1, ioSceneContent.mEmissiveTriangleCount, });
+					ioSceneContent.mEmissiveTriangleCount += index_count / kIndexCountPerTriangle;
 				}
 			}
 
@@ -1015,36 +1014,69 @@ void Scene::InitializeBuffers()
 	}
 
 	{
-		desc_upload.Width = sizeof(InstanceData) * mSceneContent.mInstanceDatas.size();
+		desc_upload.Width = sizeof(InstanceData)  * gMax(1ull, mSceneContent.mInstanceDatas.size());
 		gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mBuffers.mInstanceDatas)));
 		gSetName(mBuffers.mInstanceDatas, "Scene.", "mBuffers.mInstanceDatas", "");
 
-		uint8_t* pData = nullptr;
-		mBuffers.mInstanceDatas->Map(0, nullptr, reinterpret_cast<void**>(&pData));
-		memcpy(pData, mSceneContent.mInstanceDatas.data(), desc_upload.Width);
-		mBuffers.mInstanceDatas->Unmap(0, nullptr);
+		if (!mSceneContent.mInstanceDatas.empty())
+		{
+			uint8_t* pData = nullptr;
+			mBuffers.mInstanceDatas->Map(0, nullptr, reinterpret_cast<void**>(&pData));
+			memcpy(pData, mSceneContent.mInstanceDatas.data(), desc_upload.Width);
+			mBuffers.mInstanceDatas->Unmap(0, nullptr);
+		}
 	}
 
 	{
-		std::vector<Light> dummy; dummy.push_back({}); // Avoid zero byte buffer
-		std::vector<Light>& lights = mSceneContent.mLights.empty() ? dummy : mSceneContent.mLights;
-
-		desc_upload.Width = sizeof(Light) * lights.size();
+		desc_upload.Width = sizeof(Light) * gMax(1ull, mSceneContent.mLights.size());
 		gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mBuffers.mLights)));
 		gSetName(mBuffers.mLights, "Scene.", "mBuffers.mLights", "");
 
-		uint8_t* pData = nullptr;
-		mBuffers.mLights->Map(0, nullptr, reinterpret_cast<void**>(&pData));
-		memcpy(pData, lights.data(), desc_upload.Width);
-		mBuffers.mLights->Unmap(0, nullptr);
+		if (!mSceneContent.mLights.empty())
+		{
+			uint8_t* pData = nullptr;
+			mBuffers.mLights->Map(0, nullptr, reinterpret_cast<void**>(&pData));
+			memcpy(pData, mSceneContent.mLights.data(), desc_upload.Width);
+			mBuffers.mLights->Unmap(0, nullptr);
+		}
 	}
 
 	{
-		desc_uav.Width = sizeof(EncodedTriangleLight) * gMax(1u, mSceneContent.mTriangleLightsCount); // Avoid zero byte buffer
-		gValidate(gDevice->CreateCommittedResource(&props_default, D3D12_HEAP_FLAG_NONE, &desc_uav, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mBuffers.mEncodedTriangleLights)));
-		gSetName(mBuffers.mEncodedTriangleLights, "Scene.", "mBuffers.mEncodedTriangleLights", "");
+		desc_upload.Width = sizeof(PrepareLightsTask) * gMax(1ull, mSceneContent.mEmissiveInstances.size());
+		gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mBuffers.mTaskBuffer)));
+		gSetName(mBuffers.mTaskBuffer, "Scene.", "mBuffers.mTaskBuffer", "");
 
-		// Write, Read on GPU
+		if (!mSceneContent.mEmissiveInstances.empty())
+		{
+			// See PrepareLightsPass::Process
+			// Handle here for now since Scene changes after load is not supported yet
+			uint light_buffer_offset = 0;
+			for (auto&& emissive_instance : mSceneContent.mEmissiveInstances)
+			{
+				auto& instance_data = mSceneContent.mInstanceDatas[emissive_instance.mInstanceIndex];
+				
+				PrepareLightsTask task;
+				task.mInstanceIndex		= emissive_instance.mInstanceIndex;
+				task.mGeometryIndex		= emissive_instance.mInstanceIndex; // Currently only 1 geometry per instance is supported
+				task.mTriangleCount		= instance_data.mIndexCount / kVertexCountPerTriangle;
+				task.mLightBufferOffset	= light_buffer_offset;
+
+				mBuffers.mTaskBufferCPU.push_back(task);
+
+				light_buffer_offset		+= task.mTriangleCount;
+			}
+			
+			uint8_t* pData = nullptr;
+			mBuffers.mTaskBuffer->Map(0, nullptr, reinterpret_cast<void**>(&pData));
+			memcpy(pData, mBuffers.mTaskBufferCPU.data(), desc_upload.Width);
+			mBuffers.mTaskBuffer->Unmap(0, nullptr);
+		}
+	}
+
+	{
+		desc_uav.Width = sizeof(RAB_LightInfo) * gMax(1u, mSceneContent.mEmissiveTriangleCount);
+		gValidate(gDevice->CreateCommittedResource(&props_default, D3D12_HEAP_FLAG_NONE, &desc_uav, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mBuffers.mLightDataBuffer)));
+		gSetName(mBuffers.mLightDataBuffer, "Scene.", "mBuffers.mLightDataBuffer", "");
 	}
 }
 
@@ -1101,6 +1133,21 @@ void Scene::InitializeViews()
 		for (int i = 0; i < kFrameInFlightCount; i++)
 			gDevice->CreateShaderResourceView(inResource, &desc, gFrameContexts[i].mViewDescriptorHeap.GetCPUHandle(inViewDescriptorIndex));
 	};
+
+	auto create_buffer_UAV = [](ID3D12Resource* inResource, int inStride, ViewDescriptorIndex inViewDescriptorIndex)
+	{
+		D3D12_UNORDERED_ACCESS_VIEW_DESC desc = {};
+		D3D12_RESOURCE_DESC resource_desc = inResource->GetDesc();
+		desc.Format = DXGI_FORMAT_UNKNOWN;
+		desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+		desc.Buffer.NumElements = static_cast<UINT>(resource_desc.Width / inStride);
+		desc.Buffer.StructureByteStride = inStride;
+		desc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
+
+		for (int i = 0; i < kFrameInFlightCount; i++)
+			gDevice->CreateUnorderedAccessView(inResource, nullptr, &desc, gFrameContexts[i].mViewDescriptorHeap.GetCPUHandle(inViewDescriptorIndex));
+	};
+	
 	create_buffer_SRV(mBuffers.mInstanceDatas.Get(), sizeof(InstanceData), ViewDescriptorIndex::RaytraceInstanceDataSRV);
 	create_buffer_SRV(mBuffers.mIndices.Get(), sizeof(IndexType), ViewDescriptorIndex::RaytraceIndicesSRV);
 	create_buffer_SRV(mBuffers.mVertices.Get(), sizeof(VertexType), ViewDescriptorIndex::RaytraceVerticesSRV);
@@ -1108,18 +1155,8 @@ void Scene::InitializeViews()
 	create_buffer_SRV(mBuffers.mUVs.Get(), sizeof(UVType), ViewDescriptorIndex::RaytraceUVsSRV);
 	create_buffer_SRV(mBuffers.mLights.Get(), sizeof(Light), ViewDescriptorIndex::RaytraceLightsSRV);
 
-	auto create_buffer_UAV = [](ID3D12Resource* inResource, int inStride, ViewDescriptorIndex inViewDescriptorIndex)
-	{
-		D3D12_UNORDERED_ACCESS_VIEW_DESC desc = {};
-		desc.Format = DXGI_FORMAT_UNKNOWN;
-		desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-		desc.Buffer.NumElements = 1;
-		desc.Buffer.StructureByteStride = inStride;
-		desc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
-
-		for (int i = 0; i < kFrameInFlightCount; i++)
-			gDevice->CreateUnorderedAccessView(inResource, nullptr, &desc, gFrameContexts[i].mViewDescriptorHeap.GetCPUHandle(inViewDescriptorIndex));
-	};
-
-	create_buffer_UAV(mBuffers.mEncodedTriangleLights.Get(), sizeof(EncodedTriangleLight), ViewDescriptorIndex::RaytraceEncodedTriangleLightsUAV);
+	// RTXDI - minimal-sample
+	create_buffer_SRV(mBuffers.mTaskBuffer.Get(), sizeof(PrepareLightsTask), ViewDescriptorIndex::TaskBufferSRV);
+	create_buffer_SRV(mBuffers.mLightDataBuffer.Get(), sizeof(RAB_LightInfo), ViewDescriptorIndex::LightDataBufferSRV);
+	create_buffer_UAV(mBuffers.mLightDataBuffer.Get(), sizeof(RAB_LightInfo), ViewDescriptorIndex::LightDataBufferUAV);
 }

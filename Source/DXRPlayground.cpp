@@ -1159,14 +1159,10 @@ void sRender()
 	{
 		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "PrepareLights");
 
-		for (const SceneContent::TriangleLightsInfo info : gScene.GetSceneContent().mTriangleLightsInfos)
-		{
-			const InstanceData& instance_data = gScene.GetSceneContent().mInstanceDatas[info.mInstanceDataIndex];
-			gRenderer.Setup(gRenderer.mRuntime.mPrepareLightsShader);
-			uint constants[] = { info.mInstanceDataIndex, info.mTriangleLightsOffset };
-			gCommandList->SetComputeRoot32BitConstants((int)RootParameterIndex::ConstantsPrepareLights, 2, &constants, 0);
-			gCommandList->Dispatch(gAlignUpDiv(instance_data.mIndexCount / kIndexCountPerTriangle, 64u), 1, 1);
-		}
+		gRenderer.Setup(gRenderer.mRuntime.mPrepareLightsShader);
+		uint constants[] = { static_cast<uint>(gScene.GetPrepareLightsTaskCount()) };
+		gCommandList->SetComputeRoot32BitConstants(static_cast<int>(RootParameterIndex::ConstantsPrepareLights), 1, &constants, 0);
+		gCommandList->Dispatch(gAlignUpDiv(gScene.GetSceneContent().mEmissiveTriangleCount, 256u), 1, 1);
 
 		gBarrierUAV(gCommandList, nullptr);
 	}
