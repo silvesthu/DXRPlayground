@@ -5,8 +5,6 @@
 #include "Context.h"
 #include "BSDF.h"
 #include "Light.h"
-#include "Reservoir.h"
-#include "Planet.h"
 #include "AtmosphereIntegration.h"
 #include "CloudIntegration.h"
 
@@ -156,7 +154,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 					Light light									= Lights[light_index];
 
 					LightContext light_context					= LightEvaluation::GenerateContext(LightEvaluation::ContextType::Input, ray.Direction, light_index, ray.Origin, path_context);
-					float light_mis_pdf							= light_context.mLPDF * light_context.UniformSelectionPDF();
+					float light_mis_pdf							= light_context.mSolidAnglePDF * light_context.UniformSelectionPDF();
 					
 					float mis_weight							= max(0.0, MIS::PowerHeuristic(1, path_context.mPrevBSDFSamplePDF, 1, light_mis_pdf));
 					path_context.mEmission						+= path_context.mThroughput * emission * mis_weight;
@@ -178,10 +176,10 @@ void TraceRay(inout PixelContext ioPixelContext)
 					LightContext light_context					= LightEvaluation::SelectLight(hit_context.PositionWS(), path_context);
 					DebugValue(PixelDebugMode::LightIndex, path_context.mRecursionDepth, light_context.LightIndex());
 					
-					float light_pdf								= light_context.mLPDF * light_context.SelectionPDF();
-					float light_uniform_pdf						= light_context.mLPDF * light_context.UniformSelectionPDF(); // [TODO] Unify MIS (with BRDF sample) to use same mis weight
+					float light_pdf								= light_context.mSolidAnglePDF * light_context.SelectionPDF();
+					float light_uniform_pdf						= light_context.mSolidAnglePDF * light_context.UniformSelectionPDF(); // [TODO] Unify MIS (with BRDF sample) to use same mis weight
 					
-					if (light_pdf > 0)
+					if (light_context.IsValid() && light_pdf > 0)
 					{
 						// Cast shadow ray
 						RayDesc shadow_ray;

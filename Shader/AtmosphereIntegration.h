@@ -1,5 +1,6 @@
 #include "Shared.h"
 #include "Context.h"
+#include "Planet.h"
 
 AtmosphereMode GetAtmosphereMode()
 {

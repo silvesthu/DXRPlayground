@@ -250,6 +250,11 @@ static void sPrepareImGui()
 				ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mLightSampleMode), i);
 			}
 
+			if (gConstants.mLightSampleMode == LightSampleMode::ReSTIR)
+			{
+				ImGui::SliderInt("Initial Sample Count", reinterpret_cast<int*>(&gConstants.mReSTIR.mInitialSampleCount), 1, 32);
+			}
+
 			ImGui::TreePop();
 		}
 

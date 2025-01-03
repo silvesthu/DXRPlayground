@@ -356,7 +356,7 @@ enum class LightSourceMode : uint
 enum class LightSampleMode : uint
 {
 	Uniform = 0,
-	RIS,
+	WRS,
 	ReSTIR,
 
 	Count,
@@ -653,6 +653,14 @@ struct CloudConstants
 	ShapeNoise					mShapeNoise;
 };
 
+struct ReSTIR
+{
+	uint						mInitialSampleCount				CONSTANT_DEFAULT(1);
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+};
+
 struct Constants
 {
 	// Right-handed Y-up
@@ -721,6 +729,7 @@ struct Constants
 
 	AtmosphereConstants			mAtmosphere;
 	CloudConstants				mCloud;
+	ReSTIR						mReSTIR;
 };
 
 struct PixelInspection

@@ -1,23 +1,29 @@
 #pragma once
 
-#include "Shared.h"
-#include "Binding.h"
 #include "Common.h"
 
 struct Reservoir
 {
-	uint			mLightIndex;
-	float			mTotalWeight;
+	static const uint kLightValidBit			= 0x80000000;
+	static const uint kLightIndexMask			= 0x7FFFFFFF;
+	
+	uint			mLightData;                 // r.y
+	float			mTotalWeight;				// r.w_sum
+	
+	uint			mSampleCount;				// r.M
+	float			mTargetPDF;					// \hat{p_{q}}(r.y)
+
+	bool			IsValid()					{ return mLightData != 0; }
+	uint			LightIndex()				{ return mLightData & kLightIndexMask; }
 
 	bool			Update(Reservoir inReservoir, inout PathContext ioPathContext)
 	{
 		mTotalWeight							+= inReservoir.mTotalWeight;
+		mSampleCount							+= inReservoir.mSampleCount;
 		
-		float threshold							= mTotalWeight == 0.0 ? 1.0 : (inReservoir.mTotalWeight / mTotalWeight); // in case 0.0 / 0.0, use division only for clarity. Otherwise, better to use xi * mTotalWeight < inWeight
-		float xi								= RandomFloat01(ioPathContext.mRandomState);
-		if (xi < threshold)
+		if (RandomFloat01(ioPathContext.mRandomState) * mTotalWeight < inReservoir.mTotalWeight)
 		{
-			mLightIndex							= inReservoir.mLightIndex;
+			mLightData							= inReservoir.mLightData;
 			return true;
 		}
 
@@ -27,15 +33,16 @@ struct Reservoir
 	static Reservoir Generate()
 	{
 		Reservoir reservoir;
-		reservoir.mLightIndex					= 0;
+		reservoir.mLightData					= 0;
 		reservoir.mTotalWeight					= 0.0;
+		reservoir.mSampleCount					= 1;
 		return reservoir;
 	}
 
 	static float4 Pack(Reservoir inReservoir)
 	{
 		float4 raw_reservoir					= 0;
-		raw_reservoir.x							= asfloat(inReservoir.mLightIndex);
+		raw_reservoir.x							= asfloat(inReservoir.mLightData);
 		raw_reservoir.y							= inReservoir.mTotalWeight;
 		raw_reservoir.z							= 0.0;
 		raw_reservoir.w							= 0.0;
@@ -45,7 +52,7 @@ struct Reservoir
 	static Reservoir Unpack(float4 inRawReservoir)
 	{
 		Reservoir reservoir;
-		reservoir.mLightIndex					= asuint(inRawReservoir.x);
+		reservoir.mLightData					= asuint(inRawReservoir.x);
 		reservoir.mTotalWeight					= inRawReservoir.y;
 		return reservoir;
 	}
