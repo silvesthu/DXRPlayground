@@ -138,8 +138,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 				if (path_context.mRecursionDepth == 0 ||					// Camera ray hit the light
 					path_context.mPrevDiracDeltaDistribution || 			// Prev hit is DiracDeltaDistribution -> no light sample
 					mConstants.mSampleMode == SampleMode::SampleBSDF ||		// SampleBSDF mode -> no light sample
-					false
-					)
+					false)
 				{
 					// Add light contribution
 					
@@ -156,13 +155,13 @@ void TraceRay(inout PixelContext ioPixelContext)
 					uint light_index							= hit_context.LightIndex();
 					Light light									= Lights[light_index];
 
-					LightContext light_context					= LightEvaluation::GenerateContext(LightEvaluation::ContextType::Input, ray.Direction, light, ray.Origin, path_context);
-					float light_pdf								= light_context.mLPDF * LightEvaluation::SelectLightPDF(light_index, ray.Origin, path_context);
+					LightContext light_context					= LightEvaluation::GenerateContext(LightEvaluation::ContextType::Input, ray.Direction, light_index, ray.Origin, path_context);
+					float light_mis_pdf							= light_context.mLPDF * light_context.UniformSelectionPDF();
 					
-					float mis_weight							= max(0.0, MIS::PowerHeuristic(1, path_context.mPrevBSDFSamplePDF, 1, light_pdf));
+					float mis_weight							= max(0.0, MIS::PowerHeuristic(1, path_context.mPrevBSDFSamplePDF, 1, light_mis_pdf));
 					path_context.mEmission						+= path_context.mThroughput * emission * mis_weight;
 					
-					DebugValue(PixelDebugMode::BSDF_MIS,		path_context.mRecursionDepth - 1 /* for prev BSDF hit */, float3(path_context.mPrevBSDFSamplePDF, light_pdf, mis_weight));
+					DebugValue(PixelDebugMode::BSDF_MIS,		path_context.mRecursionDepth - 1 /* for prev BSDF hit */, float3(path_context.mPrevBSDFSamplePDF, light_mis_pdf, mis_weight));
 				}
 			}
 			// Ray hit a surface
@@ -176,16 +175,11 @@ void TraceRay(inout PixelContext ioPixelContext)
 					true)
 				{
 					// Select light
-					uint light_index							= LightEvaluation::SelectLight(hit_context.PositionWS(), path_context);
-					Light light									= Lights[light_index];
+					LightContext light_context					= LightEvaluation::SelectLight(hit_context.PositionWS(), path_context);
+					DebugValue(PixelDebugMode::LightIndex, path_context.mRecursionDepth, light_context.LightIndex());
 					
-					DebugValue(PixelDebugMode::LightIndex, path_context.mRecursionDepth, light_index);
-					
-					// [TODO]
-					// ScreenReservoirUAV[ioPixelContext.mPixelIndex.xy] = 0;
-					
-					LightContext light_context					= LightEvaluation::GenerateContext(LightEvaluation::ContextType::Random, 0, light, hit_context.PositionWS(), path_context);					
-					float light_pdf								= light_context.mLPDF * LightEvaluation::SelectLightPDF(light_index, hit_context.PositionWS(), path_context);
+					float light_pdf								= light_context.mLPDF * light_context.SelectionPDF();
+					float light_uniform_pdf						= light_context.mLPDF * light_context.UniformSelectionPDF(); // [TODO] Unify MIS (with BRDF sample) to use same mis weight
 					
 					if (light_pdf > 0)
 					{
@@ -203,7 +197,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 						shadow_query.Proceed();
 						
 						// Shadow ray hit the light
-						if (shadow_query.CommittedStatus() == COMMITTED_TRIANGLE_HIT && shadow_query.CommittedInstanceID() == light.mInstanceID)
+						if (shadow_query.CommittedStatus() == COMMITTED_TRIANGLE_HIT && shadow_query.CommittedInstanceID() == light_context.Light().mInstanceID)
 						{
 							BSDFContext bsdf_context			= BSDFContext::Generate(BSDFContext::Mode::Light, light_context.mL, hit_context);
 							BSDFResult bsdf_result				= BSDFEvaluation::Evaluate(bsdf_context, hit_context, path_context);
@@ -216,15 +210,15 @@ void TraceRay(inout PixelContext ioPixelContext)
 							DebugValue(PixelDebugMode::Light_BSDF,	path_context.mRecursionDepth, float3(bsdf_result.mBSDF));
 							DebugValue(PixelDebugMode::Light_PDF,	path_context.mRecursionDepth, float3(light_pdf, 0, 0));
 
-							float3 luminance					= light.mEmission * (mConstants.mEmissionBoost * kPreExposure);
+							float3 luminance					= light_context.Light().mEmission * (mConstants.mEmissionBoost * kPreExposure);
 							float3 light_emission				= luminance * bsdf_result.mBSDF * abs(bsdf_context.mNdotL) / light_pdf;
 
 							if (mConstants.mSampleMode == SampleMode::MIS)
 							{
-								float mis_weight				= max(0.0, MIS::PowerHeuristic(1, light_pdf, 1, bsdf_result.mBSDFSamplePDF));
+								float mis_weight				= max(0.0, MIS::PowerHeuristic(1, light_uniform_pdf, 1, bsdf_result.mBSDFSamplePDF));
 								light_emission					*= mis_weight;
 								
-								DebugValue(PixelDebugMode::Light_MIS,	path_context.mRecursionDepth, float3(bsdf_result.mBSDFSamplePDF, light_pdf, mis_weight));
+								DebugValue(PixelDebugMode::Light_MIS, path_context.mRecursionDepth, float3(bsdf_result.mBSDFSamplePDF, light_uniform_pdf, mis_weight));
 							}
 
 							path_context.mLightEmission			= path_context.mThroughput * light_emission;

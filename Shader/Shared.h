@@ -357,6 +357,7 @@ enum class LightSampleMode : uint
 {
 	Uniform = 0,
 	RIS,
+	ReSTIR,
 
 	Count,
 };

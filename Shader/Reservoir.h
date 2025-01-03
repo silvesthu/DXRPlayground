@@ -9,13 +9,19 @@ struct Reservoir
 	uint			mLightIndex;
 	float			mTotalWeight;
 
-	void			Update(uint inLightIndex, float inWeight, inout PathContext ioPathContext)
+	bool			Update(Reservoir inReservoir, inout PathContext ioPathContext)
 	{
-		mTotalWeight							+= inWeight;
-		float threshold							= mTotalWeight == 0.0 ? 1.0 : (inWeight / mTotalWeight); // in case 0.0 / 0.0
+		mTotalWeight							+= inReservoir.mTotalWeight;
+		
+		float threshold							= mTotalWeight == 0.0 ? 1.0 : (inReservoir.mTotalWeight / mTotalWeight); // in case 0.0 / 0.0, use division only for clarity. Otherwise, better to use xi * mTotalWeight < inWeight
 		float xi								= RandomFloat01(ioPathContext.mRandomState);
 		if (xi < threshold)
-			mLightIndex							= inLightIndex;
+		{
+			mLightIndex							= inReservoir.mLightIndex;
+			return true;
+		}
+
+		return false;
 	}
 
 	static Reservoir Generate()

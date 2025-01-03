@@ -76,7 +76,8 @@
 			<rgb name="k" value="3.91295, 2.45285, 2.14219" />
 		</bsdf>
 	</bsdf>
-	<shape type="cube" id="Smooth">
+
+<!-- 	<shape type="cube" id="Smooth">
 		<transform name="to_world">
 			<matrix value="0.805757 0.0961775 0 0.264069 -0.673242 0.115108 0 4.09801 0 0 4 0 0 0 0 1" />
 		</transform>
@@ -94,6 +95,13 @@
 		</transform>
 		<ref id="RoughBSDF" />
 	</shape>
+	<shape type="cube" id="SuperRough">
+		<transform name="to_world">
+			<matrix value="1.04217 0.0182831 0 10.6769 -0.127982 0.148882 0 1.23376 0 0 4 0 0 0 0 1" />
+		</transform>
+		<ref id="SuperRoughBSDF" />
+	</shape> -->
+
 	<shape type="rectangle" id="Diffuse_0001">
 		<transform name="to_world">
 			<matrix value="9.9 0 0 4.9 0 -4.32743e-007 9.9 0 0 -23.76 -1.03858e-006 0 0 0 0 1" />
@@ -106,7 +114,8 @@
 		</transform>
 		<ref id="DiffuseBSDF" />
 	</shape>
-	<shape type="sphere" id="Null_0001">
+
+<!-- 	<shape type="sphere" id="Null_0001">
 		<float name="radius" value="1" />
 		<point name="center" x="0" y="6.5" z="-2.8" />
 		<ref id="NullBSDF" />
@@ -129,14 +138,14 @@
 		<emitter type="area">
 			<rgb name="radiance" value="3039.64, 3039.64, 3039.64" />
 		</emitter>
-	</shape>
+	</shape> -->
 
 	<shape type="sphere" id="ManyLight0">
 		<float name="radius" value="0.3" />
 		<point name="center" x="-5" y="8" z="-8.0" />
 		<ref id="NullBSDF" />
 		<emitter type="area">
-			<rgb name="radiance" value="10, 10, 10" />
+			<rgb name="radiance" value="100, 0, 0" />
 		</emitter>
 	</shape>
 	<shape type="sphere" id="ManyLight_0_1">
@@ -144,7 +153,7 @@
 		<point name="center" x="-5" y="8" z="-6.0" />
 		<ref id="NullBSDF" />
 		<emitter type="area">
-			<rgb name="radiance" value="10, 10, 10" />
+			<rgb name="radiance" value="0, 100, 0" />
 		</emitter>
 	</shape>
 	<shape type="sphere" id="ManyLight_0_2">
@@ -152,7 +161,7 @@
 		<point name="center" x="-5" y="8" z="-4.0" />
 		<ref id="NullBSDF" />
 		<emitter type="area">
-			<rgb name="radiance" value="10, 10, 10" />
+			<rgb name="radiance" value="0, 0, 100" />
 		</emitter>
 	</shape>
 	<shape type="sphere" id="ManyLight_0_3">
@@ -160,7 +169,7 @@
 		<point name="center" x="-5" y="8" z="-2.0" />
 		<ref id="NullBSDF" />
 		<emitter type="area">
-			<rgb name="radiance" value="10, 10, 10" />
+			<rgb name="radiance" value="100, 0, 0" />
 		</emitter>
 	</shape>
 	<shape type="sphere" id="ManyLight_0_4">
@@ -168,7 +177,7 @@
 		<point name="center" x="-5" y="8" z="+8.0" />
 		<ref id="NullBSDF" />
 		<emitter type="area">
-			<rgb name="radiance" value="10, 10, 10" />
+			<rgb name="radiance" value="0, 100, 0" />
 		</emitter>
 	</shape>
 	<shape type="sphere" id="ManyLight_0_5">
@@ -176,7 +185,7 @@
 		<point name="center" x="-5" y="8" z="+6.0" />
 		<ref id="NullBSDF" />
 		<emitter type="area">
-			<rgb name="radiance" value="10, 10, 10" />
+			<rgb name="radiance" value="0, 0, 100" />
 		</emitter>
 	</shape>
 	<shape type="sphere" id="ManyLight_0_6">
@@ -184,7 +193,7 @@
 		<point name="center" x="-5" y="8" z="+4.0" />
 		<ref id="NullBSDF" />
 		<emitter type="area">
-			<rgb name="radiance" value="10, 10, 10" />
+			<rgb name="radiance" value="100, 0, 0" />
 		</emitter>
 	</shape>
 	<shape type="sphere" id="ManyLight_0_7">
@@ -192,7 +201,7 @@
 		<point name="center" x="-5" y="8" z="+2.0" />
 		<ref id="NullBSDF" />
 		<emitter type="area">
-			<rgb name="radiance" value="10, 10, 10" />
+			<rgb name="radiance" value="0, 100, 0" />
 		</emitter>
 	</shape>
 
@@ -201,7 +210,7 @@
 		<point name="center" x="-5" y="6" z="-8.0" />
 		<ref id="NullBSDF" />
 		<emitter type="area">
-			<rgb name="radiance" value="10, 10, 10" />
+			<rgb name="radiance" value="0, 0, 100" />
 		</emitter>
 	</shape>
 	<shape type="sphere" id="ManyLight_1_1">
@@ -209,7 +218,7 @@
 		<point name="center" x="-5" y="6" z="-6.0" />
 		<ref id="NullBSDF" />
 		<emitter type="area">
-			<rgb name="radiance" value="10, 10, 10" />
+			<rgb name="radiance" value="100, 0, 0" />
 		</emitter>
 	</shape>
 	<shape type="sphere" id="ManyLight_1_2">
@@ -217,7 +226,7 @@
 		<point name="center" x="-5" y="6" z="-4.0" />
 		<ref id="NullBSDF" />
 		<emitter type="area">
-			<rgb name="radiance" value="10, 10, 10" />
+			<rgb name="radiance" value="0, 100, 0" />
 		</emitter>
 	</shape>
 	<shape type="sphere" id="ManyLight_1_3">
@@ -225,7 +234,7 @@
 		<point name="center" x="-5" y="6" z="-2.0" />
 		<ref id="NullBSDF" />
 		<emitter type="area">
-			<rgb name="radiance" value="10, 10, 10" />
+			<rgb name="radiance" value="0, 0, 100" />
 		</emitter>
 	</shape>
 	<shape type="sphere" id="ManyLight_1_4">
@@ -233,7 +242,7 @@
 		<point name="center" x="-5" y="6" z="+8.0" />
 		<ref id="NullBSDF" />
 		<emitter type="area">
-			<rgb name="radiance" value="10, 10, 10" />
+			<rgb name="radiance" value="100, 0, 0" />
 		</emitter>
 	</shape>
 	<shape type="sphere" id="ManyLight_1_5">
@@ -241,7 +250,7 @@
 		<point name="center" x="-5" y="6" z="+6.0" />
 		<ref id="NullBSDF" />
 		<emitter type="area">
-			<rgb name="radiance" value="10, 10, 10" />
+			<rgb name="radiance" value="0, 100, 0" />
 		</emitter>
 	</shape>
 	<shape type="sphere" id="ManyLight_1_6">
@@ -249,7 +258,7 @@
 		<point name="center" x="-5" y="6" z="+4.0" />
 		<ref id="NullBSDF" />
 		<emitter type="area">
-			<rgb name="radiance" value="10, 10, 10" />
+			<rgb name="radiance" value="0, 0, 100" />
 		</emitter>
 	</shape>
 	<shape type="sphere" id="ManyLight_1_7">
@@ -257,7 +266,7 @@
 		<point name="center" x="-5" y="6" z="+2.0" />
 		<ref id="NullBSDF" />
 		<emitter type="area">
-			<rgb name="radiance" value="10, 10, 10" />
+			<rgb name="radiance" value="100, 0, 0" />
 		</emitter>
 	</shape>
 
@@ -266,7 +275,7 @@
 		<point name="center" x="-5" y="4" z="-8.0" />
 		<ref id="NullBSDF" />
 		<emitter type="area">
-			<rgb name="radiance" value="10, 10, 10" />
+			<rgb name="radiance" value="0, 100, 0" />
 		</emitter>
 	</shape>
 	<shape type="sphere" id="ManyLight_2_1">
@@ -274,7 +283,7 @@
 		<point name="center" x="-5" y="4" z="-6.0" />
 		<ref id="NullBSDF" />
 		<emitter type="area">
-			<rgb name="radiance" value="10, 10, 10" />
+			<rgb name="radiance" value="0, 0, 100" />
 		</emitter>
 	</shape>
 	<shape type="sphere" id="ManyLight_2_2">
@@ -282,7 +291,7 @@
 		<point name="center" x="-5" y="4" z="-4.0" />
 		<ref id="NullBSDF" />
 		<emitter type="area">
-			<rgb name="radiance" value="10, 10, 10" />
+			<rgb name="radiance" value="100, 0, 0" />
 		</emitter>
 	</shape>
 	<shape type="sphere" id="ManyLight_2_3">
@@ -290,7 +299,7 @@
 		<point name="center" x="-5" y="4" z="-2.0" />
 		<ref id="NullBSDF" />
 		<emitter type="area">
-			<rgb name="radiance" value="10, 10, 10" />
+			<rgb name="radiance" value="0, 100, 0" />
 		</emitter>
 	</shape>
 	<shape type="sphere" id="ManyLight_2_4">
@@ -298,7 +307,7 @@
 		<point name="center" x="-5" y="4" z="+8.0" />
 		<ref id="NullBSDF" />
 		<emitter type="area">
-			<rgb name="radiance" value="10, 10, 10" />
+			<rgb name="radiance" value="0, 0, 100" />
 		</emitter>
 	</shape>
 	<shape type="sphere" id="ManyLight_2_5">
@@ -306,7 +315,7 @@
 		<point name="center" x="-5" y="4" z="+6.0" />
 		<ref id="NullBSDF" />
 		<emitter type="area">
-			<rgb name="radiance" value="10, 10, 10" />
+			<rgb name="radiance" value="100, 0, 0" />
 		</emitter>
 	</shape>
 	<shape type="sphere" id="ManyLight_2_6">
@@ -314,7 +323,7 @@
 		<point name="center" x="-5" y="4" z="+4.0" />
 		<ref id="NullBSDF" />
 		<emitter type="area">
-			<rgb name="radiance" value="10, 10, 10" />
+			<rgb name="radiance" value="0, 100, 0" />
 		</emitter>
 	</shape>
 	<shape type="sphere" id="ManyLight_2_7">
@@ -322,7 +331,7 @@
 		<point name="center" x="-5" y="4" z="+2.0" />
 		<ref id="NullBSDF" />
 		<emitter type="area">
-			<rgb name="radiance" value="10, 10, 10" />
+			<rgb name="radiance" value="0, 0, 100" />
 		</emitter>
 	</shape>
 
@@ -331,7 +340,7 @@
 		<point name="center" x="-5" y="2" z="-8.0" />
 		<ref id="NullBSDF" />
 		<emitter type="area">
-			<rgb name="radiance" value="10, 10, 10" />
+			<rgb name="radiance" value="100, 0, 0" />
 		</emitter>
 	</shape>
 	<shape type="sphere" id="ManyLight_3_1">
@@ -339,7 +348,7 @@
 		<point name="center" x="-5" y="2" z="-6.0" />
 		<ref id="NullBSDF" />
 		<emitter type="area">
-			<rgb name="radiance" value="10, 10, 10" />
+			<rgb name="radiance" value="0, 100, 0" />
 		</emitter>
 	</shape>
 	<shape type="sphere" id="ManyLight_3_2">
@@ -347,7 +356,7 @@
 		<point name="center" x="-5" y="2" z="-4.0" />
 		<ref id="NullBSDF" />
 		<emitter type="area">
-			<rgb name="radiance" value="10, 10, 10" />
+			<rgb name="radiance" value="0, 0, 100" />
 		</emitter>
 	</shape>
 	<shape type="sphere" id="ManyLight_3_3">
@@ -355,7 +364,7 @@
 		<point name="center" x="-5" y="2" z="-2.0" />
 		<ref id="NullBSDF" />
 		<emitter type="area">
-			<rgb name="radiance" value="10, 10, 10" />
+			<rgb name="radiance" value="100, 0, 0" />
 		</emitter>
 	</shape>
 	<shape type="sphere" id="ManyLight_3_4">
@@ -363,7 +372,7 @@
 		<point name="center" x="-5" y="2" z="+8.0" />
 		<ref id="NullBSDF" />
 		<emitter type="area">
-			<rgb name="radiance" value="10, 10, 10" />
+			<rgb name="radiance" value="0, 100, 0" />
 		</emitter>
 	</shape>
 	<shape type="sphere" id="ManyLight_3_5">
@@ -371,7 +380,7 @@
 		<point name="center" x="-5" y="2" z="+6.0" />
 		<ref id="NullBSDF" />
 		<emitter type="area">
-			<rgb name="radiance" value="10, 10, 10" />
+			<rgb name="radiance" value="0, 0, 100" />
 		</emitter>
 	</shape>
 	<shape type="sphere" id="ManyLight_3_6">
@@ -379,7 +388,7 @@
 		<point name="center" x="-5" y="2" z="+4.0" />
 		<ref id="NullBSDF" />
 		<emitter type="area">
-			<rgb name="radiance" value="10, 10, 10" />
+			<rgb name="radiance" value="100, 0, 0" />
 		</emitter>
 	</shape>
 	<shape type="sphere" id="ManyLight_3_7">
@@ -387,14 +396,7 @@
 		<point name="center" x="-5" y="2" z="+2.0" />
 		<ref id="NullBSDF" />
 		<emitter type="area">
-			<rgb name="radiance" value="10, 10, 10" />
+			<rgb name="radiance" value="0, 100, 0" />
 		</emitter>
-	</shape>
-
-	<shape type="cube" id="SuperRough">
-		<transform name="to_world">
-			<matrix value="1.04217 0.0182831 0 10.6769 -0.127982 0.148882 0 1.23376 0 0 4 0 0 0 0 1" />
-		</transform>
-		<ref id="SuperRoughBSDF" />
 	</shape>
 </scene>

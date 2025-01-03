@@ -32,8 +32,16 @@ struct TriangleLight
 
 struct LightContext
 {
-	float3	mL;
-	float	mLPDF;
+	Light		Light()					{ return Lights[LightIndex()]; }
+	uint		LightIndex()			{ return mReservoir.mLightIndex; }
+	
+	float3		mL;
+	float		mLPDF;
+	Reservoir	mReservoir;
+
+	float		SelectionPDF()			{ return mReservoir.mTotalWeight / mSelectionReservoir.mTotalWeight; }
+	float		UniformSelectionPDF()	{ return 1.0 / mConstants.mLightCount; }
+	Reservoir	mSelectionReservoir;
 };
 
 namespace LightEvaluation
@@ -45,16 +53,18 @@ namespace LightEvaluation
 		Input,
 	};
 
-	LightContext GenerateContext(ContextType inContextType, float3 inL, Light inLight, float3 inLitPositionWS, inout PathContext ioPathContext)
+	LightContext GenerateContext(ContextType inContextType, float3 inL, uint inLightIndex, float3 inLitPositionWS, inout PathContext ioPathContext)
 	{
-		const float3 vector_to_light			= inLight.mPosition - inLitPositionWS;
+		Light light								= Lights[inLightIndex];
+		
+		const float3 vector_to_light			= light.mPosition - inLitPositionWS;
 		const float3 direction_to_light			= normalize(vector_to_light);
-
+		
 		LightContext light_context;
 		light_context.mL						= direction_to_light;
 		light_context.mLPDF						= 0.0;
 		
-		switch (inLight.mType)
+		switch (light.mType)
 		{
 		case LightType::Sphere:
 		{
@@ -65,7 +75,7 @@ namespace LightEvaluation
 			// Position inside light is not proper handled
 			// See https://www.akalin.com/sampling-visible-sphere
 
-			float radius_squared				= inLight.mHalfExtends.x * inLight.mHalfExtends.x;
+			float radius_squared				= light.mHalfExtends.x * light.mHalfExtends.x;
 			float distance_to_light_position_squared = dot(vector_to_light, vector_to_light);
 			float distance_to_light_position	= sqrt(distance_to_light_position_squared);
 
@@ -117,8 +127,8 @@ namespace LightEvaluation
 			}
 
 			float3 vector_to_sample				= vector_to_light;
-			vector_to_sample					+= inLight.mTangent * inLight.mHalfExtends.x * (xi1 * 2.0 - 1.0);
-			vector_to_sample					+= inLight.mBitangent * inLight.mHalfExtends.y * (xi2 * 2.0 - 1.0);
+			vector_to_sample					+= light.mTangent * light.mHalfExtends.x * (xi1 * 2.0 - 1.0);
+			vector_to_sample					+= light.mBitangent * light.mHalfExtends.y * (xi2 * 2.0 - 1.0);
 
 			light_context.mL					= normalize(vector_to_sample);
 
@@ -127,14 +137,14 @@ namespace LightEvaluation
 				// [TODO] Validate this
 
 				light_context.mL				= inL;
-				float t							= dot(-vector_to_light, inLight.mNormal) / dot(-light_context.mL, inLight.mNormal);
+				float t							= dot(-vector_to_light, light.mNormal) / dot(-light_context.mL, light.mNormal);
 				vector_to_sample				= light_context.mL * t;
 			}
 
 			float distance_to_sample_position	= length(vector_to_sample);
-			float surface_area					= 4.0 * inLight.mHalfExtends.x * inLight.mHalfExtends.y;
+			float surface_area					= 4.0 * light.mHalfExtends.x * light.mHalfExtends.y;
 			float pdf_position					= 1.0 / surface_area;
-			float denom							= max(dot(-light_context.mL, inLight.mNormal), 0.0);
+			float denom							= max(dot(-light_context.mL, light.mNormal), 0.0);
 			float pdf_direction					= pdf_position * (distance_to_sample_position * distance_to_sample_position) / denom;
 
 			light_context.mLPDF					= pdf_direction;
@@ -147,22 +157,27 @@ namespace LightEvaluation
 			break;
 		}
 
+		light_context.mReservoir.mLightIndex	= inLightIndex;
+		light_context.mReservoir.mTotalWeight	= 0;
 		return light_context;
 	}
 
-	float CalculateWeight(uint inLightIndex, float3 inLitPositionWS, inout PathContext ioPathContext)
+	LightContext CalculateWeight(uint inLightIndex, float3 inLitPositionWS, inout PathContext ioPathContext)
 	{
 		// [NOTE] Use uniform weight here is effectively same as LightSampleMode::Uniform
 		// [NOTE] minimal-sample in RTXDI merge light reservoir and brdf reservoir for initial sample
 
-		// [TODO] Also weight on BSDF
-
-		LightContext light_context = LightEvaluation::GenerateContext(LightEvaluation::ContextType::Random, 0, Lights[inLightIndex], inLitPositionWS, ioPathContext);
-		return light_context.mLPDF <= 0.0 ? 0.0 : RGBToLuminance(Lights[inLightIndex].mEmission) / light_context.mLPDF;
+		// [TODO] Use second-best implementation. See RAB_GetLightSampleTargetPdfForSurface in RTXDI.
+		// Currently, it is only based on luminance of light and pdf of sampling direction.
+		LightContext light_context = LightEvaluation::GenerateContext(LightEvaluation::ContextType::Random, 0, inLightIndex, inLitPositionWS, ioPathContext);
+		light_context.mReservoir.mTotalWeight = light_context.mLPDF <= 0.0 ? 0.0 : RGBToLuminance(Lights[inLightIndex].mEmission) / light_context.mLPDF;
+		return light_context;
 	}
 
-	uint SelectLight(float3 inLitPositionWS, inout PathContext ioPathContext)
+	LightContext SelectLight(float3 inLitPositionWS, inout PathContext ioPathContext)
 	{
+		// [TODO] Generate random uv first instead of LightEvaluation::ContextType::Random for each sample. See RTXDI_RandomlySelectLocalLightUV(rng). Affect performance only?
+		LightContext selected_light_context = (LightContext)0;
 		switch (mConstants.mLightSampleMode)
 		{
 		case LightSampleMode::RIS:
@@ -170,40 +185,35 @@ namespace LightEvaluation
 			Reservoir reservoir = Reservoir::Generate();
 			for (uint light_index = 0; light_index < mConstants.mLightCount; light_index++)
 			{
-				float weight = CalculateWeight(light_index, inLitPositionWS, ioPathContext);
-				reservoir.Update(light_index, weight, ioPathContext);
+				// [NOTE] Use uniform weight here is effectively same as LightSampleMode::Uniform
+				// [NOTE] minimal-sample in RTXDI merge light reservoir and brdf reservoir for initial sample
+
+				// [TODO] Use second-best implementation. See RAB_GetLightSampleTargetPdfForSurface in RTXDI.
+				// Currently, it is only based on luminance of light and pdf of sampling direction.
+				LightContext light_context = LightEvaluation::GenerateContext(LightEvaluation::ContextType::Random, 0, light_index, inLitPositionWS, ioPathContext);
+				light_context.mReservoir.mTotalWeight = light_context.mLPDF <= 0.0 ? 0.0 : RGBToLuminance(Lights[light_index].mEmission) / light_context.mLPDF;
+
+				if (reservoir.Update(light_context.mReservoir, ioPathContext))
+					selected_light_context = light_context;
 			}
-			return reservoir.mLightIndex;
+
+			selected_light_context.mSelectionReservoir = reservoir;
+			return selected_light_context;
 		}
+		case LightSampleMode::ReSTIR: // [passthrough]
 		case LightSampleMode::Uniform: // [passthrough]
-		default: return min(RandomFloat01(ioPathContext.mRandomState) * mConstants.mLightCount, mConstants.mLightCount - 1);
-		}
-	}
-
-	float SelectLightPDF(uint inLightIndex, float3 inLitPositionWS, inout PathContext ioPathContext)
-	{
-		switch (mConstants.mLightSampleMode)
+		default:
 		{
-		case LightSampleMode::RIS:
-		{
-			float selected_light_weight = 0.0;
-			Reservoir reservoir = Reservoir::Generate();
-			for (uint light_index = 0; light_index < mConstants.mLightCount; light_index++)
-			{
-				float weight = CalculateWeight(light_index, inLitPositionWS, ioPathContext);
+			uint light_index = min(RandomFloat01(ioPathContext.mRandomState) * mConstants.mLightCount, mConstants.mLightCount - 1);
+			LightContext light_context = LightEvaluation::GenerateContext(LightEvaluation::ContextType::Random, 0, light_index, inLitPositionWS, ioPathContext);
+			light_context.mReservoir.mTotalWeight = 1.0;
 
-				if (mConstants.mPixelDebugLightIndex == light_index)
-					DebugValue(PixelDebugMode::RISWeight, ioPathContext.mRecursionDepth, weight);
+			selected_light_context = light_context;
 
-				if (inLightIndex == light_index)
-					selected_light_weight = weight;
-
-				reservoir.Update(light_index, weight, ioPathContext);
-			}
-			return selected_light_weight / reservoir.mTotalWeight;
+			selected_light_context.mSelectionReservoir.mLightIndex = light_index;
+			selected_light_context.mSelectionReservoir.mTotalWeight = mConstants.mLightCount;
+			return selected_light_context;
 		}
-		case LightSampleMode::Uniform: // [passthrough]
-		default: return 1.0 / mConstants.mLightCount;
 		}
 	}
 }

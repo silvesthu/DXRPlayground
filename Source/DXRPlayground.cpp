@@ -91,7 +91,7 @@ int sFindScenePresetIndex(const std::string_view inName)
 {
 	return static_cast<int>(&sFindScenePreset(inName) - &kScenePresets.front());
 }
-static int sCurrentSceneIndex = sFindScenePresetIndex("Arcade");
+static int sCurrentSceneIndex = sFindScenePresetIndex("VeachMISManyLight");
 static int sPreviousSceneIndex = sCurrentSceneIndex;
 
 struct CameraSettings
