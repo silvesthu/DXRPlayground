@@ -1,6 +1,5 @@
 #include "Shared.h"
 #include "Binding.h"
 #include "Common.h"
-#include "RayQuery.h"
 #include "Planet.h"
 #include "AtmosphereIntegration.h"

@@ -552,21 +552,6 @@ struct RayPayload
 	float4						mData;
 };
 
-struct PathContext
-{
-	float3						mThroughput;					// [0, 1]		Accumulated throughput, [PBRT3] call it beta https://github.com/mmp/pbrt-v3/blob/master/src/integrators/path.cpp#L68
-	float3						mEmission;						// [0, +inf]	Accumulated emission
-	float						mEtaScale;
-
-	float3						mLightEmission;					// [0, +inf]	Emission from light sample
-
-	float						mPrevBSDFSamplePDF;
-	bool						mPrevDiracDeltaDistribution;
-
-	uint						mRandomState;
-	uint						mRecursionDepth;
-};
-
 struct DensityProfileLayer
 {
 	float 						mWidth							CONSTANT_DEFAULT(0);

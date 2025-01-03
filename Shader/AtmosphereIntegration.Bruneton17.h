@@ -1017,10 +1017,10 @@ void GetCombinedScattering(float r, float mu, float mu_s, float nu, bool ray_r_m
 	rayleigh_scattering = scattering.xyz;
 }
 
-void GetSkyRadiance(out float3 outSkyRadiance, out float3 outTransmittanceToTop)
+void GetSkyRadiance(Ray inRayPS, out float3 outSkyRadiance, out float3 outTransmittanceToTop)
 {
-	float3 camera = PlanetRayOrigin() - PlanetCenter();
-	float3 view_ray = PlanetRayDirection();
+	float3 camera = inRayPS.mOrigin - PlanetCenterPositionPS();
+	float3 view_ray = inRayPS.mDirection;
 	float3 sun_direction = GetSunDirection();
 
 	float r = length(camera);
@@ -1070,13 +1070,13 @@ void GetSkyRadiance(out float3 outSkyRadiance, out float3 outTransmittanceToTop)
 	}
 }
 
-void GetSkyRadianceToPoint(out float3 outSkyRadiance, out float3 outTransmittance)
+void GetSkyRadianceToPoint(Ray inRayPS, out float3 outSkyRadiance, out float3 outTransmittance)
 {
-	float3 hit_position = PlanetRayHitPosition() - PlanetCenter();
-	float3 camera = PlanetRayOrigin() - PlanetCenter();
+	float3 hit_position = inRayPS.TargetWS() - PlanetCenterPositionPS();
+	float3 camera = inRayPS.mOrigin - PlanetCenterPositionPS();
 	float3 sun_direction = GetSunDirection();
 
-	float3 view_ray = PlanetRayDirection();
+	float3 view_ray = inRayPS.mDirection;
 	float r = length(camera);
 	float rmu = dot(camera, view_ray);
 	float distance_to_top_atmosphere_boundary = -rmu - sqrt(rmu * rmu - r * r + mConstants.mAtmosphere.mTopRadius * mConstants.mAtmosphere.mTopRadius);
@@ -1151,7 +1151,7 @@ void GetSkyRadianceToPoint(out float3 outSkyRadiance, out float3 outTransmittanc
 
 void GetSunAndSkyIrradiance(float3 inHitPosition, float3 inNormal, out float3 outSunIrradiance, out float3 outSkyIrradiance)
 {
-	float3 local_position = inHitPosition - PlanetCenter();
+	float3 local_position = inHitPosition - PlanetCenterPositionPS();
 	float3 sun_direction = GetSunDirection();
 
 	float r = length(local_position);

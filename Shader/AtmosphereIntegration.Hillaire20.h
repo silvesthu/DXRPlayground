@@ -819,7 +819,7 @@ void SkyViewLut(
 
 	float3 camera_position = mConstants.CameraPosition().xyz * mConstants.mAtmosphere.mSceneScale;
 	camera_position.y = max(camera_position.y, 1.0 * mConstants.mAtmosphere.mSceneScale); // Keep observer position above ground
-	float3 WorldPos = camera_position - PlanetCenter();
+	float3 WorldPos = camera_position - PlanetCenterPositionPS();
 	float viewHeight = length(WorldPos);
 
 	float viewZenithCosAngle;
@@ -1007,13 +1007,13 @@ void CameraVolumes(
 
 namespace AtmosphereIntegration { namespace Hillaire20 {
 
-void GetSkyRadiance(out float3 outSkyRadiance, out float3 outTransmittanceToTop)
+void GetSkyRadiance(Ray inRayPS, out float3 outSkyRadiance, out float3 outTransmittanceToTop)
 {
 	outSkyRadiance = 0;
 	outTransmittanceToTop = 1; // [TODO]
 
-	float3 camera = PlanetRayOrigin() - PlanetCenter();
-	float3 view_ray = PlanetRayDirection();
+	float3 camera = inRayPS.mOrigin - PlanetCenterPositionPS();
+	float3 view_ray = inRayPS.mDirection;
 	float3 sun_direction = GetSunDirection();
 
 	float r = length(camera);

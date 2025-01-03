@@ -1,4 +1,5 @@
 #include "Shared.h"
+#include "Planet.h"
 
 CloudMode GetCloudMode()
 {
@@ -53,7 +54,7 @@ float SampleCloudDensityAlongCone(float3 p, float3 ray_direction, out float3 ray
 	return accumulated_density;
 }
 
-void RaymarchCloud(out float3 outTransmittance, out float3 outLuminance)
+void RaymarchCloud(Ray inRayWS, out float3 outTransmittance, out float3 outLuminance)
 {
 	outTransmittance = 1.0;
 	outLuminance = 0.0;
@@ -74,22 +75,25 @@ void RaymarchCloud(out float3 outTransmittance, out float3 outLuminance)
 	// Range
 	float2 range = 0;
 
+	// Ray
+	Ray ray_PS = RayWS2PS(inRayWS);
+
 	// Ignore alto for now
 	float2 distance_to_planet = 0;
-	bool hit_planet = IntersectRaySphere(PlanetRayOrigin(), PlanetRayDirection(), PlanetCenter(), PlanetRadius() + 0, distance_to_planet);
+	bool hit_planet = IntersectRaySphere(ray_PS.mOrigin, ray_PS.mDirection, PlanetCenterPositionPS(), PlanetRadiusPS() + 0, distance_to_planet);
 	float2 distance_to_strato = 0;
-	bool hit_strato = IntersectRaySphere(PlanetRayOrigin(), PlanetRayDirection(), PlanetCenter(), PlanetRadius() + mConstants.mCloud.mGeometry.mStrato, distance_to_strato);
+	bool hit_strato = IntersectRaySphere(ray_PS.mOrigin, ray_PS.mDirection, PlanetCenterPositionPS(), PlanetRadiusPS() + mConstants.mCloud.mGeometry.mStrato, distance_to_strato);
 	float2 distance_to_cirro = 0;
-	bool hit_cirro = IntersectRaySphere(PlanetRayOrigin(), PlanetRayDirection(), PlanetCenter(), PlanetRadius() + mConstants.mCloud.mGeometry.mCirro, distance_to_cirro);
+	bool hit_cirro = IntersectRaySphere(ray_PS.mOrigin, ray_PS.mDirection, PlanetCenterPositionPS(), PlanetRadiusPS() + mConstants.mCloud.mGeometry.mCirro, distance_to_cirro);
 
-	if (PlanetRayOrigin().y < mConstants.mCloud.mGeometry.mStrato) // camera below strato
+	if (ray_PS.mOrigin.y < mConstants.mCloud.mGeometry.mStrato) // camera below strato
 	{
 		if (distance_to_planet.x > 0) // hit ground
 			return;
 
 		range = float2(distance_to_strato.y, distance_to_cirro.y);
 	}
-	else if (PlanetRayOrigin().y > mConstants.mCloud.mGeometry.mCirro) // camera above cirro
+	else if (ray_PS.mOrigin.y > mConstants.mCloud.mGeometry.mCirro) // camera above cirro
 	{
 		if (!hit_cirro || distance_to_cirro.x < 0) // no hit
 			return;
@@ -119,11 +123,11 @@ void RaymarchCloud(out float3 outTransmittance, out float3 outLuminance)
 
 	int sample_count = mConstants.mCloud.mRaymarch.mSampleCount;
 	float step_length = (range.y - range.x) / sample_count;
-	float3 step = PlanetRayDirection() * step_length;
+	float3 step = ray_PS.mDirection * step_length;
 
 	// Move start position
-	float3 position = PlanetRayOrigin();
-	position += PlanetRayDirection() * (range.x + step_length * 0.5);
+	float3 position = ray_PS.mOrigin;
+	position += ray_PS.mDirection * (range.x + step_length * 0.5);
 	for (int i = 0; i < min(sample_count, (range.y - range.x) / step_length) ; i++)
 	{
 		float density = SampleCloudDensity(position, false);
@@ -131,9 +135,9 @@ void RaymarchCloud(out float3 outTransmittance, out float3 outLuminance)
 		// Lighting
 		{
 			float3 ray_end;
-			float density = SampleCloudDensityAlongCone(position, GetSunDirection(), ray_end);
+			float accumulated_density_along_cone = SampleCloudDensityAlongCone(position, GetSunDirection(), ray_end);
 
-			float light_samples = density * 1.0;
+			float light_samples = accumulated_density_along_cone * 1.0;
 
 			float3 sky_irradiance = mConstants.mAtmosphere.mSolarIrradiance * 0.1;
 			float3 sun_irradiance = mConstants.mAtmosphere.mSolarIrradiance;
@@ -143,7 +147,7 @@ void RaymarchCloud(out float3 outTransmittance, out float3 outLuminance)
 			float beers_law = exp(-light_samples);
 			float light_energy = 2.0 * beers_law * powder_sugar_effect;
 
-			float phase = PhaseFunction_HenyeyGreenstein(0.2, dot(PlanetRayDirection(), GetSunDirection()));
+			float phase = PhaseFunction_HenyeyGreenstein(0.2, dot(ray_PS.mDirection, GetSunDirection()));
 			light_energy *= phase;
 
 			accumulated_light += (1 - accumulated_density) * light_energy * (sun_irradiance + sky_irradiance);

@@ -91,14 +91,14 @@ float3 in_scatter(float3 o, float3 dir, float2 e, float3 l)
 	return scatter;
 }
 
-void GetSkyRadiance(out float3 sky_radiance, out float3 transmittance_to_top)
+void GetSkyRadiance(Ray inRayPS, out float3 outSkyRadiance, out float3 outTransmittanceToTop)
 {
-	sky_radiance = 0;
-	transmittance_to_top = 1;
+	outSkyRadiance = 0;
+	outTransmittanceToTop = 1;
 
 	// Position in km
-	float3 camera = PlanetRayOrigin() - PlanetCenter();
-	float3 view_ray = PlanetRayDirection();
+	float3 camera = inRayPS.mOrigin - PlanetCenterPositionPS();
+	float3 view_ray = inRayPS.mDirection;
 
 	float2 atmosphere_hit = ray_vs_sphere(camera, view_ray, mConstants.mAtmosphere.mTopRadius);
 	float2 earth_hit = ray_vs_sphere(camera, view_ray, mConstants.mAtmosphere.mBottomRadius);
@@ -118,7 +118,7 @@ void GetSkyRadiance(out float3 sky_radiance, out float3 transmittance_to_top)
 
 			if (visualize)
 			{
-				sky_radiance = float3(1,0,0);
+				outSkyRadiance = float3(1,0,0);
 				return;
 			}
 		}
@@ -132,7 +132,7 @@ void GetSkyRadiance(out float3 sky_radiance, out float3 transmittance_to_top)
 
 				if (visualize)
 				{
-					sky_radiance = float3(1,1,0);
+					outSkyRadiance = float3(1,1,0);
 					return;
 				}
 			}
@@ -143,7 +143,7 @@ void GetSkyRadiance(out float3 sky_radiance, out float3 transmittance_to_top)
 
 				if (visualize)
 				{
-					sky_radiance = float3(0,0,1);
+					outSkyRadiance = float3(0,0,1);
 					return;
 				}
 			}
@@ -156,13 +156,13 @@ void GetSkyRadiance(out float3 sky_radiance, out float3 transmittance_to_top)
 
 		if (visualize)
 		{
-			sky_radiance = float3(0,1,0);
+			outSkyRadiance = float3(0,1,0);
 			return;
 		}
 	}
 
-	sky_radiance = in_scatter(camera, view_ray, from_to, GetSunDirection());
-	sky_radiance *= mConstants.mAtmosphere.mSolarIrradiance;
+	outSkyRadiance = in_scatter(camera, view_ray, from_to, GetSunDirection());
+	outSkyRadiance *= mConstants.mAtmosphere.mSolarIrradiance;
 }
 
 }} // namespace AtmosphereIntegration { namespace Raymarch {

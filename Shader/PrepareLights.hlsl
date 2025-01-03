@@ -64,7 +64,7 @@ void PrepareLightsCS(
 		surface_context.mPrimitiveIndex		= light_index;
 		surface_context.mBarycentrics		= 1.0 / 3.0; // use barycenter
 
-		surface_context.LoadVertex();
+		surface_context.LoadSurface();
 		
 		float3 positions[3];
 		positions[0] 						= mul(surface_context.InstanceData().mTransform, float4(surface_context.mVertexPositions[0], 1)).xyz;

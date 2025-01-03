@@ -3,8 +3,6 @@
 #include "packing.hlsli"
 #include "utils.hlsli"
 
-#include "RayQuery.h"
-
 template <typename T> T fmadd(T inA, T inB, T inC)              { return inA * inB + inC; }
 template <typename T> T fmsub(T inA, T inB, T inC)              { return inA * inB - inC; }
 template <typename T> T fnmadd(T inA, T inB, T inC)             { return -inA * inB + inC; }
@@ -15,7 +13,8 @@ template <typename T> T safe_sqrt(T inValue)                    { return sqrt(ma
 
 template <typename T> T remap(T x, T a, T b, T c, T d)          { return (((x - a) / (b - a)) * (d - c)) + c; }
 
-float nan()                                                     { return asfloat(0x7fc00000); }
+float qnan()                                                    { return asfloat(0x7fc00000); }
+float inf()                                                     { return asfloat(0x7f800000); }
 
 // From https://www.shadertoy.com/view/tsBBWW
 uint wang_hash(inout uint seed)

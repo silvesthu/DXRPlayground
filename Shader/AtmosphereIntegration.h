@@ -1,4 +1,5 @@
 #include "Shared.h"
+#include "Context.h"
 
 AtmosphereMode GetAtmosphereMode()
 {
@@ -160,7 +161,7 @@ void GetSunAndSkyIrradiance(float3 inHitPosition, float3 inNormal, out float3 ou
 	}
 }
 
-void GetSkyRadiance(out float3 outSkyRadiance, out float3 outTransmittanceToTop)
+void GetSkyRadiance(Ray inRayPS, out float3 outSkyRadiance, out float3 outTransmittanceToTop)
 {
 	outSkyRadiance = 0;
 	outTransmittanceToTop = 1;
@@ -168,15 +169,15 @@ void GetSkyRadiance(out float3 outSkyRadiance, out float3 outTransmittanceToTop)
 	switch (GetAtmosphereMode())
 	{
 	case AtmosphereMode::ConstantColor:				outSkyRadiance = mConstants.mAtmosphere.mConstantColor.xyz; break;
-	case AtmosphereMode::Wilkie21:					AtmosphereIntegration::Wilkie21::GetSkyRadiance(outSkyRadiance, outTransmittanceToTop); break;
-	case AtmosphereMode::Raymarch:					AtmosphereIntegration::Raymarch::GetSkyRadiance(outSkyRadiance, outTransmittanceToTop); break;
-	case AtmosphereMode::Bruneton17: 				AtmosphereIntegration::Bruneton17::GetSkyRadiance(outSkyRadiance, outTransmittanceToTop); break;
-	case AtmosphereMode::Hillaire20: 				AtmosphereIntegration::Hillaire20::GetSkyRadiance(outSkyRadiance, outTransmittanceToTop); break;
+	case AtmosphereMode::Wilkie21:					AtmosphereIntegration::Wilkie21::GetSkyRadiance(inRayPS, outSkyRadiance, outTransmittanceToTop); break;
+	case AtmosphereMode::Raymarch:					AtmosphereIntegration::Raymarch::GetSkyRadiance(inRayPS, outSkyRadiance, outTransmittanceToTop); break;
+	case AtmosphereMode::Bruneton17: 				AtmosphereIntegration::Bruneton17::GetSkyRadiance(inRayPS, outSkyRadiance, outTransmittanceToTop); break;
+	case AtmosphereMode::Hillaire20: 				AtmosphereIntegration::Hillaire20::GetSkyRadiance(inRayPS, outSkyRadiance, outTransmittanceToTop); break;
 	default: break;
 	}
 }
 
-void GetSkyLuminanceToPoint(out float3 outSkyLuminance, out float3 outTransmittance)
+void GetSkyLuminanceToPoint(Ray inRayWS, out float3 outSkyLuminance, out float3 outTransmittance)
 {
 	outSkyLuminance = 0;
 	outTransmittance = 1;
@@ -185,11 +186,12 @@ void GetSkyLuminanceToPoint(out float3 outSkyLuminance, out float3 outTransmitta
 		return;
 
 	float3 radiance = 0;
+	Ray ray_PS = RayWS2PS(inRayWS);
 	switch (GetAtmosphereMode())
 	{
 	case AtmosphereMode::ConstantColor:				break; // Not supported
 	case AtmosphereMode::Raymarch:					break; // Not supported
-	case AtmosphereMode::Bruneton17: 				AtmosphereIntegration::Bruneton17::GetSkyRadianceToPoint(radiance, outTransmittance); break;
+	case AtmosphereMode::Bruneton17: 				AtmosphereIntegration::Bruneton17::GetSkyRadianceToPoint(ray_PS, radiance, outTransmittance); break;
 	case AtmosphereMode::Hillaire20: 				break; // [TODO]
 	default: break;
 	}
@@ -197,19 +199,20 @@ void GetSkyLuminanceToPoint(out float3 outSkyLuminance, out float3 outTransmitta
 	outSkyLuminance = radiance * kSolarKW2LM * kPreExposure * mConstants.mSolarLuminanceScale;
 }
 
-float3 GetSkyLuminance()
+float3 GetSkyLuminance(Ray inRayWS)
 {
 	// Sky
 	float3 radiance = 0;
 	float3 transmittance_to_top = 0;
-	GetSkyRadiance(radiance, transmittance_to_top);
+	Ray ray_PS = RayWS2PS(inRayWS);
+	GetSkyRadiance(ray_PS, radiance, transmittance_to_top);
 
 	// Debug
 	switch (mConstants.mDebugMode)
 	{
 	case DebugMode::Barycentrics: 			return 0;
-	case DebugMode::Position: 				return PlanetRayDirection(); // rays are supposed to go infinity
-	case DebugMode::Normal: 				return -PlanetRayDirection();
+	case DebugMode::Position: 				return ray_PS.mDirection; // rays are supposed to go infinity
+	case DebugMode::Normal: 				return -ray_PS.mDirection;
 	case DebugMode::Albedo: 				return 0;
 	case DebugMode::Reflectance: 			return 0;
 	case DebugMode::Emission: 				return 0;
@@ -221,7 +224,7 @@ float3 GetSkyLuminance()
 
 	// Sun
 	if (GetAtmosphereMode() != AtmosphereMode::ConstantColor &&
-		dot(PlanetRayDirection(), GetSunDirection()) > cos(mConstants.mAtmosphere.mSunAngularRadius))
+		dot(ray_PS.mDirection, GetSunDirection()) > cos(mConstants.mAtmosphere.mSunAngularRadius))
 	{
 		// https://en.wikipedia.org/wiki/Solid_angle#Celestial_objects
 		// https://pages.mtu.edu/~scarn/teaching/GE4250/radiation_lecture_slides.pdf

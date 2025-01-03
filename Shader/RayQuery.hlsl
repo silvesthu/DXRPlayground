@@ -2,6 +2,7 @@
 #include "Shared.h"
 #include "Binding.h"
 #include "Common.h"
+#include "Context.h"
 #include "BSDF.h"
 #include "Light.h"
 #include "Reservoir.h"
@@ -58,10 +59,6 @@ void TraceRay(inout PixelContext ioPixelContext)
 	{
 		bool continue_bounce					= false;
 
-		// Helper
-		sWorldRayOrigin							= ray.Origin;
-		sWorldRayDirection						= ray.Direction;
-
 		// Note that RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH will give first hit for "Any Hit". The result may not be the closest one
 		// https://docs.microsoft.com/en-us/windows/win32/direct3d12/ray_flag
 		RayQuery<RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> query;
@@ -95,29 +92,12 @@ void TraceRay(inout PixelContext ioPixelContext)
 			
 			// System value intrinsics https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#system-value-intrinsics
 
-			// Helper
-			sRayTCurrent						= query.CommittedRayT();
-
-			BuiltInTriangleIntersectionAttributes attributes;
-			attributes.barycentrics				= query.CommittedTriangleBarycentrics();
-
-			HitContext hit_context				= (HitContext)0;
-			hit_context.mInstanceID				= query.CommittedInstanceID();
-			hit_context.mPrimitiveIndex			= query.CommittedPrimitiveIndex();
-			hit_context.mBarycentrics			= float3(1.0 - attributes.barycentrics.x - attributes.barycentrics.y, attributes.barycentrics.x, attributes.barycentrics.y);
-			hit_context.mRayOriginWS			= ray.Origin;
-			hit_context.mRayDirectionWS			= ray.Direction;
-			hit_context.mRayTCurrent			= query.CommittedRayT();
-
-			// Ray inspection
-			if (ioPixelContext.mPixelIndex.x == mConstants.mPixelDebugCoord.x && ioPixelContext.mPixelIndex.y == mConstants.mPixelDebugCoord.y)
-				RayInspectionUAV[0].mPositionWS[path_context.mRecursionDepth] = float4(hit_context.PositionWS(), 1.0);
-
-			// HitContext
+			HitContext hit_context				= HitContext::Generate(ray, query);
+			// Debug
 			{
-				hit_context.LoadVertex();
+				if (ioPixelContext.mPixelIndex.x == mConstants.mPixelDebugCoord.x && ioPixelContext.mPixelIndex.y == mConstants.mPixelDebugCoord.y)
+					RayInspectionUAV[0].mPositionWS[path_context.mRecursionDepth] = float4(hit_context.PositionWS(), 1.0);
 				
-				// Report InstanceID of instance at PixelDebugCoord
 				if (ioPixelContext.mPixelIndex.x == mConstants.mPixelDebugCoord.x && ioPixelContext.mPixelIndex.y == mConstants.mPixelDebugCoord.y && path_context.mRecursionDepth == 0)
 					PixelInspectionUAV[0].mPixelInstanceID = hit_context.mInstanceID;
 				
@@ -130,7 +110,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 			{
 				float3 in_scattering			= 0;
 				float3 transmittance			= 1;
-				GetSkyLuminanceToPoint(in_scattering, transmittance);
+				GetSkyLuminanceToPoint(hit_context.mRayWS, in_scattering, transmittance);
 
 				path_context.mEmission			+= in_scattering;
 				path_context.mThroughput		*= transmittance;
@@ -142,7 +122,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 			// Emission
 			float3 emission = hit_context.Emission() * (mConstants.mEmissionBoost * kPreExposure);
 			{
-				if (dot(hit_context.mVertexNormalWS, -hit_context.mRayDirectionWS) < 0 && !hit_context.TwoSided())
+				if (dot(hit_context.mVertexNormalWS, hit_context.ViewWS()) < 0 && !hit_context.TwoSided())
 					emission = 0;
 
 				// IES
@@ -301,11 +281,11 @@ void TraceRay(inout PixelContext ioPixelContext)
 		{
 			// Ray missed (Background)
 
-			float3 sky_luminance				= GetSkyLuminance();
+			float3 sky_luminance				= GetSkyLuminance(Ray::Generate(ray));
 
 			float3 cloud_transmittance			= 1;
 			float3 cloud_luminance				= 0;
-		 	RaymarchCloud(cloud_transmittance, cloud_luminance);
+		 	RaymarchCloud(Ray::Generate(ray), cloud_transmittance, cloud_luminance);
 
 			float3 emission						= lerp(sky_luminance, cloud_luminance, 1.0 - cloud_transmittance);
 			path_context.mEmission				+= path_context.mThroughput * emission;

@@ -1,27 +1,33 @@
+// PlanetSpace (PS)
+#pragma once
+#include "Context.h"
 
-float3 PlanetRayOrigin()
+float3 PositionWS2PS(float3 inPositionWS)
 {
-	float3 origin = sGetWorldRayOrigin() * mConstants.mAtmosphere.mSceneScale;
+	float3 origin = inPositionWS * mConstants.mAtmosphere.mSceneScale;
     return origin;
 }
 
-float3 PlanetRayDirection()
+float3 DirectionWS2PS(float3 inDirectionWS)
 {
-	return sGetWorldRayDirection();
+	return inDirectionWS;
 }
 
-float3 PlanetRayHitPosition()
+Ray RayWS2PS(Ray inRayWS)
 {
-	float3 position = (sGetWorldRayOrigin() + sGetWorldRayDirection() * sGetRayTCurrent()) * mConstants.mAtmosphere.mSceneScale;
-    return position;
+	Ray ray;
+	ray.mOrigin = PositionWS2PS(inRayWS.mOrigin);
+	ray.mDirection = DirectionWS2PS(inRayWS.mDirection);
+	ray.mTCurrent = inRayWS.mTCurrent;
+	return ray;
 }
 
-float3 PlanetCenter()
+float3 PlanetCenterPositionPS()
 {
 	return float3(0, -mConstants.mAtmosphere.mBottomRadius, 0);
 }
 
-float PlanetRadius()
+float PlanetRadiusPS()
 {
 	return mConstants.mAtmosphere.mBottomRadius;
 }

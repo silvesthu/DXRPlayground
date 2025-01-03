@@ -1,12 +1,12 @@
 namespace AtmosphereIntegration { namespace Wilkie21 {
 
-void GetSkyRadiance(out float3 outSkyRadiance, out float3 outTransmittanceToTop)
+void GetSkyRadiance(Ray inRayPS, out float3 outSkyRadiance, out float3 outTransmittanceToTop)
 {
 	outSkyRadiance = 0;
 	outTransmittanceToTop = 1; // [TODO]
 
-	float3 camera = PlanetRayOrigin() - PlanetCenter();
-	float3 view_ray = PlanetRayDirection();
+	float3 camera = inRayPS.mOrigin - PlanetCenterPositionPS();
+	float3 view_ray = inRayPS.mDirection;
 	float3 sun_direction = GetSunDirection();
 
 	float r = length(camera);
