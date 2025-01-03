@@ -89,11 +89,9 @@ void TraceRay(inout PixelContext ioPixelContext)
 		if (query.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
 		{
 			// Ray hit something
-			
-			// System value intrinsics https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#system-value-intrinsics
 
+			// HitContext
 			HitContext hit_context				= HitContext::Generate(ray, query);
-			// Debug
 			{
 				if (ioPixelContext.mPixelIndex.x == mConstants.mPixelDebugCoord.x && ioPixelContext.mPixelIndex.y == mConstants.mPixelDebugCoord.y)
 					RayInspectionUAV[0].mPositionWS[path_context.mRecursionDepth] = float4(hit_context.PositionWS(), 1.0);
@@ -137,11 +135,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 			// Ray hit a light / [Mitsuba] Direct emission
 			if (hit_context.BSDF() == BSDF::Light)
 			{
-				if (mConstants.mSampleMode == SampleMode::SampleLight)
-				{
-					// do nothing
-				}
-				else if (path_context.mRecursionDepth == 0 ||				// Camera ray hit the light
+				if (path_context.mRecursionDepth == 0 ||					// Camera ray hit the light
 					path_context.mPrevDiracDeltaDistribution || 			// Prev hit is DiracDeltaDistribution -> no light sample
 					mConstants.mSampleMode == SampleMode::SampleBSDF ||		// SampleBSDF mode -> no light sample
 					false
@@ -171,6 +165,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 					DebugValue(PixelDebugMode::BSDF_MIS,		path_context.mRecursionDepth - 1 /* for prev BSDF hit */, float3(path_context.mPrevBSDFSamplePDF, light_pdf, mis_weight));
 				}
 			}
+			// Ray hit a surface
 			else
 			{
 				// Sample light (NEE) / [Mitsuba] Emitter sampling

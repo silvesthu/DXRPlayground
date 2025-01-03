@@ -165,6 +165,8 @@ struct HitContext : SurfaceContext
 	template <RAY_FLAG RayFlags>
 	static HitContext Generate(RayDesc inRayDesc, RayQuery<RayFlags> inRayQuery)
 	{
+		// System value intrinsics https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#system-value-intrinsics
+		
 		float2 bary2							= inRayQuery.CommittedTriangleBarycentrics();
 		
 		HitContext hit_context					= (HitContext)0;
