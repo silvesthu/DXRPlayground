@@ -120,8 +120,8 @@ enum class ViewDescriptorIndex : uint
 	UVCheckerSRV,
 
 	// [Generator]
-	GeneratorSRV,
-	GeneratorUAV,
+	GeneratedSRV,
+	GeneratedUAV,
 
 	// [Misc]
 	IESSRV,

@@ -157,8 +157,11 @@ void TraceRay(inout PixelContext ioPixelContext)
 			// Ray hit a light / [Mitsuba] Direct emission
 			if (hit_context.BSDF() == BSDF::Light)
 			{
-				if (path_context.mRecursionDepth == 0 ||					// Camera ray hit the light
-					mConstants.mLightCount == 0 ||							// No light -> no light sample
+				if (mConstants.mSampleMode == SampleMode::SampleLight)
+				{
+					// do nothing
+				}
+				else if (path_context.mRecursionDepth == 0 ||				// Camera ray hit the light
 					path_context.mPrevDiracDeltaDistribution || 			// Prev hit is DiracDeltaDistribution -> no light sample
 					mConstants.mSampleMode == SampleMode::SampleBSDF ||		// SampleBSDF mode -> no light sample
 					false
@@ -338,15 +341,15 @@ void TraceRay(inout PixelContext ioPixelContext)
 			// e.g. Fixed threshold
 			// e.g. Veach's Efficiency-Optimized Russian roulette is based on average variance and cost
 			float scale							= path_context.mEtaScale * path_context.mEtaScale; // See Dielectric::Evaluate
-			float continue_probablity			= min(throughput_max * scale, 0.95);
-			float probablity					= RandomFloat01(path_context.mRandomState);
-			bool probability_passed				= probablity < continue_probablity;
+			float continue_probability			= min(throughput_max * scale, 0.95);
+			float probability					= RandomFloat01(path_context.mRandomState);
+			bool probability_passed				= probability < continue_probability;
 
-			DebugValue(PixelDebugMode::RussianRoulette,			path_context.mRecursionDepth, float3(probability_passed, probablity, continue_probablity));
+			DebugValue(PixelDebugMode::RussianRoulette,			path_context.mRecursionDepth, float3(probability_passed, probability, continue_probability));
 			DebugValue(PixelDebugMode::EtaScale,				path_context.mRecursionDepth, float3(path_context.mEtaScale, 0, 0));				
 
 			if (probability_passed)
-				path_context.mThroughput		/= continue_probablity; 				// Weight the path to keep result unbiased
+				path_context.mThroughput		/= continue_probability; 				// Weight the path to keep result unbiased
 			else
 				break;																	// Termination by Russian Roulette
 		}
@@ -409,7 +412,7 @@ void DepthPS(
 	pixel_context.mOutputDepth					= true;
 	TraceRay(pixel_context);
 	
-	outDepth = pixel_context.mDepth;
+	outDepth									= pixel_context.mDepth;
 	
 	if (sDebugValueUpdated)
 		ScreenDebugUAV[inPosition.xy]			= sDebugValue;

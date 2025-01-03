@@ -149,15 +149,17 @@ void ClearCS(
 
 [RootSignature(ROOT_SIGNATURE_COMMON)]
 [numthreads(8, 8, 1)]
-void GeneratorCS(
+void GeneratTextureCS(
 	uint3 inGroupThreadID : SV_GroupThreadID,
 	uint3 inGroupID : SV_GroupID,
 	uint3 inDispatchThreadID : SV_DispatchThreadID,
 	uint inGroupIndex : SV_GroupIndex)
 {
-	RWTexture2D<float4> texture = ResourceDescriptorHeap[(int)ViewDescriptorIndex::GeneratorUAV];
+	RWTexture2D<float4> texture = ResourceDescriptorHeap[(int)ViewDescriptorIndex::GeneratedUAV];
 
-	float3 color = inDispatchThreadID.x % 2 == inDispatchThreadID.y % 2 ? 0.8 : 0.2;	
+	// this shader is solely used to generate texture 
+	float3 color = inDispatchThreadID.x % 2 == inDispatchThreadID.y % 2 ? 0.8 : 0.2;
+	
 	texture[inDispatchThreadID.xy] = float4(color, 1.0); 
 }
 

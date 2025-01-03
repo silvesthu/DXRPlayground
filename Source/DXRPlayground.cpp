@@ -1096,14 +1096,14 @@ void sRender()
 		gCloud.Render();
 	}
 
-	// Generator
+	// Texture Generator
 	{
-		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Generator");
+		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Texture Generator");
 
-		gRenderer.Setup(gRenderer.mRuntime.mGeneratorShader);
+		gRenderer.Setup(gRenderer.mRuntime.mGenerateTextureShader);
 
-		BarrierScope scope(gCommandList, gRenderer.mRuntime.mGeneratorTexture.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		gCommandList->Dispatch(gAlignUpDiv(gRenderer.mRuntime.mGeneratorTexture.mWidth, 8u), gAlignUpDiv(gRenderer.mRuntime.mGeneratorTexture.mHeight, 8u), 1);
+		BarrierScope scope(gCommandList, gRenderer.mRuntime.mGeneratedTexture.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		gCommandList->Dispatch(gAlignUpDiv(gRenderer.mRuntime.mGeneratedTexture.mWidth, 8u), gAlignUpDiv(gRenderer.mRuntime.mGeneratedTexture.mHeight, 8u), 1);
 		
 		gBarrierUAV(gCommandList, nullptr);
 	}
