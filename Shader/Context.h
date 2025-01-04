@@ -22,6 +22,8 @@ struct PathContext
 					
 	uint			mRandomState;
 	uint			mRecursionDepth;
+
+	uint			mRandomStateReSTIR;
 };
 
 // Context information about a point on surface

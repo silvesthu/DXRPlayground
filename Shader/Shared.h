@@ -223,7 +223,7 @@ enum class RootParameterIndex : uint
 	ConstantsAtmosphere = 1,	// ROOT_SIGNATURE_ATMOSPHERE
 };
 
-enum class DebugMode : uint
+enum class VisualizeMode : uint
 {
 	None = 0,
 
@@ -249,16 +249,15 @@ enum class DebugMode : uint
 	GENERATE_NEW_LINE_NAME,
 
 	RecursionDepth,
-	DebugValue,
 
 	GENERATE_NEW_LINE_NAME,
 
-	Cloud,
+	DebugValue,
 
 	Count
 };
 
-enum class PixelDebugMode : uint
+enum class DebugMode : uint
 {
 	Manual,
 
@@ -320,9 +319,14 @@ enum class PixelDebugMode : uint
 
 	GENERATE_NEW_LINE_NAME,
 
-	BSDF_MIS,
-	Light_MIS,
+	MIS_BSDF,
+	MIS_LIGHT,
 
+	GENERATE_NEW_LINE_NAME,
+
+	RIS_SAMPLE,
+	RIS_SUM,
+	
 	Count
 };
 
@@ -348,7 +352,6 @@ enum class LightSourceMode : uint
 {
 	Emitter = 0,
 	TriangleLights,
-	Both,
 
 	Count,
 };
@@ -655,8 +658,8 @@ struct CloudConstants
 
 struct ReSTIR
 {
+	uint						mTemporalCounter				CONSTANT_DEFAULT(0);
 	uint						mInitialSampleCount				CONSTANT_DEFAULT(1);
-	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 };
@@ -703,7 +706,7 @@ struct Constants
 
 	float4						mSunDirection					CONSTANT_DEFAULT(float4(1.0f, 0.0f, 0.0f, 0.0f));
 
-	DebugMode					mDebugMode						CONSTANT_DEFAULT(DebugMode::None);
+	VisualizeMode				mVisualizeMode					CONSTANT_DEFAULT(VisualizeMode::None);
 	DebugInstanceMode			mDebugInstanceMode				CONSTANT_DEFAULT(DebugInstanceMode::None);
 	int							mDebugInstanceIndex				CONSTANT_DEFAULT(-1);
 	int							mDebugLightIndex				CONSTANT_DEFAULT(-1);
@@ -722,8 +725,8 @@ struct Constants
 	int							mPixelDebugLightIndex			CONSTANT_DEFAULT(0);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
-	PixelDebugMode				mPixelDebugMode					CONSTANT_DEFAULT(PixelDebugMode::Manual);
-	int							mPixelDebugRecursion			CONSTANT_DEFAULT(0);
+	DebugMode					mDebugMode						CONSTANT_DEFAULT(DebugMode::Manual);
+	int							mDebugRecursion					CONSTANT_DEFAULT(0);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
@@ -750,6 +753,8 @@ struct RayInspection
 
 	float4						mPositionWS[kArraySize];
 	float4						mNormalWS[kArraySize];
+
+	float4						mLightPositionWS[kArraySize];
 };
 
 struct LocalConstants

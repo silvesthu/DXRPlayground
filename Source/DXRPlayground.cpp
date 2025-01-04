@@ -188,13 +188,12 @@ static void sPrepareImGui()
 			ImGui::InputInt2("Coords", (int*)&gConstants.mPixelDebugCoord);
 			ImGui::SliderInt("Light Index", &gConstants.mPixelDebugLightIndex, 0, (int)gScene.GetSceneContent().mLights.size() - 1);
 			ImGui::InputFloat3("Pixel Value", &gRenderer.mRuntime.mPixelInspectionBuffer.ReadbackAs<PixelInspection>(gGetFrameContextIndex())->mPixelValue.x, "%.8f", ImGuiInputTextFlags_ReadOnly);
-			ImGui::InputFloat3("Debug Value", &gRenderer.mRuntime.mPixelInspectionBuffer.ReadbackAs<PixelInspection>(gGetFrameContextIndex())->mDebugValue.x, "%.8f", ImGuiInputTextFlags_ReadOnly);
-			ImGui::SliderInt("Recursion", &gConstants.mPixelDebugRecursion, 0, 16);
-			if (ImGui::TreeNodeEx("DebugValue For Each Recursion"))
+
+			if (ImGui::TreeNodeEx("Visualize Mode"))
 			{
-				for (int i = 0; i < static_cast<int>(PixelDebugMode::Count); i++)
+				for (int i = 0; i < static_cast<int>(VisualizeMode::Count); i++)
 				{
-					const auto& name = nameof::nameof_enum(static_cast<PixelDebugMode>(i));
+					const auto& name = nameof::nameof_enum(static_cast<VisualizeMode>(i));
 					if (name.starts_with('_'))
 					{
 						ImGui::NewLine();
@@ -204,7 +203,29 @@ static void sPrepareImGui()
 					if (i != 0)
 						ImGui::SameLine();
 
-					ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mPixelDebugMode), i);
+					ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mVisualizeMode), i);
+				}
+				ImGui::TreePop();
+			}
+			
+			if (ImGui::TreeNodeEx("Debug Mode"))
+			{
+				ImGui::InputFloat3("Debug Value", &gRenderer.mRuntime.mPixelInspectionBuffer.ReadbackAs<PixelInspection>(gGetFrameContextIndex())->mDebugValue.x, "%.8f", ImGuiInputTextFlags_ReadOnly);
+				ImGui::SliderInt("Recursion (output to ScreenDebug)", &gConstants.mDebugRecursion, 0, 16);
+				
+				for (int i = 0; i < static_cast<int>(DebugMode::Count); i++)
+				{
+					const auto& name = nameof::nameof_enum(static_cast<DebugMode>(i));
+					if (name.starts_with('_'))
+					{
+						ImGui::NewLine();
+						continue;
+					}
+
+					if (i != 0)
+						ImGui::SameLine();
+
+					ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mDebugMode), i);
 				}
 
 				for (int i = 0; i < PixelInspection::kArraySize; i++)
@@ -252,6 +273,7 @@ static void sPrepareImGui()
 
 			if (gConstants.mLightSampleMode == LightSampleMode::ReSTIR)
 			{
+				ImGui::InputInt("Temporal Counter", reinterpret_cast<int*>(&gConstants.mReSTIR.mTemporalCounter), 0, 0, ImGuiInputTextFlags_ReadOnly);
 				ImGui::SliderInt("Initial Sample Count", reinterpret_cast<int*>(&gConstants.mReSTIR.mInitialSampleCount), 1, 32);
 			}
 
@@ -336,26 +358,6 @@ static void sPrepareImGui()
 			}
 
 			ImGui::SliderFloat("Emission Boost", &gConstants.mEmissionBoost, 1E-16f, 1E16F);
-
-			ImGui::TreePop();
-		}
-
-		if (ImGui::TreeNodeEx("Render"))
-		{
-			for (int i = 0; i < static_cast<int>(DebugMode::Count); i++)
-			{
-				const auto& name = nameof::nameof_enum(static_cast<DebugMode>(i));
-				if (name.starts_with('_'))
-				{
-					ImGui::NewLine();
-					continue;
-				}
-
-				if (i != 0)
-					ImGui::SameLine();
-
-				ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mDebugMode), i);
-			}
 
 			ImGui::TreePop();
 		}
@@ -1024,48 +1026,45 @@ void sRender()
 
 		// Accumulation
 		{
-			static Constants sConstantsCopy = gConstants;
+			static Constants sConstantsCopy			= gConstants;
 
 			// Whitelist
 			sConstantsCopy.mTime					= gConstants.mTime;
 			sConstantsCopy.mCurrentFrameIndex		= gConstants.mCurrentFrameIndex;
 			sConstantsCopy.mCurrentFrameWeight		= gConstants.mCurrentFrameWeight;
 			sConstantsCopy.mPixelDebugCoord			= gConstants.mPixelDebugCoord;
-			sConstantsCopy.mPixelDebugMode			= gConstants.mPixelDebugMode;
+			sConstantsCopy.mDebugMode			= gConstants.mDebugMode;
+			sConstantsCopy.mReSTIR.mTemporalCounter	= gConstants.mReSTIR.mTemporalCounter;
 
 			if (memcmp(&sConstantsCopy, &gConstants, sizeof(Constants)) != 0)
 				gRenderer.mAccumulationResetRequested = true;
 
-			if (gRenderer.mAccumulationResetRequested)
 			{
-				gConstants.mCurrentFrameIndex = 0;
-				gRenderer.mAccumulationDone = false;
+				if (!gRenderer.mAccumulationPaused)
+					gConstants.mCurrentFrameIndex++;
+
+				if (gRenderer.mAccumulationResetRequested)
+					gConstants.mCurrentFrameIndex = 0;
+
+				uint accumulation_frame_count = gRenderer.mAccumulationFrameUnlimited ? UINT_MAX : gRenderer.mAccumulationFrameCount;
+				bool accumulation_done = gConstants.mCurrentFrameIndex + 1 > accumulation_frame_count;
+				gConstants.mCurrentFrameIndex = gMin(gConstants.mCurrentFrameIndex, accumulation_frame_count - 1);
+
+				if (accumulation_done || gRenderer.mAccumulationPaused)
+					gConstants.mCurrentFrameWeight = 0.0f;
+				else
+					gConstants.mCurrentFrameWeight = 1.0f / (gConstants.mCurrentFrameIndex + 1);
 			}
 
-			if (gRenderer.mAccumulationDone || gRenderer.mAccumulationPaused)
-				gConstants.mCurrentFrameWeight = 0.0f;
-			else
-				gConstants.mCurrentFrameWeight = 1.0f / (gConstants.mCurrentFrameIndex + 1);
+			// ReSTIR
+			{
+				gConstants.mReSTIR.mTemporalCounter++;
+			}
 			
 			sConstantsCopy = gConstants;
 			gRenderer.mAccumulationResetRequested = false;
-		}
 
-		{
-			Constants gpu_constants = gConstants;
-			memcpy(gRenderer.mRuntime.mConstantsBuffer.mUploadPointer[gGetFrameContextIndex()], &gpu_constants, sizeof(gConstants));
-		}
-
-		{
-			if (!gRenderer.mAccumulationPaused)
-				gConstants.mCurrentFrameIndex++;
-
-			uint32_t accumulation_frame_count = gRenderer.mAccumulationFrameUnlimited ? UINT_MAX : gRenderer.mAccumulationFrameCount;
-
-			if (gConstants.mCurrentFrameIndex == accumulation_frame_count)
-				gRenderer.mAccumulationDone = true;
-
-			gConstants.mCurrentFrameIndex = gMin(gConstants.mCurrentFrameIndex, accumulation_frame_count - 1);
+			memcpy(gRenderer.mRuntime.mConstantsBuffer.mUploadPointer[gGetFrameContextIndex()], &gConstants, sizeof(gConstants));
 		}
 
 		gBarrierTransition(gCommandList, gRenderer.mRuntime.mConstantsBuffer.mResource.Get(), D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, D3D12_RESOURCE_STATE_COPY_DEST);
@@ -1255,9 +1254,9 @@ void sRender()
 		gRenderer.Setup(gRenderer.mRuntime.mCompositeShader);
 		gCommandList->DrawInstanced(3, 1, 0, 0);
 
-		gCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINESTRIP);
+		gCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
 		gRenderer.Setup(gRenderer.mRuntime.mLineShader);
-		gCommandList->DrawInstanced(RayInspection::kArraySize, 1, 0, 0);
+		gCommandList->DrawInstanced(RayInspection::kArraySize * 3 /* Position, Normal, LightPosition */ * 2 /* 2 vertex per line */, 1, 0, 0);
 	}
 
 	// Readback

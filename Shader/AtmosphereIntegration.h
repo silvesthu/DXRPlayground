@@ -209,17 +209,17 @@ float3 GetSkyLuminance(Ray inRayWS)
 	GetSkyRadiance(ray_PS, radiance, transmittance_to_top);
 
 	// Debug
-	switch (mConstants.mDebugMode)
+	switch (mConstants.mVisualizeMode)
 	{
-	case DebugMode::Barycentrics: 			return 0;
-	case DebugMode::Position: 				return ray_PS.mDirection; // rays are supposed to go infinity
-	case DebugMode::Normal: 				return -ray_PS.mDirection;
-	case DebugMode::Albedo: 				return 0;
-	case DebugMode::Reflectance: 			return 0;
-	case DebugMode::Emission: 				return 0;
-	case DebugMode::RoughnessAlpha:			return 0;
-	case DebugMode::Transmittance:			return transmittance_to_top;
-	case DebugMode::InScattering:			return radiance;
+	case VisualizeMode::Barycentrics: 			return 0;
+	case VisualizeMode::Position: 				return ray_PS.mDirection; // rays are supposed to go infinity
+	case VisualizeMode::Normal: 				return -ray_PS.mDirection;
+	case VisualizeMode::Albedo: 				return 0;
+	case VisualizeMode::Reflectance: 			return 0;
+	case VisualizeMode::Emission: 				return 0;
+	case VisualizeMode::RoughnessAlpha:			return 0;
+	case VisualizeMode::Transmittance:			return transmittance_to_top;
+	case VisualizeMode::InScattering:			return radiance;
 	default:								break;
 	}
 

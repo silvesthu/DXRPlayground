@@ -7,23 +7,32 @@ struct Reservoir
 	static const uint kLightValidBit			= 0x80000000;
 	static const uint kLightIndexMask			= 0x7FFFFFFF;
 	
-	uint			mLightData;                 // r.y
-	float			mTotalWeight;				// r.w_sum
+	uint			mLightData;                 																		// r.y                  // Selected sample
+	float			mTargetPDF;																							// \hat{p_{q}}(r.y)		// Target PDF of selected sample
 	
-	uint			mSampleCount;				// r.M
-	float			mTargetPDF;					// \hat{p_{q}}(r.y)
+	float			mWeightSum;																							// r.w_sum				// Sum of processed sample weight	                                            																		
+	uint			mCountSum;																							// r.M					// Sum of processed sample count
+
+	float			StochasticWeight()																					// r.W                  // Stochastic weight, expected value is 1/p(y). Eq(6)
+	{
+		if (mTargetPDF == 0.0)
+			return 0.0;
+		
+		return (1.0 / mTargetPDF) * (1.0 / mCountSum * mWeightSum);
+	}
 
 	bool			IsValid()					{ return mLightData != 0; }
 	uint			LightIndex()				{ return mLightData & kLightIndexMask; }
 
 	bool			Update(Reservoir inReservoir, inout PathContext ioPathContext)
 	{
-		mTotalWeight							+= inReservoir.mTotalWeight;
-		mSampleCount							+= inReservoir.mSampleCount;
+		mWeightSum								+= inReservoir.mWeightSum;
+		mCountSum								+= inReservoir.mCountSum;
 		
-		if (RandomFloat01(ioPathContext.mRandomState) * mTotalWeight < inReservoir.mTotalWeight)
+		if (RandomFloat01(ioPathContext.mRandomState) * mWeightSum < inReservoir.mWeightSum)
 		{
 			mLightData							= inReservoir.mLightData;
+			mTargetPDF							= inReservoir.mTargetPDF;
 			return true;
 		}
 
@@ -34,8 +43,9 @@ struct Reservoir
 	{
 		Reservoir reservoir;
 		reservoir.mLightData					= 0;
-		reservoir.mTotalWeight					= 0.0;
-		reservoir.mSampleCount					= 1;
+		reservoir.mWeightSum					= 0.0;
+		reservoir.mCountSum					= 0;
+		reservoir.mTargetPDF					= 0.0;
 		return reservoir;
 	}
 
@@ -43,7 +53,7 @@ struct Reservoir
 	{
 		float4 raw_reservoir					= 0;
 		raw_reservoir.x							= asfloat(inReservoir.mLightData);
-		raw_reservoir.y							= inReservoir.mTotalWeight;
+		raw_reservoir.y							= inReservoir.mWeightSum;
 		raw_reservoir.z							= 0.0;
 		raw_reservoir.w							= 0.0;
 		return raw_reservoir;
@@ -53,7 +63,7 @@ struct Reservoir
 	{
 		Reservoir reservoir;
 		reservoir.mLightData					= asuint(inRawReservoir.x);
-		reservoir.mTotalWeight					= inRawReservoir.y;
+		reservoir.mWeightSum					= inRawReservoir.y;
 		return reservoir;
 	}
 };

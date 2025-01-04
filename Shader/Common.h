@@ -283,18 +283,17 @@ float3 F_Conductor_Mitsuba(float3 inEta, float3 inK, float inCosThetaI)
     return 0.5f * (r_s + r_p);
 }
 
-static float3       sDebugModeValue = 0;
+static float3       sVisualizeModeValue = 0;
+void VisualizeValue(VisualizeMode inDebugMode, float3 inValue)
+{
+    if (mConstants.mVisualizeMode == inDebugMode)
+        sVisualizeModeValue = inValue;
+}
+
 static float4       sDebugValue = 0;
 static bool         sDebugValueUpdated = false;
 static uint3        sDebugDispatchRaysIndex;
 static uint3        sDebugDispatchRaysDimensions;
-
-void DebugModeValue(DebugMode inDebugMode, float3 inValue)
-{
-    if (mConstants.mDebugMode == inDebugMode)
-        sDebugModeValue = inValue;
-}
-
 void DebugValueInit()
 {
     if (sDebugDispatchRaysIndex.x == mConstants.mPixelDebugCoord.x && sDebugDispatchRaysIndex.y == mConstants.mPixelDebugCoord.y)
@@ -302,18 +301,21 @@ void DebugValueInit()
             PixelInspectionUAV[0].mPixelValueArray[i] = 0;
 }
 
-void DebugValue(PixelDebugMode inPixelDebugMode, uint inRecursionDepth, float3 inValue)
+void DebugValue(DebugMode inDebugMode, uint inRecursionDepth, float3 inValue)
 {
-    if (mConstants.mPixelDebugMode == inPixelDebugMode)
+    if (mConstants.mDebugMode == inDebugMode)
     {
         if (sDebugDispatchRaysIndex.x == mConstants.mPixelDebugCoord.x && sDebugDispatchRaysIndex.y == mConstants.mPixelDebugCoord.y && inRecursionDepth < PixelInspection::kArraySize)
             PixelInspectionUAV[0].mPixelValueArray[inRecursionDepth] = float4(inValue, 1.0); // 1.0 indicate value is written
 
-        if (mConstants.mPixelDebugRecursion == inRecursionDepth)
+        if (mConstants.mDebugRecursion == inRecursionDepth)
         {
             sDebugValue = float4(inValue, 1.0); // fill alpha to show on ImGui
             sDebugValueUpdated = true;
         }
+
+        if (mConstants.mVisualizeMode == VisualizeMode::DebugValue)
+            sVisualizeModeValue = inValue;
     }
 }
 

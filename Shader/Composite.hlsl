@@ -89,20 +89,20 @@ float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 	}
 	
 	// For visualization
-	switch (mConstants.mDebugMode)
+	switch (mConstants.mVisualizeMode)
 	{
-	case DebugMode::None:						color.xyz = LuminanceToColor(color.xyz, mConstants); break;
-	case DebugMode::Barycentrics: 				break;
-	case DebugMode::Position: 					break;
-	case DebugMode::Normal: 					color.xyz = color.xyz * 0.5 + 0.5; break;
-	case DebugMode::UV:							break;
-	case DebugMode::Albedo: 					break;
-	case DebugMode::Reflectance: 				break;
-	case DebugMode::Emission: 					break;
-	case DebugMode::RoughnessAlpha: 			break;
-	case DebugMode::Transmittance:				break;
-	case DebugMode::InScattering:				break;
-	case DebugMode::RecursionDepth:				color.xyz = hsv2rgb(float3(color.x / 8.0, 1, 1)); break;
+	case VisualizeMode::None:					color.xyz = LuminanceToColor(color.xyz, mConstants); break;
+	case VisualizeMode::Barycentrics: 			break;
+	case VisualizeMode::Position: 				break;
+	case VisualizeMode::Normal: 				color.xyz = color.xyz * 0.5 + 0.5; break;
+	case VisualizeMode::UV:						break;
+	case VisualizeMode::Albedo: 				break;
+	case VisualizeMode::Reflectance: 			break;
+	case VisualizeMode::Emission: 				break;
+	case VisualizeMode::RoughnessAlpha: 		break;
+	case VisualizeMode::Transmittance:			break;
+	case VisualizeMode::InScattering:			break;
+	case VisualizeMode::RecursionDepth:			color.xyz = hsv2rgb(float3(color.x / 8.0, 1, 1)); break;
 	default:									break;
 	}
 	
@@ -144,6 +144,7 @@ void ClearCS(
 	{
 		RayInspectionUAV[0].mPositionWS[inDispatchThreadID.x] = 0;
 		RayInspectionUAV[0].mNormalWS[inDispatchThreadID.x] = 0;
+		RayInspectionUAV[0].mLightPositionWS[inDispatchThreadID.x] = 0;
 	}
 }
 
@@ -163,16 +164,51 @@ void GeneratTextureCS(
 	texture[inDispatchThreadID.xy] = float4(color, 1.0); 
 }
 
-float4 LineVS(uint inVertexID : SV_VertexID) : SV_POSITION
+float4 LineVS(uint inVertexID : SV_VertexID, out float4 outColor : COLOR) : SV_POSITION
 {
-	float4 position_ws = RayInspectionUAV[0].mPositionWS[inVertexID];
+	float4 position_ws = 0;
+	outColor = 1.0;
+
+	if (inVertexID < RayInspection::kArraySize * 1 * 2)
+	{
+		// Position
+		uint group = inVertexID / 2;
+		uint index = inVertexID % 2;
+		uint vertex_index = group + index;
+		position_ws = RayInspectionUAV[0].mPositionWS[vertex_index];
+
+		if (group == 0)
+			outColor = float4(1.0, 1.0, 0.0, 1.0);
+		else
+			outColor = float4(0.5, 0.5, 0.0, 1.0);
+	}
+	else if (inVertexID < RayInspection::kArraySize * 2 * 2)
+	{
+		// Normal
+
+		// [TODO]
+	}
+	else if (inVertexID < RayInspection::kArraySize * 3 * 2)
+	{
+		// LightPosition
+		uint group = (inVertexID - RayInspection::kArraySize * 2 * 2) / 2;
+		uint index = (inVertexID - RayInspection::kArraySize * 2 * 2) % 2;
+		uint vertex_index = group;
+		position_ws = index == 0 ? RayInspectionUAV[0].mPositionWS[vertex_index] : RayInspectionUAV[0].mLightPositionWS[vertex_index];
+
+		if (group == 0)
+			outColor = float4(0.0, 1.0, 1.0, 1.0);
+		else
+			outColor = float4(0.0, 0.5, 0.5, 1.0);		
+	}
+	
 	float4 position_ps = mul(mConstants.mViewProjectionMatrix, position_ws);
-	position_ps = position_ps / position_ps.w; 
+	position_ps = position_ps / position_ps.w;
 	return position_ps;
 }
 
 [RootSignature(ROOT_SIGNATURE_COMMON)]
-float4 LinePS(float4 position : SV_POSITION) : SV_TARGET
+float4 LinePS(float4 position : SV_POSITION, in float4 inColor : COLOR) : SV_TARGET
 {
-	return 1.0;
+	return inColor;
 }
