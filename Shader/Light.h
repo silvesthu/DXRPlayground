@@ -39,7 +39,7 @@ struct LightContext
 	float3		mL;
 	float		mSolidAnglePDF;
 
-	float		StochasticWeight()		{ return mReservoir.StochasticWeight(); }
+	float		SelectionWeight()		{ return mReservoir.StochasticWeight(); }
 	float		UniformSelectionPDF()	{ return 1.0 / mConstants.mLightCount; }
 	Reservoir	mReservoir;
 };
@@ -159,7 +159,7 @@ namespace LightEvaluation
 
 		light_context.mReservoir.mLightData		= inLightIndex | Reservoir::kLightValidBit;
 		light_context.mReservoir.mCountSum		= 1;
-		light_context.mReservoir.mTargetPDF		= light_context.mSolidAnglePDF;
+		light_context.mReservoir.mTargetPDF		= 0.0;
 		light_context.mReservoir.mWeightSum		= 0.0;
 		return light_context;
 	}
@@ -167,40 +167,47 @@ namespace LightEvaluation
 	LightContext SelectLight(float3 inLitPositionWS, inout PathContext ioPathContext)
 	{
 		LightContext selected_light_context = (LightContext)0;
+		Reservoir reservoir = Reservoir::Generate();
 		switch (mConstants.mLightSampleMode)
 		{
-		case LightSampleMode::WRS:
+		case LightSampleMode::RIS:
 		{
-			Reservoir reservoir = Reservoir::Generate();
 			for (uint light_index = 0; light_index < mConstants.mLightCount; light_index++)
 			{
 				// [TODO] Use second-best implementation as target pdf. See RAB_GetLightSampleTargetPdfForSurface in RTXDI.
-				// Currently, it is only based on luminance of light and pdf of sampling direction, need to add BRDF evaluation.
+				// Currently, it is only based on luminance of light and pdf of solid angle, better to use full evaluation of rendering equation.
 				LightContext light_context = LightEvaluation::GenerateContext(LightEvaluation::ContextType::Random, 0, light_index, inLitPositionWS, ioPathContext);
-				light_context.mReservoir.mWeightSum = mConstants.mLightCount / light_context.mReservoir.mTargetPDF;				
+				light_context.mReservoir.mTargetPDF = light_context.mSolidAnglePDF <= 0.0 ? 0.0 : (RGBToLuminance(Lights[light_index].mEmission) / light_context.mSolidAnglePDF);
+				float target_pdf = light_context.mReservoir.mTargetPDF;
+				float candidate_pdf = light_context.UniformSelectionPDF();
+				light_context.mReservoir.mWeightSum = target_pdf / candidate_pdf;			
 
 				if (reservoir.Update(light_context.mReservoir, ioPathContext))
 					selected_light_context = light_context;
 			}
 
 			selected_light_context.mReservoir = reservoir;
-			selected_light_context.mReservoir.mWeightSum *= selected_light_context.mReservoir.mTargetPDF;
 			return selected_light_context;
 		}
-		case LightSampleMode::ReSTIR:
+		case LightSampleMode::ReSTIR:  // [passthrough]
+		case LightSampleMode::Uniform: // [passthrough]
+		default:
 		{
-			Reservoir reservoir = Reservoir::Generate();
-			for (uint i = 0; i < min(mConstants.mReSTIR.mInitialSampleCount, mConstants.mLightCount); i++)
+			uint sample_count = mConstants.mReSTIR.mInitialSampleCount;
+			if (mConstants.mLightSampleMode != LightSampleMode::ReSTIR)
+				sample_count = 1;
+				
+			for (uint i = 0; i < min(sample_count, mConstants.mLightCount); i++)
 			{
 				uint light_index = min(RandomFloat01(ioPathContext.mRandomState) * mConstants.mLightCount, mConstants.mLightCount - 1);
 				
 				// [TODO] Use second-best implementation as target pdf. See RAB_GetLightSampleTargetPdfForSurface in RTXDI.
 				// Currently, it is only based on luminance of light and pdf of sampling direction, need to add BRDF evaluation.
 				LightContext light_context = LightEvaluation::GenerateContext(LightEvaluation::ContextType::Random, 0, light_index, inLitPositionWS, ioPathContext);
-				light_context.mReservoir.mTargetPDF = light_context.mReservoir.mTargetPDF <= 0.0 ? 0.0 : (RGBToLuminance(Lights[light_index].mEmission) / light_context.mReservoir.mTargetPDF);
+				light_context.mReservoir.mTargetPDF = light_context.mSolidAnglePDF <= 0.0 ? 0.0 : (RGBToLuminance(Lights[light_index].mEmission) / light_context.mSolidAnglePDF);
 				float target_pdf = light_context.mReservoir.mTargetPDF;
-				float sample_pdf = 1.0;
-				light_context.mReservoir.mWeightSum = target_pdf / sample_pdf;
+				float candidate_pdf = light_context.UniformSelectionPDF();
+				light_context.mReservoir.mWeightSum = target_pdf / candidate_pdf;
 
 				if (reservoir.Update(light_context.mReservoir, ioPathContext))
 					selected_light_context = light_context;
@@ -208,20 +215,6 @@ namespace LightEvaluation
 
 			selected_light_context.mReservoir = reservoir;
 			return selected_light_context;	
-		}
-		case LightSampleMode::Uniform: // [passthrough]
-		default:
-		{
-			uint light_index = min(RandomFloat01(ioPathContext.mRandomState) * mConstants.mLightCount, mConstants.mLightCount - 1);
-			LightContext light_context = LightEvaluation::GenerateContext(LightEvaluation::ContextType::Random, 0, light_index, inLitPositionWS, ioPathContext);
-			float target_pdf = 1.0;
-			float sample_pdf = light_context.UniformSelectionPDF();
-			light_context.mReservoir.mWeightSum = target_pdf / sample_pdf;
-
-			// Setup reservoir as if ReSTIR with only 1 initial sample
-			selected_light_context = light_context;
-			selected_light_context.mReservoir.mCountSum = 1;
-			return selected_light_context;
 		}
 		}
 	}

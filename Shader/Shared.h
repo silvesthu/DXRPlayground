@@ -359,7 +359,7 @@ enum class LightSourceMode : uint
 enum class LightSampleMode : uint
 {
 	Uniform = 0,
-	WRS,
+	RIS,
 	ReSTIR,
 
 	Count,

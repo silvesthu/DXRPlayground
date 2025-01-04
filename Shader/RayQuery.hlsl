@@ -173,7 +173,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 					DebugValue(DebugMode::LightIndex, path_context.mRecursionDepth, light_context.LightIndex());
 					
 					float light_uniform_pdf						= light_context.mSolidAnglePDF * light_context.UniformSelectionPDF(); // [TODO] Unify MIS (with BRDF sample) to use same mis weight
-					float light_weight							= light_context.StochasticWeight();
+					float light_weight							= light_context.mSolidAnglePDF <= 0.0 ? 0.0 : (light_context.SelectionWeight() / light_context.mSolidAnglePDF);
 					// light_weight								= 1.0 / light_uniform_pdf; // for uniform sample debugging
 
 					DebugValue(DebugMode::RIS_SAMPLE,	path_context.mRecursionDepth, float3(light_context.mReservoir.mTargetPDF, 0.0, 0.0));
