@@ -366,7 +366,7 @@ static void sPrepareImGui()
 		{
 			for (int i = 0; i < kScenePresets.size(); i++)
 			{
-				if (std::filesystem::exists(kScenePresets[i].mPath))
+				if (!kScenePresets[i].mName.empty())
 					ImGui::RadioButton(kScenePresets[i].mName.data(), &sCurrentSceneIndex, i);
 			}
 

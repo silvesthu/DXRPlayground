@@ -598,10 +598,10 @@ void Atmosphere::ImGuiShowMenus()
 
 void Atmosphere::ImGuiShowTextures()
 {
-	ImGui::Textures(mRuntime.mBruneton17.mTextures,					"Atmosphere.Bruneton17",				ImGuiTreeNodeFlags_None);
-	ImGui::Textures(mRuntime.mHillaire20.mTextures,					"Atmosphere.Hillaire20",				ImGuiTreeNodeFlags_None);
-	ImGui::Textures(mRuntime.mHillaire20.mValidationTextures,		"Atmosphere.Hillaire20.Validation",		ImGuiTreeNodeFlags_None);
-	ImGui::Textures(mRuntime.mWilkie21.mTextures,					"Atmosphere.Wilkie21",					ImGuiTreeNodeFlags_None);
+	ImGui::Textures(mRuntime.mBruneton17.mTextures,					"Atmosphere.Bruneton17",											ImGuiTreeNodeFlags_None);
+	ImGui::Textures(mRuntime.mHillaire20.mTextures,					"Atmosphere.Hillaire20",											ImGuiTreeNodeFlags_None);
+	ImGui::Textures(mRuntime.mHillaire20.mValidationTextures,		"Atmosphere.Hillaire20.Validation (Requires Hillaire20 scene)",		ImGuiTreeNodeFlags_None);
+	ImGui::Textures(mRuntime.mWilkie21.mTextures,					"Atmosphere.Wilkie21",												ImGuiTreeNodeFlags_None);
 }
 
 Atmosphere gAtmosphere;
