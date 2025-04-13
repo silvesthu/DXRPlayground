@@ -607,7 +607,7 @@ struct AtmosphereConstants
 	float						mSunAngularRadius				CONSTANT_DEFAULT(0);
 
 	uint						mHillaire20SkyViewInLuminance	CONSTANT_DEFAULT(0);
-	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	float						mSunDiskLuminanceScale			CONSTANT_DEFAULT(1.0f);
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 

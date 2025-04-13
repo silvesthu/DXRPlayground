@@ -232,7 +232,7 @@ float3 GetSkyLuminance(Ray inRayWS)
 		// static const float kSunSolidAngle = 6.8E-5;
 		static const float kSunSolidAngle = 6.8E-5;
 		static const float kSolarRadianceScale = 1E-5; // Limit radiance to prevent fireflies...		
-		float3 solar_radiance = mConstants.mAtmosphere.mSolarIrradiance / kSunSolidAngle * kSolarRadianceScale;
+		float3 solar_radiance = mConstants.mAtmosphere.mSolarIrradiance * mConstants.mAtmosphere.mSunDiskLuminanceScale / kSunSolidAngle * kSolarRadianceScale;
 		radiance = radiance + transmittance_to_top * solar_radiance;
 	}
 

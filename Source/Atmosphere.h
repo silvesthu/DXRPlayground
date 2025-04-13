@@ -148,7 +148,9 @@ public:
 
 				// [TODO] Different from paper?
 				profile.mMieExtinctionCoefficient = kMieAngstromBeta / kMieScaleHeight * glm::pow(profile.kLambda, glm::dvec3(-kMieAngstromAlpha)); // km^-1
+				profile.mMieExtinctionCoefficientScale = 1.0;
 				profile.mMieScatteringCoefficient = profile.mMieExtinctionCoefficient * kMieSingleScatteringAlbedo; // km^-1
+				profile.mMieScatteringCoefficientScale = 1.0;
 
 				profile.mMiePhaseFunctionG = 0.8;
 
@@ -165,7 +167,9 @@ public:
 				Bruneton17(profile);
 
 				profile.mMieScatteringCoefficient = glm::dvec3(20.0, 20.0, 20.0) * 1e-3; // km^-1
+				profile.mMieExtinctionCoefficientScale = 1.0;
 				profile.mMieExtinctionCoefficient = profile.mMieScatteringCoefficient / 0.9; // km^-1
+				profile.mMieScatteringCoefficientScale = 1.0;
 
 				profile.mMiePhaseFunctionG = 0.76;
 			}
@@ -182,7 +186,9 @@ public:
 				Bruneton17(profile);
 
 				profile.mMieScatteringCoefficient = glm::dvec3(0.003996f, 0.003996f, 0.003996f); // km^-1
+				profile.mMieExtinctionCoefficientScale = 1.0;
 				profile.mMieExtinctionCoefficient = glm::dvec3(0.004440f, 0.004440f, 0.004440f); // km^-1
+				profile.mMieScatteringCoefficientScale = 1.0;
 
 				profile.mMiePhaseFunctionG = 0.8;
 			}
@@ -190,7 +196,9 @@ public:
 		bool mEnableMie										= {};
 		DensityProfile mMieDensityProfile					= {}; // km
 		glm::dvec3 mMieScatteringCoefficient				= {}; // km^-1
+		double mMieScatteringCoefficientScale				= 1.0f;
 		glm::dvec3 mMieExtinctionCoefficient				= {}; // km^-1
+		double mMieExtinctionCoefficientScale				= 1.0f;
 		double mMiePhaseFunctionG							= {};
 
 		// Ozone 
@@ -275,6 +283,8 @@ public:
 		// https://sciencing.com/calculate-angular-diameter-sun-8592633.html
 		// Angular Radius = Angular Diameter / 2.0 = arctan(Sun radius / Sun-Earth distance)
 		double kSunAngularRadius							= 0.00935f / 2.0f; // Radian, from [Bruneton17] demo.cc
+
+		float mSunDiskLuminanceScale						= 1.0f;
 
 		// Ground
 		struct GroundReference

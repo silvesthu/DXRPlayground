@@ -50,6 +50,7 @@ void Atmosphere::UpdateProfile()
 	constants.mAerialPerspective				= mRuntime.mAerialPerspective ? 1 : 0;
 	constants.mGroundAlbedo						= mProfile.mGroundAlbedo;
 	constants.mRuntimeGroundAlbedo				= mProfile.mRuntimeGroundAlbedo;
+	constants.mSunDiskLuminanceScale			= mProfile.mSunDiskLuminanceScale;
 
 	// Density Profile
 	{
@@ -68,10 +69,10 @@ void Atmosphere::UpdateProfile()
 		// Mie
 		{
 			// Scattering Coefficient
-			constants.mMieScattering			= mProfile.mEnableMie ? mProfile.mMieScatteringCoefficient : glm::dvec3(1e-9);
+			constants.mMieScattering			= mProfile.mEnableMie ? (mProfile.mMieScatteringCoefficient * mProfile.mMieScatteringCoefficientScale) : glm::dvec3(1e-9);
 
 			// Extinction Coefficient
-			constants.mMieExtinction			= mProfile.mEnableMie ? mProfile.mMieExtinctionCoefficient : glm::dvec3(1e-9);
+			constants.mMieExtinction			= mProfile.mEnableMie ? (mProfile.mMieExtinctionCoefficient * mProfile.mMieExtinctionCoefficientScale) : glm::dvec3(1e-9);
 
 			// Phase function
 			constants.mMiePhaseFunctionG		= static_cast<float>(mProfile.mMiePhaseFunctionG);
@@ -388,6 +389,8 @@ void Atmosphere::ImGuiShowMenus()
 		ImGui::SameLine();
 		if (ImGui::SmallButton("Hillaire20")) Profile::SolarIrradianceReference::Hillaire20(mProfile);
 
+		ImGui::SliderFloat("Sun Disk Luminance Scale", &mProfile.mSunDiskLuminanceScale, 0.0f, 100.0f);
+
 		ImGui::TreePop();
 	}
 
@@ -498,7 +501,9 @@ void Atmosphere::ImGuiShowMenus()
 			ImGui::Checkbox("Enable", &mProfile.mEnableMie);
 
 			ImGui::SliderDouble3("Extinction (/km)", &mProfile.mMieExtinctionCoefficient[0], 1.0e-5, 1.0e-1, "%.3e");
+			ImGui::SliderDouble("Extinction Scale", &mProfile.mMieExtinctionCoefficientScale, 1.0, 100.0, "%.3e");
 			ImGui::SliderDouble3("Scattering (/km)", &mProfile.mMieScatteringCoefficient[0], 1.0e-5, 1.0e-1, "%.3e");
+			ImGui::SliderDouble("Scattering Scale", &mProfile.mMieScatteringCoefficientScale, 1.0, 100.0, "%.3e");
 			ImGui::SliderDouble("Phase Function G", &mProfile.mMiePhaseFunctionG, -1.0f, 1.0f);
 
 			DensityPlot plot;

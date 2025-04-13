@@ -16,6 +16,17 @@ template <typename T> T remap(T x, T a, T b, T c, T d)          { return (((x - 
 float qnan()                                                    { return asfloat(0x7fc00000); }
 float inf()                                                     { return asfloat(0x7f800000); }
 
+// Hash.ush, originally from MurmurHash, thus the name
+uint MurmurMix(uint Hash)
+{
+    Hash ^= Hash >> 16;
+    Hash *= 0x85ebca6b;
+    Hash ^= Hash >> 13;
+    Hash *= 0xc2b2ae35;
+    Hash ^= Hash >> 16;
+    return Hash;
+}
+
 // From https://www.shadertoy.com/view/tsBBWW
 uint wang_hash(inout uint seed)
 {
@@ -79,6 +90,21 @@ float3 hsv2rgb( in float3 c )
     rgb = rgb*rgb*(3.0-2.0*rgb); // cubic smoothing 
 
     return c.z * lerp(1.0, rgb, c.y);
+}
+
+// Visualization.ush
+float3 IntToColor(uint Index)
+{
+    uint Hash = MurmurMix(Index);
+
+    float3 Color = float3
+    (
+        (Hash >> 0) & 255,
+        (Hash >> 8) & 255,
+        (Hash >> 16) & 255
+    );
+
+    return Color * (1.0f / 255.0f);
 }
 
 bool IntersectRaySphere(float3 origin, float3 direction, float3 center, float radius, out float2 distance)
