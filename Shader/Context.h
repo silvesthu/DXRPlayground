@@ -155,7 +155,7 @@ struct Ray
 		return ray;
 	}
 	
-	float3			TargetWS()					{ return mOrigin + mDirection * mTCurrent; }
+	float3			Target()					{ return mOrigin + mDirection * mTCurrent; }
 	
 	float3			mOrigin;
 	float3			mDirection;
@@ -185,7 +185,7 @@ struct HitContext : SurfaceContext
 		return hit_context;
 	}
 	
-	float3			PositionWS()				{ return mRayWS.TargetWS(); }
+	float3			PositionWS()				{ return mRayWS.Target(); }
 	float3			DirectionWS()				{ return mRayWS.mDirection; }
 	float3			ViewWS()					{ return -mRayWS.mDirection; }
 	float3			NormalWS()

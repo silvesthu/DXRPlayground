@@ -147,16 +147,18 @@ float2 UV_to_XY(float2 uv, Texture2D<float4> texture) // GetUnitRangeFromTexture
 #include "AtmosphereIntegration.Wilkie21.h"
 #include "AtmosphereIntegration.Raymarch.h"
 
-void GetSunAndSkyIrradiance(float3 inHitPosition, float3 inNormal, out float3 outSunIrradiance, out float3 outSkyIrradiance)
+void GetSunAndSkyIrradiance(float3 inPositionWS, float3 inNormal, out float3 outSunIrradiance, out float3 outSkyIrradiance)
 {
 	outSunIrradiance = 0;
 	outSkyIrradiance = 0;
+
+	float3 position_PS = PositionWS2PS(inPositionWS);
 
 	switch (GetAtmosphereMode())
 	{
 	case AtmosphereMode::ConstantColor:				break; // Not supported
 	case AtmosphereMode::Raymarch:					break; // Not supported
-	case AtmosphereMode::Bruneton17: 				AtmosphereIntegration::Bruneton17::GetSunAndSkyIrradiance(inHitPosition, inNormal, outSunIrradiance, outSkyIrradiance); break;
+	case AtmosphereMode::Bruneton17: 				AtmosphereIntegration::Bruneton17::GetSunAndSkyIrradiance(position_PS, inNormal, outSunIrradiance, outSkyIrradiance); break;
 	case AtmosphereMode::Hillaire20: 				break; // [TODO]
 	default: break;
 	}

@@ -12,6 +12,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <CopyFileToFolders Include="Shader\Context.h" />
     <ClInclude Include="Source\ImGuizmo\ImGuizmoExt.h" />
     <ClInclude Include="Source\Thirdparty\glm.h" />
     <ClInclude Include="Source\Thirdparty\ImGuizmo\example\ImApp.h" />
@@ -193,6 +194,12 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+    <CopyFileToFolders Include="Shader\packing.hlsli">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Shader\utils.hlsli">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="Source\Thirdparty\glm\util\glm.natvis" />

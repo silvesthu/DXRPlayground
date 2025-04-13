@@ -279,6 +279,8 @@
     <ClInclude Include="Source\Thirdparty\ImGuizmo\ImGuizmo.cpp">
       <Filter>Source\Thirdparty\ImGuizmo</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Thirdparty\tinyexr.h" />
+    <ClInclude Include="Source\Thirdparty\tinyexr\tinyexr.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\DXRPlayground.cpp">
@@ -338,9 +340,6 @@
     <ClCompile Include="Source\Thirdparty\tinyxml2\tinyxml2.cpp">
       <Filter>Source\Thirdparty\tinyxml2</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Thirdparty.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Thirdparty\ImGuizmo\ImGradient.cpp">
       <Filter>Source\Thirdparty\ImGuizmo</Filter>
     </ClCompile>
@@ -356,6 +355,7 @@
     <ClCompile Include="Source\ImGuizmo\ImGuizmoExt.cpp">
       <Filter>Source\ImGuizmo</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Thirdparty\Thirdparty.cpp" />
   </ItemGroup>
   <ItemGroup>
     <CopyFileToFolders Include="Shader\Common.h">
@@ -397,9 +397,6 @@
     <CopyFileToFolders Include="Shader\Cloud.hlsl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\RayQuery.h">
-      <Filter>Shader</Filter>
-    </CopyFileToFolders>
     <CopyFileToFolders Include="Shader\Binding.h">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
@@ -439,6 +436,9 @@
     <CopyFileToFolders Include="Shader\PrepareLights.hlsl">
       <Filter>Shader</Filter>
     </CopyFileToFolders>
+    <CopyFileToFolders Include="Shader\utils.hlsli" />
+    <CopyFileToFolders Include="Shader\packing.hlsli" />
+    <CopyFileToFolders Include="Shader\Context.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

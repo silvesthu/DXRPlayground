@@ -4,8 +4,8 @@
 
 float3 PositionWS2PS(float3 inPositionWS)
 {
-	float3 origin = inPositionWS * mConstants.mAtmosphere.mSceneScale;
-    return origin;
+	float3 position = inPositionWS * mConstants.mAtmosphere.mSceneScale;
+    return position;
 }
 
 float3 DirectionWS2PS(float3 inDirectionWS)

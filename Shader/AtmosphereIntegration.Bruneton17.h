@@ -1072,7 +1072,7 @@ void GetSkyRadiance(Ray inRayPS, out float3 outSkyRadiance, out float3 outTransm
 
 void GetSkyRadianceToPoint(Ray inRayPS, out float3 outSkyRadiance, out float3 outTransmittance)
 {
-	float3 hit_position = inRayPS.TargetWS() - PlanetCenterPositionPS();
+	float3 hit_position = inRayPS.Target() - PlanetCenterPositionPS();
 	float3 camera = inRayPS.mOrigin - PlanetCenterPositionPS();
 	float3 sun_direction = GetSunDirection();
 
@@ -1149,9 +1149,9 @@ void GetSkyRadianceToPoint(Ray inRayPS, out float3 outSkyRadiance, out float3 ou
 	outSkyRadiance *= mConstants.mAtmosphere.mSolarIrradiance;
 }
 
-void GetSunAndSkyIrradiance(float3 inHitPosition, float3 inNormal, out float3 outSunIrradiance, out float3 outSkyIrradiance)
+void GetSunAndSkyIrradiance(float3 inPositionPS, float3 inNormal, out float3 outSunIrradiance, out float3 outSkyIrradiance)
 {
-	float3 local_position = inHitPosition - PlanetCenterPositionPS();
+	float3 local_position = inPositionPS - PlanetCenterPositionPS();
 	float3 sun_direction = GetSunDirection();
 
 	float r = length(local_position);

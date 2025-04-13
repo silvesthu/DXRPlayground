@@ -817,9 +817,7 @@ void SkyViewLut(
 	float2 pixPos = inDispatchThreadID.xy + 0.5; 		// half pixel offset
 	float2 uv = pixPos / dimensions;
 
-	float3 camera_position = mConstants.CameraPosition().xyz * mConstants.mAtmosphere.mSceneScale;
-	camera_position.y = max(camera_position.y, 1.0 * mConstants.mAtmosphere.mSceneScale); // Keep observer position above ground
-	float3 WorldPos = camera_position - PlanetCenterPositionPS();
+	float3 WorldPos = PositionWS2PS(mConstants.CameraPosition().xyz) - PlanetCenterPositionPS();
 	float viewHeight = length(WorldPos);
 
 	float viewZenithCosAngle;
