@@ -694,7 +694,7 @@ bool Scene::LoadGLTF(const std::string& inFilename, SceneContent& ioSceneContent
 			mat4x4 T = translate(vec3((float)inNode.translation[0], (float)inNode.translation[1], (float)inNode.translation[2]));
 			mat4x4 R = toMat4(quat((float)inNode.rotation[3], (float)inNode.rotation[0], (float)inNode.rotation[1], (float)inNode.rotation[2]));
 			mat4x4 S = scale(vec3((float)inNode.scale[0], (float)inNode.scale[1], (float)inNode.scale[2]));
-			matrix = T * R * S;
+			matrix = matrix * T * R * S;
 
 			Mesh mesh = model.meshes[inNode.mesh];
 
@@ -820,15 +820,15 @@ bool Scene::LoadGLTF(const std::string& inFilename, SceneContent& ioSceneContent
 			return matrix;
 		};
 
-	for (int node_index : model.scenes[model.defaultScene].nodes)
+	auto visit_node_and_children = [&](const auto &self, Node& inNode, mat4x4 inParentMatrix) -> void
 	{
-		Node& node = model.nodes[node_index];
+		mat4x4 matrix = visit_node(inNode, inParentMatrix);
+		for (int child_node_index : inNode.children)
+			self(self, model.nodes[child_node_index], matrix);
+	};
 
-		mat4x4 matrix = visit_node(node, mat4x4(1.0f));
-
-		for (int child_node_index : node.children)
-			visit_node(model.nodes[child_node_index], matrix);
-	}
+	for (int node_index : model.scenes[model.defaultScene].nodes)
+		visit_node_and_children(visit_node_and_children, model.nodes[node_index], mat4x4(1.0f));
 
 	return ret;
 }

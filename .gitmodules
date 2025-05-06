@@ -35,3 +35,6 @@
 [submodule "Source/Thirdparty/SHforHLSL"]
 	path = Source/Thirdparty/SHforHLSL
 	url = https://github.com/TheRealMJP/SHforHLSL.git
+[submodule "Asset/Comparison/RTXDI-Assets"]
+	path = Asset/Comparison/RTXDI-Assets
+	url = https://github.com/NVIDIA-RTX/RTXDI-Assets.git

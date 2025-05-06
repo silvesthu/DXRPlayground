@@ -61,7 +61,7 @@ static const std::array kScenePresets =
 
 	// RIS and ReSTIR
 	ScenePreset().Name("VeachMISManyLight").Path("Asset/Comparison/benedikt-bitterli/veach-mis-manylight/scene_ggx_v3.xml").EmissionBoost(1E4f),
-	ScenePreset().Name("Arcade").Path("Asset/Comparison/RTXDI/Arcade/Arcade.gltf").CameraPosition(glm::vec4(-1.658f, 1.577f, 1.69f, 0.0f)).CameraDirection(glm::vec4(-0.9645f, 1.2672f, 1.0396f, 0.0f) - glm::vec4(-1.658f, 1.577f, 1.69f, 0.0f)).EmissionBoost(1E6f),
+	ScenePreset().Name("Arcade").Path("Asset/Comparison/RTXDI-Assets/Arcade/Arcade.gltf").CameraPosition(glm::vec4(-1.658f, 1.577f, 1.69f, 0.0f)).CameraDirection(glm::vec4(-0.9645f, 1.2672f, 1.0396f, 0.0f) - glm::vec4(-1.658f, 1.577f, 1.69f, 0.0f)).EmissionBoost(1E6f),
 
 	// Simple scenes
 	ScenePreset().Name("Dragon").Path("Asset/Comparison/benedikt-bitterli/dragon/scene_v3.xml").EmissionBoost(1E4f),
@@ -70,6 +70,7 @@ static const std::array kScenePresets =
 	ScenePreset().Name("LivingRoom2").Path("Asset/Comparison/benedikt-bitterli/living-room-2/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("VeachAjar").Path("Asset/Comparison/benedikt-bitterli/veach-ajar/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("VeachBidir").Path("Asset/Comparison/benedikt-bitterli/veach-bidir/scene_v3.xml").EmissionBoost(1E4f),
+	ScenePreset().Name("Bistro").Path("Asset/Comaprison/RTXDI-Assets/bistro/bistro.gltf").CameraPosition(glm::vec4(-1.658f, 1.577f, 1.69f, 0.0f)).CameraDirection(glm::vec4(-0.9645f, 1.2672f, 1.0396f, 0.0f) - glm::vec4(-1.658f, 1.577f, 1.69f, 0.0f)).EmissionBoost(1E6f),
 	
 	// Atmosphere
 	ScenePreset().Name("Bruneton17").Path("Asset/primitives/sphere.obj").CameraPosition(glm::vec4(0.0f, 0.0f, 9.0f, 0.0f)).CameraDirection(glm::vec4(0.0f, 0.0f, -1.0f, 0.0f)).Transform(glm::translate(glm::vec3(0.0f, 1.0f, 0.0f))).Atmosphere(AtmosphereMode::Bruneton17),
