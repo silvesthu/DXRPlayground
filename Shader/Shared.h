@@ -379,7 +379,8 @@ enum class BSDF : uint
 	// Plastic	
 	// Roughplastic
 
-	glTF,					// https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-material
+	pbrMetallicRoughness,	// https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-material-pbrmetallicroughness
+	pbrSpecularGlossiness,	// https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Archived/KHR_materials_pbrSpecularGlossiness/README.md
 
 	Unsupported,			// Fallback to Diffuse
 

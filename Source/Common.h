@@ -511,8 +511,8 @@ struct FrameContext
 
 	uint64_t								mFenceValue = 0;
 
-	DescriptorHeap<ViewDescriptorIndex>		mViewDescriptorHeap			{ .mType = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, .mCount = 4096 };
-	DescriptorHeap<SamplerDescriptorIndex>	mSamplerDescriptorHeap		{ .mType = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, .mCount = 128 };
+	DescriptorHeap<ViewDescriptorIndex>		mViewDescriptorHeap			{ .mType = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, .mCount = 1000000 };
+	DescriptorHeap<SamplerDescriptorIndex>	mSamplerDescriptorHeap		{ .mType = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, .mCount = 2048 };
 
 	// For ClearUnorderedAccessViewFloat, what is the best practice for this? Create on the fly?
 	DescriptorHeap<ViewDescriptorIndex>		mClearDescriptorHeap		{ .mType = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, .mCount = 4096, .mForceCPU = true };

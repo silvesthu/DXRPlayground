@@ -777,9 +777,14 @@ bool Scene::LoadGLTF(const std::string& inFilename, SceneContent& ioSceneContent
 					return std::filesystem::path();
 
 				std::filesystem::path path = inFilename;
-				path.replace_filename(std::filesystem::path(model.images[model.textures[inIndex].source].uri));
+				auto dds = model.textures[inIndex].extensions.find("MSFT_texture_dds");
+				if (dds != model.textures[inIndex].extensions.end())
+					path.replace_filename(std::filesystem::path(model.images[dds->second.Get("source").GetNumberAsInt()].uri));
+				else
+					path.replace_filename(std::filesystem::path(model.images[model.textures[inIndex].source].uri));
 				return path;
 			};
+
 			InstanceInfo instance_info =
 			{
 				.mName = std::format("{} - {}", ioName, mesh.name),
@@ -790,11 +795,27 @@ bool Scene::LoadGLTF(const std::string& inFilename, SceneContent& ioSceneContent
 				.mRoughnessTexture = get_texture_path(material.pbrMetallicRoughness.metallicRoughnessTexture.index),
 				.mEmissionTexture = get_texture_path(material.emissiveTexture.index),
 			};
+
+			auto pbr_specular_glossiness = material.extensions.find("KHR_materials_pbrSpecularGlossiness");
+			if (pbr_specular_glossiness != material.extensions.end())
+			{
+				auto diffuseTexture = pbr_specular_glossiness->second.Get("diffuseTexture");
+				if (diffuseTexture.IsObject())
+					instance_info.mAlbedoTexture = { .mPath = get_texture_path(diffuseTexture.Get("index").GetNumberAsInt()) };
+				
+				auto specularGlossinessTexture = pbr_specular_glossiness->second.Get("specularGlossinessTexture");
+				if (specularGlossinessTexture.IsObject())
+				{
+					instance_info.mReflectanceTexture = { .mPath = get_texture_path(specularGlossinessTexture.Get("index").GetNumberAsInt()) };
+					instance_info.mRoughnessTexture = { .mPath = get_texture_path(specularGlossinessTexture.Get("index").GetNumberAsInt()) };
+				}
+			}
+			
 			ioSceneContent.mInstanceInfos.push_back(instance_info);
 
 			InstanceData instance_data =
 			{
-				.mBSDF = BSDF::glTF,
+				.mBSDF = BSDF::pbrMetallicRoughness,
 				.mTwoSided = material.doubleSided,
 				.mRoughnessAlpha = static_cast<float>(material.pbrMetallicRoughness.roughnessFactor),
 				.mAlbedo = vec3(material.pbrMetallicRoughness.baseColorFactor[0], material.pbrMetallicRoughness.baseColorFactor[1], material.pbrMetallicRoughness.baseColorFactor[2]),
@@ -807,6 +828,26 @@ bool Scene::LoadGLTF(const std::string& inFilename, SceneContent& ioSceneContent
 				.mIndexOffset = index_offset,
 				.mIndexCount = index_count
 			};
+
+			if (pbr_specular_glossiness != material.extensions.end())
+			{
+				instance_data.mBSDF = BSDF::pbrSpecularGlossiness;
+
+				auto diffuseFactor = pbr_specular_glossiness->second.Get("diffuseFactor");
+				if (diffuseFactor.IsArray())
+					instance_data.mAlbedo = vec3(diffuseFactor.Get(0).GetNumberAsDouble(), diffuseFactor.Get(1).GetNumberAsDouble(), diffuseFactor.Get(2).GetNumberAsDouble());
+
+				// [TODO] Need proper conversion
+				
+				auto specularFactor = pbr_specular_glossiness->second.Get("specularFactor");
+				if (specularFactor.IsArray())
+					instance_data.mReflectance = vec3(specularFactor.Get(0).GetNumberAsDouble(), specularFactor.Get(1).GetNumberAsDouble(), specularFactor.Get(2).GetNumberAsDouble());
+
+				auto glossinessFactor = pbr_specular_glossiness->second.Get("glossinessFactor");
+				if (glossinessFactor.IsNumber())
+					instance_data.mRoughnessAlpha = static_cast<float>(glossinessFactor.GetNumberAsDouble());
+			}
+			
 			ioSceneContent.mInstanceDatas.push_back(instance_data);
 
 			if (glm::compMax(instance_data.mEmission) > 0.0f)
@@ -901,53 +942,60 @@ void Scene::Render()
 
 void Scene::InitializeTextures()
 {
-	std::map<std::string, Texture*> texture_map;
+	std::map<std::string, int> texture_map;
 	for (int i = 0; i < mSceneContent.mInstanceDatas.size(); i++)
 	{
 		InstanceInfo& instance_info = mSceneContent.mInstanceInfos[i];
 		InstanceData& instance_data = mSceneContent.mInstanceDatas[i];
 
 		auto get_texture_index = [&](InstanceInfo::Texture& inTexture, bool inSRGB) -> TextureInfo
+		{
+			if (inTexture.empty())
+				return {};
+
+			uint sampler_index = inTexture.mPointSampler ? (uint)SamplerDescriptorIndex::PointWrap : (uint)SamplerDescriptorIndex::BilinearWrap;
+
+			auto iter = texture_map.find(inTexture.string());
+			if (iter != texture_map.end())
+				return { .mTextureIndex = (uint)mTextures[iter->second].mSRVIndex, .mSamplerIndex = sampler_index };
+
+			DXGI_FORMAT format = inSRGB ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM;
+			int x = 0, y = 0, n = 0;
+			float* exr_data = nullptr;
+			if (inTexture.string().ends_with(".exr"))
 			{
-				if (inTexture.empty())
+				const char* err = nullptr;
+				if (LoadEXR(&exr_data, &x, &y, inTexture.string().c_str(), &err) != TINYEXR_SUCCESS)
 					return {};
+				format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+			}
+			else if (inTexture.string().ends_with(".dds"))
+			{
+				DirectX::TexMetadata metadata;
+				if (FAILED(DirectX::GetMetadataFromDDSFile(inTexture.wstring().c_str(), DirectX::DDS_FLAGS_NONE, metadata)))
+					return {};
+				x = static_cast<int>(metadata.width);
+				y = static_cast<int>(metadata.height);
+				format = metadata.format;
+			}
+			else
+			{
+				if (stbi_info(inTexture.string().c_str(), &x, &y, &n) == 0)
+					return {};
+			}
 
-				uint sampler_index = inTexture.mPointSampler ? (uint)SamplerDescriptorIndex::PointWrap : (uint)SamplerDescriptorIndex::BilinearWrap;
+			mTextures.push_back({});
+			Texture& texture = mTextures.back();
+			texture.Width(x).Height(y).
+				Format(format).
+				SRVIndex(ViewDescriptorIndex((uint)ViewDescriptorIndex::SceneAutoSRV + mNextSRVIndex++)).
+				Name(inTexture.filename().string().c_str()).
+				Path(inTexture.wstring());
+			texture.mEXRData = exr_data;
+			texture_map[inTexture.string()] = static_cast<int>(mTextures.size() - 1);
 
-				auto iter = texture_map.find(inTexture.string());
-				if (iter != texture_map.end())
-				{
-					return { .mTextureIndex = (uint)iter->second->mSRVIndex, .mSamplerIndex = sampler_index };
-				}
-
-				DXGI_FORMAT format = inSRGB ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM;
-				int x = 0, y = 0, n = 0;
-				float* exr_data = nullptr;
-				if (inTexture.string().ends_with(".exr"))
-				{
-					const char* err = nullptr;
-					if (LoadEXR(&exr_data, &x, &y, inTexture.string().c_str(), &err) != TINYEXR_SUCCESS)
-						return {};
-					format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-				}
-				else
-				{
-					if (stbi_info(inTexture.string().c_str(), &x, &y, &n) == 0)
-						return {};
-				}
-
-				mTextures.push_back({});
-				Texture& texture = mTextures.back();
-				texture.Width(x).Height(y).
-					Format(format).
-					SRVIndex(ViewDescriptorIndex((uint)ViewDescriptorIndex::SceneAutoSRV + mNextSRVIndex++)).
-					Name(inTexture.filename().string().c_str()).
-					Path(inTexture.wstring());
-				texture.mEXRData = exr_data;
-				texture_map[inTexture.string()] = &texture;
-
-				return { .mTextureIndex = (uint)texture.mSRVIndex, .mSamplerIndex = sampler_index };
-			};
+			return { .mTextureIndex = (uint)texture.mSRVIndex, .mSamplerIndex = sampler_index };
+		};
 
 		instance_data.mAlbedoTexture = get_texture_index(instance_info.mAlbedoTexture, true);
 		instance_data.mReflectanceTexture = get_texture_index(instance_info.mReflectanceTexture, false);

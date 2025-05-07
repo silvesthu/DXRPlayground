@@ -442,7 +442,7 @@ namespace BSDFEvaluation
 		case BSDF::Dielectric:					bsdf_context = Dielectric::GenerateContext(inHitContext, ioPathContext); break;
 		case BSDF::ThinDielectric:				bsdf_context = Dielectric::GenerateContext(inHitContext, ioPathContext); break;
 		case BSDF::RoughDielectric:				bsdf_context = RoughDielectric::GenerateContext(inHitContext, ioPathContext); break;
-		case BSDF::glTF:						bsdf_context = glTF::GenerateContext(inHitContext, ioPathContext); break;
+		case BSDF::pbrMetallicRoughness:						bsdf_context = glTF::GenerateContext(inHitContext, ioPathContext); break;
 		default:								bsdf_context = Diffuse::GenerateContext(inHitContext, ioPathContext); break;
 		}
 
@@ -465,7 +465,7 @@ namespace BSDFEvaluation
 		case BSDF::Dielectric:					result = Dielectric::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
 		case BSDF::ThinDielectric:				result = Dielectric::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
 		case BSDF::RoughDielectric:				result = RoughDielectric::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
-		case BSDF::glTF:						result = glTF::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
+		case BSDF::pbrMetallicRoughness:						result = glTF::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
 		case BSDF::Unsupported:					result = Diffuse::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
 		default:								result = Diffuse::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
 		}
