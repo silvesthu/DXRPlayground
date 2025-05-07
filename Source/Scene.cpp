@@ -684,151 +684,150 @@ bool Scene::LoadGLTF(const std::string& inFilename, SceneContent& ioSceneContent
 		return ret;
 	}
 
-	auto visit_node = [&](Node& inNode, mat4x4 inParentMatrix)
+	auto visit_node = [&](const Node& inNode, std::string& ioName, mat4x4& ioMatrix)
+	{
+		mat4x4 T = translate(vec3((float)inNode.translation[0], (float)inNode.translation[1], (float)inNode.translation[2]));
+		mat4x4 R = toMat4(quat((float)inNode.rotation[3], (float)inNode.rotation[0], (float)inNode.rotation[1], (float)inNode.rotation[2]));
+		mat4x4 S = scale(vec3((float)inNode.scale[0], (float)inNode.scale[1], (float)inNode.scale[2]));
+		ioMatrix = ioMatrix * (T * R * S);
+		ioName = std::format("{}.{}", ioName, inNode.name);
+
+		if (inNode.mesh == -1)
+			return;
+
+		Mesh mesh = model.meshes[inNode.mesh];
+
+		for (auto&& primitive : mesh.primitives)
 		{
-			mat4x4 matrix = inParentMatrix;
+			gAssert(primitive.mode == TINYGLTF_MODE_TRIANGLES);
 
-			if (inNode.mesh == -1)
-				return matrix;
+			auto position_attribute = primitive.attributes.find("POSITION");
+			gAssert(position_attribute != primitive.attributes.end());
+			auto normal_attribute = primitive.attributes.find("NORMAL");
+			gAssert(normal_attribute != primitive.attributes.end());
+			auto uv_attribute = primitive.attributes.find("TEXCOORD_0");
+			gAssert(uv_attribute != primitive.attributes.end());
 
-			mat4x4 T = translate(vec3((float)inNode.translation[0], (float)inNode.translation[1], (float)inNode.translation[2]));
-			mat4x4 R = toMat4(quat((float)inNode.rotation[3], (float)inNode.rotation[0], (float)inNode.rotation[1], (float)inNode.rotation[2]));
-			mat4x4 S = scale(vec3((float)inNode.scale[0], (float)inNode.scale[1], (float)inNode.scale[2]));
-			matrix = matrix * T * R * S;
+			Accessor position_accessor = model.accessors[position_attribute->second];
+			uint8* position_data = model.buffers[model.bufferViews[position_accessor.bufferView].buffer].data.data() + model.bufferViews[position_accessor.bufferView].byteOffset;
+			size_t position_stride = model.bufferViews[position_accessor.bufferView].byteStride;
+			position_stride = position_stride == 0 ? sizeof(vec3) : position_stride;
+			gAssert(position_accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT && position_accessor.type == TINYGLTF_TYPE_VEC3);
+			gAssert(position_stride * position_accessor.count == model.bufferViews[position_accessor.bufferView].byteLength);
 
-			Mesh mesh = model.meshes[inNode.mesh];
+			Accessor normal_accessor = model.accessors[normal_attribute->second];
+			uint8* normal_data = model.buffers[model.bufferViews[normal_accessor.bufferView].buffer].data.data() + model.bufferViews[normal_accessor.bufferView].byteOffset;
+			size_t normal_stride = model.bufferViews[normal_accessor.bufferView].byteStride;
+			normal_stride = normal_stride == 0 ? sizeof(vec3) : normal_stride;
+			gAssert(normal_accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT && normal_accessor.type == TINYGLTF_TYPE_VEC3);
+			gAssert(normal_stride * normal_accessor.count == model.bufferViews[normal_accessor.bufferView].byteLength);
 
-			for (auto&& primitive : mesh.primitives)
+			Accessor uv_accessor = model.accessors[uv_attribute->second];
+			uint8* uv_data = model.buffers[model.bufferViews[uv_accessor.bufferView].buffer].data.data() + model.bufferViews[uv_accessor.bufferView].byteOffset;
+			size_t uv_stride = model.bufferViews[uv_accessor.bufferView].byteStride;
+			uv_stride = uv_stride == 0 ? sizeof(vec2) : uv_stride;
+			gAssert(uv_accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT && uv_accessor.type == TINYGLTF_TYPE_VEC2);
+			gAssert(uv_stride * uv_accessor.count == model.bufferViews[uv_accessor.bufferView].byteLength);
+
+			gAssert(position_accessor.count == normal_accessor.count);
+			gAssert(position_accessor.count == uv_accessor.count);
+
+			uint vertex_offset = (uint)ioSceneContent.mVertices.size();
+			uint vertex_count = (uint)position_accessor.count;
+			for (uint i = 0; i < vertex_count; i++)
 			{
-				gAssert(primitive.mode == TINYGLTF_MODE_TRIANGLES);
+				VertexType vertex;
+				memcpy(&vertex, position_data + i * position_stride, sizeof(VertexType));
+				ioSceneContent.mVertices.push_back(vertex);
 
-				auto position_attribute = primitive.attributes.find("POSITION");
-				gAssert(position_attribute != primitive.attributes.end());
-				auto normal_attribute = primitive.attributes.find("NORMAL");
-				gAssert(normal_attribute != primitive.attributes.end());
-				auto uv_attribute = primitive.attributes.find("TEXCOORD_0");
-				gAssert(uv_attribute != primitive.attributes.end());
+				NormalType normal;
+				memcpy(&normal, normal_data + i * normal_stride, sizeof(NormalType));
+				ioSceneContent.mNormals.push_back(normal);
 
-				Accessor position_accessor = model.accessors[position_attribute->second];
-				uint8* position_data = model.buffers[model.bufferViews[position_accessor.bufferView].buffer].data.data() + model.bufferViews[position_accessor.bufferView].byteOffset;
-				size_t position_stride = model.bufferViews[position_accessor.bufferView].byteStride;
-				position_stride = position_stride == 0 ? sizeof(vec3) : position_stride;
-				gAssert(position_accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT && position_accessor.type == TINYGLTF_TYPE_VEC3);
-				gAssert(position_stride * position_accessor.count == model.bufferViews[position_accessor.bufferView].byteLength);
-
-				Accessor normal_accessor = model.accessors[normal_attribute->second];
-				uint8* normal_data = model.buffers[model.bufferViews[normal_accessor.bufferView].buffer].data.data() + model.bufferViews[normal_accessor.bufferView].byteOffset;
-				size_t normal_stride = model.bufferViews[normal_accessor.bufferView].byteStride;
-				normal_stride = normal_stride == 0 ? sizeof(vec3) : normal_stride;
-				gAssert(normal_accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT && normal_accessor.type == TINYGLTF_TYPE_VEC3);
-				gAssert(normal_stride * normal_accessor.count == model.bufferViews[normal_accessor.bufferView].byteLength);
-
-				Accessor uv_accessor = model.accessors[uv_attribute->second];
-				uint8* uv_data = model.buffers[model.bufferViews[uv_accessor.bufferView].buffer].data.data() + model.bufferViews[uv_accessor.bufferView].byteOffset;
-				size_t uv_stride = model.bufferViews[uv_accessor.bufferView].byteStride;
-				uv_stride = uv_stride == 0 ? sizeof(vec2) : uv_stride;
-				gAssert(uv_accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT && uv_accessor.type == TINYGLTF_TYPE_VEC2);
-				gAssert(uv_stride * uv_accessor.count == model.bufferViews[uv_accessor.bufferView].byteLength);
-
-				gAssert(position_accessor.count == normal_accessor.count);
-				gAssert(position_accessor.count == uv_accessor.count);
-
-				uint vertex_offset = (uint)ioSceneContent.mVertices.size();
-				uint vertex_count = (uint)position_accessor.count;
-				for (uint i = 0; i < vertex_count; i++)
-				{
-					VertexType vertex;
-					memcpy(&vertex, position_data + i * position_stride, sizeof(VertexType));
-					ioSceneContent.mVertices.push_back(vertex);
-
-					NormalType normal;
-					memcpy(&normal, normal_data + i * normal_stride, sizeof(NormalType));
-					ioSceneContent.mNormals.push_back(normal);
-
-					UVType uv;
-					memcpy(&uv, uv_data + i * uv_stride, sizeof(UVType));
-					ioSceneContent.mUVs.push_back(uv);
-				}
-
-				gAssert(primitive.indices != -1);
-				Accessor index_accessor = model.accessors[primitive.indices];
-				uint8* index_data = model.buffers[model.bufferViews[index_accessor.bufferView].buffer].data.data() + model.bufferViews[index_accessor.bufferView].byteOffset;
-				size_t index_stride = model.bufferViews[index_accessor.bufferView].byteStride;
-				gAssert(index_accessor.type == TINYGLTF_TYPE_SCALAR && index_stride == 0);
-
-				uint index_offset = (uint)ioSceneContent.mIndices.size();
-				uint index_count = (uint)index_accessor.count;
-				for (uint i = 0; i < index_count; i++)
-				{
-					IndexType index;
-					if (index_accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
-						index = *reinterpret_cast<uint16*>(index_data + i * sizeof(uint16));
-					else if (index_accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
-						index = *reinterpret_cast<uint32*>(index_data + i * sizeof(uint32));
-					else
-						gAssert(false);
-					ioSceneContent.mIndices.push_back(index);
-				}
-
-				Material material = model.materials[primitive.material];
-
-				auto get_texture_path = [&](int inIndex)
-				{
-					if (inIndex == -1)
-						return std::filesystem::path();
-
-					std::filesystem::path path = inFilename;
-					path.replace_filename(std::filesystem::path(model.images[model.textures[inIndex].source].uri));
-					return path;
-				};
-				InstanceInfo instance_info =
-				{
-					.mName = std::format("{} - {} - {}", inNode.name, mesh.name, material.name),
-					.mMaterialName = material.name,
-					.mAlbedoTexture = get_texture_path(material.pbrMetallicRoughness.baseColorTexture.index),
-					.mNormalTexture = get_texture_path(material.normalTexture.index),
-					.mReflectanceTexture = get_texture_path(material.pbrMetallicRoughness.metallicRoughnessTexture.index),
-					.mRoughnessTexture = get_texture_path(material.pbrMetallicRoughness.metallicRoughnessTexture.index),
-					.mEmissionTexture = get_texture_path(material.emissiveTexture.index),
-				};
-				ioSceneContent.mInstanceInfos.push_back(instance_info);
-
-				InstanceData instance_data =
-				{
-					.mBSDF = BSDF::glTF,
-					.mTwoSided = material.doubleSided,
-					.mRoughnessAlpha = static_cast<float>(material.pbrMetallicRoughness.roughnessFactor),
-					.mAlbedo = vec3(material.pbrMetallicRoughness.baseColorFactor[0], material.pbrMetallicRoughness.baseColorFactor[1], material.pbrMetallicRoughness.baseColorFactor[2]),
-					.mMetallic = static_cast<float>(material.pbrMetallicRoughness.metallicFactor),
-					.mEmission = vec3(material.emissiveFactor[0], material.emissiveFactor[1], material.emissiveFactor[2]),
-					.mTransform = matrix,
-					.mInverseTranspose = transpose(inverse(matrix)),
-					.mVertexOffset = vertex_offset,
-					.mVertexCount = vertex_count,
-					.mIndexOffset = index_offset,
-					.mIndexCount = index_count
-				};
-				ioSceneContent.mInstanceDatas.push_back(instance_data);
-
-				if (glm::compMax(instance_data.mEmission) > 0.0f)
-				{
-					ioSceneContent.mEmissiveInstances.push_back({ static_cast<uint>(ioSceneContent.mInstanceDatas.size()) - 1, ioSceneContent.mEmissiveTriangleCount, });
-					ioSceneContent.mEmissiveTriangleCount += index_count / kIndexCountPerTriangle;
-				}
+				UVType uv;
+				memcpy(&uv, uv_data + i * uv_stride, sizeof(UVType));
+				ioSceneContent.mUVs.push_back(uv);
 			}
 
-			return matrix;
-		};
+			gAssert(primitive.indices != -1);
+			Accessor index_accessor = model.accessors[primitive.indices];
+			uint8* index_data = model.buffers[model.bufferViews[index_accessor.bufferView].buffer].data.data() + model.bufferViews[index_accessor.bufferView].byteOffset;
+			size_t index_stride = model.bufferViews[index_accessor.bufferView].byteStride;
+			gAssert(index_accessor.type == TINYGLTF_TYPE_SCALAR && index_stride == 0);
 
-	auto visit_node_and_children = [&](const auto &self, Node& inNode, mat4x4 inParentMatrix) -> void
+			uint index_offset = (uint)ioSceneContent.mIndices.size();
+			uint index_count = (uint)index_accessor.count;
+			for (uint i = 0; i < index_count; i++)
+			{
+				IndexType index;
+				if (index_accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
+					index = *reinterpret_cast<uint16*>(index_data + i * sizeof(uint16));
+				else if (index_accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
+					index = *reinterpret_cast<uint32*>(index_data + i * sizeof(uint32));
+				else
+					gAssert(false);
+				ioSceneContent.mIndices.push_back(index);
+			}
+
+			Material material = model.materials[primitive.material];
+
+			auto get_texture_path = [&](int inIndex)
+			{
+				if (inIndex == -1)
+					return std::filesystem::path();
+
+				std::filesystem::path path = inFilename;
+				path.replace_filename(std::filesystem::path(model.images[model.textures[inIndex].source].uri));
+				return path;
+			};
+			InstanceInfo instance_info =
+			{
+				.mName = std::format("{} - {}", ioName, mesh.name),
+				.mMaterialName = material.name,
+				.mAlbedoTexture = get_texture_path(material.pbrMetallicRoughness.baseColorTexture.index),
+				.mNormalTexture = get_texture_path(material.normalTexture.index),
+				.mReflectanceTexture = get_texture_path(material.pbrMetallicRoughness.metallicRoughnessTexture.index),
+				.mRoughnessTexture = get_texture_path(material.pbrMetallicRoughness.metallicRoughnessTexture.index),
+				.mEmissionTexture = get_texture_path(material.emissiveTexture.index),
+			};
+			ioSceneContent.mInstanceInfos.push_back(instance_info);
+
+			InstanceData instance_data =
+			{
+				.mBSDF = BSDF::glTF,
+				.mTwoSided = material.doubleSided,
+				.mRoughnessAlpha = static_cast<float>(material.pbrMetallicRoughness.roughnessFactor),
+				.mAlbedo = vec3(material.pbrMetallicRoughness.baseColorFactor[0], material.pbrMetallicRoughness.baseColorFactor[1], material.pbrMetallicRoughness.baseColorFactor[2]),
+				.mMetallic = static_cast<float>(material.pbrMetallicRoughness.metallicFactor),
+				.mEmission = vec3(material.emissiveFactor[0], material.emissiveFactor[1], material.emissiveFactor[2]),
+				.mTransform = ioMatrix,
+				.mInverseTranspose = transpose(inverse(ioMatrix)),
+				.mVertexOffset = vertex_offset,
+				.mVertexCount = vertex_count,
+				.mIndexOffset = index_offset,
+				.mIndexCount = index_count
+			};
+			ioSceneContent.mInstanceDatas.push_back(instance_data);
+
+			if (glm::compMax(instance_data.mEmission) > 0.0f)
+			{
+				ioSceneContent.mEmissiveInstances.push_back({ static_cast<uint>(ioSceneContent.mInstanceDatas.size()) - 1, ioSceneContent.mEmissiveTriangleCount, });
+				ioSceneContent.mEmissiveTriangleCount += index_count / kIndexCountPerTriangle;
+			}
+		}
+	};
+
+	auto visit_node_and_children = [&](const auto &self, const Node& inNode, const std::string& inParentName, const mat4x4& inParentMatrix) -> void
 	{
-		mat4x4 matrix = visit_node(inNode, inParentMatrix);
+		std::string name = inParentName;
+		mat4x4 matrix = inParentMatrix;
+		visit_node(inNode, name, matrix);
 		for (int child_node_index : inNode.children)
-			self(self, model.nodes[child_node_index], matrix);
+			self(self, model.nodes[child_node_index], name, matrix);
 	};
 
 	for (int node_index : model.scenes[model.defaultScene].nodes)
-		visit_node_and_children(visit_node_and_children, model.nodes[node_index], mat4x4(1.0f));
+		visit_node_and_children(visit_node_and_children, model.nodes[node_index], std::string(), mat4x4(1.0f));
 
 	return ret;
 }

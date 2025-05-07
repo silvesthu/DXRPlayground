@@ -3,6 +3,7 @@
 #include "Common.h"
 
 static constexpr DXGI_FORMAT					kBackBufferFormat			= DXGI_FORMAT_R8G8B8A8_UNORM;
+static constexpr uint							kTimestampCount				= 1024;
 
 struct Renderer
 {
@@ -141,3 +142,41 @@ struct Renderer
 	uint										mResizeHeight = 0;
 };
 extern Renderer									gRenderer;
+
+struct Timing
+{
+	UINT										mQueryHeapIndex = 0;
+	UINT64										mTimestampFrequency = 0;
+
+	UINT64 TimestampBegin()
+	{
+		UINT64 timestamp = gRenderer.mRuntime.mQueryBuffer.ReadbackAs<UINT64>(gGetFrameContextIndex())[mQueryHeapIndex];
+		gCommandList->EndQuery(gQueryHeap, D3D12_QUERY_TYPE_TIMESTAMP, mQueryHeapIndex++);
+		return timestamp;
+	}
+
+	void TimestampEnd(UINT64 inTimestampBegin, float& outMS)
+	{
+		UINT64 timestamp = gRenderer.mRuntime.mQueryBuffer.ReadbackAs<UINT64>(gGetFrameContextIndex())[mQueryHeapIndex];
+		outMS = (timestamp - inTimestampBegin) * 1000.0f / mTimestampFrequency;
+		gCommandList->EndQuery(gQueryHeap, D3D12_QUERY_TYPE_TIMESTAMP, mQueryHeapIndex++);
+	}
+
+	void FrameEnd(ID3D12Resource* inReadbackResource)
+	{
+		gCommandList->ResolveQueryData(gQueryHeap, D3D12_QUERY_TYPE_TIMESTAMP, 0, mQueryHeapIndex, inReadbackResource, 0);
+		mQueryHeapIndex = 0;
+	}
+};
+extern Timing									gTiming;
+
+struct TimingScope
+{
+	TimingScope(float& outMS) : mOutMS(outMS)	{ mTimestampBegin = gTiming.TimestampBegin(); }
+	~TimingScope()								{ gTiming.TimestampEnd(mTimestampBegin, mOutMS); }
+
+	UINT64										mTimestampBegin = 0;
+	float&										mOutMS;
+};
+#define TIMING_SCOPE(name, outMS)				PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), name);				\
+												TimingScope mTimingScope_##__LINE__(outMS)

@@ -97,3 +97,4 @@ void Renderer::FinalizeShaders()
 }
 
 Renderer gRenderer;
+Timing gTiming;

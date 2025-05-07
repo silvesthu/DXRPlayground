@@ -17,7 +17,6 @@ ID3D12GraphicsCommandList4*			gCommandList = nullptr;
 
 ID3D12QueryHeap*					gQueryHeap = nullptr;
 Stats								gStats;
-Timing								gTiming;
 
 ID3D12Fence*						gIncrementalFence = nullptr;
 HANDLE                       		gIncrementalFenceEvent = nullptr;

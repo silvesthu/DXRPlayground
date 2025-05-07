@@ -267,36 +267,29 @@ extern ID3D12GraphicsCommandList4* 			gCommandList;
 extern ID3D12QueryHeap*						gQueryHeap;
 struct Stats
 {
-	int										mInstructionCount = 0;
-	float									mTimeInMS = 0;				// [NOTE] Time might look longer than necessary if GPU is not full load, turn off Vsync to force it run full speed
+	struct InstructionCount
+	{
+		int									mRayQuery = 0;	
+	};
+	InstructionCount						mInstructionCount;
+
+	// [NOTE] Time might look longer than necessary if GPU is not full load, turn off Vsync to force it run full speed
+	struct TimeMS
+	{
+		float								mUpload = 0;
+		float								mRenderer = 0;
+		float								mScene = 0;
+		float								mAtmosphere = 0;
+		float								mCloud = 0;
+		float								mTextureGenerator = 0;
+		float								mClear = 0;
+		float								mDepths = 0;
+		float								mPrepareLights = 0;
+		float								mRayQuery = 0;			
+	};
+	TimeMS									mTimeMS;
 };
 extern Stats								gStats;
-struct Timing
-{
-	UINT									mQueryHeapIndex = 0;
-	UINT64									mTimestampFrequency = 0;
-
-	UINT64 TimestampBegin(UINT64* inReadbackBufferPointer)
-	{
-		UINT64 timestamp = inReadbackBufferPointer[mQueryHeapIndex];
-		gCommandList->EndQuery(gQueryHeap, D3D12_QUERY_TYPE_TIMESTAMP, mQueryHeapIndex++);
-		return timestamp;
-	}
-
-	void TimestampEnd(UINT64* inReadbackBufferPointer, UINT64 inTimestampBegin, float& outMS)
-	{
-		UINT64 timestamp = inReadbackBufferPointer[mQueryHeapIndex];
-		outMS = (timestamp - inTimestampBegin) * 1000.0f / mTimestampFrequency;
-		gCommandList->EndQuery(gQueryHeap, D3D12_QUERY_TYPE_TIMESTAMP, mQueryHeapIndex++);
-	}
-
-	void FrameEnd(ID3D12Resource* inReadbackResource)
-	{
-		gCommandList->ResolveQueryData(gQueryHeap, D3D12_QUERY_TYPE_TIMESTAMP, 0, mQueryHeapIndex, inReadbackResource, 0);
-		mQueryHeapIndex = 0;
-	}
-};
-extern Timing								gTiming;
 
 extern ID3D12Fence* 						gIncrementalFence;			// Fence value increment each frame (most time)
 extern HANDLE                       		gIncrementalFenceEvent;		// Allow CPU to wait on fence

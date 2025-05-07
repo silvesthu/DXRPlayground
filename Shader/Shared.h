@@ -69,7 +69,6 @@ static const float kSolarKW2LM					= kKW2W * kSolarLuminousEfficacy;
 static const float kSolarLM2KW					= 1.0f / kSolarKW2LM;
 
 static const uint kFrameInFlightCount			= 2;
-static const uint kTimestampCount				= 1024;
 
 enum class RTVDescriptorIndex : uint
 {

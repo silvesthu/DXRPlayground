@@ -518,7 +518,7 @@ ComPtr<IDxcBlob> gCompileShader(const char* inFilename, const char* inEntryPoint
 		D3D12_SHADER_DESC shader_desc;
 		D3D_SHADER_REQUIRES shader_requires;
 		gExtractShaderReflection(blob, shader_desc, shader_requires);
-		gStats.mInstructionCount = shader_desc.InstructionCount;
+		gStats.mInstructionCount.mRayQuery = shader_desc.InstructionCount;
 
 		if (gRenderer.mDumpRayQuery)
 		{

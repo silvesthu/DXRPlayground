@@ -70,7 +70,7 @@ static const std::array kScenePresets =
 	ScenePreset().Name("LivingRoom2").Path("Asset/Comparison/benedikt-bitterli/living-room-2/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("VeachAjar").Path("Asset/Comparison/benedikt-bitterli/veach-ajar/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("VeachBidir").Path("Asset/Comparison/benedikt-bitterli/veach-bidir/scene_v3.xml").EmissionBoost(1E4f),
-	ScenePreset().Name("Bistro").Path("Asset/Comaprison/RTXDI-Assets/bistro/bistro.gltf").CameraPosition(glm::vec4(-1.658f, 1.577f, 1.69f, 0.0f)).CameraDirection(glm::vec4(-0.9645f, 1.2672f, 1.0396f, 0.0f) - glm::vec4(-1.658f, 1.577f, 1.69f, 0.0f)).EmissionBoost(1E6f),
+	ScenePreset().Name("Bistro").Path("Asset/Comparison/RTXDI-Assets/bistro/bistro.gltf").CameraPosition(glm::vec4(-20.588f, 2.453f, 13.020f, 0.0f)).CameraDirection(glm::vec4(0.983f, -0.168f, 0.071f, 0.0f)).EmissionBoost(1E4f),
 	
 	// Atmosphere
 	ScenePreset().Name("Bruneton17").Path("Asset/primitives/sphere.obj").CameraPosition(glm::vec4(0.0f, 0.0f, 9.0f, 0.0f)).CameraDirection(glm::vec4(0.0f, 0.0f, -1.0f, 0.0f)).Transform(glm::translate(glm::vec3(0.0f, 1.0f, 0.0f))).Atmosphere(AtmosphereMode::Bruneton17),
@@ -92,7 +92,7 @@ int sFindScenePresetIndex(const std::string_view inName)
 {
 	return static_cast<int>(&sFindScenePreset(inName) - &kScenePresets.front());
 }
-static int sCurrentSceneIndex = sFindScenePresetIndex("VeachMISManyLight");
+static int sCurrentSceneIndex = sFindScenePresetIndex("Bistro");
 static int sPreviousSceneIndex = sCurrentSceneIndex;
 
 struct CameraSettings
@@ -619,8 +619,28 @@ static void sPrepareImGui()
 
 			if (ImGui::Begin("Stats"))
 			{
-				ImGui::InputInt("Instruction Count", &gStats.mInstructionCount, 0, 0, ImGuiInputTextFlags_ReadOnly);
-				ImGui::InputFloat("Time (ms)", &gStats.mTimeInMS, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+				if (ImGui::TreeNodeEx("InstructionCount", ImGuiTreeNodeFlags_DefaultOpen))
+				{
+					ImGui::InputInt("Instruction Count", &gStats.mInstructionCount.mRayQuery, 0, 0, ImGuiInputTextFlags_ReadOnly);
+					
+					ImGui::TreePop();
+				}
+
+				if (ImGui::TreeNodeEx("Time (MS)", ImGuiTreeNodeFlags_DefaultOpen))
+				{
+					ImGui::InputFloat("Upload", &gStats.mTimeMS.mUpload, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+					ImGui::InputFloat("Renderer", &gStats.mTimeMS.mRenderer, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+					ImGui::InputFloat("Scene", &gStats.mTimeMS.mScene, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+					ImGui::InputFloat("Atmosphere", &gStats.mTimeMS.mAtmosphere, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+					ImGui::InputFloat("Cloud", &gStats.mTimeMS.mCloud, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+					ImGui::InputFloat("TextureGenerator", &gStats.mTimeMS.mTextureGenerator, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+					ImGui::InputFloat("Clear", &gStats.mTimeMS.mClear, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+					ImGui::InputFloat("Depths", &gStats.mTimeMS.mDepths, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+					ImGui::InputFloat("PrepareLights", &gStats.mTimeMS.mPrepareLights, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+					ImGui::InputFloat("RayQuery", &gStats.mTimeMS.mRayQuery, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+
+					ImGui::TreePop();
+				}
 			}
 			ImGui::End();
 		}
@@ -1011,7 +1031,7 @@ void sRender()
 
 	// Update and Upload Constants
 	{
-		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Upload");
+		TIMING_SCOPE("Upload", gStats.mTimeMS.mUpload);
 
 		{
 			// https://google.github.io/filament/Filament.html#imagingpipeline/physicallybasedcamera/exposurevalue
@@ -1075,35 +1095,35 @@ void sRender()
 
 	// Renderer
 	{
-		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Renderer");
+		TIMING_SCOPE("Renderer", gStats.mTimeMS.mRenderer);
 
 		gRenderer.Render();
 	}
 
 	// Scene
 	{
-		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Scene");
+		TIMING_SCOPE("Scene", gStats.mTimeMS.mScene);
 
 		gScene.Render();
 	}
 
 	// Atmosphere
 	{
-		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Atmosphere");
+		TIMING_SCOPE("Atmosphere", gStats.mTimeMS.mAtmosphere);
 
 		gAtmosphere.Render();
 	}
 
 	// Cloud
 	{
-		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Cloud");
+		TIMING_SCOPE("Cloud", gStats.mTimeMS.mCloud);
 
 		gCloud.Render();
 	}
 
 	// Texture Generator
 	{
-		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Texture Generator");
+		TIMING_SCOPE("TextureGenerator", gStats.mTimeMS.mTextureGenerator);
 
 		gRenderer.Setup(gRenderer.mRuntime.mGenerateTextureShader);
 
@@ -1115,7 +1135,7 @@ void sRender()
 
 	// Clear
 	{
-		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Clear");
+		TIMING_SCOPE("Clear", gStats.mTimeMS.mClear);
 
 		gRenderer.Setup(gRenderer.mRuntime.mClearShader);
 		gCommandList->Dispatch(gAlignUpDiv(PixelInspection::kArraySize, 64u), 1, 1);
@@ -1128,7 +1148,7 @@ void sRender()
 	
 	// Depth
 	{
-		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Depth");
+		TIMING_SCOPE("Depths", gStats.mTimeMS.mDepths);
 
 		BarrierScope depth_scope(gCommandList, gRenderer.mRuntime.mScreenDepthTexture.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
@@ -1162,7 +1182,7 @@ void sRender()
 
 	// PrepareLights
 	{
-		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "PrepareLights");
+		TIMING_SCOPE("PrepareLights", gStats.mTimeMS.mPrepareLights);
 
 		gRenderer.Setup(gRenderer.mRuntime.mPrepareLightsShader);
 		uint constants[] = { static_cast<uint>(gScene.GetPrepareLightsTaskCount()) };
@@ -1174,15 +1194,13 @@ void sRender()
 
 	// RayQuery
 	{
-		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "RayQuery");
+		TIMING_SCOPE("RayQuery", gStats.mTimeMS.mRayQuery);
 
 		DXGI_SWAP_CHAIN_DESC1 swap_chain_desc;
 		gSwapChain->GetDesc1(&swap_chain_desc);
-
-		UINT64 timestamp = gTiming.TimestampBegin(gRenderer.mRuntime.mQueryBuffer.ReadbackAs<UINT64>(gGetFrameContextIndex()));
+				
 		gRenderer.Setup(gRenderer.mRuntime.mRayQueryShader);
 		gCommandList->Dispatch(gAlignUpDiv(swap_chain_desc.Width, 8u), gAlignUpDiv(swap_chain_desc.Height, 8u), 1);
-		gTiming.TimestampEnd(gRenderer.mRuntime.mQueryBuffer.ReadbackAs<UINT64>(gGetFrameContextIndex()), timestamp, gStats.mTimeInMS);
 
 		gBarrierUAV(gCommandList, nullptr);
 	}
