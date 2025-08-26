@@ -236,7 +236,7 @@ void F_Dielectric_Mitsuba(float inCosThetaI, float inEta, out float outR, out fl
 
     //
 
-    float outside_mask = cos_theta_i >= 0.f;
+    bool outside_mask = cos_theta_i >= 0.f;
 
     float rcp_eta = rcp(eta);
     float eta_it = select(outside_mask, eta, rcp_eta);

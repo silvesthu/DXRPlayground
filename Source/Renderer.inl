@@ -474,11 +474,13 @@ ComPtr<IDxcBlob> gCompileShader(const char* inFilename, const char* inEntryPoint
 	defines.push_back(dxc_define_entry_point);
 
 	std::vector<LPCWSTR> arguments;
-	arguments.push_back(DXC_ARG_WARNINGS_ARE_ERRORS);				// -WX
-	arguments.push_back(DXC_ARG_ALL_RESOURCES_BOUND);				// -all_resources_bound
-	arguments.push_back(DXC_ARG_DEBUG);								// -Zi
-	arguments.push_back(L"-Qembed_debug");							// -Qembed_debug
-	arguments.push_back(L"-HV 2021");								// -HV 2021
+	arguments.push_back(L"-WX");									// warning as error
+	// arguments.push_back(L"-Wconversion");						// warning on implicit conversion, disabled as 3rd party code is a mess. Implies -Wfloat-conversion, -Wsign-conversion, etc.
+																	// there is no option to only warn about "implicit truncation of vector type" 
+	arguments.push_back(L"-all_resources_bound");					// assume all resources bound
+	arguments.push_back(L"-Zi");									// .pdb
+	arguments.push_back(L"-Qembed_debug");							// embeded .pdb
+	arguments.push_back(L"-HV 2021");								// more like c++
 	arguments.push_back(L"-disable-payload-qualifiers");			// -disable-payload-qualifiers, see https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#payload-access-qualifiers
 
 	IDxcOperationResult* operation_result;

@@ -158,7 +158,7 @@ float4 Unpack_R16G16B16A16_FLOAT(uint2 rgba)
 
 uint Pack_R8_SNORM(float value)
 {
-    return int(clamp(value, -1.0, 1.0) * 127.0) & 0xff;
+    return (int)(clamp(value, -1.0, 1.0) * 127.0) & 0xff;
 }
 
 float Unpack_R8_SNORM(uint value)

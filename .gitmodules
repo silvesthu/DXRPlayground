@@ -38,3 +38,6 @@
 [submodule "Asset/Comparison/RTXDI-Assets"]
 	path = Asset/Comparison/RTXDI-Assets
 	url = https://github.com/NVIDIA-RTX/RTXDI-Assets.git
+[submodule "Source/Thirdparty/SHARC"]
+	path = Source/Thirdparty/SHARC
+	url = https://github.com/NVIDIA-RTX/SHARC.git

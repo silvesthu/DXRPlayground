@@ -92,7 +92,7 @@ int sFindScenePresetIndex(const std::string_view inName)
 {
 	return static_cast<int>(&sFindScenePreset(inName) - &kScenePresets.front());
 }
-static int sCurrentSceneIndex = sFindScenePresetIndex("Bistro");
+static int sCurrentSceneIndex = sFindScenePresetIndex("VeachMISManyLight");
 static int sPreviousSceneIndex = sCurrentSceneIndex;
 
 struct CameraSettings
@@ -669,13 +669,13 @@ void sPrepareImGuizmo()
 }
 
 static void sUpdate()
-{
+{	
 	// Resize
 	if (gRenderer.mResizeWidth != 0)
 	{
 		RECT rect = { 0, 0, (LONG)gRenderer.mResizeWidth, (LONG)gRenderer.mResizeHeight };
 		AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, false);
-		::SetWindowPos(::GetActiveWindow(), NULL, 0, 0, rect.right - rect.left, rect.bottom - rect.top, SWP_NOMOVE | SWP_NOOWNERZORDER | SWP_NOZORDER);
+		SetWindowPos(::GetActiveWindow(), NULL, 0, 0, rect.right - rect.left, rect.bottom - rect.top, SWP_NOMOVE | SWP_NOOWNERZORDER | SWP_NOZORDER);
 
 		gRenderer.mResizeWidth = 0;
 		gRenderer.mResizeHeight = 0;
