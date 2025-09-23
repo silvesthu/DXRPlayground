@@ -44,6 +44,7 @@ struct ScenePreset
 	SCENE_PRESET_MEMBER(float, 				SunAzimuth, 			0);
 	SCENE_PRESET_MEMBER(float, 				SunZenith, 				glm::pi<float>() / 4.0f);
 	SCENE_PRESET_MEMBER(AtmosphereMode,		Atmosphere,				AtmosphereMode::ConstantColor);
+	SCENE_PRESET_MEMBER(glm::vec4,			ConstantColor,			glm::vec4(0, 0, 0, 0));
 };
 
 static const std::array kScenePresets =
@@ -70,6 +71,7 @@ static const std::array kScenePresets =
 	ScenePreset().Name("LivingRoom2").Path("Asset/Comparison/benedikt-bitterli/living-room-2/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("VeachAjar").Path("Asset/Comparison/benedikt-bitterli/veach-ajar/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("VeachBidir").Path("Asset/Comparison/benedikt-bitterli/veach-bidir/scene_v3.xml").EmissionBoost(1E4f),
+	ScenePreset().Name("PicaPica").Path("Asset/Sketchfab/pica-pica-mini-diorama-01/scene.gltf").CameraPosition(glm::vec4(-20.588f, 2.453f, 13.020f, 0.0f)).CameraDirection(glm::vec4(0.983f, -0.168f, 0.071f, 0.0f)).EmissionBoost(1E6f).ConstantColor(glm::vec4(0.1f)),
 	ScenePreset().Name("Bistro").Path("Asset/Comparison/RTXDI-Assets/bistro/bistro.gltf").CameraPosition(glm::vec4(-20.588f, 2.453f, 13.020f, 0.0f)).CameraDirection(glm::vec4(0.983f, -0.168f, 0.071f, 0.0f)).EmissionBoost(1E6f),
 	
 	// Atmosphere
@@ -445,6 +447,7 @@ static void sPrepareImGui()
 					"Index",
 					"Name",
 					"Position",
+					"Material",
 					"BSDF",
 					"Albedo",
 					"Reflectance",
@@ -493,6 +496,9 @@ static void sPrepareImGui()
 						std::string position = std::format("{:.2f} {:.2f} {:.2f} ", instance_data.mTransform[3][0], instance_data.mTransform[3][1], instance_data.mTransform[3][2]);
 						position = glm::dot(glm::vec3(instance_data.mTransform[3]), glm::vec3(instance_data.mTransform[3])) != 0.0f ? position : "";
 						ImGui::Text(position.c_str());
+
+						ImGui::TableSetColumnIndex(column_index++);
+						ImGui::Text("%s", instance_info.mMaterialName.c_str());
 
 						ImGui::TableSetColumnIndex(column_index++);
 						ImGui::Text("%s%s", NAMEOF_ENUM(instance_data.mBSDF).data(), instance_data.mTwoSided ? " (TwoSided)" : "");
@@ -984,11 +990,15 @@ void sLoadScene()
 	gConstants.mSunAzimuth = kScenePresets[sCurrentSceneIndex].mSunAzimuth;
 	gConstants.mSunZenith = kScenePresets[sCurrentSceneIndex].mSunZenith;
 
-	gAtmosphere.mProfile.mMode = kScenePresets[sCurrentSceneIndex].mAtmosphere;
 	if (gScene.GetSceneContent().mAtmosphereMode.has_value())
 	{
 		gAtmosphere.mProfile.mMode = gScene.GetSceneContent().mAtmosphereMode.value();
 		gAtmosphere.mProfile.mConstantColor = gScene.GetSceneContent().mBackgroundColor;
+	}
+	else
+	{
+		gAtmosphere.mProfile.mMode = kScenePresets[sCurrentSceneIndex].mAtmosphere;
+		gAtmosphere.mProfile.mConstantColor = kScenePresets[sCurrentSceneIndex].mConstantColor;
 	}
 
 	gRenderer.mReloadShader = true;
@@ -1656,7 +1666,7 @@ static LRESULT WINAPI sWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam
 				return WritePrivateProfileString(lpAppName, lpKeyName, buffer, lpFileName) != 0;
 			};
 			RECT rect_for_ini;
-			gAssert(::GetWindowRect(hWnd, &rect_for_ini));
+			::GetWindowRect(hWnd, &rect_for_ini);
 			SetPrivateProfileInt(L"Main", L"Window_X", rect_for_ini.left, kINIPathW);
 			SetPrivateProfileInt(L"Main", L"Window_Y", rect_for_ini.top, kINIPathW);
 			WritePrivateProfileString(NULL, NULL, NULL, kINIPathW); // Flush

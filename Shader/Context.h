@@ -73,9 +73,16 @@ struct SurfaceContext
 	uint			TwoSided()					{ return InstanceData().mTwoSided; }
 	float			Opacity()					{ return InstanceData().mOpacity; }
 	uint			LightIndex()				{ return InstanceData().mLightIndex; }
-	float			RoughnessAlpha()			{ return InstanceData().mRoughnessAlpha; }
-	float3			Albedo()						
+	float			RoughnessAlpha()
 	{
+		if (BSDF() == BSDF::pbrMetallicRoughness) { return RoughnessAlphaGLTF(); }
+		
+		return InstanceData().mRoughnessAlpha;
+	}
+	float3			Albedo()
+	{
+		if (BSDF() == BSDF::pbrMetallicRoughness) { return AlbedoGLTF(); }
+		
 		uint texture_index = InstanceData().mAlbedoTexture.mTextureIndex;
 		uint sampler_index = InstanceData().mAlbedoTexture.mSamplerIndex;
 		if (texture_index != (uint)ViewDescriptorIndex::Invalid)
@@ -88,6 +95,8 @@ struct SurfaceContext
 	}
 	float3			SpecularReflectance()
 	{
+		if (BSDF() == BSDF::pbrMetallicRoughness) { return SpecularReflectanceGLTF(); }
+		
 		uint texture_index = InstanceData().mReflectanceTexture.mTextureIndex;
 		uint sampler_index = InstanceData().mReflectanceTexture.mSamplerIndex;
 		if (texture_index != (uint)ViewDescriptorIndex::Invalid)
@@ -101,6 +110,12 @@ struct SurfaceContext
 	float3			SpecularTransmittance()		{ return InstanceData().mSpecularTransmittance; }
 	float3			Eta()						{ return InstanceData().mEta; }
 	float3			K()							{ return InstanceData().mK; }
+	float			Metallic()
+	{
+		if (BSDF() == BSDF::pbrMetallicRoughness) { return MetallicGLTF(); }
+		
+		return 0;
+	}
 	float3			Emission()					
 	{
 		uint texture_index = InstanceData().mEmissionTexture.mTextureIndex;
@@ -112,6 +127,66 @@ struct SurfaceContext
 			return texture.SampleLevel(sampler, mUV, 0).rgb * InstanceData().mEmission;
 		}
 		return InstanceData().mEmission; 
+	}
+
+	// https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#metal-brdf-and-dielectric-brdf
+	float3			AlbedoGLTF()						
+	{
+		float3 base_color = InstanceData().mAlbedo;
+		
+		uint texture_index = InstanceData().mAlbedoTexture.mTextureIndex;
+		uint sampler_index = InstanceData().mAlbedoTexture.mSamplerIndex;
+		if (texture_index != (uint)ViewDescriptorIndex::Invalid)
+		{
+			Texture2D<float4> texture = ResourceDescriptorHeap[texture_index];
+			SamplerState sampler = SamplerDescriptorHeap[sampler_index];
+			base_color = texture.SampleLevel(sampler, mUV, 0).rgb * InstanceData().mAlbedo;
+		}
+
+		float metallic = MetallicGLTF();
+		return lerp(base_color, 0.0, metallic);
+	}
+	float3			SpecularReflectanceGLTF()
+	{
+		float3 base_color = InstanceData().mAlbedo;
+		
+		uint texture_index = InstanceData().mAlbedoTexture.mTextureIndex;
+		uint sampler_index = InstanceData().mAlbedoTexture.mSamplerIndex;
+		if (texture_index != (uint)ViewDescriptorIndex::Invalid)
+		{
+			Texture2D<float4> texture = ResourceDescriptorHeap[texture_index];
+			SamplerState sampler = SamplerDescriptorHeap[sampler_index];
+			base_color = texture.SampleLevel(sampler, mUV, 0).rgb * InstanceData().mAlbedo;
+		}
+
+		float metallic = MetallicGLTF();
+		return lerp(DielectricReflectanceGLTF(), base_color, metallic);
+	}
+	float			DielectricReflectanceGLTF() { return 0.04; }
+	float			MetallicGLTF()
+	{
+		uint texture_index = InstanceData().mReflectanceTexture.mTextureIndex;
+		uint sampler_index = InstanceData().mReflectanceTexture.mSamplerIndex;
+		if (texture_index != (uint)ViewDescriptorIndex::Invalid)
+		{
+			Texture2D<float4> texture = ResourceDescriptorHeap[texture_index];
+			SamplerState sampler = SamplerDescriptorHeap[sampler_index];
+			return texture.SampleLevel(sampler, mUV, 0).b * InstanceData().mReflectance.x;
+		}
+		return InstanceData().mReflectance.x;
+	}
+	float			RoughnessAlphaGLTF()
+	{
+		uint texture_index = InstanceData().mReflectanceTexture.mTextureIndex;
+		uint sampler_index = InstanceData().mReflectanceTexture.mSamplerIndex;
+		if (texture_index != (uint)ViewDescriptorIndex::Invalid)
+		{
+			Texture2D<float4> texture = ResourceDescriptorHeap[texture_index];
+			SamplerState sampler = SamplerDescriptorHeap[sampler_index];
+			float roughness = texture.SampleLevel(sampler, mUV, 0).g;
+			return (roughness * roughness) * InstanceData().mRoughnessAlpha;
+		}
+		return max(0.01, InstanceData().mRoughnessAlpha); // Extra clamp
 	}
 
 	bool			DiracDeltaDistribution()

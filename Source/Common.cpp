@@ -262,7 +262,7 @@ void Texture::Update()
 		else if (extension == ".exr")
 		{
 			int color_count = (int)(DirectX::BitsPerPixel(mFormat) / DirectX::BitsPerColor(mFormat));
-			gAssert(1 <= color_count && color_count <= 4);
+			gAssert(1 <= color_count && color_count <= 4); UNUSED(color_count);
 
 			size_t byte_per_pixel = DirectX::BitsPerPixel(mFormat) / 8;
 			gAssert(mEXRData != nullptr);

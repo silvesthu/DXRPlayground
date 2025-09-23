@@ -686,10 +686,13 @@ bool Scene::LoadGLTF(const std::string& inFilename, SceneContent& ioSceneContent
 
 	auto visit_node = [&](const Node& inNode, std::string& ioName, mat4x4& ioMatrix)
 	{
-		mat4x4 T = translate(vec3((float)inNode.translation[0], (float)inNode.translation[1], (float)inNode.translation[2]));
-		mat4x4 R = toMat4(quat((float)inNode.rotation[3], (float)inNode.rotation[0], (float)inNode.rotation[1], (float)inNode.rotation[2]));
-		mat4x4 S = scale(vec3((float)inNode.scale[0], (float)inNode.scale[1], (float)inNode.scale[2]));
-		ioMatrix = ioMatrix * (T * R * S);
+		if (inNode.translation.size() > 0) // not all nodes have transform
+		{
+			mat4x4 T = translate(vec3((float)inNode.translation[0], (float)inNode.translation[1], (float)inNode.translation[2]));
+			mat4x4 R = toMat4(quat((float)inNode.rotation[3], (float)inNode.rotation[0], (float)inNode.rotation[1], (float)inNode.rotation[2]));
+			mat4x4 S = scale(vec3((float)inNode.scale[0], (float)inNode.scale[1], (float)inNode.scale[2]));
+			ioMatrix = ioMatrix * (T * R * S);	
+		}
 		ioName = std::format("{}.{}", ioName, inNode.name);
 
 		if (inNode.mesh == -1)
@@ -709,25 +712,28 @@ bool Scene::LoadGLTF(const std::string& inFilename, SceneContent& ioSceneContent
 			gAssert(uv_attribute != primitive.attributes.end());
 
 			Accessor position_accessor = model.accessors[position_attribute->second];
-			uint8* position_data = model.buffers[model.bufferViews[position_accessor.bufferView].buffer].data.data() + model.bufferViews[position_accessor.bufferView].byteOffset;
+			uint8* position_data = model.buffers[model.bufferViews[position_accessor.bufferView].buffer].data.data()
+				+ model.bufferViews[position_accessor.bufferView].byteOffset
+				+ position_accessor.byteOffset;
 			size_t position_stride = model.bufferViews[position_accessor.bufferView].byteStride;
 			position_stride = position_stride == 0 ? sizeof(vec3) : position_stride;
 			gAssert(position_accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT && position_accessor.type == TINYGLTF_TYPE_VEC3);
-			gAssert(position_stride * position_accessor.count == model.bufferViews[position_accessor.bufferView].byteLength);
 
 			Accessor normal_accessor = model.accessors[normal_attribute->second];
-			uint8* normal_data = model.buffers[model.bufferViews[normal_accessor.bufferView].buffer].data.data() + model.bufferViews[normal_accessor.bufferView].byteOffset;
+			uint8* normal_data = model.buffers[model.bufferViews[normal_accessor.bufferView].buffer].data.data()
+				+ model.bufferViews[normal_accessor.bufferView].byteOffset
+				+ normal_accessor.byteOffset;
 			size_t normal_stride = model.bufferViews[normal_accessor.bufferView].byteStride;
 			normal_stride = normal_stride == 0 ? sizeof(vec3) : normal_stride;
 			gAssert(normal_accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT && normal_accessor.type == TINYGLTF_TYPE_VEC3);
-			gAssert(normal_stride * normal_accessor.count == model.bufferViews[normal_accessor.bufferView].byteLength);
 
 			Accessor uv_accessor = model.accessors[uv_attribute->second];
-			uint8* uv_data = model.buffers[model.bufferViews[uv_accessor.bufferView].buffer].data.data() + model.bufferViews[uv_accessor.bufferView].byteOffset;
+			uint8* uv_data = model.buffers[model.bufferViews[uv_accessor.bufferView].buffer].data.data()
+				+ model.bufferViews[uv_accessor.bufferView].byteOffset
+				+ uv_accessor.byteOffset;
 			size_t uv_stride = model.bufferViews[uv_accessor.bufferView].byteStride;
 			uv_stride = uv_stride == 0 ? sizeof(vec2) : uv_stride;
 			gAssert(uv_accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT && uv_accessor.type == TINYGLTF_TYPE_VEC2);
-			gAssert(uv_stride * uv_accessor.count == model.bufferViews[uv_accessor.bufferView].byteLength);
 
 			gAssert(position_accessor.count == normal_accessor.count);
 			gAssert(position_accessor.count == uv_accessor.count);
@@ -751,9 +757,11 @@ bool Scene::LoadGLTF(const std::string& inFilename, SceneContent& ioSceneContent
 
 			gAssert(primitive.indices != -1);
 			Accessor index_accessor = model.accessors[primitive.indices];
-			uint8* index_data = model.buffers[model.bufferViews[index_accessor.bufferView].buffer].data.data() + model.bufferViews[index_accessor.bufferView].byteOffset;
+			uint8* index_data = model.buffers[model.bufferViews[index_accessor.bufferView].buffer].data.data()
+				+ model.bufferViews[index_accessor.bufferView].byteOffset
+				+ index_accessor.byteOffset; 
 			size_t index_stride = model.bufferViews[index_accessor.bufferView].byteStride;
-			gAssert(index_accessor.type == TINYGLTF_TYPE_SCALAR && index_stride == 0);
+			gAssert(index_accessor.type == TINYGLTF_TYPE_SCALAR && index_stride == 0); UNUSED(index_stride);
 
 			uint index_offset = (uint)ioSceneContent.mIndices.size();
 			uint index_count = (uint)index_accessor.count;
@@ -817,9 +825,9 @@ bool Scene::LoadGLTF(const std::string& inFilename, SceneContent& ioSceneContent
 			{
 				.mBSDF = BSDF::pbrMetallicRoughness,
 				.mTwoSided = material.doubleSided,
-				.mRoughnessAlpha = static_cast<float>(material.pbrMetallicRoughness.roughnessFactor),
+				.mRoughnessAlpha = static_cast<float>(material.pbrMetallicRoughness.roughnessFactor * material.pbrMetallicRoughness.roughnessFactor),
 				.mAlbedo = vec3(material.pbrMetallicRoughness.baseColorFactor[0], material.pbrMetallicRoughness.baseColorFactor[1], material.pbrMetallicRoughness.baseColorFactor[2]),
-				.mMetallic = static_cast<float>(material.pbrMetallicRoughness.metallicFactor),
+				.mReflectance = vec3(static_cast<float>(material.pbrMetallicRoughness.metallicFactor)),
 				.mEmission = vec3(material.emissiveFactor[0], material.emissiveFactor[1], material.emissiveFactor[2]),
 				.mTransform = ioMatrix,
 				.mInverseTranspose = transpose(inverse(ioMatrix)),
@@ -838,14 +846,6 @@ bool Scene::LoadGLTF(const std::string& inFilename, SceneContent& ioSceneContent
 					instance_data.mAlbedo = vec3(diffuseFactor.Get(0).GetNumberAsDouble(), diffuseFactor.Get(1).GetNumberAsDouble(), diffuseFactor.Get(2).GetNumberAsDouble());
 
 				// [TODO] Need proper conversion
-				
-				auto specularFactor = pbr_specular_glossiness->second.Get("specularFactor");
-				if (specularFactor.IsArray())
-					instance_data.mReflectance = vec3(specularFactor.Get(0).GetNumberAsDouble(), specularFactor.Get(1).GetNumberAsDouble(), specularFactor.Get(2).GetNumberAsDouble());
-
-				auto glossinessFactor = pbr_specular_glossiness->second.Get("glossinessFactor");
-				if (glossinessFactor.IsNumber())
-					instance_data.mRoughnessAlpha = static_cast<float>(glossinessFactor.GetNumberAsDouble());
 			}
 			
 			ioSceneContent.mInstanceDatas.push_back(instance_data);

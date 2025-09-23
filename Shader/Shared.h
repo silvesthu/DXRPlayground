@@ -476,7 +476,7 @@ struct InstanceData
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
 	float3						mEta							CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
-	float						mMetallic						CONSTANT_DEFAULT(0);
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
 	float3						mK								CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);

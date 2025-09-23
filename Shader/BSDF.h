@@ -296,12 +296,12 @@ namespace BSDFEvaluation
 			float3 H							= Distribution::GGX::GenerateMicrofacetDirection(tangent_space, inHitContext, ioPathContext);
 			float3 V							= inHitContext.ViewWS();
 
-			bool selected_r = RandomFloat01(ioPathContext.mRandomState) <= r_i;
-			float3 L = select(selected_r,
+			bool select_reflection = RandomFloat01(ioPathContext.mRandomState) <= r_i;
+			float3 L = select(select_reflection,
 				reflect(-inHitContext.ViewWS(), inHitContext.NdotV() < 0 ? -H : H),
 				refract(-inHitContext.ViewWS(), inHitContext.NdotV() < 0 ? -H : H, eta_ti));
 
-			return BSDFContext::Generate(BSDFContext::Mode::BSDF, L, select(selected_r, 1.0, eta_it), selected_r, inHitContext);
+			return BSDFContext::Generate(BSDFContext::Mode::BSDF, L, select(select_reflection, 1.0, eta_it), select_reflection, inHitContext);
 		}
 
 		BSDFResult Evaluate(inout BSDFContext inBSDFContext, HitContext inHitContext, inout PathContext ioPathContext)
@@ -401,31 +401,77 @@ namespace BSDFEvaluation
 
 	namespace glTF
 	{
-		// [TODO] Add GGX Specular to match RTXDI
-		
 		BSDFContext GenerateContext(HitContext inHitContext, inout PathContext ioPathContext)
 		{
-			float3x3 tangent_space				= GenerateTangentSpace(inHitContext.NormalWS());
-			float3 randome_direction			= RandomCosineDirection(ioPathContext.mRandomState);
-			float3 L							= normalize(randome_direction.x * tangent_space[0] + randome_direction.y * tangent_space[1] + randome_direction.z * tangent_space[2]);
+			BSDFContext bsdf_context;
 
-			return BSDFContext::Generate(BSDFContext::Mode::BSDF, L, inHitContext);
+			float3 specular_reflectance			= inHitContext.SpecularReflectance();
+			bool select_specular					= RandomFloat01(ioPathContext.mRandomState) <= MaxComponent(specular_reflectance);
+			if (select_specular)
+			{
+				float3x3 tangent_space			= GenerateTangentSpace(inHitContext.NormalWS());
+				float3 H						= Distribution::GGX::GenerateMicrofacetDirection(tangent_space, inHitContext, ioPathContext);
+				float3 V						= inHitContext.ViewWS();
+				float HdotV						= dot(H, V);
+				float3 L						= 2.0 * HdotV * H - V;
+				bsdf_context = BSDFContext::Generate(BSDFContext::Mode::BSDF, L, inHitContext);
+			}
+			else
+			{
+				float3x3 tangent_space			= GenerateTangentSpace(inHitContext.NormalWS());
+				float3 randome_direction		= RandomCosineDirection(ioPathContext.mRandomState);
+				float3 L						= normalize(randome_direction.x * tangent_space[0] + randome_direction.y * tangent_space[1] + randome_direction.z * tangent_space[2]);
+				bsdf_context = BSDFContext::Generate(BSDFContext::Mode::BSDF, L, inHitContext);
+			}
+
+			bsdf_context.mLobe0Selected			= select_specular;
+			return bsdf_context;
 		}
 
 		BSDFResult Evaluate(inout BSDFContext inBSDFContext, HitContext inHitContext, inout PathContext ioPathContext)
 		{
-			BSDFResult result;
-			result.mBSDF						= inHitContext.Albedo() / MATH_PI;
-			result.mBSDFSamplePDF				= max(0, inBSDFContext.mNdotL) / MATH_PI;
-			result.mEta							= 1.0;
+			bool select_specular					= inBSDFContext.mLobe0Selected;
+			float3 specular_reflectance				= inHitContext.SpecularReflectance();
+			
+			if (!select_specular)
+			{
+				BSDFResult brdf_result = Diffuse::Evaluate(inBSDFContext, inHitContext, ioPathContext);
+				brdf_result.mBSDFSamplePDF *= 1.0 - MaxComponent(specular_reflectance);
 
-			if (inBSDFContext.mNdotL < 0 || inBSDFContext.mNdotV < 0 || inBSDFContext.mHdotL < 0 || inBSDFContext.mHdotV < 0)
-				result.mBSDF					= 0;
+				return brdf_result;
+			}
 
-			if (mConstants.mDebugInstanceIndex == inHitContext.mInstanceID && mConstants.mDebugInstanceMode == DebugInstanceMode::Barycentrics)
-				result.mBSDF					= 0.0;
+			// Based on RoughConductor::Evaluate
+			{
+				float D								= D_GGX(inBSDFContext.mNdotH, inHitContext.RoughnessAlpha());
+				float G								= G_SmithGGX(inBSDFContext.mNdotL, inBSDFContext.mNdotV, inHitContext.RoughnessAlpha());
+				float3 F							= F_Schlick(specular_reflectance, inBSDFContext.mHdotV);
 
-			return result;
+				if (inBSDFContext.mNdotL < 0 || inBSDFContext.mNdotV < 0 || inBSDFContext.mHdotL < 0 || inBSDFContext.mHdotV < 0)
+					D								= 0;
+
+				if (inBSDFContext.mMode == BSDFContext::Mode::BSDF)
+				{
+					DebugValue(DebugMode::BSDF__D, ioPathContext.mRecursionDepth, float3(D, 0, 0));
+					DebugValue(DebugMode::BSDF__G, ioPathContext.mRecursionDepth, float3(G, 0, 0));
+					DebugValue(DebugMode::BSDF__F, ioPathContext.mRecursionDepth, float3(F));
+				}
+				else
+				{
+					DebugValue(DebugMode::Light_D, ioPathContext.mRecursionDepth, float3(D, 0, 0));
+					DebugValue(DebugMode::Light_G, ioPathContext.mRecursionDepth, float3(G, 0, 0));
+					DebugValue(DebugMode::Light_F, ioPathContext.mRecursionDepth, float3(F));
+				}
+			
+				float microfacet_pdf				= D * inBSDFContext.mNdotH;
+				float jacobian						= 1.0 / (4.0f * inBSDFContext.mHdotL);
+
+				BSDFResult result;
+				result.mBSDF						= D * G * F / (4.0f * inBSDFContext.mNdotV * inBSDFContext.mNdotL);
+				result.mBSDFSamplePDF				= microfacet_pdf * jacobian * MaxComponent(specular_reflectance);
+				result.mEta							= 1.0;
+				return result;
+			}
 		}
 	};
 
@@ -442,7 +488,7 @@ namespace BSDFEvaluation
 		case BSDF::Dielectric:					bsdf_context = Dielectric::GenerateContext(inHitContext, ioPathContext); break;
 		case BSDF::ThinDielectric:				bsdf_context = Dielectric::GenerateContext(inHitContext, ioPathContext); break;
 		case BSDF::RoughDielectric:				bsdf_context = RoughDielectric::GenerateContext(inHitContext, ioPathContext); break;
-		case BSDF::pbrMetallicRoughness:						bsdf_context = glTF::GenerateContext(inHitContext, ioPathContext); break;
+		case BSDF::pbrMetallicRoughness:		bsdf_context = glTF::GenerateContext(inHitContext, ioPathContext); break;
 		default:								bsdf_context = Diffuse::GenerateContext(inHitContext, ioPathContext); break;
 		}
 
@@ -465,7 +511,7 @@ namespace BSDFEvaluation
 		case BSDF::Dielectric:					result = Dielectric::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
 		case BSDF::ThinDielectric:				result = Dielectric::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
 		case BSDF::RoughDielectric:				result = RoughDielectric::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
-		case BSDF::pbrMetallicRoughness:						result = glTF::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
+		case BSDF::pbrMetallicRoughness:		result = glTF::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
 		case BSDF::Unsupported:					result = Diffuse::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
 		default:								result = Diffuse::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
 		}

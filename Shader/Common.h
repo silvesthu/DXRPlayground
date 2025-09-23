@@ -16,6 +16,13 @@ template <typename T> T remap(T x, T a, T b, T c, T d)          { return (((x - 
 float qnan()                                                    { return asfloat(0x7fc00000); }
 float inf()                                                     { return asfloat(0x7f800000); }
 
+float MinComponent(float2 inValue)                              { return min(inValue.x, inValue.y); }
+float MinComponent(float3 inValue)                              { return min(MinComponent(inValue.xy), inValue.z); }
+float MinComponent(float4 inValue)                              { return min(MinComponent(inValue.xyz), inValue.z); }
+float MaxComponent(float2 inValue)                              { return max(inValue.x, inValue.y); }
+float MaxComponent(float3 inValue)                              { return max(MaxComponent(inValue.xy), inValue.z); }
+float MaxComponent(float4 inValue)                              { return max(MaxComponent(inValue.xyz), inValue.z); }
+
 // Hash.ush, originally from MurmurHash, thus the name
 uint MurmurMix(uint Hash)
 {
