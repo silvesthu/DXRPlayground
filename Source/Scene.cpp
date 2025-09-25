@@ -18,6 +18,7 @@ void BLAS::Initialize(const InstanceInfo& inInstanceInfo, const InstanceData& in
 {
 	mDesc = {};
 	mDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
+	mDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
 	mDesc.Triangles.VertexBuffer.StartAddress = inVertexBaseAddress + inInstanceData.mVertexOffset * sizeof(VertexType);
 	mDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(VertexType);
 	mDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
@@ -28,16 +29,69 @@ void BLAS::Initialize(const InstanceInfo& inInstanceInfo, const InstanceData& in
 		mDesc.Triangles.IndexCount = inInstanceData.mIndexCount;
 		mDesc.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
 	}
-	mDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
 
-	mInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+	mInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
 	mInputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
 	mInputs.NumDescs = 1;
+	mInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
 	mInputs.pGeometryDescs = &mDesc;
-	mInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
 
 	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO info = {};
-	gDevice->GetRaytracingAccelerationStructurePrebuildInfo(&mInputs, &info);
+
+	if (gNVAPI.mLinearSweptSpheresSupported)
+	{
+		// D3D12_RAYTRACING_GEOMETRY_DESC -> NVAPI_D3D12_RAYTRACING_GEOMETRY_DESC_EX
+		if (inInstanceInfo.mGeometryType == GeometryType::Triangles)
+		{
+			mDescEx.type = NVAPI_D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES_EX;
+			mDescEx.flags = mDesc.Flags;
+			mDescEx.triangles = mDesc.Triangles;
+		}
+		else if (inInstanceInfo.mGeometryType == GeometryType::Sphere)
+		{
+			mDescEx.type = NVAPI_D3D12_RAYTRACING_GEOMETRY_TYPE_SPHERES_EX; // see fillD3dSpheresDesc
+			mDescEx.flags = mDesc.Flags;
+
+			// [TODO]
+		}
+		else if (inInstanceInfo.mGeometryType == GeometryType::LSS)
+		{
+			mDescEx.type = NVAPI_D3D12_RAYTRACING_GEOMETRY_TYPE_LSS_EX; // see fillD3dLssDesc
+			mDescEx.flags = mDesc.Flags;
+			mDescEx.lss.vertexCount = 0;
+			mDescEx.lss.indexCount = 0;
+			mDescEx.lss.primitiveCount = 1;
+			mDescEx.lss.vertexPositionBuffer;
+			mDescEx.lss.vertexPositionFormat;
+			mDescEx.lss.vertexRadiusBuffer;
+			mDescEx.lss.vertexRadiusFormat;
+			mDescEx.lss.indexBuffer;
+			mDescEx.lss.indexFormat;
+			mDescEx.lss.endcapMode = NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_NONE;
+			// mDescEx.lss.endcapMode = NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_CHAINED;
+			mDescEx.lss.primitiveFormat = NVAPI_D3D12_RAYTRACING_LSS_PRIMITIVE_FORMAT_LIST;
+			// mDescEx.lss.primitiveFormat = NVAPI_D3D12_RAYTRACING_LSS_PRIMITIVE_FORMAT_SUCCESSIVE_IMPLICIT;
+		}
+		
+		// D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS -> NVAPI_D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS_EX
+		mInputsEx.type = mInputs.Type;
+		mInputsEx.flags = (NVAPI_D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS_EX)mInputs.Flags; // EX used by OMM
+		mInputsEx.numDescs = mInputs.NumDescs;
+		mInputsEx.geometryDescStrideInBytes = sizeof(NVAPI_D3D12_RAYTRACING_GEOMETRY_DESC_EX);
+		mInputsEx.descsLayout = mInputs.DescsLayout;
+		mInputsEx.pGeometryDescs = &mDescEx;
+
+		NVAPI_GET_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO_EX_PARAMS params;
+		params.version = NVAPI_GET_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO_EX_PARAMS_VER;
+		params.pDesc = &mInputsEx;
+		params.pInfo = &info;
+
+		gVerify(NvAPI_D3D12_GetRaytracingAccelerationStructurePrebuildInfoEx(gDevice, &params) == NVAPI_OK);
+	}
+	else
+	{
+		gDevice->GetRaytracingAccelerationStructurePrebuildInfo(&mInputs, &info);
+	}
 
 	D3D12_HEAP_PROPERTIES props = gGetDefaultHeapProperties();
 	D3D12_RESOURCE_DESC desc = gGetUAVResourceDesc(info.ScratchDataSizeInBytes);
@@ -55,11 +109,30 @@ void BLAS::Build(ID3D12GraphicsCommandList4* inCommandList)
 	if (mBuilt)
 		return;
 
-	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC desc = {};
-	desc.Inputs = mInputs;
-	desc.DestAccelerationStructureData = mDest->GetGPUVirtualAddress();
-	desc.ScratchAccelerationStructureData = mScratch->GetGPUVirtualAddress();
-	inCommandList->BuildRaytracingAccelerationStructure(&desc, 0, nullptr);
+	if (gNVAPI.mLinearSweptSpheresSupported)
+	{
+		NVAPI_D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC_EX desc = {};
+		desc.inputs = mInputsEx;
+		desc.destAccelerationStructureData = mDest->GetGPUVirtualAddress();
+		desc.sourceAccelerationStructureData = 0;
+		desc.scratchAccelerationStructureData = mScratch->GetGPUVirtualAddress();
+
+		NVAPI_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_EX_PARAMS params = {};
+		params.version = NVAPI_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_EX_PARAMS_VER;
+		params.pDesc = &desc;
+		params.numPostbuildInfoDescs = 0;
+		params.pPostbuildInfoDescs = nullptr;
+		gVerify(NvAPI_D3D12_BuildRaytracingAccelerationStructureEx(inCommandList, &params) == NVAPI_OK);
+	}
+	else
+	{
+		D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC desc = {};
+		desc.Inputs = mInputs;
+		desc.DestAccelerationStructureData = mDest->GetGPUVirtualAddress();
+		desc.SourceAccelerationStructureData = 0;
+		desc.ScratchAccelerationStructureData = mScratch->GetGPUVirtualAddress();
+		inCommandList->BuildRaytracingAccelerationStructure(&desc, 0, nullptr);
+	}
 
 	mBuilt = true;
 }

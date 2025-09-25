@@ -30,6 +30,13 @@
     <ClInclude Include="Source\Thirdparty\ImGuizmo\ImSequencer.h" />
     <ClInclude Include="Source\Thirdparty\ImGuizmo\ImZoomSlider.h" />
     <ClInclude Include="Source\Thirdparty\imgui_config.h" />
+    <ClInclude Include="Source\Thirdparty\nvapi\nvapi.h" />
+    <ClInclude Include="Source\Thirdparty\nvapi\nvapi_interface.h" />
+    <ClInclude Include="Source\Thirdparty\nvapi\nvapi_lite_common.h" />
+    <ClInclude Include="Source\Thirdparty\nvapi\nvapi_lite_d3dext.h" />
+    <ClInclude Include="Source\Thirdparty\nvapi\nvHLSLExtns.h" />
+    <ClInclude Include="Source\Thirdparty\nvapi\nvHLSLExtnsInternal.h" />
+    <ClInclude Include="Source\Thirdparty\nvapi\nvShaderExtnEnums.h" />
     <ClInclude Include="Source\Thirdparty\tinyexr.h" />
     <ClInclude Include="Source\Thirdparty\tinyexr\tinyexr.h" />
     <ClInclude Include="Source\Thirdparty\tiny_gltf.h" />
@@ -303,7 +310,8 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>DirectXTex.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>DirectXTex.lib;nvapi64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)Source\Thirdparty\nvapi\amd64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Command>if not exist $(ProjectDir)Asset\ArPragueSkyModelGround\SkyModelDataset.dat powershell Expand-Archive $(ProjectDir)Asset\ArPragueSkyModelGround\SkyModelDataset.zip -DestinationPath $(ProjectDir)Asset\ArPragueSkyModelGround\</Command>
@@ -333,7 +341,8 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>DirectXTex.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>DirectXTex.lib;nvapi64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)Source\Thirdparty\nvapi\amd64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Command>if not exist $(ProjectDir)Asset\ArPragueSkyModelGround\SkyModelDataset.dat powershell Expand-Archive $(ProjectDir)Asset\ArPragueSkyModelGround\SkyModelDataset.zip -DestinationPath $(ProjectDir)Asset\ArPragueSkyModelGround\</Command>

@@ -41,3 +41,6 @@
 [submodule "Source/Thirdparty/SHARC"]
 	path = Source/Thirdparty/SHARC
 	url = https://github.com/NVIDIA-RTX/SHARC.git
+[submodule "Source/Thirdparty/nvapi"]
+	path = Source/Thirdparty/nvapi
+	url = https://github.com/NVIDIA/nvapi.git

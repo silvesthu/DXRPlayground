@@ -281,6 +281,13 @@
     </ClInclude>
     <ClInclude Include="Source\Thirdparty\tinyexr.h" />
     <ClInclude Include="Source\Thirdparty\tinyexr\tinyexr.h" />
+    <ClInclude Include="Source\Thirdparty\nvapi\nvapi.h" />
+    <ClInclude Include="Source\Thirdparty\nvapi\nvapi_interface.h" />
+    <ClInclude Include="Source\Thirdparty\nvapi\nvapi_lite_common.h" />
+    <ClInclude Include="Source\Thirdparty\nvapi\nvapi_lite_d3dext.h" />
+    <ClInclude Include="Source\Thirdparty\nvapi\nvHLSLExtns.h" />
+    <ClInclude Include="Source\Thirdparty\nvapi\nvHLSLExtnsInternal.h" />
+    <ClInclude Include="Source\Thirdparty\nvapi\nvShaderExtnEnums.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\DXRPlayground.cpp">

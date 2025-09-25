@@ -25,6 +25,7 @@ using Microsoft::WRL::ComPtr;
 #include "Thirdparty/nameof/include/nameof.hpp"
 #include "Thirdparty/DirectXTex/DirectXTex/DirectXTex.h"
 #include "Thirdparty/DirectXTex/DirectXTex/d3dx12.h"
+#include "Thirdparty/nvapi/nvapi.h"
 #include "ImGui/imgui_impl_helper.h"
 #include "ImGui/imgui_impl_dx12.h"
 
@@ -32,6 +33,13 @@ using Microsoft::WRL::ComPtr;
 
 // Common helpers
 #define gAssert assert
+#define gVerify(condition)				\
+	do {								\
+		if (!(condition))				\
+		{								\
+			*((volatile int *)0) = 0;	\
+		}								\
+	} while(0)
 #define UNUSED(_VAR) ((void)(_VAR))
 
 template <typename T>
@@ -299,6 +307,17 @@ extern IDXGISwapChain3* 					gSwapChain;
 extern HANDLE                       		gSwapChainWaitableObject;
 
 extern HMODULE								gPIXHandle;
+
+struct NVAPI
+{
+	bool									mInitialized = false;
+	bool									mMicromapSupported = false;
+	bool									mClustersSupported = false;
+	bool									mLinearSweptSpheresSupported = false;
+	bool									mSpheresSupported = false;
+	bool									mShaderExecutionReorderingSupported = false;
+};
+extern NVAPI								gNVAPI;
 
 template <typename DescriptorIndex>
 struct DescriptorHeap

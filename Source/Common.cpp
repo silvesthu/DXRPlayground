@@ -27,6 +27,8 @@ HANDLE                       		gSwapChainWaitableObject = nullptr;
 
 HMODULE								gPIXHandle = nullptr;
 
+NVAPI								gNVAPI;
+
 // Frame
 FrameContext						gFrameContexts[kFrameInFlightCount] = {};
 uint32_t							gFrameIndex = 0;

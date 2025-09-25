@@ -76,7 +76,8 @@ public:
 															UAVIndex(ViewDescriptorIndex::CloudErosionNoise2DUAV).SRVIndex(ViewDescriptorIndex::CloudErosionNoise2DSRV).Name("Cloud.ErosionNoise.Input").Path(L"Asset/TileableVolumeNoise/noiseErosionPacked.tga");
 		
 		Texture mSentinelTexture				= Texture();
-		std::span<Texture> mTextures			= std::span<Texture>(&mShapeNoise3DTexture, &mSentinelTexture);
+		// std::span<Texture> mTextures			= std::span<Texture>(&mShapeNoise3DTexture, &mSentinelTexture);
+		std::span<Texture> mTextures			= std::span<Texture>(&mSentinelTexture, &mSentinelTexture);
 	};
 	Runtime mRuntime;
 

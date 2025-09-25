@@ -2,6 +2,16 @@
 
 #include "Common.h"
 
+enum class GeometryType
+{
+	Triangles = 0,
+	AABB,
+	OMM,
+	DMM,
+	Sphere,
+	LSS,
+};
+
 struct InstanceInfo
 {
 	std::string mName;
@@ -23,6 +33,8 @@ struct InstanceInfo
 	Texture mReflectanceTexture;
 	Texture mRoughnessTexture;
 	Texture mEmissionTexture;
+	
+	GeometryType mGeometryType = GeometryType::Triangles;
 };
 
 class BLAS final
@@ -36,6 +48,9 @@ public:
 private:
 	D3D12_RAYTRACING_GEOMETRY_DESC mDesc{};
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS mInputs{};
+
+	NVAPI_D3D12_RAYTRACING_GEOMETRY_DESC_EX mDescEx{};
+	NVAPI_D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS_EX mInputsEx{};
 
 	ComPtr<ID3D12Resource> mScratch = nullptr;
 	ComPtr<ID3D12Resource> mDest = nullptr;

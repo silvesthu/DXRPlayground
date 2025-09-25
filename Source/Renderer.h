@@ -42,12 +42,12 @@ struct Renderer
 		Texture									mScreenSentinelTexture;
 		std::span<Texture>						mScreenTextures				= std::span<Texture>(&mScreenColorTexture, &mScreenSentinelTexture);
 
-		Texture									mUVCheckerTexture			= Texture().Width(1024).Height(1024).Format(DXGI_FORMAT_R8G8B8A8_UNORM_SRGB).SRVIndex(ViewDescriptorIndex::UVCheckerSRV).Name("Renderer.UVCheckerMap").Path(L"Asset/UVChecker-map/UVCheckerMaps/UVCheckerMap01-1024.png");
 		Texture									mGeneratedTexture			= Texture().Width(2 * 20).Height(2 * 80).Format(DXGI_FORMAT_R8G8B8A8_UNORM).UAVIndex(ViewDescriptorIndex::GeneratedUAV).SRVIndex(ViewDescriptorIndex::GeneratedSRV).Name("Renderer.Generated");
-		Texture									mIESTexture					= Texture().Width(256).Height(16).Format(DXGI_FORMAT_R32_FLOAT).SRVIndex(ViewDescriptorIndex::IESSRV).Name("Renderer.IES").Path(L"Asset/IES/007cfb11e343e2f42e3b476be4ab684e/IES.hdr");
+		// Texture									mUVCheckerTexture			= Texture().Width(1024).Height(1024).Format(DXGI_FORMAT_R8G8B8A8_UNORM_SRGB).SRVIndex(ViewDescriptorIndex::UVCheckerSRV).Name("Renderer.UVCheckerMap").Path(L"Asset/UVChecker-map/UVCheckerMaps/UVCheckerMap01-1024.png");
+		// Texture									mIESTexture					= Texture().Width(256).Height(16).Format(DXGI_FORMAT_R32_FLOAT).SRVIndex(ViewDescriptorIndex::IESSRV).Name("Renderer.IES").Path(L"Asset/IES/007cfb11e343e2f42e3b476be4ab684e/IES.hdr");
 
 		Texture									mSentinelTexture;
-		std::span<Texture>						mTextures					= std::span<Texture>(&mUVCheckerTexture, &mSentinelTexture);
+		std::span<Texture>						mTextures					= std::span<Texture>(&mGeneratedTexture, &mSentinelTexture);
 
 		Texture									mBackBuffers[kFrameInFlightCount] = { 
 																			Texture().Format(kBackBufferFormat).RTVIndex(RTVDescriptorIndex::BackBuffer0).Name("Renderer.BackBuffer0"),
