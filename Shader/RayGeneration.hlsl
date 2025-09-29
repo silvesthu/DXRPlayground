@@ -36,6 +36,11 @@ void RayGeneration()
 		ray,
 		payload);
 
+	// https://developer.nvidia.com/sites/default/files/akamai/gameworks/ser-whitepaper.pdf
+	// Reordering will consider information in the HitObject and coherence hint with the following priority:
+	// 1. Shader ID stored in the HitObject
+	// 2. Coherence hint, with the most significant hint bit having highest priority
+	// 3. Spatial information stored in the HitObject
 	uint CoherenceHint = 0;
 	uint NumCoherenceHintBits = 0;
 	NvReorderThread(hit_object, CoherenceHint, NumCoherenceHintBits);
