@@ -316,6 +316,7 @@ struct NVAPI
 	bool									mLinearSweptSpheresSupported = false;
 	bool									mSpheresSupported = false;
 	bool									mShaderExecutionReorderingSupported = false;
+	bool									mFakeUAVEnabled = false;
 };
 extern NVAPI								gNVAPI;
 

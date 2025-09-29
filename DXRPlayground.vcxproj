@@ -12,7 +12,30 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="Shader\Context.h" />
+    <CopyFileToFolders Include="dxcompiler.dll">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="dxil.dll">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="imgui.ini">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
+    <None Include="Shader\AtmosphereIntegration.Bruneton17.h" />
+    <None Include="Shader\AtmosphereIntegration.h" />
+    <None Include="Shader\AtmosphereIntegration.Hillaire20.h" />
+    <None Include="Shader\AtmosphereIntegration.Raymarch.h" />
+    <None Include="Shader\AtmosphereIntegration.Wilkie21.h" />
+    <None Include="Shader\Binding.h" />
+    <None Include="Shader\BSDF.h" />
+    <None Include="Shader\ClosestHit.h" />
+    <None Include="Shader\CloudIntegration.h" />
+    <None Include="Shader\Common.h" />
+    <None Include="Shader\Context.h" />
+    <None Include="Shader\Light.h" />
+    <None Include="Shader\Planet.h" />
+    <None Include="Shader\Reservoir.h" />
+    <None Include="Shader\Shared.h" />
     <ClInclude Include="Source\ImGuizmo\ImGuizmoExt.h" />
     <ClInclude Include="Source\Thirdparty\glm.h" />
     <ClInclude Include="Source\Thirdparty\ImGuizmo\example\ImApp.h" />
@@ -30,27 +53,10 @@
     <ClInclude Include="Source\Thirdparty\ImGuizmo\ImSequencer.h" />
     <ClInclude Include="Source\Thirdparty\ImGuizmo\ImZoomSlider.h" />
     <ClInclude Include="Source\Thirdparty\imgui_config.h" />
-    <ClInclude Include="Source\Thirdparty\nvapi\nvapi.h" />
-    <ClInclude Include="Source\Thirdparty\nvapi\nvapi_interface.h" />
-    <ClInclude Include="Source\Thirdparty\nvapi\nvapi_lite_common.h" />
-    <ClInclude Include="Source\Thirdparty\nvapi\nvapi_lite_d3dext.h" />
-    <ClInclude Include="Source\Thirdparty\nvapi\nvHLSLExtns.h" />
-    <ClInclude Include="Source\Thirdparty\nvapi\nvHLSLExtnsInternal.h" />
-    <ClInclude Include="Source\Thirdparty\nvapi\nvShaderExtnEnums.h" />
-    <ClInclude Include="Source\Thirdparty\tinyexr.h" />
-    <ClInclude Include="Source\Thirdparty\tinyexr\tinyexr.h" />
     <ClInclude Include="Source\Thirdparty\tiny_gltf.h" />
-    <CopyFileToFolders Include="Shader\ClosestHit.h" />
-    <CopyFileToFolders Include="Shader\Light.h" />
-    <CopyFileToFolders Include="Shader\BSDF.h" />
-    <CopyFileToFolders Include="Shader\Reservoir.h" />
     <ClInclude Include="Source\Renderer.h" />
     <ClInclude Include="Source\Renderer.inl" />
     <ClInclude Include="Source\Thirdparty\tinyxml2\tinyxml2.h" />
-    <CopyFileToFolders Include="Shader\AtmosphereIntegration.Wilkie21.h">
-      <FileType>Document</FileType>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\Binding.h" />
     <ClInclude Include="Source\Atmosphere.h" />
     <ClInclude Include="Source\Cloud.h" />
     <ClInclude Include="Source\Color.h" />
@@ -142,111 +148,53 @@
     <ClCompile Include="Source\Thirdparty\tinyxml2\tinyxml2.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="Shader\Common.h">
-      <FileType>Document</FileType>
-      <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)$(Platform)\$(Configuration)\Shader</DestinationFolders>
-      <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)$(Platform)\$(Configuration)\Shader</DestinationFolders>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\Shared.h">
-      <FileType>Document</FileType>
-      <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)$(Platform)\$(Configuration)\Shader</DestinationFolders>
-      <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)$(Platform)\$(Configuration)\Shader</DestinationFolders>
-    </CopyFileToFolders>
-  </ItemGroup>
-  <ItemGroup>
-    <CopyFileToFolders Include="Shader\AtmosphereIntegration.Raymarch.h">
-      <FileType>Document</FileType>
-    </CopyFileToFolders>
-  </ItemGroup>
-  <ItemGroup>
-    <CopyFileToFolders Include="Shader\AtmosphereIntegration.h">
-      <FileType>Document</FileType>
-    </CopyFileToFolders>
-  </ItemGroup>
-  <ItemGroup>
-    <CopyFileToFolders Include="Shader\AtmosphereIntegration.Hillaire20.h">
-      <FileType>Document</FileType>
-    </CopyFileToFolders>
-  </ItemGroup>
-  <ItemGroup>
-    <CopyFileToFolders Include="Shader\AtmosphereIntegration.Bruneton17.h">
-      <FileType>Document</FileType>
-    </CopyFileToFolders>
-  </ItemGroup>
-  <ItemGroup>
-    <CopyFileToFolders Include="Shader\Planet.h">
-      <FileType>Document</FileType>
-    </CopyFileToFolders>
-  </ItemGroup>
-  <ItemGroup>
-    <CopyFileToFolders Include="Shader\CloudIntegration.h">
-      <FileType>Document</FileType>
-    </CopyFileToFolders>
-  </ItemGroup>
-  <ItemGroup>
-    <CopyFileToFolders Include="Shader\Composite.hlsl">
-      <FileType>Document</FileType>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\DiffTexture.hlsl">
-      <FileType>Document</FileType>
-    </CopyFileToFolders>
-  </ItemGroup>
-  <ItemGroup>
-    <CopyFileToFolders Include="Shader\Atmosphere.hlsl">
-      <FileType>Document</FileType>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\Cloud.hlsl">
-      <FileType>Document</FileType>
-    </CopyFileToFolders>
-  </ItemGroup>
-  <ItemGroup>
     <None Include="packages.config" />
-    <CopyFileToFolders Include="Shader\packing.hlsli">
-      <FileType>Document</FileType>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\utils.hlsli">
-      <FileType>Document</FileType>
-    </CopyFileToFolders>
+    <None Include="Shader\packing.hlsli" />
+    <None Include="Shader\utils.hlsli" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="Source\Thirdparty\glm\util\glm.natvis" />
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="Shader\RayQuery.hlsl">
-      <FileType>Document</FileType>
-    </CopyFileToFolders>
-  </ItemGroup>
-  <ItemGroup>
-    <CopyFileToFolders Include="Shader\Miss.hlsl">
-      <FileType>Document</FileType>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\RayGeneration.hlsl">
-      <FileType>Document</FileType>
-    </CopyFileToFolders>
-  </ItemGroup>
-  <ItemGroup>
-    <CopyFileToFolders Include="Shader\ClosestHit001.hlsl">
-      <FileType>Document</FileType>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\ClosestHit010.hlsl">
-      <FileType>Document</FileType>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Shader\ClosestHit100.hlsl">
-      <FileType>Document</FileType>
-    </CopyFileToFolders>
-  </ItemGroup>
-  <ItemGroup>
-    <CopyFileToFolders Include="Shader\AnyHit.hlsl">
-      <FileType>Document</FileType>
-    </CopyFileToFolders>
-  </ItemGroup>
-  <ItemGroup>
     <Manifest Include="dpi.manifest" />
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="Shader\PrepareLights.hlsl">
+    <None Include="Shader\AnyHit.hlsl">
       <FileType>Document</FileType>
-    </CopyFileToFolders>
+    </None>
+    <None Include="Shader\Atmosphere.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Shader\ClosestHit001.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Shader\ClosestHit010.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Shader\ClosestHit100.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Shader\Cloud.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Shader\Composite.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Shader\DiffTexture.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Shader\Miss.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Shader\PrepareLights.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Shader\RayGeneration.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Shader\RayQuery.hlsl">
+      <FileType>Document</FileType>
+    </None>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
@@ -314,7 +262,13 @@
       <AdditionalLibraryDirectories>$(ProjectDir)Source\Thirdparty\nvapi\amd64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
-      <Command>if not exist $(ProjectDir)Asset\ArPragueSkyModelGround\SkyModelDataset.dat powershell Expand-Archive $(ProjectDir)Asset\ArPragueSkyModelGround\SkyModelDataset.zip -DestinationPath $(ProjectDir)Asset\ArPragueSkyModelGround\</Command>
+      <Command>mkdir $(ProjectDir)Shader\nvapi
+copy $(ProjectDir)Source\Thirdparty\nvapi\nvHLSLExtns.h $(ProjectDir)Shader\nvapi
+copy $(ProjectDir)Source\Thirdparty\nvapi\nvHLSLExtnsInternal.h $(ProjectDir)Shader\nvapi
+copy $(ProjectDir)Source\Thirdparty\nvapi\nvShaderExtnEnums.h $(ProjectDir)Shader\nvapi
+robocopy $(ProjectDir)Shader $(OutputPath)Shader /MIR
+if ErrorLevel 8 (exit /B 1) else (exit /B 0)
+if not exist $(ProjectDir)Asset\ArPragueSkyModelGround\SkyModelDataset.dat powershell Expand-Archive $(ProjectDir)Asset\ArPragueSkyModelGround\SkyModelDataset.zip -DestinationPath $(ProjectDir)Asset\ArPragueSkyModelGround\</Command>
     </PostBuildEvent>
     <Manifest />
     <Manifest>
@@ -345,7 +299,13 @@
       <AdditionalLibraryDirectories>$(ProjectDir)Source\Thirdparty\nvapi\amd64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
-      <Command>if not exist $(ProjectDir)Asset\ArPragueSkyModelGround\SkyModelDataset.dat powershell Expand-Archive $(ProjectDir)Asset\ArPragueSkyModelGround\SkyModelDataset.zip -DestinationPath $(ProjectDir)Asset\ArPragueSkyModelGround\</Command>
+      <Command>mkdir $(ProjectDir)Shader\nvapi
+copy $(ProjectDir)Source\Thirdparty\nvapi\nvHLSLExtns.h $(ProjectDir)Shader\nvapi
+copy $(ProjectDir)Source\Thirdparty\nvapi\nvHLSLExtnsInternal.h $(ProjectDir)Shader\nvapi
+copy $(ProjectDir)Source\Thirdparty\nvapi\nvShaderExtnEnums.h $(ProjectDir)Shader\nvapi
+robocopy $(ProjectDir)Shader $(OutputPath)Shader /MIR
+if ErrorLevel 8 (exit /B 1) else (exit /B 0)
+if not exist $(ProjectDir)Asset\ArPragueSkyModelGround\SkyModelDataset.dat powershell Expand-Archive $(ProjectDir)Asset\ArPragueSkyModelGround\SkyModelDataset.zip -DestinationPath $(ProjectDir)Asset\ArPragueSkyModelGround\</Command>
     </PostBuildEvent>
     <Manifest>
       <AdditionalManifestFiles>

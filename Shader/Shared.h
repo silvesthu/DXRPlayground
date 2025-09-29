@@ -202,6 +202,17 @@ enum class ViewDescriptorIndex : uint
 	SceneAutoSRV = Count,		// Indices started from this are allocated incrementally by Scene
 };
 
+#define LOCAL_ROOT_SIGNATURE_REGISTER_SPACE 100
+
+// https://developer.nvidia.com/blog/improve-shader-performance-and-in-game-frame-rates-with-shader-execution-reordering/
+#ifdef __cplusplus
+#define NV_SHADER_EXTN_SLOT					999999
+#define NV_SHADER_EXTN_REGISTER_SPACE		999999
+#else
+#define NV_SHADER_EXTN_SLOT					u999999
+#define NV_SHADER_EXTN_REGISTER_SPACE		space999999
+#endif // __cplusplus
+
 enum class SamplerDescriptorIndex : uint
 {
 	BilinearClamp = 0,

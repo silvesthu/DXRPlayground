@@ -94,7 +94,7 @@ int sFindScenePresetIndex(const std::string_view inName)
 {
 	return static_cast<int>(&sFindScenePreset(inName) - &kScenePresets.front());
 }
-static int sCurrentSceneIndex = sFindScenePresetIndex("VeachMISManyLight");
+static int sCurrentSceneIndex = sFindScenePresetIndex("CornellBox");
 static int sPreviousSceneIndex = sCurrentSceneIndex;
 
 struct CameraSettings
@@ -1435,7 +1435,7 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		|| !options12.EnhancedBarriersSupported)
 		return false;
 
-	// NVAPI, based on RTXCR
+	// NVAPI, based on RTXDI, RTXCR. NvAPI_Unload is not used.
 	gNVAPI.mInitialized = NvAPI_Initialize() == NVAPI_OK;
 	if (gNVAPI.mInitialized)
 	{
@@ -1467,9 +1467,16 @@ static bool sCreateDeviceD3D(HWND hWnd)
 			gVerify(NvAPI_D3D12_SetCreatePipelineStateOptions(gDevice, &params) == NVAPI_OK);
 		}
 
+		// Seems this replaced NV_EXTN_OP_HIT_OBJECT_REORDER_THREAD
 		NVAPI_D3D12_RAYTRACING_THREAD_REORDERING_CAPS ser = NVAPI_D3D12_RAYTRACING_THREAD_REORDERING_CAP_NONE;
 		gVerify(NvAPI_D3D12_GetRaytracingCaps(gDevice, NVAPI_D3D12_RAYTRACING_CAPS_TYPE_THREAD_REORDERING, &ser, sizeof(ser)) == NVAPI_OK);
 		gNVAPI.mShaderExecutionReorderingSupported = ser == NVAPI_D3D12_RAYTRACING_THREAD_REORDERING_CAP_STANDARD;
+
+		if (gNVAPI.mShaderExecutionReorderingSupported)
+		{
+			gVerify(NvAPI_D3D12_SetNvShaderExtnSlotSpace(gDevice, NV_SHADER_EXTN_SLOT, NV_SHADER_EXTN_REGISTER_SPACE) == NVAPI_OK);
+			gNVAPI.mFakeUAVEnabled = true;
+		}
 	}
 
 	// InfoQueue callback

@@ -269,29 +269,44 @@ static_assert(sizeof(ShaderTableEntry) % D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIG
 
 ComPtr<ID3D12RootSignature> gCreateLocalRootSignature()
 {
-	uint32_t local_root_signature_register_space = 100; // As long as no overlap with global root signature
-
-	D3D12_DESCRIPTOR_RANGE local_root_descriptor_table_range =
+	D3D12_DESCRIPTOR_RANGE srv_range =
 	{
 		.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV,
 		.NumDescriptors = 4096, // Unbounded, match size with referencing FrameContext::mViewDescriptorHeap
 		.BaseShaderRegister = 0,
-		.RegisterSpace = local_root_signature_register_space,
+		.RegisterSpace = LOCAL_ROOT_SIGNATURE_REGISTER_SPACE,
+		.OffsetInDescriptorsFromTableStart = 0,
+	};
+
+	D3D12_DESCRIPTOR_RANGE nvapi_range =
+	{
+		.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV,
+		.NumDescriptors = 1,
+		.BaseShaderRegister = NV_SHADER_EXTN_SLOT,
+		.RegisterSpace = NV_SHADER_EXTN_REGISTER_SPACE,
 		.OffsetInDescriptorsFromTableStart = 0,
 	};
 
 	// Local Root Parameters, see also ShaderTableEntry
 	D3D12_ROOT_PARAMETER local_root_parameters[] =
 	{
-		D3D12_ROOT_PARAMETER {.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS, .Constants = {.ShaderRegister = 0, .RegisterSpace = local_root_signature_register_space, .Num32BitValues = 4 } },
-		D3D12_ROOT_PARAMETER {.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV, .Descriptor = {.ShaderRegister = 1, .RegisterSpace = local_root_signature_register_space }  },
-		D3D12_ROOT_PARAMETER {.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE, .DescriptorTable = D3D12_ROOT_DESCRIPTOR_TABLE {.NumDescriptorRanges = 1, .pDescriptorRanges = &local_root_descriptor_table_range } },
+		D3D12_ROOT_PARAMETER {.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS, .Constants = {.ShaderRegister = 0, .RegisterSpace = LOCAL_ROOT_SIGNATURE_REGISTER_SPACE, .Num32BitValues = 4 } },
+		D3D12_ROOT_PARAMETER {.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV, .Descriptor = {.ShaderRegister = 1, .RegisterSpace = LOCAL_ROOT_SIGNATURE_REGISTER_SPACE }  },
+		D3D12_ROOT_PARAMETER {.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE, .DescriptorTable = D3D12_ROOT_DESCRIPTOR_TABLE {.NumDescriptorRanges = 1, .pDescriptorRanges = &srv_range } },
+
+		// https://developer.nvidia.com/blog/improve-shader-performance-and-in-game-frame-rates-with-shader-execution-reordering/
+		// Sample code use GlobalRootSignature, here LocalRootSignature is used
+		D3D12_ROOT_PARAMETER {.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE, .DescriptorTable = D3D12_ROOT_DESCRIPTOR_TABLE {.NumDescriptorRanges = 1, .pDescriptorRanges = &nvapi_range } },
 	};
+
+	uint parameter_count = gArraySize(local_root_parameters);
+	if (!gNVAPI.mFakeUAVEnabled)
+		parameter_count--;
 
 	ComPtr<ID3D12RootSignature> local_root_signature = gCreateRootSignature(
 		D3D12_ROOT_SIGNATURE_DESC
 		{
-			.NumParameters = gArraySize(local_root_parameters),
+			.NumParameters = parameter_count,
 			.pParameters = local_root_parameters,
 			.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE,
 		});
@@ -465,6 +480,10 @@ ComPtr<IDxcBlob> gCompileShader(const char* inFilename, const char* inEntryPoint
 	std::string cloud_mode_string = std::format("{}_{}", nameof::nameof_enum_type<CloudMode>(), nameof::nameof_enum(gCloud.mProfile.mMode));
 	std::wstring cloud_mode_wstring = gToWString(cloud_mode_string);
 	defines.push_back({ .Name = cloud_mode_wstring.c_str(), .Value = L"1" });
+
+	// NVAPI
+	if (gNVAPI.mShaderExecutionReorderingSupported)
+		defines.push_back({ .Name = L"NVAPI_SER", .Value = L"1"});
 
 	std::wstring entry_point = gToWString(inEntryPoint);
 	std::wstring entry_point_macro = L"ENTRY_POINT_";

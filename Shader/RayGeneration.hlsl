@@ -3,6 +3,8 @@
 #include "Binding.h"
 #include "Common.h"
 
+#include "nvapi/nvHLSLExtns.h"
+
 [shader("raygeneration")]
 void RayGeneration()
 {
@@ -22,6 +24,25 @@ void RayGeneration()
 	ray.TMax									= 100000;
 
 	RayPayload payload							= (RayPayload)0;
+
+#if NVAPI_SER
+	NvHitObject hit_object = NvTraceRayHitObject(
+		RaytracingScene,
+		0,
+		0xFF,
+		0,
+		0,
+		0,
+		ray,
+		payload);
+
+	uint CoherenceHint = 0;
+	uint NumCoherenceHintBits = 0;
+	NvReorderThread(hit_object, CoherenceHint, NumCoherenceHintBits);
+	// void NvReorderThread(uint CoherenceHint, uint NumCoherenceHintBits); // Generic ver.
+
+	NvInvokeHitObject(RaytracingScene, hit_object, payload);
+#else
 	TraceRay(
 		RaytracingScene, 		// RaytracingAccelerationStructure
 		0,						// RayFlags 
@@ -32,6 +53,7 @@ void RayGeneration()
 		ray,					// RayDesc
 		payload					// Payload
 	);
+#endif // NVAPI_SER
 
 	ScreenColorUAV[DispatchRaysIndex().xy]	= payload.mData;
 }
