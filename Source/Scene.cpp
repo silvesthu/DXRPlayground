@@ -14,19 +14,22 @@
 
 Scene gScene;
 
-void BLAS::Initialize(const InstanceInfo& inInstanceInfo, const InstanceData& inInstanceData, D3D12_GPU_VIRTUAL_ADDRESS inVertexBaseAddress, D3D12_GPU_VIRTUAL_ADDRESS inIndexBaseAddress)
+void BLAS::Initialize(const Initializer& inInitializer)
 {
+	const InstanceInfo& instance_info = inInitializer.mInstanceInfo;
+	const InstanceData& instance_data = inInitializer.mInstanceData;
+
 	mDesc = {};
 	mDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
 	mDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
-	mDesc.Triangles.VertexBuffer.StartAddress = inVertexBaseAddress + inInstanceData.mVertexOffset * sizeof(VertexType);
+	mDesc.Triangles.VertexBuffer.StartAddress = inInitializer.mVertexBaseAddress + instance_data.mVertexOffset * sizeof(VertexType);
 	mDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(VertexType);
 	mDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-	mDesc.Triangles.VertexCount = inInstanceData.mVertexCount;
-	if (inInstanceData.mIndexCount > 0)
+	mDesc.Triangles.VertexCount = instance_data.mVertexCount;
+	if (instance_data.mIndexCount > 0)
 	{
-		mDesc.Triangles.IndexBuffer = inIndexBaseAddress + inInstanceData.mIndexOffset * sizeof(IndexType);
-		mDesc.Triangles.IndexCount = inInstanceData.mIndexCount;
+		mDesc.Triangles.IndexBuffer = inInitializer.mIndexBaseAddress + instance_data.mIndexOffset * sizeof(IndexType);
+		mDesc.Triangles.IndexCount = instance_data.mIndexCount;
 		mDesc.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
 	}
 
@@ -41,36 +44,44 @@ void BLAS::Initialize(const InstanceInfo& inInstanceInfo, const InstanceData& in
 	if (gNVAPI.mLinearSweptSpheresSupported)
 	{
 		// D3D12_RAYTRACING_GEOMETRY_DESC -> NVAPI_D3D12_RAYTRACING_GEOMETRY_DESC_EX
-		if (inInstanceInfo.mGeometryType == GeometryType::Triangles)
+		if (instance_info.mGeometryType == GeometryType::Triangles)
 		{
 			mDescEx.type = NVAPI_D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES_EX;
 			mDescEx.flags = mDesc.Flags;
 			mDescEx.triangles = mDesc.Triangles;
 		}
-		else if (inInstanceInfo.mGeometryType == GeometryType::Sphere)
+		else if (instance_info.mGeometryType == GeometryType::Sphere)
 		{
 			mDescEx.type = NVAPI_D3D12_RAYTRACING_GEOMETRY_TYPE_SPHERES_EX; // see fillD3dSpheresDesc
 			mDescEx.flags = mDesc.Flags;
 
 			// [TODO]
 		}
-		else if (inInstanceInfo.mGeometryType == GeometryType::LSS)
+		else if (instance_info.mGeometryType == GeometryType::LSS)
 		{
 			mDescEx.type = NVAPI_D3D12_RAYTRACING_GEOMETRY_TYPE_LSS_EX; // see fillD3dLssDesc
 			mDescEx.flags = mDesc.Flags;
-			mDescEx.lss.vertexCount = 0;
-			mDescEx.lss.indexCount = 0;
-			mDescEx.lss.primitiveCount = 1;
-			mDescEx.lss.vertexPositionBuffer;
-			mDescEx.lss.vertexPositionFormat;
-			mDescEx.lss.vertexRadiusBuffer;
-			mDescEx.lss.vertexRadiusFormat;
-			mDescEx.lss.indexBuffer;
-			mDescEx.lss.indexFormat;
-			mDescEx.lss.endcapMode = NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_NONE;
+			mDescEx.lss.vertexCount = instance_data.mVertexCount;
+			mDescEx.lss.primitiveCount = instance_data.mVertexCount / 2; // Assume line list
+			mDescEx.lss.vertexPositionBuffer.StartAddress = inInitializer.mVertexBaseAddress + instance_data.mVertexOffset * sizeof(VertexType);
+			mDescEx.lss.vertexPositionBuffer.StrideInBytes = sizeof(VertexType);
+			mDescEx.lss.vertexPositionFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+			mDescEx.lss.vertexRadiusBuffer.StartAddress = inInitializer.mVertexBaseAddress + instance_data.mVertexOffset * sizeof(RadiusType);
+			mDescEx.lss.vertexRadiusBuffer.StrideInBytes = sizeof(RadiusType);
+			mDescEx.lss.vertexRadiusFormat = DXGI_FORMAT_R32_FLOAT;
+
+			mDescEx.lss.endcapMode = gNVAPI.mEndcapMode;
 			// mDescEx.lss.endcapMode = NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_CHAINED;
 			mDescEx.lss.primitiveFormat = NVAPI_D3D12_RAYTRACING_LSS_PRIMITIVE_FORMAT_LIST;
 			// mDescEx.lss.primitiveFormat = NVAPI_D3D12_RAYTRACING_LSS_PRIMITIVE_FORMAT_SUCCESSIVE_IMPLICIT;
+
+			if (instance_data.mIndexCount > 0)
+			{
+				mDescEx.lss.indexBuffer.StartAddress = inInitializer.mIndexBaseAddress + instance_data.mIndexOffset * sizeof(IndexType);
+				mDescEx.lss.indexBuffer.StrideInBytes = sizeof(IndexType);
+				mDescEx.lss.indexCount = instance_data.mIndexCount;
+				mDescEx.lss.indexFormat = DXGI_FORMAT_R32_UINT;
+			}
 		}
 		
 		// D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS -> NVAPI_D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS_EX
@@ -97,11 +108,11 @@ void BLAS::Initialize(const InstanceInfo& inInstanceInfo, const InstanceData& in
 	D3D12_RESOURCE_DESC desc = gGetUAVResourceDesc(info.ScratchDataSizeInBytes);
 
 	gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mScratch)));
-	gSetName(mScratch, "Scene.", inInstanceInfo.mName, ".[BLAS].Scratch");
+	gSetName(mScratch, "Scene.", instance_info.mName, ".[BLAS].Scratch");
 
 	desc = gGetUAVResourceDesc(info.ResultDataMaxSizeInBytes);
 	gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, nullptr, IID_PPV_ARGS(&mDest)));
-	gSetName(mDest, "Scene.", inInstanceInfo.mName, ".[BLAS].Dest");
+	gSetName(mDest, "Scene.", instance_info.mName, ".[BLAS].Dest");
 }
 
 void BLAS::Build(ID3D12GraphicsCommandList4* inCommandList)
@@ -1210,7 +1221,13 @@ void Scene::InitializeAccelerationStructures()
 		const InstanceData& instance_data = GetInstanceData(instance_index);
 
 		BLASRef blas = std::make_shared<BLAS>();
-		blas->Initialize(instance_info, instance_data, mBuffers.mVertices->GetGPUVirtualAddress(), mBuffers.mIndices->GetGPUVirtualAddress());
+		blas->Initialize(
+		{
+			.mInstanceInfo = instance_info,
+			.mInstanceData = instance_data,
+			.mVertexBaseAddress = mBuffers.mVertices->GetGPUVirtualAddress(),
+			.mIndexBaseAddress = mBuffers.mIndices->GetGPUVirtualAddress()
+		});
 		mBlases.push_back(blas);
 
 		glm::mat4x4 transform = glm::transpose(instance_data.mTransform); // column-major -> row-major

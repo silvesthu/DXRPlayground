@@ -56,6 +56,7 @@ static const std::array kScenePresets =
 	ScenePreset().Name("CornellBoxDielectric").Path("Asset/Comparison/benedikt-bitterli/cornell-box-dielectric/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("CornellBoxTeapot").Path("Asset/Comparison/benedikt-bitterli/cornell-box-teapot/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("CornellMonkey").Path("Asset/Comparison/benedikt-bitterli/cornell-box-monkey/scene_v3.xml").EmissionBoost(1E4f),
+	ScenePreset().Name("CornellDragon").Path("Asset/Comparison/benedikt-bitterli/cornell-box-dragon/scene_v3.xml").EmissionBoost(1E4f),
 
 	// MIS
 	ScenePreset().Name("VeachMIS").Path("Asset/Comparison/benedikt-bitterli/veach-mis/scene_ggx_v3.xml").EmissionBoost(1E4f),
@@ -64,16 +65,13 @@ static const std::array kScenePresets =
 	ScenePreset().Name("VeachMISManyLight").Path("Asset/Comparison/benedikt-bitterli/veach-mis-manylight/scene_ggx_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("Arcade").Path("Asset/Comparison/RTXDI-Assets/Arcade/Arcade.gltf").CameraPosition(glm::vec4(-1.658f, 1.577f, 1.69f, 0.0f)).CameraDirection(glm::vec4(-0.9645f, 1.2672f, 1.0396f, 0.0f) - glm::vec4(-1.658f, 1.577f, 1.69f, 0.0f)).EmissionBoost(1E6f),
 
-	// Simple scenes
-	ScenePreset().Name("Dragon").Path("Asset/Comparison/benedikt-bitterli/dragon/scene_v3.xml").EmissionBoost(1E4f),
-	
 	// Complex scenes
 	ScenePreset().Name("LivingRoom2").Path("Asset/Comparison/benedikt-bitterli/living-room-2/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("VeachAjar").Path("Asset/Comparison/benedikt-bitterli/veach-ajar/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("VeachBidir").Path("Asset/Comparison/benedikt-bitterli/veach-bidir/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("PicaPica").Path("Asset/Sketchfab/pica-pica-mini-diorama-01/scene.gltf").CameraPosition(glm::vec4(-20.588f, 2.453f, 13.020f, 0.0f)).CameraDirection(glm::vec4(0.983f, -0.168f, 0.071f, 0.0f)).EmissionBoost(1E6f).ConstantColor(glm::vec4(0.1f)),
 	ScenePreset().Name("Bistro").Path("Asset/Comparison/RTXDI-Assets/bistro/bistro.gltf").CameraPosition(glm::vec4(-20.588f, 2.453f, 13.020f, 0.0f)).CameraDirection(glm::vec4(0.983f, -0.168f, 0.071f, 0.0f)).EmissionBoost(1E6f),
-	
+
 	// Atmosphere
 	ScenePreset().Name("Bruneton17").Path("Asset/primitives/sphere.obj").CameraPosition(glm::vec4(0.0f, 0.0f, 9.0f, 0.0f)).CameraDirection(glm::vec4(0.0f, 0.0f, -1.0f, 0.0f)).Transform(glm::translate(glm::vec3(0.0f, 1.0f, 0.0f))).Atmosphere(AtmosphereMode::Bruneton17),
 	ScenePreset().Name("Bruneton17_Artifact_Mu").Path("Asset/primitives/sphere.obj").CameraPosition(glm::vec4(0.0f, 80.0f, 150.0f, 0.0f)).CameraDirection(glm::vec4(0.0f, 0.0f, -1.0f, 0.0f)).Transform(glm::scale(glm::vec3(100.0f, 100.0f, 100.0f))).Atmosphere(AtmosphereMode::Bruneton17),
@@ -94,7 +92,7 @@ int sFindScenePresetIndex(const std::string_view inName)
 {
 	return static_cast<int>(&sFindScenePreset(inName) - &kScenePresets.front());
 }
-static int sCurrentSceneIndex = sFindScenePresetIndex("CornellBox");
+static int sCurrentSceneIndex = sFindScenePresetIndex("CornellDragon");
 static int sPreviousSceneIndex = sCurrentSceneIndex;
 
 struct CameraSettings
@@ -167,9 +165,17 @@ static void sPrepareImGui()
 			if (ImGui::Button("Copy Mitsuba Camera"))
 			{
 				glm::mat4x4 camera_transform = gConstants.mCameraTransform;
-				camera_transform[0] = -camera_transform[0];
 				ImGui::SetClipboardText(gToString(camera_transform).c_str());
 			}
+		}
+		{
+			if (ImGui::Button("Reload Scene"))
+				sLoadScene();
+
+			ImGui::SameLine();
+
+			if (ImGui::Button("Open Scene Folder"))
+				gOpenSceneFolder(kScenePresets[sCurrentSceneIndex].mPath);
 		}
 		{
 			if (ImGui::Button("Dump Luminance (F9)"))
@@ -179,11 +185,6 @@ static void sPrepareImGui()
 
 			if (ImGui::Button("Open Dump Folder"))
 				gOpenDumpFolder();
-
-			ImGui::SameLine();
-
-			if (ImGui::Button("Open Scene Folder"))
-				gOpenSceneFolder(kScenePresets[sCurrentSceneIndex].mPath);
 		}
 
 		if (ImGui::TreeNodeEx("Debug", ImGuiTreeNodeFlags_DefaultOpen))
@@ -983,6 +984,8 @@ void sLoadCamera()
 
 void sLoadScene()
 {
+	sWaitForGPU();
+
 	gScene.Unload();
 	gScene.Load(kScenePresets[sCurrentSceneIndex].mPath, kScenePresets[sCurrentSceneIndex].mTransform);
 	gScene.Build();
@@ -990,18 +993,13 @@ void sLoadScene()
 	gConstants.mSunAzimuth = kScenePresets[sCurrentSceneIndex].mSunAzimuth;
 	gConstants.mSunZenith = kScenePresets[sCurrentSceneIndex].mSunZenith;
 
+	gAtmosphere.mProfile.mMode = kScenePresets[sCurrentSceneIndex].mAtmosphere;
 	if (gScene.GetSceneContent().mAtmosphereMode.has_value())
-	{
 		gAtmosphere.mProfile.mMode = gScene.GetSceneContent().mAtmosphereMode.value();
-		gAtmosphere.mProfile.mConstantColor = gScene.GetSceneContent().mBackgroundColor;
-	}
-	else
-	{
-		gAtmosphere.mProfile.mMode = kScenePresets[sCurrentSceneIndex].mAtmosphere;
-		gAtmosphere.mProfile.mConstantColor = kScenePresets[sCurrentSceneIndex].mConstantColor;
-	}
+	gAtmosphere.mProfile.mConstantColor = kScenePresets[sCurrentSceneIndex].mConstantColor;
 
 	gRenderer.mReloadShader = true;
+	gRenderer.mAccumulationResetRequested = true;
 
 	sLoadCamera();
 }
@@ -1031,11 +1029,7 @@ void sRender()
 		if (sPreviousSceneIndex != sCurrentSceneIndex)
 		{
 			sPreviousSceneIndex = sCurrentSceneIndex;
-
-			sWaitForGPU();
 			sLoadScene();
-
-			gRenderer.mAccumulationResetRequested = true;
 		}
 	}
 

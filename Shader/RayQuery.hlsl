@@ -34,10 +34,11 @@ void TraceRay(inout PixelContext ioPixelContext)
 	float3 ray_direction_vs						= normalize(point_on_near_plane.xyz / point_on_near_plane.w);
 	float3 ray_direction_ws						= mul(mConstants.mInverseViewMatrix, float4(ray_direction_vs, 0.0)).xyz;
 
+	// [TODO] Origin offset and TMin
 	RayDesc ray;
 	ray.Origin									= mConstants.CameraPosition().xyz;
 	ray.Direction								= ray_direction_ws;
-	ray.TMin									= 0.001;
+	ray.TMin									= 1E-4;
 	ray.TMax									= 100000;
 
 	PathContext path_context					= (PathContext)0;

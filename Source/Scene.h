@@ -40,7 +40,18 @@ struct InstanceInfo
 class BLAS final
 {
 public:
-	void Initialize(const InstanceInfo& inInstanceInfo, const InstanceData& inInstanceData, D3D12_GPU_VIRTUAL_ADDRESS inVertexBaseAddress, D3D12_GPU_VIRTUAL_ADDRESS inIndexBaseAddress);
+	struct Initializer
+	{
+		const InstanceInfo& mInstanceInfo;
+		const InstanceData& mInstanceData;
+
+		D3D12_GPU_VIRTUAL_ADDRESS mVertexBaseAddress;
+		D3D12_GPU_VIRTUAL_ADDRESS mIndexBaseAddress;
+
+		D3D12_GPU_VIRTUAL_ADDRESS mRadiusBaseAddress;
+	};
+
+	void Initialize(const Initializer& inInitializer);
 	void Build(ID3D12GraphicsCommandList4* inCommandList);
 
 	D3D12_GPU_VIRTUAL_ADDRESS GetGPUVirtualAddress() const { return mDest->GetGPUVirtualAddress(); }
@@ -63,6 +74,8 @@ using IndexType = uint32_t;
 using VertexType = glm::vec3;
 using NormalType = glm::vec3;
 using UVType = glm::vec2;
+
+using RadiusType = float;
 
 struct SceneContent
 {
@@ -88,7 +101,6 @@ struct SceneContent
 	std::optional<float>						mFov;
 
 	std::optional<AtmosphereMode>				mAtmosphereMode;
-	glm::vec4									mBackgroundColor = glm::vec4(0.0f);
 };
 
 class TLAS final

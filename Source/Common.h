@@ -317,6 +317,8 @@ struct NVAPI
 	bool									mSpheresSupported = false;
 	bool									mShaderExecutionReorderingSupported = false;
 	bool									mFakeUAVEnabled = false;
+
+	NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE  mEndcapMode = NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_NONE;
 };
 extern NVAPI								gNVAPI;
 
