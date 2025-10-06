@@ -140,12 +140,13 @@ void ClearCS(
 		PixelInspectionUAV[0].mPixelValueArray[inDispatchThreadID.x] = 0;
 	}
 
-	if (inDispatchThreadID.x < RayInspection::kArraySize)
-	{
-		RayInspectionUAV[0].mPositionWS[inDispatchThreadID.x] = 0;
-		RayInspectionUAV[0].mNormalWS[inDispatchThreadID.x] = 0;
-		RayInspectionUAV[0].mLightPositionWS[inDispatchThreadID.x] = 0;
-	}
+	if (mConstants.mDebugFlag & DebugFlag::UpdateRayInspection)
+		if (inDispatchThreadID.x < RayInspection::kArraySize)
+		{
+			RayInspectionUAV[0].mPositionWS[inDispatchThreadID.x] = 0;
+			RayInspectionUAV[0].mNormalWS[inDispatchThreadID.x] = 0;
+			RayInspectionUAV[0].mLightPositionWS[inDispatchThreadID.x] = 0;
+		}
 }
 
 [RootSignature(ROOT_SIGNATURE_COMMON)]
@@ -174,13 +175,18 @@ float4 LineVS(uint inVertexID : SV_VertexID, out float4 outColor : COLOR) : SV_P
 		// Position
 		uint group = inVertexID / 2;
 		uint index = inVertexID % 2;
-		uint vertex_index = group + index;
-		position_ws = RayInspectionUAV[0].mPositionWS[vertex_index];
+
+		float4 position_0 = RayInspectionUAV[0].mPositionWS[group + 0];
+		float4 position_1 = RayInspectionUAV[0].mPositionWS[group + 1];
+
+		position_ws = index == 0 ? position_0 : position_1;
+
+		float distance_along_ray = index == 0 ? 0.0 : length(position_1.xyz - position_0.xyz);
 
 		if (group == 0)
-			outColor = float4(1.0, 1.0, 0.0, 1.0);
+			outColor = float4(1.0, 0.0, 0.0, distance_along_ray); // Primary hit
 		else
-			outColor = float4(0.5, 0.5, 0.0, 1.0);
+			outColor = float4(0.0, 1.0, 0.0, distance_along_ray); // Secondary hit
 	}
 	else if (inVertexID < RayInspection::kArraySize * 2 * 2)
 	{
@@ -193,13 +199,18 @@ float4 LineVS(uint inVertexID : SV_VertexID, out float4 outColor : COLOR) : SV_P
 		// LightPosition
 		uint group = (inVertexID - RayInspection::kArraySize * 2 * 2) / 2;
 		uint index = (inVertexID - RayInspection::kArraySize * 2 * 2) % 2;
-		uint vertex_index = group;
-		position_ws = index == 0 ? RayInspectionUAV[0].mPositionWS[vertex_index] : RayInspectionUAV[0].mLightPositionWS[vertex_index];
+
+		float4 position_0 = RayInspectionUAV[0].mPositionWS[group];
+		float4 position_1 = RayInspectionUAV[0].mLightPositionWS[group];
+
+		position_ws = index == 0 ? position_0 : position_1;
+
+		float distance_along_ray = index == 0 ? 0.0 : length(position_1.xyz - position_0.xyz);
 
 		if (group == 0)
-			outColor = float4(0.0, 1.0, 1.0, 1.0);
+			outColor = float4(0.0, 0.0, 1.0, distance_along_ray); // Primary hit
 		else
-			outColor = float4(0.0, 0.5, 0.5, 1.0);		
+			outColor = float4(0.0, 0.0, 1.0, distance_along_ray); // Secondary hit
 	}
 	
 	float4 position_ps = mul(mConstants.mViewProjectionMatrix, position_ws);
@@ -210,5 +221,18 @@ float4 LineVS(uint inVertexID : SV_VertexID, out float4 outColor : COLOR) : SV_P
 [RootSignature(ROOT_SIGNATURE_COMMON)]
 float4 LinePS(float4 position : SV_POSITION, in float4 inColor : COLOR) : SV_TARGET
 {
-	return inColor;
+	return float4(inColor.xyz, 1.0);
+}
+
+[RootSignature(ROOT_SIGNATURE_COMMON)]
+float4 LineHiddenPS(float4 position : SV_POSITION, in float4 inColor : COLOR) : SV_TARGET
+{
+	// Dashed line
+	if (frac(inColor.w * 100.0) < 0.8)
+	{
+		discard;
+		return 0;
+	}
+
+	return float4(inColor.xyz, 1.0);
 }

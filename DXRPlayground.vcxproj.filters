@@ -414,6 +414,9 @@
       <Filter>Shader</Filter>
     </None>
     <None Include="dxcompiler.dll" />
+    <None Include="Shader\EnumHelper.inl">
+      <Filter>Shader</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="Source\Thirdparty\glm\util\glm.natvis">

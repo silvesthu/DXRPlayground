@@ -29,25 +29,12 @@ using float4x4 = glm::mat4x4;
 #define CONSTANT_DEFAULT(x) = x
 #define RETURN_AS_REFERENCE &
 #define GET_COLUMN(x, i) x[i]
-#define ENUM_CLASS_OPERATOR(T)									\
-inline constexpr T operator&(T inContainer, T inValue)			\
-{																\
-	using U = std::underlying_type_t<T>;						\
-	return (T)((U)inContainer & (U)inValue);					\
-}																\
-																\
-inline constexpr T operator|(T inContainer, T inValue)			\
-{																\
-	using U = std::underlying_type_t<T>;						\
-	return (T)((U)inContainer | (U)inValue);					\
-}																\
 
 #else
 
 #define CONSTANT_DEFAULT(x)
 #define RETURN_AS_REFERENCE
 #define GET_COLUMN(x, i) transpose(x)[i]
-#define ENUM_CLASS_OPERATOR(T)
 
 #endif // __cplusplus
 
@@ -55,6 +42,8 @@ inline constexpr T operator|(T inContainer, T inValue)			\
 #define CONCAT_INNER(a, b) a ## b
 #define GENERATE_PAD_NAME CONCAT(mPad_, __LINE__)
 #define GENERATE_NEW_LINE_NAME CONCAT(_Newline_, __LINE__)
+
+#include "EnumHelper.inl"
 
 static const uint kIndexCountPerTriangle		= 3;
 
@@ -457,6 +446,13 @@ enum class CloudMode  : uint
 	Count
 };
 
+enum_class_cpp DebugFlag : uint
+{
+	None										= 0,
+	UpdateRayInspection							= 1 << 0,
+};
+ENABLE_UINT_ENUM_BITWISE_OPERATORS(DebugFlag)
+
 struct TextureInfo
 {
 	uint						mTextureIndex : 16				CONSTANT_DEFAULT((uint)ViewDescriptorIndex::Invalid);
@@ -494,6 +490,12 @@ struct InstanceData
 
     float3						mEmission						CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	TextureInfo					mEmissionTexture;
+
+	float3						mMediumAlbedo					CONSTANT_DEFAULT(float3(0.75f, 0.75f, 0.75f));
+	float						mMediumSigmaT					CONSTANT_DEFAULT(1.0f);
+
+	float						mMediumPhase					CONSTANT_DEFAULT(0.5f);
+	float3						GENERATE_PAD_NAME				CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 
 	float4x4					mTransform						CONSTANT_DEFAULT(float4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1));
 	float4x4					mInverseTranspose				CONSTANT_DEFAULT(float4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1));
@@ -722,8 +724,8 @@ struct Constants
 	int							mDebugInstanceIndex				CONSTANT_DEFAULT(-1);
 	int							mDebugLightIndex				CONSTANT_DEFAULT(-1);
 
-	uint						mRecursionDepthCountMax			CONSTANT_DEFAULT(1);
-	uint						mRussianRouletteDepth			CONSTANT_DEFAULT(1);
+	uint						mRecursionDepthCountMax			CONSTANT_DEFAULT(16);
+	uint						mRussianRouletteDepth			CONSTANT_DEFAULT(16);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
@@ -738,7 +740,7 @@ struct Constants
 
 	DebugMode					mDebugMode						CONSTANT_DEFAULT(DebugMode::Manual);
 	int							mDebugRecursion					CONSTANT_DEFAULT(0);
-	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	DebugFlag					mDebugFlag						CONSTANT_DEFAULT(DebugFlag::None);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
 	AtmosphereConstants			mAtmosphere;
@@ -774,7 +776,6 @@ struct LocalConstants
 	uint3						mPad							CONSTANT_DEFAULT(uint3(0, 0, 0));
 };
 
-#undef ENUM_CLASS_OPERATOR
 #undef GET_COLUMN
 #undef RETURN_AS_REFERENCE
 #undef CONSTANT_DEFAULT

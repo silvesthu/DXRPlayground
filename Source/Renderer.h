@@ -17,6 +17,7 @@ struct Renderer
 		Shader									mDiffTexture2DShader		= Shader().FileName("Shader/DiffTexture.hlsl").CSName("DiffTexture2DShader");
 		Shader									mDiffTexture3DShader		= Shader().FileName("Shader/DiffTexture.hlsl").CSName("DiffTexture3DShader");
 		Shader									mLineShader					= Shader().FileName("Shader/Composite.hlsl").VSName("LineVS").PSName("LinePS").Topology(D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE).DepthFunc(D3D12_COMPARISON_FUNC_LESS).RTVFormat(kBackBufferFormat).DSVFormat(DXGI_FORMAT_D32_FLOAT);
+		Shader									mLineHiddenShader			= Shader().FileName("Shader/Composite.hlsl").VSName("LineVS").PSName("LineHiddenPS").Topology(D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE).DepthFunc(D3D12_COMPARISON_FUNC_GREATER).RTVFormat(kBackBufferFormat).DSVFormat(DXGI_FORMAT_D32_FLOAT);
 		Shader									mCompositeShader			= Shader().FileName("Shader/Composite.hlsl").VSName("ScreenspaceTriangleVS").PSName("CompositePS").RTVFormat(kBackBufferFormat).DSVFormat(DXGI_FORMAT_D32_FLOAT);
 		Shader									mSentinelShader				= Shader();
 		std::span<Shader>						mShaders					= std::span<Shader>(&mRayQueryShader, &mSentinelShader);
@@ -133,7 +134,7 @@ struct Renderer
 	bool										mAccumulationDone = false;
 	bool										mAccumulationFrameUnlimited = false;
 	bool										mAccumulationPaused = false;
-	uint										mAccumulationFrameCount = 1;
+	uint										mAccumulationFrameCount = 64;
 	bool										mAccumulationResetRequested = false;
 
 	uint										mScreenWidth = 0;

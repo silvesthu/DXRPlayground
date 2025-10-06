@@ -87,12 +87,16 @@ void TraceRay(inout PixelContext ioPixelContext)
 
 			// HitContext
 			HitContext hit_context				= HitContext::Generate(ray, query);
+
+			// Debug
 			{
-				if (ioPixelContext.mPixelIndex.x == mConstants.mPixelDebugCoord.x && ioPixelContext.mPixelIndex.y == mConstants.mPixelDebugCoord.y)
-					RayInspectionUAV[0].mPositionWS[path_context.mRecursionDepth] = float4(hit_context.PositionWS(), 1.0);
+				if (mConstants.mDebugFlag & DebugFlag::UpdateRayInspection)
+					if (ioPixelContext.mPixelIndex.x == mConstants.mPixelDebugCoord.x && ioPixelContext.mPixelIndex.y == mConstants.mPixelDebugCoord.y)
+						RayInspectionUAV[0].mPositionWS[path_context.mRecursionDepth] = float4(hit_context.PositionWS(), 1.0);
 				
-				if (ioPixelContext.mPixelIndex.x == mConstants.mPixelDebugCoord.x && ioPixelContext.mPixelIndex.y == mConstants.mPixelDebugCoord.y && path_context.mRecursionDepth == 0)
-					PixelInspectionUAV[0].mPixelInstanceID = hit_context.mInstanceID;
+				if (path_context.mRecursionDepth == 0)
+					if (ioPixelContext.mPixelIndex.x == mConstants.mPixelDebugCoord.x && ioPixelContext.mPixelIndex.y == mConstants.mPixelDebugCoord.y)
+						PixelInspectionUAV[0].mPixelInstanceID = hit_context.mInstanceID;
 				
 				DebugValue(DebugMode::PositionWS, path_context.mRecursionDepth, float3(hit_context.PositionWS()));
 				DebugValue(DebugMode::DirectionWS, path_context.mRecursionDepth, float3(hit_context.DirectionWS()));
@@ -197,9 +201,10 @@ void TraceRay(inout PixelContext ioPixelContext)
 						
 						// Shadow ray hit the light
 						if (shadow_query.CommittedStatus() == COMMITTED_TRIANGLE_HIT && shadow_query.CommittedInstanceID() == light_context.Light().mInstanceID)
-						{							
-							if (ioPixelContext.mPixelIndex.x == mConstants.mPixelDebugCoord.x && ioPixelContext.mPixelIndex.y == mConstants.mPixelDebugCoord.y)
-								RayInspectionUAV[0].mLightPositionWS[path_context.mRecursionDepth] = float4(shadow_ray.Origin + shadow_ray.Direction * shadow_query.CommittedRayT(), 1.0);
+						{
+							if (mConstants.mDebugFlag& DebugFlag::UpdateRayInspection)
+								if (ioPixelContext.mPixelIndex.x == mConstants.mPixelDebugCoord.x && ioPixelContext.mPixelIndex.y == mConstants.mPixelDebugCoord.y)
+									RayInspectionUAV[0].mLightPositionWS[path_context.mRecursionDepth] = float4(shadow_ray.Origin + shadow_ray.Direction * shadow_query.CommittedRayT(), 1.0);
 							
 							BSDFContext bsdf_context			= BSDFContext::Generate(BSDFContext::Mode::Light, light_context.mL, hit_context);
 							BSDFResult bsdf_result				= BSDFEvaluation::Evaluate(bsdf_context, hit_context, path_context);
@@ -255,16 +260,16 @@ void TraceRay(inout PixelContext ioPixelContext)
 			// DebugMode
 			switch (mConstants.mVisualizeMode)
 			{
-			case VisualizeMode::None:				break;
-			case VisualizeMode::Barycentrics: 		path_context.mEmission = hit_context.Barycentrics(); continue_bounce = false; break;
-			case VisualizeMode::Position: 			path_context.mEmission = hit_context.PositionWS(); continue_bounce = false; break;
-			case VisualizeMode::Normal: 			path_context.mEmission = hit_context.NormalWS(); continue_bounce = false; break;
-			case VisualizeMode::UV:					path_context.mEmission = float3(hit_context.UV(), 0.0); continue_bounce = false; break;
-			case VisualizeMode::Albedo: 			path_context.mEmission = hit_context.Albedo(); continue_bounce = false; break;
-			case VisualizeMode::Reflectance: 		path_context.mEmission = hit_context.SpecularReflectance(); continue_bounce = false; break;
-			case VisualizeMode::Emission: 			path_context.mEmission = hit_context.Emission(); continue_bounce = false; break;
-			case VisualizeMode::RoughnessAlpha: 	path_context.mEmission = hit_context.RoughnessAlpha(); continue_bounce = false; break;
-			case VisualizeMode::RecursionDepth:		continue_bounce = true; break;
+			case VisualizeMode::None:			break;
+			case VisualizeMode::Barycentrics: 	path_context.mEmission = hit_context.Barycentrics(); continue_bounce = false; break;
+			case VisualizeMode::Position: 		path_context.mEmission = hit_context.PositionWS(); continue_bounce = false; break;
+			case VisualizeMode::Normal: 		path_context.mEmission = hit_context.NormalWS(); continue_bounce = false; break;
+			case VisualizeMode::UV:				path_context.mEmission = float3(hit_context.UV(), 0.0); continue_bounce = false; break;
+			case VisualizeMode::Albedo: 		path_context.mEmission = hit_context.Albedo(); continue_bounce = false; break;
+			case VisualizeMode::Reflectance: 	path_context.mEmission = hit_context.SpecularReflectance(); continue_bounce = false; break;
+			case VisualizeMode::Emission: 		path_context.mEmission = hit_context.Emission(); continue_bounce = false; break;
+			case VisualizeMode::RoughnessAlpha: path_context.mEmission = hit_context.RoughnessAlpha(); continue_bounce = false; break;
+			case VisualizeMode::RecursionDepth:	continue_bounce = true; break;
 			default:							path_context.mEmission = sVisualizeModeValue; continue_bounce = false; break;
 			}
 		}

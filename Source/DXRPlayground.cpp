@@ -455,6 +455,9 @@ static void sPrepareImGui()
 					"Transmittance",
 					"Eta",
 					"K",
+					"MediumAlbedo",
+					"MediumSigmaT",
+					"MediumPhase",
 					"Emission",
 					"RoughnessAlpha",
 					"Opacity",
@@ -472,6 +475,11 @@ static void sPrepareImGui()
 					{
 						ImGui::TableSetColumnIndex(i);
 						ImGui::Text(columns[i]);
+
+						if (ImGui::IsItemHovered())
+						{
+							ImGui::SetTooltip(columns[i]);
+						}
 					}
 
 					for (int row = 0; row < gScene.GetInstanceCount(); row++)
@@ -530,6 +538,21 @@ static void sPrepareImGui()
 						std::string k = std::format("{:.2f} {:.2f} {:.2f} ", instance_data.mK.x, instance_data.mK.y, instance_data.mK.z);
 						k = instance_data.mK != InstanceData().mK ? k : "";
 						ImGui::Text(k.c_str());
+
+						ImGui::TableSetColumnIndex(column_index++);
+						std::string medium_albedo = std::format("{:.2f} {:.2f} {:.2f} ", instance_data.mMediumAlbedo.x, instance_data.mMediumAlbedo.y, instance_data.mMediumAlbedo.z);
+						medium_albedo = instance_data.mMediumAlbedo != InstanceData().mMediumAlbedo ? medium_albedo : "";
+						ImGui::Text(medium_albedo.c_str());
+
+						ImGui::TableSetColumnIndex(column_index++);
+						std::string medium_sigma_t = std::format("{:.2f} ", instance_data.mMediumSigmaT);
+						medium_sigma_t = instance_data.mMediumSigmaT != InstanceData().mMediumSigmaT ? medium_sigma_t : "";
+						ImGui::Text(medium_sigma_t.c_str());
+
+						ImGui::TableSetColumnIndex(column_index++);
+						std::string medium_phase = std::format("{:.2f} ", instance_data.mMediumPhase);
+						medium_phase = instance_data.mMediumPhase != InstanceData().mMediumPhase ? medium_phase : "";
+						ImGui::Text(medium_phase.c_str());
 
 						ImGui::TableSetColumnIndex(column_index++);
 						std::string emission = std::format("{:.2f} {:.2f} {:.2f} ", instance_data.mEmission.x, instance_data.mEmission.y, instance_data.mEmission.z);
@@ -1037,6 +1060,7 @@ void sRender()
 	{
 		TIMING_SCOPE("Upload", gStats.mTimeMS.mUpload);
 
+		// Update
 		{
 			// https://google.github.io/filament/Filament.html#imagingpipeline/physicallybasedcamera/exposurevalue
 			gConstants.mEV100			= glm::log2(
@@ -1046,10 +1070,13 @@ void sRender()
 			gConstants.mLightCount		= gConstants.mLightSourceMode != LightSourceMode::TriangleLights ? (glm::uint)gScene.GetSceneContent().mLights.size() : 0;
 
 			if (ImGui::IsMouseDown(ImGuiMouseButton_Middle))
-				gConstants.mPixelDebugCoord	= glm::uvec2(static_cast<uint32_t>(ImGui::GetMousePos().x), (uint32_t)ImGui::GetMousePos().y);
+			{
+				gConstants.mPixelDebugCoord = glm::uvec2(static_cast<uint32_t>(ImGui::GetMousePos().x), (uint32_t)ImGui::GetMousePos().y);
+				gConstants.mDebugFlag |= DebugFlag::UpdateRayInspection;
+			}
 		}
 
-		// Accumulation
+		// Upload
 		{
 			static Constants sConstantsCopy			= gConstants;
 
@@ -1058,7 +1085,8 @@ void sRender()
 			sConstantsCopy.mCurrentFrameIndex		= gConstants.mCurrentFrameIndex;
 			sConstantsCopy.mCurrentFrameWeight		= gConstants.mCurrentFrameWeight;
 			sConstantsCopy.mPixelDebugCoord			= gConstants.mPixelDebugCoord;
-			sConstantsCopy.mDebugMode			= gConstants.mDebugMode;
+			sConstantsCopy.mDebugMode				= gConstants.mDebugMode;
+			sConstantsCopy.mDebugFlag				= gConstants.mDebugFlag;
 			sConstantsCopy.mReSTIR.mTemporalCounter	= gConstants.mReSTIR.mTemporalCounter;
 
 			if (memcmp(&sConstantsCopy, &gConstants, sizeof(Constants)) != 0)
@@ -1090,6 +1118,11 @@ void sRender()
 			gRenderer.mAccumulationResetRequested = false;
 
 			memcpy(gRenderer.mRuntime.mConstantsBuffer.mUploadPointer[gGetFrameContextIndex()], &gConstants, sizeof(gConstants));
+		}
+
+		// Reset
+		{
+			gConstants.mDebugFlag &= ~DebugFlag::UpdateRayInspection;
 		}
 
 		gBarrierTransition(gCommandList, gRenderer.mRuntime.mConstantsBuffer.mResource.Get(), D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, D3D12_RESOURCE_STATE_COPY_DEST);
@@ -1279,6 +1312,10 @@ void sRender()
 
 		gCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
 		gRenderer.Setup(gRenderer.mRuntime.mLineShader);
+		gCommandList->DrawInstanced(RayInspection::kArraySize * 3 /* Position, Normal, LightPosition */ * 2 /* 2 vertex per line */, 1, 0, 0);
+
+		gCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
+		gRenderer.Setup(gRenderer.mRuntime.mLineHiddenShader);
 		gCommandList->DrawInstanced(RayInspection::kArraySize * 3 /* Position, Normal, LightPosition */ * 2 /* 2 vertex per line */, 1, 0, 0);
 	}
 

@@ -392,7 +392,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 
 	std::unordered_map<std::string_view, BSDFInstance> bsdf_instance_by_id;
 	tinyxml2::XMLElement* bsdf = scene->FirstChildElement("bsdf");
-	while (bsdf != nullptr)
+	while (bsdf != nullptr) // loop to handle nested bsdf
 	{
 		BSDFInstance bsdf_instance;
 
@@ -402,57 +402,57 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 		std::string_view local_type = bsdf->Attribute("type");
 
 		auto process_twosided = [&]()
+		{
+			if (local_type == "twosided")
 			{
-				if (local_type == "twosided")
-				{
-					bsdf_instance.mInstanceData.mTwoSided = true;
+				bsdf_instance.mInstanceData.mTwoSided = true;
 
-					local_bsdf = local_bsdf->FirstChildElement("bsdf");
-					local_type = local_bsdf->Attribute("type");
+				local_bsdf = local_bsdf->FirstChildElement("bsdf");
+				local_type = local_bsdf->Attribute("type");
 
-					return true;
-				}
+				return true;
+			}
 
-				return false;
-			};
+			return false;
+		};
 
 		auto process_mask = [&]()
+		{
+			if (local_type == "mask")
 			{
-				if (local_type == "mask")
-				{
-					std::string_view opacity = get_child_value(local_bsdf, "opacity");
-					gFromString(opacity.data(), bsdf_instance.mInstanceData.mOpacity);
+				std::string_view opacity = get_child_value(local_bsdf, "opacity");
+				gFromString(opacity.data(), bsdf_instance.mInstanceData.mOpacity);
 
-					// Could be texture
+				// Could be texture
 
-					local_bsdf = local_bsdf->FirstChildElement("bsdf");
-					local_type = local_bsdf->Attribute("type");
+				local_bsdf = local_bsdf->FirstChildElement("bsdf");
+				local_type = local_bsdf->Attribute("type");
 
-					return true;
-				}
+				return true;
+			}
 
-				return false;
-			};
+			return false;
+		};
 
 		auto process_bumpmap = [&]()
+		{
+			if (local_type == "bumpmap")
 			{
-				if (local_type == "bumpmap")
-				{
-					std::filesystem::path path = inFilename;
-					path.replace_filename(std::filesystem::path(get_child_texture(local_bsdf, "map")));
-					bsdf_instance.mInstanceInfo.mNormalTexture = { .mPath = path };
+				std::filesystem::path path = inFilename;
+				path.replace_filename(std::filesystem::path(get_child_texture(local_bsdf, "map")));
+				bsdf_instance.mInstanceInfo.mNormalTexture = { .mPath = path };
 
-					local_bsdf = local_bsdf->FirstChildElement("bsdf");
-					local_type = local_bsdf->Attribute("type");
+				local_bsdf = local_bsdf->FirstChildElement("bsdf");
+				local_type = local_bsdf->Attribute("type");
 
-					gAssert(id == nullptr);
-					id = local_bsdf->Attribute("id");
+				gAssert(id == nullptr);
+				id = local_bsdf->Attribute("id");
 
-					return true;
-				}
+				return true;
+			}
 
-				return false;
-			};
+			return false;
+		};
 
 		while (true)
 		{
@@ -671,6 +671,27 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 				}
 				if (!found_material)
 					FillDummyMaterial(instance_info, instance_data);
+			}
+
+			// Medium
+			{
+				tinyxml2::XMLElement* medium = shape->FirstChildElement("medium");
+				if (medium != nullptr)
+				{
+					std::string_view medium_type = medium->Attribute("type");
+					gAssert(medium_type == "homogeneous"); // heterogeneous not supported
+
+					gFromString(get_child_value(medium, "albedo").data(), instance_data.mMediumAlbedo);
+					gFromString(get_child_value(medium, "sigma_t").data(), instance_data.mMediumSigmaT);
+
+					tinyxml2::XMLElement* phase = medium->FirstChildElement("phase");
+					if (phase != nullptr)
+					{
+						gAssert(false); // Not supported yet
+
+						gFromString(get_child_value(medium, "g").data(), instance_data.mMediumPhase);
+					}
+				}
 			}
 
 			// Light
