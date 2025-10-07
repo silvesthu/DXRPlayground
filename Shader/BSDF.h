@@ -270,8 +270,9 @@ namespace BSDFEvaluation
 			//		          https://www.pbr-book.org/3ed-2018/Light_Transport_III_Bidirectional_Methods/The_Path-Space_Measurement_Equation#x3-Non-symmetryDuetoRefraction
 			result.mBSDF						*= select(selected_r, 1.0, sqr(eta_ti));
 
-			// [NOTE] Output eta (inverse) to remove its effect on Russian Roulette. As Russian Roulette depends on throughput, which in turn depends on BSDF.
-			//        The difference is easily observable when Russian Roulette is enabled even for the first iterations.
+			// [NOTE] Output eta (inverse) to remove its effect on Russian Roulette. 
+			//		  Russian Roulette terminates path early depending on throughput (beta), which in turn depending on BSDF above
+			//		  Refraction in and out may temporarily lower throughput to cause termination unintentionally
 			//		  [PBRT3] > It lets us sometimes avoid terminating refracted rays that are about to be refracted back out of a medium and thus have their beta value increased.
 			//                https://github.com/mmp/pbrt-v3/blob/master/src/integrators/path.cpp#L72
 			result.mEta							= select(selected_r, 1.0, eta_it);
