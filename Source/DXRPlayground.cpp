@@ -10,7 +10,6 @@
 
 #include "ImGui/imgui_impl_win32.h"
 #include "ImGui/imgui_impl_dx12.h"
-#include "ImGuizmo/ImGuizmoExt.h"
 
 #pragma warning(push)
 #pragma warning(disable: 4068)
@@ -136,7 +135,6 @@ static void sDumpLuminance()
 	gCPUContext.mDumpTextureRef = &gCPUContext.mDumpTextureProxy;
 }
 static void sPrepareImGui();
-static void sPrepareImGuizmo();
 static void sRender();
 static LRESULT WINAPI sWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -678,26 +676,6 @@ static void sPrepareImGui()
 	ImGui::End();
 }
 
-void sPrepareImGuizmo()
-{
-	ImGuiIO& io = ImGui::GetIO();
-	ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
-
-	float axis_length = 48.0f;
-	float2 axis_center = float2(64.0f, io.DisplaySize.y - 64.0f);
-	glm::vec4 x_vector = gConstants.mViewMatrix * glm::vec4(axis_length, 0, 0, 0);
-	glm::vec4 y_vector = gConstants.mViewMatrix * glm::vec4(0, axis_length, 0, 0);
-	glm::vec4 z_vector = gConstants.mViewMatrix * glm::vec4(0, 0, axis_length, 0);
-	float2 x_axis = axis_center + float2(x_vector.x, -x_vector.y);
-	float2 y_axis = axis_center + float2(y_vector.x, -y_vector.y);
-	float2 z_axis = axis_center + float2(z_vector.x, -z_vector.y);
-	float2 xz_axis = axis_center + (float2(x_vector.x, -x_vector.y) + float2(z_vector.x, -z_vector.y)) / float2(glm::sqrt(2.0f));
-	ImGuizmo::GetDrawlist()->AddLine(axis_center, x_axis, ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 0.0f, 0.0f, 1.0f)), 5.0f);
-	ImGuizmo::GetDrawlist()->AddLine(axis_center, y_axis, ImGui::ColorConvertFloat4ToU32(ImVec4(0.0f, 1.0f, 0.0f, 1.0f)), 5.0f);
-	ImGuizmo::GetDrawlist()->AddLine(axis_center, z_axis, ImGui::ColorConvertFloat4ToU32(ImVec4(0.0f, 0.0f, 1.0f, 1.0f)), 5.0f);
-	ImGuizmo::GetDrawlist()->AddLine(axis_center, xz_axis, ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 0.0f, 1.0f, 1.0f)), 2.0f);
-}
-
 static void sUpdate()
 {	
 	// Resize
@@ -955,7 +933,6 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 		ImGui_ImplDX12_NewFrame();
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
-		ImGuizmo::BeginFrame();
 
 		sUpdate();
 		sRender();
@@ -1335,8 +1312,6 @@ SkipRender:
 		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "ImGui");
 
 		sPrepareImGui(); // Keep this right before render to get latest data
-
-		sPrepareImGuizmo();
 
 		ImGui::Render();
 

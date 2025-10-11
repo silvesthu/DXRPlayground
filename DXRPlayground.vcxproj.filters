@@ -46,15 +46,6 @@
     <Filter Include="Source\Thirdparty\stb">
       <UniqueIdentifier>{3b8b57d3-df7a-479e-94cb-dbc9de3cfb59}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source\Thirdparty\ImGuizmo">
-      <UniqueIdentifier>{564ae1e4-07fd-4b52-a2c4-8c6dd5f36001}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\Thirdparty\ImGuizmo\example">
-      <UniqueIdentifier>{720d4033-de1b-4b11-b732-5130d860a700}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\ImGuizmo">
-      <UniqueIdentifier>{60be0eae-f0fc-4259-96ac-894bd0965d4f}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Common.h">
@@ -207,77 +198,11 @@
     <ClInclude Include="Source\Thirdparty\tiny_gltf.h">
       <Filter>Source\Thirdparty</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Thirdparty\ImGuizmo\ImCurveEdit.h">
-      <Filter>Source\Thirdparty\ImGuizmo</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Thirdparty\ImGuizmo\ImGradient.h">
-      <Filter>Source\Thirdparty\ImGuizmo</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Thirdparty\ImGuizmo\ImGuizmo.h">
-      <Filter>Source\Thirdparty\ImGuizmo</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Thirdparty\ImGuizmo\ImSequencer.h">
-      <Filter>Source\Thirdparty\ImGuizmo</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Thirdparty\ImGuizmo\ImZoomSlider.h">
-      <Filter>Source\Thirdparty\ImGuizmo</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Thirdparty\ImGuizmo\GraphEditor.h">
-      <Filter>Source\Thirdparty\ImGuizmo</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Thirdparty\ImGuizmo\example\imgui_internal.h">
-      <Filter>Source\Thirdparty\ImGuizmo\example</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Thirdparty\ImGuizmo\example\imstb_rectpack.h">
-      <Filter>Source\Thirdparty\ImGuizmo\example</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Thirdparty\ImGuizmo\example\imstb_textedit.h">
-      <Filter>Source\Thirdparty\ImGuizmo\example</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Thirdparty\ImGuizmo\example\imstb_truetype.h">
-      <Filter>Source\Thirdparty\ImGuizmo\example</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Thirdparty\ImGuizmo\example\stb_image.h">
-      <Filter>Source\Thirdparty\ImGuizmo\example</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Thirdparty\ImGuizmo\example\ImApp.h">
-      <Filter>Source\Thirdparty\ImGuizmo\example</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Thirdparty\ImGuizmo\example\imconfig.h">
-      <Filter>Source\Thirdparty\ImGuizmo\example</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Thirdparty\ImGuizmo\example\imgui.h">
-      <Filter>Source\Thirdparty\ImGuizmo\example</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Thirdparty\ImGuizmo\example\imgui.cpp">
-      <Filter>Source\Thirdparty\ImGuizmo\example</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Thirdparty\ImGuizmo\example\imgui_demo.cpp">
-      <Filter>Source\Thirdparty\ImGuizmo\example</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Thirdparty\ImGuizmo\example\imgui_draw.cpp">
-      <Filter>Source\Thirdparty\ImGuizmo\example</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Thirdparty\ImGuizmo\example\imgui_tables.cpp">
-      <Filter>Source\Thirdparty\ImGuizmo\example</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Thirdparty\ImGuizmo\example\imgui_widgets.cpp">
-      <Filter>Source\Thirdparty\ImGuizmo\example</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Thirdparty\ImGuizmo\example\main.cpp">
-      <Filter>Source\Thirdparty\ImGuizmo\example</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\ImGuizmo\ImGuizmoExt.h">
-      <Filter>Source\ImGuizmo</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Thirdparty\glm.h">
       <Filter>Source\Thirdparty</Filter>
     </ClInclude>
     <ClInclude Include="Source\Thirdparty\imgui_config.h">
       <Filter>Source\Thirdparty</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Thirdparty\ImGuizmo\ImGuizmo.cpp">
-      <Filter>Source\Thirdparty\ImGuizmo</Filter>
     </ClInclude>
     <ClInclude Include="Shader\AtmosphereIntegration.Bruneton17.h">
       <Filter>Shader</Filter>
@@ -382,21 +307,6 @@
     </ClCompile>
     <ClCompile Include="Source\Thirdparty\tinyxml2\tinyxml2.cpp">
       <Filter>Source\Thirdparty\tinyxml2</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Thirdparty\ImGuizmo\ImGradient.cpp">
-      <Filter>Source\Thirdparty\ImGuizmo</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Thirdparty\ImGuizmo\ImSequencer.cpp">
-      <Filter>Source\Thirdparty\ImGuizmo</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Thirdparty\ImGuizmo\GraphEditor.cpp">
-      <Filter>Source\Thirdparty\ImGuizmo</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Thirdparty\ImGuizmo\ImCurveEdit.cpp">
-      <Filter>Source\Thirdparty\ImGuizmo</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\ImGuizmo\ImGuizmoExt.cpp">
-      <Filter>Source\ImGuizmo</Filter>
     </ClCompile>
     <ClCompile Include="Source\Thirdparty\Thirdparty.cpp">
       <Filter>Source\Thirdparty</Filter>
