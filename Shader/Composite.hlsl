@@ -1,6 +1,7 @@
 #include "Shared.h"
 #include "Binding.h"
 #include "Common.h"
+#include "BRDFExplorer.h"
 
 // https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
 float3 ToneMapping_ACES_Knarkowicz(float3 x)
@@ -163,6 +164,28 @@ void GeneratTextureCS(
 	float3 color = inDispatchThreadID.x % 2 == inDispatchThreadID.y % 2 ? 0.8 : 0.2;
 	
 	texture[inDispatchThreadID.xy] = float4(color, 1.0); 
+}
+
+[RootSignature(ROOT_SIGNATURE_COMMON)]
+[numthreads(8, 8, 1)]
+void BRDFSliceCS(
+	uint3 inGroupThreadID : SV_GroupThreadID,
+	uint3 inGroupID : SV_GroupID,
+	uint3 inDispatchThreadID : SV_DispatchThreadID,
+	uint inGroupIndex : SV_GroupIndex)
+{
+	RWTexture2D<float4> texture = ResourceDescriptorHeap[(int)ViewDescriptorIndex::BRDFSliceUAV];
+
+	uint2 dimensions;
+	texture.GetDimensions(dimensions.x, dimensions.y);
+
+	float2 texCoord = (inDispatchThreadID.xy + 0.5) / dimensions;	// [0, 1]
+	texCoord.y = 1.0 - texCoord.y;									// match GLSL
+	texCoord *= (MATH_PI / 2.0);									// thetaH, thetaD
+	float4 fragColor = 0;
+	BRDFExplorer::BRDFSlice(texCoord, fragColor);
+
+	texture[inDispatchThreadID.xy] = fragColor;
 }
 
 float4 LineVS(uint inVertexID : SV_VertexID, out float4 outColor : COLOR) : SV_POSITION

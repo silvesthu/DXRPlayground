@@ -14,6 +14,7 @@ struct Renderer
 		Shader									mPrepareLightsShader		= Shader().FileName("Shader/PrepareLights.hlsl").CSName("PrepareLightsCS");
 		Shader									mClearShader				= Shader().FileName("Shader/Composite.hlsl").CSName("ClearCS");
 		Shader									mGenerateTextureShader		= Shader().FileName("Shader/Composite.hlsl").CSName("GeneratTextureCS");
+		Shader									mBRDFSliceShader			= Shader().FileName("Shader/Composite.hlsl").CSName("BRDFSliceCS");
 		Shader									mDiffTexture2DShader		= Shader().FileName("Shader/DiffTexture.hlsl").CSName("DiffTexture2DShader");
 		Shader									mDiffTexture3DShader		= Shader().FileName("Shader/DiffTexture.hlsl").CSName("DiffTexture3DShader");
 		Shader									mLineShader					= Shader().FileName("Shader/Composite.hlsl").VSName("LineVS").PSName("LinePS").Topology(D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE).DepthFunc(D3D12_COMPARISON_FUNC_LESS).RTVFormat(kBackBufferFormat).DSVFormat(DXGI_FORMAT_D32_FLOAT);
@@ -43,12 +44,13 @@ struct Renderer
 		Texture									mScreenSentinelTexture;
 		std::span<Texture>						mScreenTextures				= std::span<Texture>(&mScreenColorTexture, &mScreenSentinelTexture);
 
-		Texture									mGeneratedTexture			= Texture().Width(2 * 20).Height(2 * 80).Format(DXGI_FORMAT_R8G8B8A8_UNORM).UAVIndex(ViewDescriptorIndex::GeneratedUAV).SRVIndex(ViewDescriptorIndex::GeneratedSRV).Name("Renderer.Generated");
+		Texture									mBRDFSliceTexture			= Texture().Width(512).Height(512).Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(ViewDescriptorIndex::BRDFSliceUAV).SRVIndex(ViewDescriptorIndex::BRDFSliceSRV).Name("Renderer.BRDFSlice");
+		Texture									mGenerateTexture			= Texture().Width(2 * 20).Height(2 * 80).Format(DXGI_FORMAT_R8G8B8A8_UNORM).UAVIndex(ViewDescriptorIndex::GeneratedUAV).SRVIndex(ViewDescriptorIndex::GeneratedSRV).Name("Renderer.Generated");
 		// Texture									mUVCheckerTexture			= Texture().Width(1024).Height(1024).Format(DXGI_FORMAT_R8G8B8A8_UNORM_SRGB).SRVIndex(ViewDescriptorIndex::UVCheckerSRV).Name("Renderer.UVCheckerMap").Path(L"Asset/UVChecker-map/UVCheckerMaps/UVCheckerMap01-1024.png");
 		// Texture									mIESTexture					= Texture().Width(256).Height(16).Format(DXGI_FORMAT_R32_FLOAT).SRVIndex(ViewDescriptorIndex::IESSRV).Name("Renderer.IES").Path(L"Asset/IES/007cfb11e343e2f42e3b476be4ab684e/IES.hdr");
 
 		Texture									mSentinelTexture;
-		std::span<Texture>						mTextures					= std::span<Texture>(&mGeneratedTexture, &mSentinelTexture);
+		std::span<Texture>						mTextures					= std::span<Texture>(&mBRDFSliceTexture, &mSentinelTexture);
 
 		Texture									mBackBuffers[kFrameInFlightCount] = { 
 																			Texture().Format(kBackBufferFormat).RTVIndex(RTVDescriptorIndex::BackBuffer0).Name("Renderer.BackBuffer0"),

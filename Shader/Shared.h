@@ -111,6 +111,10 @@ enum class ViewDescriptorIndex : uint
 	GeneratedSRV,
 	GeneratedUAV,
 
+	// [BSDF]
+	BRDFSliceSRV,
+	BRDFSliceUAV,
+
 	// [Misc]
 	IESSRV,
 
@@ -669,6 +673,27 @@ struct CloudConstants
 	ShapeNoise					mShapeNoise;
 };
 
+struct BRDFExplorerConstants
+{
+	float3						mBaseColor						CONSTANT_DEFAULT(float3(0.82f, 0.67f, 0.16f));
+	float						mMetallic						CONSTANT_DEFAULT(0.0f);
+
+	float						mSubsurface						CONSTANT_DEFAULT(0.0f);
+	float						mSpecular						CONSTANT_DEFAULT(0.5f);
+	float						mRoughness						CONSTANT_DEFAULT(0.5f);
+	float						mSpecularTint					CONSTANT_DEFAULT(0.0f);
+
+	float						mAnisotropic					CONSTANT_DEFAULT(0.0f);
+	float						mSheen							CONSTANT_DEFAULT(0.0f);
+	float						mSheenTint						CONSTANT_DEFAULT(0.5f);
+	float						mClearcoat						CONSTANT_DEFAULT(0.0f);
+
+	float						mClearcoatGloss					CONSTANT_DEFAULT(1.0f);
+	float						mPhiD							CONSTANT_DEFAULT(MATH_PI / 2.0);
+	float						mGamma							CONSTANT_DEFAULT(1.0f);
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+};
+
 struct ReSTIR
 {
 	uint						mTemporalCounter				CONSTANT_DEFAULT(0);
@@ -745,6 +770,7 @@ struct Constants
 
 	AtmosphereConstants			mAtmosphere;
 	CloudConstants				mCloud;
+	BRDFExplorerConstants		mBRDFExplorer;
 	ReSTIR						mReSTIR;
 };
 

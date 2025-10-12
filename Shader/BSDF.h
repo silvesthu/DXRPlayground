@@ -407,7 +407,8 @@ namespace BSDFEvaluation
 			BSDFContext bsdf_context;
 
 			float3 specular_reflectance			= inHitContext.SpecularReflectance();
-			bool select_specular					= RandomFloat01(ioPathContext.mRandomState) <= MaxComponent(specular_reflectance);
+			float specular_probability			= MaxComponent(specular_reflectance); // [TODO] Better lobe selection probability? Fresnel based on N?
+			bool select_specular				= RandomFloat01(ioPathContext.mRandomState) <= specular_probability;
 			if (select_specular)
 			{
 				float3x3 tangent_space			= GenerateTangentSpace(inHitContext.NormalWS());
@@ -433,11 +434,11 @@ namespace BSDFEvaluation
 		{
 			bool select_specular					= inBSDFContext.mLobe0Selected;
 			float3 specular_reflectance				= inHitContext.SpecularReflectance();
-			
+			float specular_probability				= MaxComponent(specular_reflectance);			
 			if (!select_specular)
 			{
 				BSDFResult brdf_result = Diffuse::Evaluate(inBSDFContext, inHitContext, ioPathContext);
-				brdf_result.mBSDFSamplePDF *= 1.0 - MaxComponent(specular_reflectance);
+				brdf_result.mBSDFSamplePDF			*= 1.0 - specular_probability;
 
 				return brdf_result;
 			}
@@ -469,7 +470,7 @@ namespace BSDFEvaluation
 
 				BSDFResult result;
 				result.mBSDF						= D * G * F / (4.0f * inBSDFContext.mNdotV * inBSDFContext.mNdotL);
-				result.mBSDFSamplePDF				= microfacet_pdf * jacobian * MaxComponent(specular_reflectance);
+				result.mBSDFSamplePDF				= microfacet_pdf * jacobian * specular_probability;
 				result.mEta							= 1.0;
 				return result;
 			}

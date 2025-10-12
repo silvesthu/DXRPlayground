@@ -387,7 +387,36 @@ static void sPrepareImGui()
 			ImGui::TreePop();
 		}
 
-		if (ImGui::TreeNodeEx("Shader"))
+		if (ImGui::TreeNodeEx("BRDF Explorer"))
+		{
+			ImGui::Texture1(gRenderer.mRuntime.mBRDFSliceTexture);
+
+			ImGui::ColorEdit3("BaseColor",		&gConstants.mBRDFExplorer.mBaseColor.x);
+			ImGui::SliderFloat("Metallic",		&gConstants.mBRDFExplorer.mMetallic, 0.0f, 1.0f);
+			ImGui::SliderFloat("Subsurface",	&gConstants.mBRDFExplorer.mSubsurface, 0.0f, 1.0f);
+			ImGui::SliderFloat("Specular",		&gConstants.mBRDFExplorer.mSpecular, 0.0f, 1.0f);
+			ImGui::SliderFloat("Roughness",		&gConstants.mBRDFExplorer.mRoughness, 0.0f, 1.0f);
+			ImGui::SliderFloat("SpecularTint",	&gConstants.mBRDFExplorer.mSpecularTint, 0.0f, 1.0f);
+			ImGui::SliderFloat("Anisotropic",	&gConstants.mBRDFExplorer.mAnisotropic, 0.0f, 1.0f);
+			ImGui::SliderFloat("Sheen",			&gConstants.mBRDFExplorer.mSheen, 0.0f, 1.0f);
+			ImGui::SliderFloat("SheenTint",		&gConstants.mBRDFExplorer.mSheenTint, 0.0f, 1.0f);
+			ImGui::SliderFloat("Clearcoat",		&gConstants.mBRDFExplorer.mClearcoat, 0.0f, 1.0f);
+			ImGui::SliderFloat("ClearcoatGloss",&gConstants.mBRDFExplorer.mClearcoatGloss, 0.0f, 1.0f);
+
+			ImGui::Separator();
+
+			ImGui::SliderAngle("PhiD",			&gConstants.mBRDFExplorer.mPhiD, 0.0f, 180.0f);
+			ImGui::SliderFloat("Gamma",			&gConstants.mBRDFExplorer.mGamma, 1.0f, 2.2f);
+
+			if (ImGui::Button("Reset"))
+			{
+				gConstants.mBRDFExplorer = {};
+			}
+
+			ImGui::TreePop();
+		}
+
+		if (ImGui::TreeNodeEx("DXR"))
 		{
 			if (ImGui::Button("Dump RayQuery"))
 			{
@@ -662,6 +691,7 @@ static void sPrepareImGui()
 					ImGui::InputFloat("Atmosphere", &gStats.mTimeMS.mAtmosphere, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
 					ImGui::InputFloat("Cloud", &gStats.mTimeMS.mCloud, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
 					ImGui::InputFloat("TextureGenerator", &gStats.mTimeMS.mTextureGenerator, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+					ImGui::InputFloat("BRDFSlice", &gStats.mTimeMS.mBRDFSlice, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
 					ImGui::InputFloat("Clear", &gStats.mTimeMS.mClear, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
 					ImGui::InputFloat("Depths", &gStats.mTimeMS.mDepths, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
 					ImGui::InputFloat("PrepareLights", &gStats.mTimeMS.mPrepareLights, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
@@ -1141,9 +1171,21 @@ void sRender()
 
 		gRenderer.Setup(gRenderer.mRuntime.mGenerateTextureShader);
 
-		BarrierScope scope(gCommandList, gRenderer.mRuntime.mGeneratedTexture.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		gCommandList->Dispatch(gAlignUpDiv(gRenderer.mRuntime.mGeneratedTexture.mWidth, 8u), gAlignUpDiv(gRenderer.mRuntime.mGeneratedTexture.mHeight, 8u), 1);
+		BarrierScope scope(gCommandList, gRenderer.mRuntime.mGenerateTexture.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		gCommandList->Dispatch(gAlignUpDiv(gRenderer.mRuntime.mGenerateTexture.mWidth, 8u), gAlignUpDiv(gRenderer.mRuntime.mGenerateTexture.mHeight, 8u), 1);
 		
+		gBarrierUAV(gCommandList, nullptr);
+	}
+
+	// BRDF Slice
+	{
+		TIMING_SCOPE("BRDFSlice", gStats.mTimeMS.mBRDFSlice);
+
+		gRenderer.Setup(gRenderer.mRuntime.mBRDFSliceShader);
+
+		BarrierScope scope(gCommandList, gRenderer.mRuntime.mBRDFSliceTexture.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		gCommandList->Dispatch(gAlignUpDiv(gRenderer.mRuntime.mBRDFSliceTexture.mWidth, 8u), gAlignUpDiv(gRenderer.mRuntime.mBRDFSliceTexture.mHeight, 8u), 1);
+
 		gBarrierUAV(gCommandList, nullptr);
 	}
 

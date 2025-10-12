@@ -290,6 +290,7 @@ struct Stats
 		float								mAtmosphere = 0;
 		float								mCloud = 0;
 		float								mTextureGenerator = 0;
+		float								mBRDFSlice = 0;
 		float								mClear = 0;
 		float								mDepths = 0;
 		float								mPrepareLights = 0;
@@ -780,5 +781,6 @@ namespace ImGui
 {
 	extern float gDpiScale;
 
+	void Texture1(Texture& inTexture);
 	void Textures(std::span<Texture> inTextures, const std::string& inName = "Texture", ImGuiTreeNodeFlags inFlags = 0);
 }

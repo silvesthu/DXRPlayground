@@ -37,6 +37,7 @@
     <None Include="Shader\Planet.h" />
     <None Include="Shader\Reservoir.h" />
     <None Include="Shader\Shared.h" />
+    <ClInclude Include="Shader\BRDFExplorer.h" />
     <ClInclude Include="Source\Thirdparty\glm.h" />
     <ClInclude Include="Source\Thirdparty\imgui_config.h" />
     <ClInclude Include="Source\Thirdparty\tiny_gltf.h" />

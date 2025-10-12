@@ -20,6 +20,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 	float2 screen_coords						= float2(ioPixelContext.mPixelIndex.xy);
 	float2 screen_size							= float2(ioPixelContext.mPixelTotal.xy);
 
+	// [TODO] Need proper reconstruction filter, see https://www.pbr-book.org/4ed/Sampling_and_Reconstruction/Image_Reconstruction
 	switch (mConstants.mOffsetMode)
 	{
 	case OffsetMode::HalfPixel:	screen_coords	+= 0.5; break;
@@ -34,7 +35,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 	float3 ray_direction_vs						= normalize(point_on_near_plane.xyz / point_on_near_plane.w);
 	float3 ray_direction_ws						= mul(mConstants.mInverseViewMatrix, float4(ray_direction_vs, 0.0)).xyz;
 
-	// [TODO] Origin offset and TMin
+	// [TODO] Use btter offset on Origin and TMin
 	RayDesc ray;
 	ray.Origin									= mConstants.CameraPosition().xyz;
 	ray.Direction								= ray_direction_ws;
@@ -54,7 +55,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 	{
 		bool continue_bounce					= false;
 
-		// Note that RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH will give first hit for "Any Hit". The result may not be the closest one
+		// Note RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH will give first hit but not necessary the closest one, commonly used for shadow ray
 		// https://docs.microsoft.com/en-us/windows/win32/direct3d12/ray_flag
 		RayQuery<RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> query;
 		uint additional_ray_flags				= 0;
@@ -321,7 +322,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 			float probability					= RandomFloat01(path_context.mRandomState);
 			bool probability_passed				= probability < continue_probability;
 
-			DebugValue(DebugMode::RussianRoulette,			path_context.mRecursionDepth, float3(probability_passed, probability, continue_probability));
+			DebugValue(DebugMode::RussianRoulette,		path_context.mRecursionDepth, float3(probability_passed, probability, continue_probability));
 			DebugValue(DebugMode::EtaScale,				path_context.mRecursionDepth, float3(path_context.mEtaScale, 0, 0));				
 
 			if (probability_passed)

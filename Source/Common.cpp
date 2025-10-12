@@ -325,77 +325,80 @@ namespace ImGui
 {
 	float gDpiScale = 1.0f;
 
+	void Texture1(Texture& inTexture)
+	{
+		static Texture* sTexture = nullptr;
+
+		if (sTexture == &inTexture && ImGui::BeginPopup("Image Options"))
+		{
+			gAssert(sTexture != nullptr);
+
+			ImGui::Text(sTexture->mName.c_str());
+
+			if (ImGui::Button("Dump"))
+				gCPUContext.mDumpTextureRef = sTexture;
+
+			ImGui::Separator();
+
+			ImGui::PushItemWidth(100);
+
+			static int visualize_slice = 0;
+			static bool visualize_show_alpha = false;
+
+			ImGui::Text("Image Options");
+			ImGui::SliderFloat("Min", &ImGui_ImplDX12_ShaderContants.mMin, 0.0, 1.0f); ImGui::SameLine(); ImGui::SliderFloat("Max", &ImGui_ImplDX12_ShaderContants.mMax, 0.0, 1.0f);
+			ImGui::SliderInt("Depth Slice", &visualize_slice, 0, sTexture->mDepth - 1);
+			ImGui::Checkbox("Show Alpha", &visualize_show_alpha);
+
+			ImGui_ImplDX12_ShaderContants.mSlice = visualize_slice * 1.0f;
+			ImGui_ImplDX12_ShaderContants.mAlpha = visualize_show_alpha ? 1.0f : 0.0f;
+
+			ImGui::PopItemWidth();
+
+			ImGui::EndPopup();
+		}
+
+		{
+			ImVec2 uv0 = ImVec2(0, 0);
+			ImVec2 uv1 = ImVec2(1, 1);
+
+			UINT64 handle = gGetFrameContext().mViewDescriptorHeap.GetGPUHandle(inTexture.mSRVIndex).ptr;
+			if (inTexture.mDepth != 1)
+				handle |= ImGui_ImplDX12_ImTextureID_Mask_3D;
+
+			ImGui::Image(reinterpret_cast<ImTextureID>(handle), ImVec2(inTexture.mWidth * inTexture.mUIScale, inTexture.mHeight * inTexture.mUIScale), uv0, uv1);
+
+			if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+			{
+				sTexture = &inTexture;
+				ImGui::OpenPopup("Image Options");
+			}
+
+			ImGui::SameLine();
+			std::string text = "-----------------------------------\n";
+			text += inTexture.mName + " (" + std::to_string((uint)inTexture.mSRVIndex) + ")";
+			text += "\n";
+			text += std::to_string(inTexture.mWidth) + " x " + std::to_string(inTexture.mHeight) + (inTexture.mDepth == 1 ? "" : " x " + std::to_string(inTexture.mDepth));
+			text += "\n";
+			text += nameof::nameof_enum(inTexture.mFormat);
+			if (inTexture.mSRVFormat != DXGI_FORMAT_UNKNOWN)
+			{
+				text += "\n";
+				text += nameof::nameof_enum(inTexture.mSRVFormat);
+				text += " (SRV)";
+			}
+			ImGui::Text(text.c_str());
+		}
+	}
+
 	void Textures(std::span<Texture> inTextures, const std::string& inName, ImGuiTreeNodeFlags inFlags)
 	{
 		if (ImGui::Begin("Textures"))
 		{
 			if (ImGui::TreeNodeEx(inName.c_str(), inFlags))
 			{
-				static Texture* sTexture = nullptr;
-				auto add_texture = [&](Texture& inTexture)
-				{
-					ImVec2 uv0 = ImVec2(0, 0);
-					ImVec2 uv1 = ImVec2(1, 1);
-
-					UINT64 handle = gGetFrameContext().mViewDescriptorHeap.GetGPUHandle(inTexture.mSRVIndex).ptr;
-					if (inTexture.mDepth != 1)
-						handle |= ImGui_ImplDX12_ImTextureID_Mask_3D;
-
-					ImGui::Image(reinterpret_cast<ImTextureID>(handle), ImVec2(inTexture.mWidth * inTexture.mUIScale, inTexture.mHeight * inTexture.mUIScale), uv0, uv1);
-
-					if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
-					{
-						sTexture = &inTexture;
-						ImGui::OpenPopup("Image Options");
-					}
-
-					ImGui::SameLine();
-					std::string text = "-----------------------------------\n";
-					text += inTexture.mName + " (" + std::to_string((uint)inTexture.mSRVIndex) + ")";
-					text += "\n";
-					text += std::to_string(inTexture.mWidth) + " x " + std::to_string(inTexture.mHeight) + (inTexture.mDepth == 1 ? "" : " x " + std::to_string(inTexture.mDepth));
-					text += "\n";
-					text += nameof::nameof_enum(inTexture.mFormat);
-					if (inTexture.mSRVFormat != DXGI_FORMAT_UNKNOWN)
-					{
-						text += "\n";
-						text += nameof::nameof_enum(inTexture.mSRVFormat);
-						text += " (SRV)";
-					}
-					ImGui::Text(text.c_str());
-				};
-
-				if (ImGui::BeginPopup("Image Options"))
-				{
-					gAssert(sTexture != nullptr);
-
-					ImGui::Text(sTexture->mName.c_str());
-
-					if (ImGui::Button("Dump"))
-						gCPUContext.mDumpTextureRef = sTexture;
-
-					ImGui::Separator();
-
-					ImGui::PushItemWidth(100);
-
-					static int visualize_slice = 0;
-					static bool visualize_show_alpha = false;
-
-					ImGui::Text("Image Options");
-					ImGui::SliderFloat("Min", &ImGui_ImplDX12_ShaderContants.mMin, 0.0, 1.0f); ImGui::SameLine(); ImGui::SliderFloat("Max", &ImGui_ImplDX12_ShaderContants.mMax, 0.0, 1.0f);
-					ImGui::SliderInt("Depth Slice", &visualize_slice, 0, sTexture->mDepth - 1);
-					ImGui::Checkbox("Show Alpha", &visualize_show_alpha);
-
-					ImGui_ImplDX12_ShaderContants.mSlice = visualize_slice * 1.0f;
-					ImGui_ImplDX12_ShaderContants.mAlpha = visualize_show_alpha ? 1.0f : 0.0f;
-
-					ImGui::PopItemWidth();
-
-					ImGui::EndPopup();
-				}
-
 				for (auto&& texture : inTextures)
-					add_texture(texture);
+					Texture1(texture);
 
 				ImGui::TreePop();
 			}

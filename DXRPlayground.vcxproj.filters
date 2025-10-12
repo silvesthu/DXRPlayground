@@ -204,49 +204,7 @@
     <ClInclude Include="Source\Thirdparty\imgui_config.h">
       <Filter>Source\Thirdparty</Filter>
     </ClInclude>
-    <ClInclude Include="Shader\AtmosphereIntegration.Bruneton17.h">
-      <Filter>Shader</Filter>
-    </ClInclude>
-    <ClInclude Include="Shader\AtmosphereIntegration.h">
-      <Filter>Shader</Filter>
-    </ClInclude>
-    <ClInclude Include="Shader\AtmosphereIntegration.Hillaire20.h">
-      <Filter>Shader</Filter>
-    </ClInclude>
-    <ClInclude Include="Shader\AtmosphereIntegration.Raymarch.h">
-      <Filter>Shader</Filter>
-    </ClInclude>
-    <ClInclude Include="Shader\AtmosphereIntegration.Wilkie21.h">
-      <Filter>Shader</Filter>
-    </ClInclude>
-    <ClInclude Include="Shader\Binding.h">
-      <Filter>Shader</Filter>
-    </ClInclude>
-    <ClInclude Include="Shader\BSDF.h">
-      <Filter>Shader</Filter>
-    </ClInclude>
-    <ClInclude Include="Shader\ClosestHit.h">
-      <Filter>Shader</Filter>
-    </ClInclude>
-    <ClInclude Include="Shader\CloudIntegration.h">
-      <Filter>Shader</Filter>
-    </ClInclude>
-    <ClInclude Include="Shader\Common.h">
-      <Filter>Shader</Filter>
-    </ClInclude>
-    <ClInclude Include="Shader\Context.h">
-      <Filter>Shader</Filter>
-    </ClInclude>
-    <ClInclude Include="Shader\Light.h">
-      <Filter>Shader</Filter>
-    </ClInclude>
-    <ClInclude Include="Shader\Planet.h">
-      <Filter>Shader</Filter>
-    </ClInclude>
-    <ClInclude Include="Shader\Reservoir.h">
-      <Filter>Shader</Filter>
-    </ClInclude>
-    <ClInclude Include="Shader\Shared.h">
+    <ClInclude Include="Shader\BRDFExplorer.h">
       <Filter>Shader</Filter>
     </ClInclude>
   </ItemGroup>
@@ -323,10 +281,35 @@
     <None Include="Shader\AnyHit.hlsl">
       <Filter>Shader</Filter>
     </None>
-    <None Include="dxcompiler.dll" />
     <None Include="Shader\EnumHelper.inl">
       <Filter>Shader</Filter>
     </None>
+    <None Include="Shader\AtmosphereIntegration.Bruneton17.h" />
+    <None Include="Shader\AtmosphereIntegration.h" />
+    <None Include="Shader\AtmosphereIntegration.Hillaire20.h" />
+    <None Include="Shader\AtmosphereIntegration.Raymarch.h" />
+    <None Include="Shader\AtmosphereIntegration.Wilkie21.h" />
+    <None Include="Shader\Binding.h" />
+    <None Include="Shader\BSDF.h" />
+    <None Include="Shader\ClosestHit.h" />
+    <None Include="Shader\CloudIntegration.h" />
+    <None Include="Shader\Common.h" />
+    <None Include="Shader\Context.h" />
+    <None Include="Shader\Light.h" />
+    <None Include="Shader\Planet.h" />
+    <None Include="Shader\Reservoir.h" />
+    <None Include="Shader\Shared.h" />
+    <None Include="Shader\Atmosphere.hlsl" />
+    <None Include="Shader\ClosestHit001.hlsl" />
+    <None Include="Shader\ClosestHit010.hlsl" />
+    <None Include="Shader\ClosestHit100.hlsl" />
+    <None Include="Shader\Cloud.hlsl" />
+    <None Include="Shader\Composite.hlsl" />
+    <None Include="Shader\DiffTexture.hlsl" />
+    <None Include="Shader\Miss.hlsl" />
+    <None Include="Shader\PrepareLights.hlsl" />
+    <None Include="Shader\RayGeneration.hlsl" />
+    <None Include="Shader\RayQuery.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="Source\Thirdparty\glm\util\glm.natvis">
@@ -337,42 +320,8 @@
     <Manifest Include="dpi.manifest" />
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="Shader\Atmosphere.hlsl">
-      <Filter>Shader</Filter>
-    </FxCompile>
-    <FxCompile Include="Shader\ClosestHit001.hlsl">
-      <Filter>Shader</Filter>
-    </FxCompile>
-    <FxCompile Include="Shader\ClosestHit010.hlsl">
-      <Filter>Shader</Filter>
-    </FxCompile>
-    <FxCompile Include="Shader\ClosestHit100.hlsl">
-      <Filter>Shader</Filter>
-    </FxCompile>
-    <FxCompile Include="Shader\Cloud.hlsl">
-      <Filter>Shader</Filter>
-    </FxCompile>
-    <FxCompile Include="Shader\Composite.hlsl">
-      <Filter>Shader</Filter>
-    </FxCompile>
-    <FxCompile Include="Shader\DiffTexture.hlsl">
-      <Filter>Shader</Filter>
-    </FxCompile>
-    <FxCompile Include="Shader\Miss.hlsl">
-      <Filter>Shader</Filter>
-    </FxCompile>
-    <FxCompile Include="Shader\PrepareLights.hlsl">
-      <Filter>Shader</Filter>
-    </FxCompile>
-    <FxCompile Include="Shader\RayGeneration.hlsl">
-      <Filter>Shader</Filter>
-    </FxCompile>
-    <FxCompile Include="Shader\RayQuery.hlsl">
-      <Filter>Shader</Filter>
-    </FxCompile>
-  </ItemGroup>
-  <ItemGroup>
     <CopyFileToFolders Include="dxil.dll" />
     <CopyFileToFolders Include="imgui.ini" />
+    <CopyFileToFolders Include="dxcompiler.dll" />
   </ItemGroup>
 </Project>
