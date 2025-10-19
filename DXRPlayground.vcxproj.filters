@@ -46,6 +46,9 @@
     <Filter Include="Source\Thirdparty\stb">
       <UniqueIdentifier>{3b8b57d3-df7a-479e-94cb-dbc9de3cfb59}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\Thirdparty\nvapi">
+      <UniqueIdentifier>{89cc6c88-247b-4842-9220-e6ca406e8cf1}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Common.h">
@@ -284,32 +287,93 @@
     <None Include="Shader\EnumHelper.inl">
       <Filter>Shader</Filter>
     </None>
-    <None Include="Shader\AtmosphereIntegration.Bruneton17.h" />
-    <None Include="Shader\AtmosphereIntegration.h" />
-    <None Include="Shader\AtmosphereIntegration.Hillaire20.h" />
-    <None Include="Shader\AtmosphereIntegration.Raymarch.h" />
-    <None Include="Shader\AtmosphereIntegration.Wilkie21.h" />
-    <None Include="Shader\Binding.h" />
-    <None Include="Shader\BSDF.h" />
-    <None Include="Shader\ClosestHit.h" />
-    <None Include="Shader\CloudIntegration.h" />
-    <None Include="Shader\Common.h" />
-    <None Include="Shader\Context.h" />
-    <None Include="Shader\Light.h" />
-    <None Include="Shader\Planet.h" />
-    <None Include="Shader\Reservoir.h" />
-    <None Include="Shader\Shared.h" />
-    <None Include="Shader\Atmosphere.hlsl" />
-    <None Include="Shader\ClosestHit001.hlsl" />
-    <None Include="Shader\ClosestHit010.hlsl" />
-    <None Include="Shader\ClosestHit100.hlsl" />
-    <None Include="Shader\Cloud.hlsl" />
-    <None Include="Shader\Composite.hlsl" />
-    <None Include="Shader\DiffTexture.hlsl" />
-    <None Include="Shader\Miss.hlsl" />
-    <None Include="Shader\PrepareLights.hlsl" />
-    <None Include="Shader\RayGeneration.hlsl" />
-    <None Include="Shader\RayQuery.hlsl" />
+    <None Include="Shader\Atmosphere.hlsl">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\AtmosphereIntegration.Bruneton17.h">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\AtmosphereIntegration.h">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\AtmosphereIntegration.Hillaire20.h">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\AtmosphereIntegration.Raymarch.h">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\AtmosphereIntegration.Wilkie21.h">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\Binding.h">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\BSDF.h">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\ClosestHit.h">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\ClosestHit001.hlsl">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\ClosestHit010.hlsl">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\ClosestHit100.hlsl">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\Cloud.hlsl">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\CloudIntegration.h">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\Common.h">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\Composite.hlsl">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\Context.h">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\DiffTexture.hlsl">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\Light.h">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\Miss.hlsl">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\Planet.h">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\PrepareLights.hlsl">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\RayGeneration.hlsl">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\RayQuery.hlsl">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\Reservoir.h">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\Shared.h">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Source\Thirdparty\nvapi\nvHLSLExtns.h">
+      <Filter>Source\Thirdparty\nvapi</Filter>
+    </None>
+    <None Include="Source\Thirdparty\nvapi\nvHLSLExtnsInternal.h">
+      <Filter>Source\Thirdparty\nvapi</Filter>
+    </None>
+    <None Include="Source\Thirdparty\nvapi\nvShaderExtnEnums.h">
+      <Filter>Source\Thirdparty\nvapi</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="Source\Thirdparty\glm\util\glm.natvis">

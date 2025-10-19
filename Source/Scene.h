@@ -10,31 +10,40 @@ enum class GeometryType
 	DMM,
 	Sphere,
 	LSS,
+	TriangleAsLSS,
 };
 
 struct InstanceInfo
 {
-	std::string mName;
-	std::string mMaterialName;
-
-	struct Texture
+	struct Material
 	{
-		bool empty() const { return mPath.empty(); }
-		std::filesystem::path filename() const { return mPath.filename(); }
-		std::string string() const { return mPath.string(); }
-		std::wstring wstring() const { return mPath.wstring(); }
-		
-		std::filesystem::path mPath;
-		bool mPointSampler = false;
+		std::string mMaterialName;
+
+		struct Texture
+		{
+			bool empty() const { return mPath.empty(); }
+			std::filesystem::path filename() const { return mPath.filename(); }
+			std::string string() const { return mPath.string(); }
+			std::wstring wstring() const { return mPath.wstring(); }
+
+			std::filesystem::path mPath;
+			bool mPointSampler = false;
+		};
+
+		Texture mAlbedoTexture;
+		Texture mNormalTexture;
+		Texture mReflectanceTexture;
+		Texture mRoughnessTexture;
+		Texture mEmissionTexture;
 	};
 
-	Texture mAlbedoTexture;
-	Texture mNormalTexture;
-	Texture mReflectanceTexture;
-	Texture mRoughnessTexture;
-	Texture mEmissionTexture;
-	
+	std::string mName;
+
+	Material mMaterial;
+
 	GeometryType mGeometryType = GeometryType::Triangles;
+
+	float3 mDecomposedScale = float3(1.0f);
 };
 
 class BLAS final
@@ -45,10 +54,11 @@ public:
 		const InstanceInfo& mInstanceInfo;
 		const InstanceData& mInstanceData;
 
-		D3D12_GPU_VIRTUAL_ADDRESS mVertexBaseAddress;
-		D3D12_GPU_VIRTUAL_ADDRESS mIndexBaseAddress;
+		D3D12_GPU_VIRTUAL_ADDRESS mVerticesBaseAddress;
+		D3D12_GPU_VIRTUAL_ADDRESS mIndicesBaseAddress;
 
-		D3D12_GPU_VIRTUAL_ADDRESS mRadiusBaseAddress;
+		D3D12_GPU_VIRTUAL_ADDRESS mLSSIndicesBaseAddress;
+		D3D12_GPU_VIRTUAL_ADDRESS mLSSRadiiBaseAddress;
 	};
 
 	void Initialize(const Initializer& inInitializer);
@@ -101,6 +111,8 @@ struct SceneContent
 	std::optional<float>						mFov;
 
 	std::optional<AtmosphereMode>				mAtmosphereMode;
+
+	bool										mLSSAllowed = false;
 };
 
 class TLAS final
@@ -121,10 +133,29 @@ private:
 };
 using TLASRef = std::shared_ptr<TLAS>;
 
+struct ScenePreset
+{
+#define SCENE_PRESET_MEMBER(type, name, default_value) MEMBER(ScenePreset, type, name, default_value)
+
+	SCENE_PRESET_MEMBER(std::string_view, 		Name, 					"");
+	SCENE_PRESET_MEMBER(std::string_view, 		Path, 					"");
+	SCENE_PRESET_MEMBER(glm::vec4, 				CameraPosition, 		glm::vec4(0, 1, 0, 1));
+	SCENE_PRESET_MEMBER(glm::vec4, 				CameraDirection, 		glm::vec4(0, 0, -1, 0));
+	SCENE_PRESET_MEMBER(LightSourceMode,		LightSource, 			LightSourceMode::Emitter);
+	SCENE_PRESET_MEMBER(float, 					EmissionBoost, 			1.0f); // As no auto exposure yet
+	SCENE_PRESET_MEMBER(float, 					HorizontalFovDegree, 	90);
+	SCENE_PRESET_MEMBER(glm::mat4x4, 			Transform, 				glm::mat4x4(1));
+	SCENE_PRESET_MEMBER(float, 					SunAzimuth, 			0);
+	SCENE_PRESET_MEMBER(float, 					SunZenith, 				glm::pi<float>() / 4.0f);
+	SCENE_PRESET_MEMBER(AtmosphereMode,			Atmosphere,				AtmosphereMode::ConstantColor);
+	SCENE_PRESET_MEMBER(glm::vec4,				ConstantColor,			glm::vec4(0, 0, 0, 0));
+	SCENE_PRESET_MEMBER(bool,					TriangleAsLSSAllowed,	false);
+};
+
 class Scene
 {
 public:
-	void Load(const std::string_view& inFilePath, const glm::mat4x4& inTransform);
+	void Load(const ScenePreset& inPreset);
 	void Unload();
 
 	void Build();
@@ -151,6 +182,7 @@ private:
 
 	void FillDummyMaterial(InstanceInfo& ioInstanceInfo, InstanceData& ioInstanceData);
 	
+	void GenerateLSSFromTriangle();
 	void InitializeTextures();
 	void InitializeBuffers();
 	void InitializeAccelerationStructures();
@@ -183,6 +215,10 @@ private:
 		ComPtr<ID3D12Resource>				mTaskBuffer;
 		std::vector<PrepareLightsTask>		mTaskBufferCPU; // CPU copy for debugging
 		ComPtr<ID3D12Resource>				mLightDataBuffer;
+
+		// LSS
+		ComPtr<ID3D12Resource>				mLSSIndices;
+		ComPtr<ID3D12Resource>				mLSSRadii;
 	};
 	Buffers									mBuffers;
 

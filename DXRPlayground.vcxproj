@@ -40,6 +40,9 @@
     <ClInclude Include="Shader\BRDFExplorer.h" />
     <ClInclude Include="Source\Thirdparty\glm.h" />
     <ClInclude Include="Source\Thirdparty\imgui_config.h" />
+    <None Include="Source\Thirdparty\nvapi\nvHLSLExtns.h" />
+    <None Include="Source\Thirdparty\nvapi\nvHLSLExtnsInternal.h" />
+    <None Include="Source\Thirdparty\nvapi\nvShaderExtnEnums.h" />
     <ClInclude Include="Source\Thirdparty\tiny_gltf.h" />
     <ClInclude Include="Source\Renderer.h" />
     <ClInclude Include="Source\Renderer.inl" />

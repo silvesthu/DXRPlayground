@@ -18,7 +18,8 @@ ConstantBuffer<Constants> mConstants : register(b0, space0);
 #endif // USE_DYNAMIC_RESOURCE_CBV
 
 #define ROOT_SIGNATURE_COMMON \
-"RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0), CBV(b1, space = 0)" 
+"RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0), CBV(b1, space = 0)" \
+ROOT_SIGNATURE_NVAPI
 
 cbuffer RootConstantsPrepareLights : register(b0, space1)
 {

@@ -3,8 +3,6 @@
 #include "Binding.h"
 #include "Common.h"
 
-#include "nvapi/nvHLSLExtns.h"
-
 [shader("raygeneration")]
 void RayGeneration()
 {
@@ -25,7 +23,7 @@ void RayGeneration()
 
 	RayPayload payload							= (RayPayload)0;
 
-#if NVAPI_SER
+#ifdef NVAPI_SER
 	NvHitObject hit_object = NvTraceRayHitObject(
 		RaytracingScene,
 		0,

@@ -286,6 +286,7 @@ ComPtr<ID3D12RootSignature> gCreateLocalRootSignature()
 		.RegisterSpace = NV_SHADER_EXTN_REGISTER_SPACE,
 		.OffsetInDescriptorsFromTableStart = 0,
 	};
+	UNUSED(nvapi_range);
 
 	// Local Root Parameters, see also ShaderTableEntry
 	D3D12_ROOT_PARAMETER local_root_parameters[] =
@@ -295,8 +296,8 @@ ComPtr<ID3D12RootSignature> gCreateLocalRootSignature()
 		D3D12_ROOT_PARAMETER {.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE, .DescriptorTable = D3D12_ROOT_DESCRIPTOR_TABLE {.NumDescriptorRanges = 1, .pDescriptorRanges = &srv_range } },
 
 		// https://developer.nvidia.com/blog/improve-shader-performance-and-in-game-frame-rates-with-shader-execution-reordering/
-		// Sample code use GlobalRootSignature, here LocalRootSignature is used
-		D3D12_ROOT_PARAMETER {.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE, .DescriptorTable = D3D12_ROOT_DESCRIPTOR_TABLE {.NumDescriptorRanges = 1, .pDescriptorRanges = &nvapi_range } },
+		// Already added in GlobalRootSignature, skip for LocalRootSignature
+		// D3D12_ROOT_PARAMETER {.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE, .DescriptorTable = D3D12_ROOT_DESCRIPTOR_TABLE {.NumDescriptorRanges = 1, .pDescriptorRanges = &nvapi_range } },
 	};
 
 	uint parameter_count = gArraySize(local_root_parameters);
@@ -484,6 +485,8 @@ ComPtr<IDxcBlob> gCompileShader(const char* inFilename, const char* inEntryPoint
 	// NVAPI
 	if (gNVAPI.mShaderExecutionReorderingSupported)
 		defines.push_back({ .Name = L"NVAPI_SER", .Value = L"1"});
+	if (gNVAPI.mLinearSweptSpheresSupported)
+		defines.push_back({ .Name = L"NVAPI_LSS", .Value = L"1" });
 
 	std::wstring entry_point = gToWString(inEntryPoint);
 	std::wstring entry_point_macro = L"ENTRY_POINT_";

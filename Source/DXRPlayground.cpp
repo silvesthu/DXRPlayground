@@ -28,34 +28,16 @@ static const wchar_t*											kApplicationTitleW = L"DXR Playground";
 static const std::wstring										kINIPathStringW = std::filesystem::absolute(L"DXRPlayground.ini").wstring();
 static const wchar_t*											kINIPathW = kINIPathStringW.c_str();
 
-struct ScenePreset
-{
-#define SCENE_PRESET_MEMBER(type, name, default_value) MEMBER(ScenePreset, type, name, default_value)
-
-	SCENE_PRESET_MEMBER(std::string_view, 	Name, 					"");
-	SCENE_PRESET_MEMBER(std::string_view, 	Path, 					"");
-	SCENE_PRESET_MEMBER(glm::vec4, 			CameraPosition, 		glm::vec4(0, 1, 0, 1));
-	SCENE_PRESET_MEMBER(glm::vec4, 			CameraDirection, 		glm::vec4(0, 0, -1, 0));
-	SCENE_PRESET_MEMBER(LightSourceMode,	LightSource, 			LightSourceMode::Emitter);
-	SCENE_PRESET_MEMBER(float, 				EmissionBoost, 			1.0f);														// As no auto exposure yet
-	SCENE_PRESET_MEMBER(float, 				HorizontalFovDegree, 	90);
-	SCENE_PRESET_MEMBER(glm::mat4x4, 		Transform, 				glm::mat4x4(1));
-	SCENE_PRESET_MEMBER(float, 				SunAzimuth, 			0);
-	SCENE_PRESET_MEMBER(float, 				SunZenith, 				glm::pi<float>() / 4.0f);
-	SCENE_PRESET_MEMBER(AtmosphereMode,		Atmosphere,				AtmosphereMode::ConstantColor);
-	SCENE_PRESET_MEMBER(glm::vec4,			ConstantColor,			glm::vec4(0, 0, 0, 0));
-};
-
 static const std::array kScenePresets =
 {
 	ScenePreset().Name("None"),
 
 	// Basics
-	ScenePreset().Name("CornellBox").Path("Asset/Comparison/benedikt-bitterli/cornell-box/scene_v3.xml").EmissionBoost(1E4f),
+	ScenePreset().Name("CornellBox").Path("Asset/Comparison/benedikt-bitterli/cornell-box/scene_v3.xml").EmissionBoost(1E4f).TriangleAsLSSAllowed(true),
 	ScenePreset().Name("CornellBoxDielectric").Path("Asset/Comparison/benedikt-bitterli/cornell-box-dielectric/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("CornellBoxTeapot").Path("Asset/Comparison/benedikt-bitterli/cornell-box-teapot/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("CornellMonkey").Path("Asset/Comparison/benedikt-bitterli/cornell-box-monkey/scene_v3.xml").EmissionBoost(1E4f),
-	ScenePreset().Name("CornellDragon").Path("Asset/Comparison/benedikt-bitterli/cornell-box-dragon/scene_v3.xml").EmissionBoost(1E4f),
+	ScenePreset().Name("CornellDragon").Path("Asset/Comparison/benedikt-bitterli/cornell-box-dragon/scene_v3.xml").EmissionBoost(1E4f).TriangleAsLSSAllowed(true),
 
 	// MIS
 	ScenePreset().Name("VeachMIS").Path("Asset/Comparison/benedikt-bitterli/veach-mis/scene_ggx_v3.xml").EmissionBoost(1E4f),
@@ -68,7 +50,7 @@ static const std::array kScenePresets =
 	ScenePreset().Name("LivingRoom2").Path("Asset/Comparison/benedikt-bitterli/living-room-2/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("VeachAjar").Path("Asset/Comparison/benedikt-bitterli/veach-ajar/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("VeachBidir").Path("Asset/Comparison/benedikt-bitterli/veach-bidir/scene_v3.xml").EmissionBoost(1E4f),
-	ScenePreset().Name("PicaPica").Path("Asset/Sketchfab/pica-pica-mini-diorama-01/scene.gltf").CameraPosition(glm::vec4(-20.588f, 2.453f, 13.020f, 0.0f)).CameraDirection(glm::vec4(0.983f, -0.168f, 0.071f, 0.0f)).EmissionBoost(1E6f).ConstantColor(glm::vec4(0.1f)),
+	ScenePreset().Name("PicaPica").Path("Asset/Sketchfab/pica-pica-mini-diorama-01/scene.gltf").CameraPosition(glm::vec4(-20.588f, 2.453f, 13.020f, 0.0f)).CameraDirection(glm::vec4(0.983f, -0.168f, 0.071f, 0.0f)).EmissionBoost(1E6f).ConstantColor(glm::vec4(0.1f)).TriangleAsLSSAllowed(true),
 	ScenePreset().Name("Bistro").Path("Asset/Comparison/RTXDI-Assets/bistro/bistro.gltf").CameraPosition(glm::vec4(-20.588f, 2.453f, 13.020f, 0.0f)).CameraDirection(glm::vec4(0.983f, -0.168f, 0.071f, 0.0f)).EmissionBoost(1E6f),
 
 	// Atmosphere
@@ -91,7 +73,7 @@ int sFindScenePresetIndex(const std::string_view inName)
 {
 	return static_cast<int>(&sFindScenePreset(inName) - &kScenePresets.front());
 }
-static int sCurrentSceneIndex = sFindScenePresetIndex("CornellDragon");
+static int sCurrentSceneIndex = sFindScenePresetIndex("CornellBox");
 static int sPreviousSceneIndex = sCurrentSceneIndex;
 
 struct CameraSettings
@@ -127,7 +109,7 @@ static void sWaitForFrameContext();
 static void sUpdate();
 static void sLoadShader() { gRenderer.mReloadShader = true; }
 static void sLoadCamera();
-static void sLoadScene();
+static void sLoadScene(bool inLoadCamera);
 static void sDumpLuminance()
 {
 	gCPUContext.mDumpTextureProxy.mResource = gRenderer.mRuntime.mScreenColorTexture.mResource;
@@ -168,7 +150,7 @@ static void sPrepareImGui()
 		}
 		{
 			if (ImGui::Button("Reload Scene"))
-				sLoadScene();
+				sLoadScene(false);
 
 			ImGui::SameLine();
 
@@ -381,11 +363,11 @@ static void sPrepareImGui()
 			ImGui::TreePop();
 		}
 
-		if (ImGui::TreeNodeEx("Cloud"))
-		{
-			gCloud.ImGuiShowMenus();
-			ImGui::TreePop();
-		}
+		//if (ImGui::TreeNodeEx("Cloud"))
+		//{
+		//	gCloud.ImGuiShowMenus();
+		//	ImGui::TreePop();
+		//}
 
 		if (ImGui::TreeNodeEx("BRDF Explorer"))
 		{
@@ -415,17 +397,43 @@ static void sPrepareImGui()
 
 			ImGui::TreePop();
 		}
-
-		if (ImGui::TreeNodeEx("DXR"))
+		
+		if (ImGui::TreeNodeEx("TraceRayInline (RayQuery)"))
 		{
-			if (ImGui::Button("Dump RayQuery"))
+			if (ImGui::Button("Dump Shader"))
 			{
 				gRenderer.mDumpRayQuery = true;
 				gRenderer.mReloadShader = true;
 			}
 
+			ImGui::TreePop();
+		}
+
+		if (ImGui::TreeNodeEx("TraceRay (Only for test)"))
+		{
 			if (ImGui::Checkbox("Test Lib Shader", &gRenderer.mTestLibShader))
 				gRenderer.mAccumulationResetRequested = true;
+
+			ImGui::TreePop();
+		}
+
+		if (ImGui::TreeNodeEx("NVAPI", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			if (ImGui::TreeNodeEx("LSS (Wireframe)", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				if (ImGui::Button("Reload Scene"))
+					sLoadScene(false);
+
+				ImGui::Checkbox("Enabled", &gNVAPI.mWireframeEnabled);
+
+				bool endcap_chained = gNVAPI.mWireframeEndcapMode == NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_CHAINED;
+				if (ImGui::Checkbox("Endcap Chained (Wireframe)", &endcap_chained))
+					gNVAPI.mWireframeEndcapMode = endcap_chained ? NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_CHAINED : NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_NONE;
+
+				ImGui::SliderFloat("Radius (Wireframe)", &gNVAPI.mWireframeRadius, 0.001f, 0.1f);
+
+				ImGui::TreePop();
+			}
 
 			ImGui::TreePop();
 		}
@@ -475,6 +483,7 @@ static void sPrepareImGui()
 					"Index",
 					"Name",
 					"Position",
+					"Scale",
 					"Material",
 					"BSDF",
 					"Albedo",
@@ -534,7 +543,12 @@ static void sPrepareImGui()
 						ImGui::Text(position.c_str());
 
 						ImGui::TableSetColumnIndex(column_index++);
-						ImGui::Text("%s", instance_info.mMaterialName.c_str());
+						std::string scale = std::format("{:.2f} {:.2f} {:.2f} ", instance_info.mDecomposedScale[0], instance_info.mDecomposedScale[1], instance_info.mDecomposedScale[2]);
+						scale = instance_info.mDecomposedScale != glm::vec3(1.0f) ? scale : "";
+						ImGui::Text(scale.c_str());
+
+						ImGui::TableSetColumnIndex(column_index++);
+						ImGui::Text("%s", instance_info.mMaterial.mMaterialName.c_str());
 
 						ImGui::TableSetColumnIndex(column_index++);
 						ImGui::Text("%s%s", NAMEOF_ENUM(instance_data.mBSDF).data(), instance_data.mTwoSided ? " (TwoSided)" : "");
@@ -542,13 +556,13 @@ static void sPrepareImGui()
 						ImGui::TableSetColumnIndex(column_index++);
 						std::string albedo = std::format("{:.2f} {:.2f} {:.2f} ", instance_data.mAlbedo.x, instance_data.mAlbedo.y, instance_data.mAlbedo.z);
 						albedo = instance_data.mAlbedo != InstanceData().mAlbedo ? albedo : "";
-						albedo += instance_info.mAlbedoTexture.empty() ? "" : (instance_info.mAlbedoTexture.filename().string() + " (" + std::to_string(instance_data.mAlbedoTexture.mTextureIndex) + ", " + std::to_string(instance_data.mAlbedoTexture.mSamplerIndex) + ")");
+						albedo += instance_info.mMaterial.mAlbedoTexture.empty() ? "" : (instance_info.mMaterial.mAlbedoTexture.filename().string() + " (" + std::to_string(instance_data.mAlbedoTexture.mTextureIndex) + ", " + std::to_string(instance_data.mAlbedoTexture.mSamplerIndex) + ")");
 						ImGui::Text(albedo.c_str());
 
 						ImGui::TableSetColumnIndex(column_index++);
 						std::string reflectance = std::format("{:.2f} {:.2f} {:.2f} ", instance_data.mReflectance.x, instance_data.mReflectance.y, instance_data.mReflectance.z);
 						reflectance = instance_data.mReflectance != InstanceData().mReflectance ? reflectance : "";
-						reflectance += instance_info.mReflectanceTexture.empty() ? "" : (instance_info.mReflectanceTexture.filename().string() + " (" + std::to_string(instance_data.mReflectanceTexture.mTextureIndex) + ", " + std::to_string(instance_data.mReflectanceTexture.mSamplerIndex) + ")");
+						reflectance += instance_info.mMaterial.mReflectanceTexture.empty() ? "" : (instance_info.mMaterial.mReflectanceTexture.filename().string() + " (" + std::to_string(instance_data.mReflectanceTexture.mTextureIndex) + ", " + std::to_string(instance_data.mReflectanceTexture.mSamplerIndex) + ")");
 						ImGui::Text(reflectance.c_str());
 
 						ImGui::TableSetColumnIndex(column_index++);
@@ -584,7 +598,7 @@ static void sPrepareImGui()
 						ImGui::TableSetColumnIndex(column_index++);
 						std::string emission = std::format("{:.2f} {:.2f} {:.2f} ", instance_data.mEmission.x, instance_data.mEmission.y, instance_data.mEmission.z);
 						emission = instance_data.mEmission != InstanceData().mEmission ? emission : "";
-						emission += instance_info.mEmissionTexture.empty() ? "" : (instance_info.mEmissionTexture.filename().string() + " (" + std::to_string(instance_data.mEmissionTexture.mTextureIndex) + ", " + std::to_string(instance_data.mEmissionTexture.mSamplerIndex) + ")");
+						emission += instance_info.mMaterial.mEmissionTexture.empty() ? "" : (instance_info.mMaterial.mEmissionTexture.filename().string() + " (" + std::to_string(instance_data.mEmissionTexture.mTextureIndex) + ", " + std::to_string(instance_data.mEmissionTexture.mSamplerIndex) + ")");
 						ImGui::Text(emission.c_str());
 
 						ImGui::TableSetColumnIndex(column_index++);
@@ -908,7 +922,7 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 	gRenderer.Initialize();
 	
 	// Load Scene
-	sLoadScene();
+	sLoadScene(true);
 
 	// Features (rely on ImGui, Scene)
 	gAtmosphere.Initialize();
@@ -1012,12 +1026,12 @@ void sLoadCamera()
 		gCameraSettings.mHorizontalFovDegree = gScene.GetSceneContent().mFov.value();
 }
 
-void sLoadScene()
+void sLoadScene(bool inLoadCamera)
 {
 	sWaitForGPU();
 
 	gScene.Unload();
-	gScene.Load(kScenePresets[sCurrentSceneIndex].mPath, kScenePresets[sCurrentSceneIndex].mTransform);
+	gScene.Load(kScenePresets[sCurrentSceneIndex]);
 	gScene.Build();
 
 	gConstants.mSunAzimuth = kScenePresets[sCurrentSceneIndex].mSunAzimuth;
@@ -1031,7 +1045,8 @@ void sLoadScene()
 	gRenderer.mReloadShader = true;
 	gRenderer.mAccumulationResetRequested = true;
 
-	sLoadCamera();
+	if (inLoadCamera)
+		sLoadCamera();
 }
 
 void sRender()
@@ -1059,7 +1074,7 @@ void sRender()
 		if (sPreviousSceneIndex != sCurrentSceneIndex)
 		{
 			sPreviousSceneIndex = sCurrentSceneIndex;
-			sLoadScene();
+			sLoadScene(true);
 		}
 	}
 
@@ -1087,7 +1102,7 @@ void sRender()
 		{
 			static Constants sConstantsCopy			= gConstants;
 
-			// Whitelist
+			// Whitelist to ignore for accumulation reset
 			sConstantsCopy.mTime					= gConstants.mTime;
 			sConstantsCopy.mCurrentFrameIndex		= gConstants.mCurrentFrameIndex;
 			sConstantsCopy.mCurrentFrameWeight		= gConstants.mCurrentFrameWeight;
@@ -1095,6 +1110,7 @@ void sRender()
 			sConstantsCopy.mDebugMode				= gConstants.mDebugMode;
 			sConstantsCopy.mDebugFlag				= gConstants.mDebugFlag;
 			sConstantsCopy.mReSTIR.mTemporalCounter	= gConstants.mReSTIR.mTemporalCounter;
+			sConstantsCopy.mBRDFExplorer			= gConstants.mBRDFExplorer;
 
 			if (memcmp(&sConstantsCopy, &gConstants, sizeof(Constants)) != 0)
 				gRenderer.mAccumulationResetRequested = true;
@@ -1502,6 +1518,9 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		NVAPI_D3D12_RAYTRACING_SPHERES_CAPS sphere_caps = NVAPI_D3D12_RAYTRACING_SPHERES_CAP_NONE;
 		gVerify(NvAPI_D3D12_GetRaytracingCaps(gDevice, NVAPI_D3D12_RAYTRACING_CAPS_TYPE_SPHERES, &sphere_caps, sizeof(NVAPI_D3D12_RAYTRACING_SPHERES_CAPS)) == NVAPI_OK);
 		gNVAPI.mSpheresSupported = sphere_caps == NVAPI_D3D12_RAYTRACING_SPHERES_CAP_STANDARD;
+
+		// Assume both LSS and sphere or neither. Will only check for LSS after this line
+		gVerify(gNVAPI.mLinearSweptSpheresSupported == gNVAPI.mSpheresSupported);
 
 		if (gNVAPI.mMicromapSupported || gNVAPI.mClustersSupported || gNVAPI.mLinearSweptSpheresSupported || gNVAPI.mSpheresSupported)
 		{

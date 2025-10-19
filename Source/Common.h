@@ -66,6 +66,13 @@ constexpr inline T gMax(T lhs, T rhs)
 	return lhs > rhs ? lhs : rhs;
 }
 
+constexpr inline float gMinComponent(float2 v) { return std::min(v.x, v.y); }
+constexpr inline float gMinComponent(float3 v) { return std::min(std::min(v.x, v.y), v.z); }
+constexpr inline float gMinComponent(float4 v) { return std::min(std::min(std::min(v.x, v.y), v.z), v.w); }
+constexpr inline float gMaxComponent(float2 v) { return std::max(v.x, v.y); }
+constexpr inline float gMaxComponent(float3 v) { return std::max(std::max(v.x, v.y), v.z); }
+constexpr inline float gMaxComponent(float4 v) { return std::max(std::max(std::max(v.x, v.y), v.z), v.w); }
+
 template <typename T, size_t N>
 struct ArraySizeHelper {
 	using type = typename std::conditional<
@@ -320,6 +327,10 @@ struct NVAPI
 	bool									mFakeUAVEnabled = false;
 
 	NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE  mEndcapMode = NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_NONE;
+
+	bool									mWireframeEnabled = false;
+	NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE  mWireframeEndcapMode = NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_CHAINED;
+	float									mWireframeRadius = 0.01f;
 };
 extern NVAPI								gNVAPI;
 

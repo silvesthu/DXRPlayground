@@ -3,6 +3,10 @@
 #include "packing.hlsli"
 #include "utils.hlsli"
 
+#ifdef NVAPI_LSS
+#include "nvapi/nvHLSLExtns.h"
+#endif // NVAPI_LSS
+
 template <typename T> T fmadd(T inA, T inB, T inC)              { return inA * inB + inC; }
 template <typename T> T fmsub(T inA, T inB, T inC)              { return inA * inB - inC; }
 template <typename T> T fnmadd(T inA, T inB, T inC)             { return -inA * inB + inC; }

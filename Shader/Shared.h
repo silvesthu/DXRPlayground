@@ -204,6 +204,7 @@ enum class ViewDescriptorIndex : uint
 #else
 #define NV_SHADER_EXTN_SLOT					u999999
 #define NV_SHADER_EXTN_REGISTER_SPACE		space999999
+#define ROOT_SIGNATURE_NVAPI				", DescriptorTable(UAV(u999999, numDescriptors=unbounded, space=999999))"
 #endif // __cplusplus
 
 enum class SamplerDescriptorIndex : uint
@@ -508,6 +509,11 @@ struct InstanceData
 	uint						mVertexCount					CONSTANT_DEFAULT(0);
 	uint						mIndexOffset					CONSTANT_DEFAULT(0);
 	uint						mIndexCount						CONSTANT_DEFAULT(0);
+
+	uint						mLSSIndexOffset					CONSTANT_DEFAULT(0);
+	uint						mLSSIndexCount					CONSTANT_DEFAULT(0);
+	uint						mLSSRadiusOffset				CONSTANT_DEFAULT(0);
+	uint						mLSSRadiusCount					CONSTANT_DEFAULT(0);
 };
 
 struct Light

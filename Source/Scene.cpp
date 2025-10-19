@@ -22,13 +22,13 @@ void BLAS::Initialize(const Initializer& inInitializer)
 	mDesc = {};
 	mDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
 	mDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
-	mDesc.Triangles.VertexBuffer.StartAddress = inInitializer.mVertexBaseAddress + instance_data.mVertexOffset * sizeof(VertexType);
+	mDesc.Triangles.VertexBuffer.StartAddress = inInitializer.mVerticesBaseAddress + instance_data.mVertexOffset * sizeof(VertexType);
 	mDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(VertexType);
 	mDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
 	mDesc.Triangles.VertexCount = instance_data.mVertexCount;
 	if (instance_data.mIndexCount > 0)
 	{
-		mDesc.Triangles.IndexBuffer = inInitializer.mIndexBaseAddress + instance_data.mIndexOffset * sizeof(IndexType);
+		mDesc.Triangles.IndexBuffer = inInitializer.mIndicesBaseAddress + instance_data.mIndexOffset * sizeof(IndexType);
 		mDesc.Triangles.IndexCount = instance_data.mIndexCount;
 		mDesc.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
 	}
@@ -57,31 +57,28 @@ void BLAS::Initialize(const Initializer& inInitializer)
 
 			// [TODO]
 		}
-		else if (instance_info.mGeometryType == GeometryType::LSS)
+		else if (instance_info.mGeometryType == GeometryType::LSS || instance_info.mGeometryType == GeometryType::TriangleAsLSS)
 		{
 			mDescEx.type = NVAPI_D3D12_RAYTRACING_GEOMETRY_TYPE_LSS_EX; // see fillD3dLssDesc
 			mDescEx.flags = mDesc.Flags;
 			mDescEx.lss.vertexCount = instance_data.mVertexCount;
-			mDescEx.lss.primitiveCount = instance_data.mVertexCount / 2; // Assume line list
-			mDescEx.lss.vertexPositionBuffer.StartAddress = inInitializer.mVertexBaseAddress + instance_data.mVertexOffset * sizeof(VertexType);
+			mDescEx.lss.primitiveCount = instance_data.mLSSIndexCount / 2; // List
+			mDescEx.lss.vertexPositionBuffer.StartAddress = inInitializer.mVerticesBaseAddress + instance_data.mVertexOffset * sizeof(VertexType);
 			mDescEx.lss.vertexPositionBuffer.StrideInBytes = sizeof(VertexType);
 			mDescEx.lss.vertexPositionFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-			mDescEx.lss.vertexRadiusBuffer.StartAddress = inInitializer.mVertexBaseAddress + instance_data.mVertexOffset * sizeof(RadiusType);
+			mDescEx.lss.vertexRadiusBuffer.StartAddress = inInitializer.mLSSRadiiBaseAddress + instance_data.mLSSRadiusOffset * sizeof(RadiusType);
 			mDescEx.lss.vertexRadiusBuffer.StrideInBytes = sizeof(RadiusType);
 			mDescEx.lss.vertexRadiusFormat = DXGI_FORMAT_R32_FLOAT;
 
-			mDescEx.lss.endcapMode = gNVAPI.mEndcapMode;
+			mDescEx.lss.endcapMode = instance_info.mGeometryType == GeometryType::TriangleAsLSS ? gNVAPI.mWireframeEndcapMode : gNVAPI.mEndcapMode;
 			// mDescEx.lss.endcapMode = NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_CHAINED;
 			mDescEx.lss.primitiveFormat = NVAPI_D3D12_RAYTRACING_LSS_PRIMITIVE_FORMAT_LIST;
 			// mDescEx.lss.primitiveFormat = NVAPI_D3D12_RAYTRACING_LSS_PRIMITIVE_FORMAT_SUCCESSIVE_IMPLICIT;
 
-			if (instance_data.mIndexCount > 0)
-			{
-				mDescEx.lss.indexBuffer.StartAddress = inInitializer.mIndexBaseAddress + instance_data.mIndexOffset * sizeof(IndexType);
-				mDescEx.lss.indexBuffer.StrideInBytes = sizeof(IndexType);
-				mDescEx.lss.indexCount = instance_data.mIndexCount;
-				mDescEx.lss.indexFormat = DXGI_FORMAT_R32_UINT;
-			}
+			mDescEx.lss.indexBuffer.StartAddress = inInitializer.mLSSIndicesBaseAddress + instance_data.mLSSIndexOffset * sizeof(IndexType);
+			mDescEx.lss.indexBuffer.StrideInBytes = sizeof(IndexType);
+			mDescEx.lss.indexCount = instance_data.mLSSIndexCount;
+			mDescEx.lss.indexFormat = DXGI_FORMAT_R32_UINT;
 		}
 		
 		// D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS -> NVAPI_D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS_EX
@@ -285,6 +282,7 @@ bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransfor
 
 		InstanceInfo instance_info = {};
 		InstanceData instance_data = {};
+		instance_info.mName = shape.name;
 		if (shape.mesh.material_ids.size() == 0 || shape.mesh.material_ids[0] == -1)
 		{
 			FillDummyMaterial(instance_info, instance_data);
@@ -292,7 +290,7 @@ bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransfor
 		else
 		{
 			const tinyobj::material_t& material = reader.GetMaterials()[shape.mesh.material_ids[0]];
-			instance_info.mMaterialName = material.name;
+			instance_info.mMaterial.mMaterialName = material.name;
 
 			BSDF type = BSDF::Unsupported;
 			switch (material.illum)
@@ -312,7 +310,14 @@ bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransfor
 			instance_data.mSpecularTransmittance = glm::vec3(material.transmittance[0], material.transmittance[1], material.transmittance[2]);
 		}
 
-		instance_info.mName = shape.name;
+		glm::vec3 translation;
+		glm::vec3 skew;
+		glm::vec4 perspective;
+		glm::quat rotation;
+		glm::vec3 scale;
+		glm::decompose(inTransform, scale, rotation, translation, skew, perspective);
+		instance_info.mDecomposedScale = scale;
+
 		ioSceneContent.mInstanceInfos.push_back(instance_info);
 
 		instance_data.mTransform = inTransform;
@@ -386,7 +391,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 
 	struct BSDFInstance
 	{
-		InstanceInfo mInstanceInfo;
+		InstanceInfo::Material mMaterial;
 		InstanceData mInstanceData;
 	};
 
@@ -440,7 +445,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 			{
 				std::filesystem::path path = inFilename;
 				path.replace_filename(std::filesystem::path(get_child_texture(local_bsdf, "map")));
-				bsdf_instance.mInstanceInfo.mNormalTexture = { .mPath = path };
+				bsdf_instance.mMaterial.mNormalTexture = { .mPath = path };
 
 				local_bsdf = local_bsdf->FirstChildElement("bsdf");
 				local_type = local_bsdf->Attribute("type");
@@ -487,7 +492,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 				load_diffuse_reflectance();
 			else
 			{
-				bsdf_instance.mInstanceInfo.mAlbedoTexture = { .mPath = path, .mPointSampler = sampler == "nearest" };
+				bsdf_instance.mMaterial.mAlbedoTexture = { .mPath = path, .mPointSampler = sampler == "nearest" };
 				bsdf_instance.mInstanceData.mAlbedo = glm::vec3(1.0f);
 			}
 		}
@@ -515,7 +520,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 				load_specular_reflectance();
 			else
 			{
-				bsdf_instance.mInstanceInfo.mReflectanceTexture = { .mPath = path, .mPointSampler = sampler == "nearest" };
+				bsdf_instance.mMaterial.mReflectanceTexture = { .mPath = path, .mPointSampler = sampler == "nearest" };
 				bsdf_instance.mInstanceData.mReflectance = glm::vec3(1.0f);
 			}
 		}
@@ -570,7 +575,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 		}
 
 		gAssert(id != nullptr);
-		bsdf_instance.mInstanceInfo.mMaterialName = id;
+		bsdf_instance.mMaterial.mMaterialName = id;
 		bsdf_instance_by_id[id] = bsdf_instance;
 
 		bsdf = bsdf->NextSiblingElement("bsdf");
@@ -616,7 +621,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 			uint32_t vertex_offset = static_cast<uint32_t>(ioSceneContent.mVertices.size());
 			uint32_t index_offset = static_cast<uint32_t>(ioSceneContent.mIndices.size());
 			for (uint32_t i = 0; i < index_count; i++)
-				ioSceneContent.mIndices.push_back(primitive->mIndices[i] + vertex_offset);
+				ioSceneContent.mIndices.push_back(primitive->mIndices[i]);
 
 			std::copy(primitive->mVertices.begin(), primitive->mVertices.end(), std::back_inserter(ioSceneContent.mVertices));
 			std::copy(primitive->mNormals.begin(), primitive->mNormals.end(), std::back_inserter(ioSceneContent.mNormals));
@@ -654,6 +659,16 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 			InstanceInfo instance_info = {};
 			InstanceData instance_data = {};
 
+			instance_info.mName = id;
+
+			glm::vec3 translation;
+			glm::vec3 skew;
+			glm::vec4 perspective;
+			glm::quat rotation;
+			glm::vec3 scale;
+			glm::decompose(matrix, scale, rotation, translation, skew, perspective);
+			instance_info.mDecomposedScale = scale;
+
 			// Material
 			{
 				bool found_material = false;
@@ -664,7 +679,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 					auto iter = bsdf_instance_by_id.find(material_id);
 					if (iter != bsdf_instance_by_id.end())
 					{
-						instance_info = iter->second.mInstanceInfo;
+						instance_info.mMaterial = iter->second.mMaterial;
 						instance_data = iter->second.mInstanceData;
 						found_material = true;
 					}
@@ -715,13 +730,6 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 					if (primitive == &mPrimitives.mRectangle)
 						light.mType = LightType::Rectangle;
 
-					glm::vec3 translation;
-					glm::vec3 skew;
-					glm::vec4 perspective;
-					glm::quat rotation;
-					glm::vec3 scale;
-					glm::decompose(matrix, scale, rotation, translation, skew, perspective);
-
 					light.mHalfExtends = glm::vec2(scale.x, scale.y);
 					light.mInstanceID = static_cast<uint>(ioSceneContent.mInstanceDatas.size());
 					light.mPosition = matrix[3];
@@ -733,12 +741,11 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 				}
 			}
 
-			instance_info.mName = id;
 			ioSceneContent.mInstanceInfos.push_back(instance_info);
 
 			instance_data.mTransform = matrix;
 			instance_data.mInverseTranspose = glm::transpose(glm::inverse(matrix));
-			instance_data.mVertexOffset = 0; // Currently all vertices share same buffer. Only works indices fit in IndexType...
+			instance_data.mVertexOffset = vertex_offset;
 			instance_data.mVertexCount = index_count;
 			instance_data.mIndexOffset = index_offset;
 			instance_data.mIndexCount = index_count;
@@ -901,12 +908,15 @@ bool Scene::LoadGLTF(const std::string& inFilename, SceneContent& ioSceneContent
 			InstanceInfo instance_info =
 			{
 				.mName = std::format("{} - {}", ioName, mesh.name),
-				.mMaterialName = material.name,
-				.mAlbedoTexture = get_texture_path(material.pbrMetallicRoughness.baseColorTexture.index),
-				.mNormalTexture = get_texture_path(material.normalTexture.index),
-				.mReflectanceTexture = get_texture_path(material.pbrMetallicRoughness.metallicRoughnessTexture.index),
-				.mRoughnessTexture = get_texture_path(material.pbrMetallicRoughness.metallicRoughnessTexture.index),
-				.mEmissionTexture = get_texture_path(material.emissiveTexture.index),
+				.mMaterial = 
+				{
+					.mMaterialName = material.name,
+					.mAlbedoTexture = get_texture_path(material.pbrMetallicRoughness.baseColorTexture.index),
+					.mNormalTexture = get_texture_path(material.normalTexture.index),
+					.mReflectanceTexture = get_texture_path(material.pbrMetallicRoughness.metallicRoughnessTexture.index),
+					.mRoughnessTexture = get_texture_path(material.pbrMetallicRoughness.metallicRoughnessTexture.index),
+					.mEmissionTexture = get_texture_path(material.emissiveTexture.index),
+				}
 			};
 
 			auto pbr_specular_glossiness = material.extensions.find("KHR_materials_pbrSpecularGlossiness");
@@ -914,15 +924,23 @@ bool Scene::LoadGLTF(const std::string& inFilename, SceneContent& ioSceneContent
 			{
 				auto diffuseTexture = pbr_specular_glossiness->second.Get("diffuseTexture");
 				if (diffuseTexture.IsObject())
-					instance_info.mAlbedoTexture = { .mPath = get_texture_path(diffuseTexture.Get("index").GetNumberAsInt()) };
+					instance_info.mMaterial.mAlbedoTexture = { .mPath = get_texture_path(diffuseTexture.Get("index").GetNumberAsInt()) };
 				
 				auto specularGlossinessTexture = pbr_specular_glossiness->second.Get("specularGlossinessTexture");
 				if (specularGlossinessTexture.IsObject())
 				{
-					instance_info.mReflectanceTexture = { .mPath = get_texture_path(specularGlossinessTexture.Get("index").GetNumberAsInt()) };
-					instance_info.mRoughnessTexture = { .mPath = get_texture_path(specularGlossinessTexture.Get("index").GetNumberAsInt()) };
+					instance_info.mMaterial.mReflectanceTexture = { .mPath = get_texture_path(specularGlossinessTexture.Get("index").GetNumberAsInt()) };
+					instance_info.mMaterial.mRoughnessTexture = { .mPath = get_texture_path(specularGlossinessTexture.Get("index").GetNumberAsInt()) };
 				}
 			}
+
+			glm::vec3 translation;
+			glm::vec3 skew;
+			glm::vec4 perspective;
+			glm::quat rotation;
+			glm::vec3 scale;
+			glm::decompose(ioMatrix, scale, rotation, translation, skew, perspective);
+			instance_info.mDecomposedScale = scale;
 			
 			ioSceneContent.mInstanceInfos.push_back(instance_info);
 
@@ -980,11 +998,11 @@ bool Scene::LoadGLTF(const std::string& inFilename, SceneContent& ioSceneContent
 
 void Scene::FillDummyMaterial(InstanceInfo& ioInstanceInfo, InstanceData& ioInstanceData)
 {
-	ioInstanceInfo.mMaterialName = "DummyMaterial";
+	ioInstanceInfo.mMaterial.mMaterialName = "DummyMaterial";
 	ioInstanceData.mBSDF = BSDF::Diffuse;
 }
 
-void Scene::Load(const std::string_view& inFilePath, const glm::mat4x4& inTransform)
+void Scene::Load(const ScenePreset& inPreset)
 {
 	LoadObj("Asset/primitives/cube.obj", glm::mat4x4(1.0f), false, mPrimitives.mCube);
 	LoadObj("Asset/primitives/rectangle.obj", glm::mat4x4(1.0f), false, mPrimitives.mRectangle);
@@ -992,13 +1010,13 @@ void Scene::Load(const std::string_view& inFilePath, const glm::mat4x4& inTransf
 
 	mSceneContent = {}; // Reset
 
-	std::string filename_lower = gToLower(inFilePath);
+	std::string filename_lower = gToLower(inPreset.mPath);
 	if (std::filesystem::exists(filename_lower))
 	{
 		bool loaded = false;
 
 		if (!loaded && filename_lower.ends_with(".obj"))
-			loaded |= LoadObj(filename_lower, inTransform, false, mSceneContent);
+			loaded |= LoadObj(filename_lower, inPreset.mTransform, false, mSceneContent);
 
 		if (!loaded && filename_lower.ends_with(".xml"))
 			loaded |= LoadMitsuba(filename_lower, mSceneContent);
@@ -1009,6 +1027,9 @@ void Scene::Load(const std::string_view& inFilePath, const glm::mat4x4& inTransf
 
 	if (mSceneContent.mInstanceDatas.empty())
 		LoadDummy(mSceneContent);
+
+	if (gNVAPI.mLinearSweptSpheresSupported && gNVAPI.mWireframeEnabled && inPreset.mTriangleAsLSSAllowed)
+		GenerateLSSFromTriangle();
 
 	InitializeTextures();
 	InitializeBuffers();
@@ -1053,7 +1074,7 @@ void Scene::InitializeTextures()
 		InstanceInfo& instance_info = mSceneContent.mInstanceInfos[i];
 		InstanceData& instance_data = mSceneContent.mInstanceDatas[i];
 
-		auto get_texture_index = [&](InstanceInfo::Texture& inTexture, bool inSRGB) -> TextureInfo
+		auto get_texture_index = [&](InstanceInfo::Material::Texture& inTexture, bool inSRGB) -> TextureInfo
 		{
 			if (inTexture.empty())
 				return {};
@@ -1102,10 +1123,10 @@ void Scene::InitializeTextures()
 			return { .mTextureIndex = (uint)texture.mSRVIndex, .mSamplerIndex = sampler_index };
 		};
 
-		instance_data.mAlbedoTexture = get_texture_index(instance_info.mAlbedoTexture, true);
-		instance_data.mReflectanceTexture = get_texture_index(instance_info.mReflectanceTexture, false);
-		instance_data.mNormalTexture = get_texture_index(instance_info.mNormalTexture, false);
-		instance_data.mEmissionTexture = get_texture_index(instance_info.mEmissionTexture, true);
+		instance_data.mAlbedoTexture = get_texture_index(instance_info.mMaterial.mAlbedoTexture, true);
+		instance_data.mReflectanceTexture = get_texture_index(instance_info.mMaterial.mReflectanceTexture, false);
+		instance_data.mNormalTexture = get_texture_index(instance_info.mMaterial.mNormalTexture, false);
+		instance_data.mEmissionTexture = get_texture_index(instance_info.mMaterial.mEmissionTexture, true);
 	}
 
 	for (auto&& texture : mTextures)
@@ -1193,42 +1214,131 @@ void Scene::InitializeBuffers()
 		}
 	}
 
+	// RTXDI
 	{
-		desc_upload.Width = sizeof(PrepareLightsTask) * gMax(1ull, mSceneContent.mEmissiveInstances.size());
-		gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mBuffers.mTaskBuffer)));
-		gSetName(mBuffers.mTaskBuffer, "Scene.", "mBuffers.mTaskBuffer", "");
-
-		if (!mSceneContent.mEmissiveInstances.empty())
 		{
-			// See PrepareLightsPass::Process
-			// Handle here for now since Scene changes after load is not supported yet
-			uint light_buffer_offset = 0;
-			for (auto&& emissive_instance : mSceneContent.mEmissiveInstances)
+			desc_upload.Width = sizeof(PrepareLightsTask) * gMax(1ull, mSceneContent.mEmissiveInstances.size());
+			gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mBuffers.mTaskBuffer)));
+			gSetName(mBuffers.mTaskBuffer, "Scene.", "mBuffers.mTaskBuffer", "");
+
+			if (!mSceneContent.mEmissiveInstances.empty())
 			{
-				auto& instance_data = mSceneContent.mInstanceDatas[emissive_instance.mInstanceIndex];
-				
-				PrepareLightsTask task;
-				task.mInstanceIndex		= emissive_instance.mInstanceIndex;
-				task.mGeometryIndex		= emissive_instance.mInstanceIndex; // Currently only 1 geometry per instance is supported
-				task.mTriangleCount		= instance_data.mIndexCount / kVertexCountPerTriangle;
-				task.mLightBufferOffset	= light_buffer_offset;
+				// See PrepareLightsPass::Process
+				// Handle here for now since Scene changes after load is not supported yet
+				uint light_buffer_offset = 0;
+				for (auto&& emissive_instance : mSceneContent.mEmissiveInstances)
+				{
+					auto& instance_data = mSceneContent.mInstanceDatas[emissive_instance.mInstanceIndex];
 
-				mBuffers.mTaskBufferCPU.push_back(task);
+					PrepareLightsTask task;
+					task.mInstanceIndex = emissive_instance.mInstanceIndex;
+					task.mGeometryIndex = emissive_instance.mInstanceIndex; // Currently only 1 geometry per instance is supported
+					task.mTriangleCount = instance_data.mIndexCount / kVertexCountPerTriangle;
+					task.mLightBufferOffset = light_buffer_offset;
 
-				light_buffer_offset		+= task.mTriangleCount;
+					mBuffers.mTaskBufferCPU.push_back(task);
+
+					light_buffer_offset += task.mTriangleCount;
+				}
+
+				uint8_t* pData = nullptr;
+				mBuffers.mTaskBuffer->Map(0, nullptr, reinterpret_cast<void**>(&pData));
+				memcpy(pData, mBuffers.mTaskBufferCPU.data(), desc_upload.Width);
+				mBuffers.mTaskBuffer->Unmap(0, nullptr);
 			}
-			
-			uint8_t* pData = nullptr;
-			mBuffers.mTaskBuffer->Map(0, nullptr, reinterpret_cast<void**>(&pData));
-			memcpy(pData, mBuffers.mTaskBufferCPU.data(), desc_upload.Width);
-			mBuffers.mTaskBuffer->Unmap(0, nullptr);
 		}
+
+		{
+			desc_uav.Width = sizeof(RAB_LightInfo) * gMax(1u, mSceneContent.mEmissiveTriangleCount);
+			gValidate(gDevice->CreateCommittedResource(&props_default, D3D12_HEAP_FLAG_NONE, &desc_uav, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mBuffers.mLightDataBuffer)));
+			gSetName(mBuffers.mLightDataBuffer, "Scene.", "mBuffers.mLightDataBuffer", "");
+		}
+	}
+}
+
+void Scene::GenerateLSSFromTriangle()
+{
+	D3D12_RESOURCE_DESC desc_upload = gGetBufferResourceDesc(0);
+	D3D12_HEAP_PROPERTIES props_upload = gGetUploadHeapProperties();
+
+	constexpr uint indices_per_triangle = 3;									// 1 triangles = 3 indices
+	constexpr uint lss_indices_per_edge = 2;									// List
+	constexpr uint lss_indices_per_lss_triangle = 3 * lss_indices_per_edge;		// 1 triangles -> 3 LSS = 6 indices
+	gAssert(mSceneContent.mIndices.size() % indices_per_triangle == 0);
+
+	size_t instance_count = mSceneContent.mInstanceDatas.size();
+	gAssert(instance_count == mSceneContent.mInstanceInfos.size());
+	for (uint instance_index = 0; instance_index < instance_count; instance_index++)
+	{
+		InstanceData& instance_data = mSceneContent.mInstanceDatas[instance_index];
+		if (gMaxComponent(instance_data.mEmission) > 0.0f)
+			continue; // Leave light source as triangles
+
+		instance_data.mLSSIndexCount = instance_data.mIndexCount * 2;
+		instance_data.mLSSIndexOffset = instance_data.mIndexOffset * 2;
+
+		instance_data.mLSSRadiusCount = instance_data.mVertexCount;
+		instance_data.mLSSRadiusOffset = instance_data.mVertexOffset;
+
+		InstanceInfo& instance_info = mSceneContent.mInstanceInfos[instance_index];
+
+		instance_info.mGeometryType = GeometryType::TriangleAsLSS;
 	}
 
 	{
-		desc_uav.Width = sizeof(RAB_LightInfo) * gMax(1u, mSceneContent.mEmissiveTriangleCount);
-		gValidate(gDevice->CreateCommittedResource(&props_default, D3D12_HEAP_FLAG_NONE, &desc_uav, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mBuffers.mLightDataBuffer)));
-		gSetName(mBuffers.mLightDataBuffer, "Scene.", "mBuffers.mLightDataBuffer", "");
+		{
+			size_t triangle_count = mSceneContent.mIndices.size() / indices_per_triangle;
+
+			std::vector<IndexType> LSSIndices;
+			LSSIndices.resize(triangle_count * lss_indices_per_lss_triangle);
+			for (uint triangle_index = 0; triangle_index < triangle_count; triangle_index++)
+			{
+				uint triangle_index_offset = triangle_index * indices_per_triangle;
+				IndexType v0 = mSceneContent.mIndices[triangle_index_offset + 0];
+				IndexType v1 = mSceneContent.mIndices[triangle_index_offset + 1];
+				IndexType v2 = mSceneContent.mIndices[triangle_index_offset + 2];
+
+				uint lss_triangle_index_offset = triangle_index * lss_indices_per_lss_triangle;
+				LSSIndices[lss_triangle_index_offset + 0] = v0;
+				LSSIndices[lss_triangle_index_offset + 1] = v1;
+				LSSIndices[lss_triangle_index_offset + 2] = v1;
+				LSSIndices[lss_triangle_index_offset + 3] = v2;
+				LSSIndices[lss_triangle_index_offset + 4] = v2;
+				LSSIndices[lss_triangle_index_offset + 5] = v0;
+			}
+
+			desc_upload.Width = sizeof(IndexType) * LSSIndices.size();
+			gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mBuffers.mLSSIndices)));
+			gSetName(mBuffers.mLSSIndices, "Scene.", "mBuffers.mLSSIndices", "");
+
+			uint8_t* pData = nullptr;
+			mBuffers.mLSSIndices->Map(0, nullptr, reinterpret_cast<void**>(&pData));
+			memcpy(pData, LSSIndices.data(), desc_upload.Width);
+			mBuffers.mLSSIndices->Unmap(0, nullptr);
+		}
+
+		{
+			// [NOTE] Radius can also be uniform by use stride = 0, see NVAPI_D3D12_RAYTRACING_GEOMETRY_LSS_DESC
+			std::vector<float> LSSRadii;
+			LSSRadii.resize(mSceneContent.mVertices.size());
+			// std::fill(LSSRadii.begin(), LSSRadii.end(), gNVAPI.mWireframeRadius);
+			for (uint instance_index = 0; instance_index < instance_count; instance_index++)
+			{
+				// Assume vertex is not shared between instances
+				float wireframe_radius = gNVAPI.mWireframeRadius * 1.0f / gMinComponent(mSceneContent.mInstanceInfos[instance_index].mDecomposedScale);
+				for (uint vertex_index = 0; vertex_index < mSceneContent.mInstanceDatas[instance_index].mVertexCount; vertex_index++)
+					LSSRadii[mSceneContent.mInstanceDatas[instance_index].mVertexOffset + vertex_index] = wireframe_radius;
+			}
+
+			desc_upload.Width = sizeof(RadiusType) * LSSRadii.size();
+			gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mBuffers.mLSSRadii)));
+			gSetName(mBuffers.mLSSRadii, "Scene.", "mBuffers.mLSSRadii", "");
+
+			uint8_t* pData = nullptr;
+			mBuffers.mLSSRadii->Map(0, nullptr, reinterpret_cast<void**>(&pData));
+			memcpy(pData, LSSRadii.data(), desc_upload.Width);
+			mBuffers.mLSSRadii->Unmap(0, nullptr);
+		}
 	}
 }
 
@@ -1246,8 +1356,10 @@ void Scene::InitializeAccelerationStructures()
 		{
 			.mInstanceInfo = instance_info,
 			.mInstanceData = instance_data,
-			.mVertexBaseAddress = mBuffers.mVertices->GetGPUVirtualAddress(),
-			.mIndexBaseAddress = mBuffers.mIndices->GetGPUVirtualAddress()
+			.mVerticesBaseAddress = mBuffers.mVertices->GetGPUVirtualAddress(),
+			.mIndicesBaseAddress = mBuffers.mIndices->GetGPUVirtualAddress(),
+			.mLSSIndicesBaseAddress = mBuffers.mLSSIndices != nullptr ? mBuffers.mLSSIndices->GetGPUVirtualAddress() : 0,
+			.mLSSRadiiBaseAddress = mBuffers.mLSSRadii != nullptr ? mBuffers.mLSSRadii->GetGPUVirtualAddress() : 0,
 		});
 		mBlases.push_back(blas);
 

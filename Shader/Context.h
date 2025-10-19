@@ -256,6 +256,25 @@ struct HitContext : SurfaceContext
 		hit_context.mRayWS.mTCurrent			= inRayQuery.CommittedRayT();
 
 		hit_context.LoadSurface();
+
+#ifdef NVAPI_LSS
+		if (NvRtCommittedIsLss(inRayQuery))
+		{
+			// Transform from object space to handle non-uniform scale properly
+			// See also getGeometryFromHit in RTXCR
+			float2x4 lss_data					= NvRtCommittedLssObjectPositionsAndRadii(inRayQuery);
+			float3 lss_center_OS				= lerp(lss_data[0].xyz, lss_data[1].xyz, bary2.x);
+			float3 lss_position_OS				= inRayQuery.CommittedObjectRayOrigin() + inRayQuery.CommittedRayT() * inRayQuery.CommittedObjectRayDirection();
+			float3 lss_normal_OS				= lss_position_OS - lss_center_OS;
+			hit_context.mVertexNormalWS			= normalize(mul((float3x3)hit_context.InstanceData().mInverseTranspose, lss_normal_OS)); // Allow non-uniform scale
+
+			// Clear data those are not available
+			hit_context.mBarycentrics			= 0;
+			hit_context.mUV						= 0;
+			hit_context.mVertexPositionOS		= 0;
+			hit_context.mVertexNormalOS			= 0;
+		}
+#endif // NVAPI_LSS
 		
 		return hit_context;
 	}

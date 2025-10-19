@@ -8,6 +8,12 @@
 #include "AtmosphereIntegration.h"
 #include "CloudIntegration.h"
 
+#ifdef NVAPI_LSS
+#define IsHit(query) (query.CommittedStatus() == COMMITTED_TRIANGLE_HIT || NvRtCommittedIsLss(query) || NvRtCommittedIsSphere(query))
+#else
+#define IsHit(query) (query.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
+#endif // NVAPI_LSS
+
 void TraceRay(inout PixelContext ioPixelContext)
 {
 	DebugValueInit();
@@ -57,7 +63,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 
 		// Note RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH will give first hit but not necessary the closest one, commonly used for shadow ray
 		// https://docs.microsoft.com/en-us/windows/win32/direct3d12/ray_flag
-		RayQuery<RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> query;
+		RayQuery<RAY_FLAG_FORCE_OPAQUE> query;
 		uint additional_ray_flags				= 0;
 		uint ray_instance_mask					= 0xffffffff;
 		query.TraceRayInline(RaytracingScene, additional_ray_flags, ray_instance_mask, ray);
@@ -65,24 +71,38 @@ void TraceRay(inout PixelContext ioPixelContext)
 		
 		if (ioPixelContext.mOutputDepth)
 		{
-			if (query.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
+			if (IsHit(query))
 			{
-				float4 position_ws = float4(ray.Origin + ray.Direction * query.CommittedRayT(), 1.0);
-				float4 position_ps = mul(mConstants.mViewProjectionMatrix, position_ws);
-				float4 position_ndc = position_ps.xyzw / position_ps.w;
+				float4 position_ws				= float4(ray.Origin + ray.Direction * query.CommittedRayT(), 1.0);
+				float4 position_ps				= mul(mConstants.mViewProjectionMatrix, position_ws);
+				float4 position_ndc				= position_ps.xyzw / position_ps.w;
 				
-				ioPixelContext.mDepth = position_ndc.z;
+				ioPixelContext.mDepth			= position_ndc.z;
 				// DebugValue(position_ndc.xyz);
 			}
 			else
 			{
-				ioPixelContext.mDepth = 1.0;
+				ioPixelContext.mDepth			= 1.0;
 				// DebugValue(0);
 			}
 			return;
 		}
+
+		if (path_context.mRecursionDepth == 0)
+		{
+			// DebugValue(query.CommittedStatus());
+			
+#ifdef NVAPI_LSS
+			if (NvRtCommittedIsLss(query))
+			{
+				// DebugValue(NvRtCommittedLssHitParameter(query)); // 0?
+				// float2x4 lss_data = NvRtCommittedLssObjectPositionsAndRadii(query);
+				// DebugValue(lerp(lss_data[0].xyz, lss_data[1].xyz, query.CommittedTriangleBarycentrics().x));
+			}
+#endif // NVAPI_LSS
+		}
 		
-		if (query.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
+		if (IsHit(query))
 		{
 			// Ray hit something
 
@@ -194,14 +214,14 @@ void TraceRay(inout PixelContext ioPixelContext)
 						shadow_ray.TMin							= 0.001;
 						shadow_ray.TMax							= 100000;
 
-						RayQuery<RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> shadow_query;
+						RayQuery<RAY_FLAG_FORCE_OPAQUE> shadow_query;
 						uint shadow_additional_ray_flags		= 0;
 						uint shadow_ray_instance_mask			= 0xffffffff;
 						shadow_query.TraceRayInline(RaytracingScene, shadow_additional_ray_flags, shadow_ray_instance_mask, shadow_ray);
 						shadow_query.Proceed();
 						
 						// Shadow ray hit the light
-						if (shadow_query.CommittedStatus() == COMMITTED_TRIANGLE_HIT && shadow_query.CommittedInstanceID() == light_context.Light().mInstanceID)
+						if (IsHit(shadow_query) && shadow_query.CommittedInstanceID() == light_context.Light().mInstanceID)
 						{
 							if (mConstants.mDebugFlag& DebugFlag::UpdateRayInspection)
 								if (ioPixelContext.mPixelIndex.x == mConstants.mPixelDebugCoord.x && ioPixelContext.mPixelIndex.y == mConstants.mPixelDebugCoord.y)
