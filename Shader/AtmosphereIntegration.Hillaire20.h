@@ -1,3 +1,6 @@
+
+#include "HLSL.h"
+
 // Sample at center of each segment
 // #define HILLAIRE20_ADJUST_INTEGRATION
 
@@ -38,11 +41,11 @@ float fromSubUvsToUnit(float u, float resolution) { return (u - 0.5f / resolutio
 
 float getAlbedo(float scattering, float extinction)
 {
-	return scattering / max(0.001, extinction);
+	return scattering / max(0.001f, extinction);
 }
 float3 getAlbedo(float3 scattering, float3 extinction)
 {
-	return scattering / max(0.001, extinction);
+	return scattering / max(0.001f, extinction);
 }
 
 struct AtmosphereParameters

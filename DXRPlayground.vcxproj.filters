@@ -374,6 +374,9 @@
     <None Include="Source\Thirdparty\nvapi\nvShaderExtnEnums.h">
       <Filter>Source\Thirdparty\nvapi</Filter>
     </None>
+    <None Include="Shader\HLSL.h">
+      <Filter>Shader</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="Source\Thirdparty\glm\util\glm.natvis">

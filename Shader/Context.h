@@ -1,5 +1,8 @@
 #pragma once
 
+#include "Shared.h"
+#include "HLSL.h"
+
 struct PixelContext
 {
 	uint3			mPixelIndex;
@@ -21,9 +24,11 @@ struct PathContext
 	bool			mPrevDiracDeltaDistribution;
 					
 	uint			mRandomState;
+	uint			mRandomStateReSTIR;
+
 	uint			mRecursionDepth;
 
-	uint			mRandomStateReSTIR;
+	uint			mMediumInstanceID;
 };
 
 // Context information about a point on surface
@@ -116,6 +121,7 @@ struct SurfaceContext
 		
 		return 0;
 	}
+
 	float3			Emission()					
 	{
 		uint texture_index = InstanceData().mEmissionTexture.mTextureIndex;
@@ -128,6 +134,8 @@ struct SurfaceContext
 		}
 		return InstanceData().mEmission; 
 	}
+
+	bool			HasMedium() { return InstanceData().mMediumSigmaT > 0; }
 
 	// https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#metal-brdf-and-dielectric-brdf
 	float3			AlbedoGLTF()						
@@ -239,7 +247,7 @@ struct Ray
 
 struct HitContext : SurfaceContext
 {
-	template <RAY_FLAG RayFlags>
+	template<RAY_FLAG RayFlags>
 	static HitContext Generate(RayDesc inRayDesc, RayQuery<RayFlags> inRayQuery)
 	{
 		// System value intrinsics https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#system-value-intrinsics
@@ -262,14 +270,14 @@ struct HitContext : SurfaceContext
 		{
 			// Transform from object space to handle non-uniform scale properly
 			// See also getGeometryFromHit in RTXCR
+			// [NOTE] Somehow the object space coordinates here might flip sign. Avoid get position from it
 			float2x4 lss_data					= NvRtCommittedLssObjectPositionsAndRadii(inRayQuery);
-			float3 lss_center_OS				= lerp(lss_data[0].xyz, lss_data[1].xyz, bary2.x);
+			float3 lss_center_OS				= lerp(lss_data[0].xyz, lss_data[1].xyz, bary2.x); // bary2.x = NvRtCommittedLssHitParameter(inRayQuery)
 			float3 lss_position_OS				= inRayQuery.CommittedObjectRayOrigin() + inRayQuery.CommittedRayT() * inRayQuery.CommittedObjectRayDirection();
 			float3 lss_normal_OS				= lss_position_OS - lss_center_OS;
 			hit_context.mVertexNormalWS			= normalize(mul((float3x3)hit_context.InstanceData().mInverseTranspose, lss_normal_OS)); // Allow non-uniform scale
 
 			// Clear data those are not available
-			hit_context.mBarycentrics			= 0;
 			hit_context.mUV						= 0;
 			hit_context.mVertexPositionOS		= 0;
 			hit_context.mVertexNormalOS			= 0;

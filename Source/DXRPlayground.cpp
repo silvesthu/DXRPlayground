@@ -37,7 +37,7 @@ static const std::array kScenePresets =
 	ScenePreset().Name("CornellBoxDielectric").Path("Asset/Comparison/benedikt-bitterli/cornell-box-dielectric/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("CornellBoxTeapot").Path("Asset/Comparison/benedikt-bitterli/cornell-box-teapot/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("CornellMonkey").Path("Asset/Comparison/benedikt-bitterli/cornell-box-monkey/scene_v3.xml").EmissionBoost(1E4f),
-	ScenePreset().Name("CornellDragon").Path("Asset/Comparison/benedikt-bitterli/cornell-box-dragon/scene_v3.xml").EmissionBoost(1E4f).TriangleAsLSSAllowed(true),
+	ScenePreset().Name("CornellDragon").Path("Asset/Comparison/benedikt-bitterli/cornell-box-dragon/scene_v3.xml").EmissionBoost(1E4f),
 
 	// MIS
 	ScenePreset().Name("VeachMIS").Path("Asset/Comparison/benedikt-bitterli/veach-mis/scene_ggx_v3.xml").EmissionBoost(1E4f),
@@ -73,7 +73,7 @@ int sFindScenePresetIndex(const std::string_view inName)
 {
 	return static_cast<int>(&sFindScenePreset(inName) - &kScenePresets.front());
 }
-static int sCurrentSceneIndex = sFindScenePresetIndex("CornellBox");
+static int sCurrentSceneIndex = sFindScenePresetIndex("CornellDragon");
 static int sPreviousSceneIndex = sCurrentSceneIndex;
 
 struct CameraSettings
@@ -435,6 +435,11 @@ static void sPrepareImGui()
 				ImGui::TreePop();
 			}
 
+			ImGui::TreePop();
+		}
+
+		if (ImGui::TreeNodeEx("Misc"))
+		{
 			ImGui::TreePop();
 		}
 
@@ -879,8 +884,8 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
-	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
-	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;   // Enable Gamepad Controls
+	// io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
+	// io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;   // Enable Gamepad Controls
 
 	// Setup Dear ImGui style
 	ImGui::StyleColorsDark();
@@ -933,7 +938,7 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 		[] (const std::string& inPath, const filewatch::Event inChangeType) 
 		{
 			(void)inChangeType;
-			std::regex pattern(".*\\.(hlsl|h|inl)");
+			std::regex pattern(".*\\.(hlsl|hlsli|h|inl)");
 			if (std::regex_match(inPath, pattern) && inChangeType == filewatch::Event::modified)
 			{
 				std::string msg = "Reload triggered by " + inPath + "\n";
@@ -1092,15 +1097,15 @@ void sRender()
 			gConstants.mLightCount		= gConstants.mLightSourceMode != LightSourceMode::TriangleLights ? (glm::uint)gScene.GetSceneContent().mLights.size() : 0;
 
 			if (ImGui::IsMouseDown(ImGuiMouseButton_Middle))
-			{
 				gConstants.mPixelDebugCoord = glm::uvec2(static_cast<uint32_t>(ImGui::GetMousePos().x), (uint32_t)ImGui::GetMousePos().y);
-				gConstants.mDebugFlag |= DebugFlag::UpdateRayInspection;
-			}
 		}
 
 		// Upload
 		{
 			static Constants sConstantsCopy			= gConstants;
+
+			if (sConstantsCopy.mPixelDebugCoord != gConstants.mPixelDebugCoord)
+				gConstants.mDebugFlag |= DebugFlag::UpdateRayInspection;
 
 			// Whitelist to ignore for accumulation reset
 			sConstantsCopy.mTime					= gConstants.mTime;
@@ -1253,6 +1258,7 @@ void sRender()
 	}
 
 	// PrepareLights
+	if (gScene.GetSceneContent().mEmissiveTriangleCount > 0)
 	{
 		TIMING_SCOPE("PrepareLights", gStats.mTimeMS.mPrepareLights);
 
@@ -1275,6 +1281,11 @@ void sRender()
 		gCommandList->Dispatch(gAlignUpDiv(swap_chain_desc.Width, 8u), gAlignUpDiv(swap_chain_desc.Height, 8u), 1);
 
 		gBarrierUAV(gCommandList, nullptr);
+	}
+
+	// [TODO] RayQuery for recorded paths, decouple those from camera view
+	{
+
 	}
 
 	// Test Hit Shader
@@ -1691,6 +1702,9 @@ static void sCleanupDeviceD3D()
 
 static void sWaitForGPU()
 {
+	if (gFenceLastSignaledValue == 0) // Nothing has been done yet, and DirectX complains about waiting on 0
+		return;
+
 	gIncrementalFence->SetEventOnCompletion(gFenceLastSignaledValue, gIncrementalFenceEvent);
 	WaitForSingleObject(gIncrementalFenceEvent, INFINITE);
 }

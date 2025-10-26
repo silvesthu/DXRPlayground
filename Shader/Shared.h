@@ -204,7 +204,7 @@ enum class ViewDescriptorIndex : uint
 #else
 #define NV_SHADER_EXTN_SLOT					u999999
 #define NV_SHADER_EXTN_REGISTER_SPACE		space999999
-#define ROOT_SIGNATURE_NVAPI				", DescriptorTable(UAV(u999999, numDescriptors=unbounded, space=999999))"
+#define ROOT_SIGNATURE_NVAPI				", DescriptorTable(UAV(u999999, numDescriptors=1, space=999999))"
 #endif // __cplusplus
 
 enum class SamplerDescriptorIndex : uint
@@ -290,6 +290,12 @@ enum class DebugMode : uint
 
 	GENERATE_NEW_LINE_NAME,
 
+	DiracDelta,
+	LobeIndex,
+	MediumInstanceID,
+
+	GENERATE_NEW_LINE_NAME,
+
 	// Light Sample
 	Light_L,
 	Light_V,
@@ -312,14 +318,10 @@ enum class DebugMode : uint
 
 	GENERATE_NEW_LINE_NAME,
 
-	Emission,
 	Throughput,
-	DiracDelta,
-
-	GENERATE_NEW_LINE_NAME,
-
-	RussianRoulette,
 	EtaScale,
+	Emission,
+	RussianRoulette,
 
 	GENERATE_NEW_LINE_NAME,
 
@@ -442,7 +444,7 @@ enum class AtmosphereMuSEncodingMode : uint
 	Count
 };
 
-enum class CloudMode  : uint
+enum class CloudMode : uint
 {
 	None = 0,
 
@@ -463,6 +465,11 @@ struct TextureInfo
 	uint						mTextureIndex : 16				CONSTANT_DEFAULT((uint)ViewDescriptorIndex::Invalid);
 	uint						mSamplerIndex : 4				CONSTANT_DEFAULT((uint)SamplerDescriptorIndex::BilinearWrap);
 	uint						mUnused	: 12					CONSTANT_DEFAULT(0);
+};
+
+enum : uint
+{
+	InvalidInstanceID							= 0xffffffff,
 };
 
 struct InstanceData
@@ -497,7 +504,7 @@ struct InstanceData
 	TextureInfo					mEmissionTexture;
 
 	float3						mMediumAlbedo					CONSTANT_DEFAULT(float3(0.75f, 0.75f, 0.75f));
-	float						mMediumSigmaT					CONSTANT_DEFAULT(1.0f);
+	float						mMediumSigmaT					CONSTANT_DEFAULT(0.0f);
 
 	float						mMediumPhase					CONSTANT_DEFAULT(0.5f);
 	float3						GENERATE_PAD_NAME				CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));

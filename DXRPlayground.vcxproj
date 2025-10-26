@@ -38,6 +38,7 @@
     <None Include="Shader\Reservoir.h" />
     <None Include="Shader\Shared.h" />
     <ClInclude Include="Shader\BRDFExplorer.h" />
+    <None Include="Shader\HLSL.h" />
     <ClInclude Include="Source\Thirdparty\glm.h" />
     <ClInclude Include="Source\Thirdparty\imgui_config.h" />
     <None Include="Source\Thirdparty\nvapi\nvHLSLExtns.h" />

@@ -581,6 +581,8 @@ bool gCreateVSPSPipelineState(const char* inShaderFileName, const char* inVSName
 	D3D12_RASTERIZER_DESC rasterizer_desc = {};
 	rasterizer_desc.FillMode = D3D12_FILL_MODE_SOLID;
 	rasterizer_desc.CullMode = D3D12_CULL_MODE_NONE;
+	rasterizer_desc.AntialiasedLineEnable = false; // Tried, but "Alpha antialiased" does not looks clean on line, see https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_rasterizer_desc
+	rasterizer_desc.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF; // Only triangles support it
 
 	D3D12_BLEND_DESC blend_desc = {};
 	blend_desc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;

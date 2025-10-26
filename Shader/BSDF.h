@@ -9,6 +9,8 @@ struct BSDFResult
 	float3			mBSDF;
 	float			mBSDFSamplePDF;
 	float			mEta;
+	uint			mLobeIndex;
+	uint			mMediumInstanceID;
 };
 
 namespace BSDFEvaluation
@@ -75,7 +77,9 @@ namespace BSDFEvaluation
 			BSDFResult result;
 			result.mBSDF						= inHitContext.Albedo() / MATH_PI;
 			result.mBSDFSamplePDF				= max(0, inBSDFContext.mNdotL) / MATH_PI;
+			result.mLobeIndex					= 0;
 			result.mEta							= 1.0;
+			result.mMediumInstanceID			= InvalidInstanceID;
 
 			if (inHitContext.BSDF() == BSDF::Unsupported)
 				result.mBSDF					= float3(1, 0, 1) / MATH_PI;
@@ -119,7 +123,9 @@ namespace BSDFEvaluation
 			BSDFResult result;
 			result.mBSDF						= F;
 			result.mBSDFSamplePDF				= 1.0;
+			result.mLobeIndex					= 0;
 			result.mEta							= 1.0;
+			result.mMediumInstanceID			= InvalidInstanceID;
 
 			if (inBSDFContext.mNdotL < 0 || inBSDFContext.mNdotV < 0 || inBSDFContext.mHdotL < 0 || inBSDFContext.mHdotV < 0)
 				result.mBSDF					= 0;
@@ -189,7 +195,9 @@ namespace BSDFEvaluation
 			BSDFResult result;
 			result.mBSDF						= D * G * F / (4.0f * inBSDFContext.mNdotV * inBSDFContext.mNdotL);
 			result.mBSDFSamplePDF				= microfacet_pdf * jacobian;
+			result.mLobeIndex					= 0;
 			result.mEta							= 1.0;
+			result.mMediumInstanceID			= InvalidInstanceID;
 			return result;
 		}
 	}
@@ -270,12 +278,15 @@ namespace BSDFEvaluation
 			//		          https://www.pbr-book.org/3ed-2018/Light_Transport_III_Bidirectional_Methods/The_Path-Space_Measurement_Equation#x3-Non-symmetryDuetoRefraction
 			result.mBSDF						*= select(selected_r, 1.0, sqr(eta_ti));
 
+			result.mLobeIndex					= select(selected_r, 0, 1);
+
 			// [NOTE] Output eta (inverse) to remove its effect on Russian Roulette. 
 			//		  Russian Roulette terminates path early depending on throughput (beta), which in turn depending on BSDF above
 			//		  Refraction in and out may temporarily lower throughput to cause termination unintentionally
 			//		  [PBRT3] > It lets us sometimes avoid terminating refracted rays that are about to be refracted back out of a medium and thus have their beta value increased.
 			//                https://github.com/mmp/pbrt-v3/blob/master/src/integrators/path.cpp#L72
 			result.mEta							= select(selected_r, 1.0, eta_it);
+			result.mMediumInstanceID			= select(selected_r, InvalidInstanceID, inHitContext.mInstanceID);
 
 			return result;
 		}
@@ -394,7 +405,9 @@ namespace BSDFEvaluation
 
 			// See Dielectric::Evaluate
 			result.mBSDF						*= select(selected_r, 1.0, sqr(eta_ti));
+			result.mLobeIndex					= select(selected_r, 0, 1);
 			result.mEta							= select(selected_r, 1.0, eta_it);
+			result.mMediumInstanceID			= select(selected_r, InvalidInstanceID, inHitContext.mInstanceID);
 
 			return result;
 		}
@@ -471,7 +484,9 @@ namespace BSDFEvaluation
 				BSDFResult result;
 				result.mBSDF						= D * G * F / (4.0f * inBSDFContext.mNdotV * inBSDFContext.mNdotL);
 				result.mBSDFSamplePDF				= microfacet_pdf * jacobian * specular_probability;
+				result.mLobeIndex					= 0;
 				result.mEta							= 1.0;
+				result.mMediumInstanceID			= InvalidInstanceID;
 				return result;
 			}
 		}
