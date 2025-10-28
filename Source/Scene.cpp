@@ -349,6 +349,15 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 			return (tinyxml2::XMLElement*)nullptr;
 		};
 
+	static auto get_child_type = [](tinyxml2::XMLElement* inElement, const char* inName)
+		{
+			tinyxml2::XMLElement* child = get_first_child_element_by_name(inElement, inName);
+			if (child == nullptr)
+				return std::string_view(); // Treat no found the same as attribute with empty string to simplify parsing
+
+			return std::string_view(child->Name());
+		};
+
 	static auto get_child_value = [](tinyxml2::XMLElement* inElement, const char* inName)
 		{
 			tinyxml2::XMLElement* child = get_first_child_element_by_name(inElement, inName);
@@ -696,8 +705,22 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 					std::string_view medium_type = medium->Attribute("type");
 					gAssert(medium_type == "homogeneous"); // heterogeneous not supported
 
-					gFromString(get_child_value(medium, "albedo").data(), instance_data.mMediumAlbedo);
-					gFromString(get_child_value(medium, "sigma_t").data(), instance_data.mMediumSigmaT);
+					if (get_child_type(medium, "albedo") == "float")
+					{
+						float value = 0;
+						gFromString(get_child_value(medium, "albedo").data(), value);
+						instance_data.mMediumAlbedo = float3(value);
+					}
+					else
+						gFromString(get_child_value(medium, "albedo").data(), instance_data.mMediumAlbedo);
+					if (get_child_type(medium, "sigma_t") == "float")
+					{
+						float value = 0;
+						gFromString(get_child_value(medium, "sigma_t").data(), value);
+						instance_data.mMediumSigmaT = float3(value);
+					}
+					else
+						gFromString(get_child_value(medium, "sigma_t").data(), instance_data.mMediumSigmaT);
 
 					tinyxml2::XMLElement* phase = medium->FirstChildElement("phase");
 					if (phase != nullptr)

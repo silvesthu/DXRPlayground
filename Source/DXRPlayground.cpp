@@ -591,7 +591,7 @@ static void sPrepareImGui()
 						ImGui::Text(medium_albedo.c_str());
 
 						ImGui::TableSetColumnIndex(column_index++);
-						std::string medium_sigma_t = std::format("{:.2f} ", instance_data.mMediumSigmaT);
+						std::string medium_sigma_t = std::format("{:.2f} {:.2f} {:.2f} ", instance_data.mMediumSigmaT.x, instance_data.mMediumSigmaT.y, instance_data.mMediumSigmaT.z);
 						medium_sigma_t = instance_data.mMediumSigmaT != InstanceData().mMediumSigmaT ? medium_sigma_t : "";
 						ImGui::Text(medium_sigma_t.c_str());
 

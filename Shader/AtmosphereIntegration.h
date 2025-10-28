@@ -5,7 +5,7 @@
 AtmosphereMode GetAtmosphereMode()
 {
 #ifdef kAtmosphereMode
-	// Static
+	// Static, see gCompileShader
 	return kAtmosphereMode;
 #else
 	// Dynamic

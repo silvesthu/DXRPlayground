@@ -292,7 +292,12 @@ enum class DebugMode : uint
 
 	DiracDelta,
 	LobeIndex,
+
+	GENERATE_NEW_LINE_NAME,
+	
 	MediumInstanceID,
+	MediumFreeFlight,
+	MediumTransmittance,
 
 	GENERATE_NEW_LINE_NAME,
 
@@ -504,7 +509,10 @@ struct InstanceData
 	TextureInfo					mEmissionTexture;
 
 	float3						mMediumAlbedo					CONSTANT_DEFAULT(float3(0.75f, 0.75f, 0.75f));
-	float						mMediumSigmaT					CONSTANT_DEFAULT(0.0f);
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+
+	float3						mMediumSigmaT					CONSTANT_DEFAULT(float3(1.0f, 1.0f, 1.0f));
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
 	float						mMediumPhase					CONSTANT_DEFAULT(0.5f);
 	float3						GENERATE_PAD_NAME				CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));

@@ -106,25 +106,51 @@ void TraceRay(inout PixelContext ioPixelContext)
 			// HitContext
 			HitContext hit_context				= HitContext::Generate(ray, query);
 
+			// Participating media (Medium)
+			// [TODO] Need a medium stack to handle nested medium
+			// [TODO] Skip medium in case ray is offseted to outside, or mesh is not water tight
+			MediumContext medium_context		= MediumContext::Generate(ray, query);
+			if (path_context.mMediumInstanceID != InvalidInstanceID && medium_context.mInstanceID == path_context.mMediumInstanceID)
+			{
+				float free_flight_distance		= -log(1.0 - RandomFloat01(path_context.mRandomState)) / MaxComponent(medium_context.SigmaT());
+
+				if (free_flight_distance < hit_context.mRayWS.mTCurrent)
+				{
+					ray.Origin					= ray.Origin + ray.Direction * free_flight_distance;
+					ray.Direction				= RandomUnitVector(path_context.mRandomState);
+
+					path_context.mThroughput	*= medium_context.Albedo();
+
+					medium_context.Scatter(free_flight_distance);
+					continue_bounce				= true;
+				}
+
+				DebugValue(DebugMode::MediumFreeFlight,			path_context.mRecursionDepth, float3(free_flight_distance, hit_context.mRayWS.mTCurrent, free_flight_distance < hit_context.mRayWS.mTCurrent ? 1 : 0));
+			}
+			{
+				DebugValue(DebugMode::MediumInstanceID,			path_context.mRecursionDepth, float3(path_context.mMediumInstanceID, 0, 0));
+			}
+
 			// Debug
 			{
 				if (mConstants.mDebugFlag & DebugFlag::UpdateRayInspection)
 					if (ioPixelContext.mPixelIndex.x == mConstants.mPixelDebugCoord.x && ioPixelContext.mPixelIndex.y == mConstants.mPixelDebugCoord.y)
-						RayInspectionUAV[0].mPositionWS[path_context.mRecursionDepth + 1] = float4(hit_context.PositionWS(), 1.0);
-				
+						RayInspectionUAV[0].mPositionWS[path_context.mRecursionDepth + 1] = float4(medium_context.PositionWS(), 1.0);
+
 				if (path_context.mRecursionDepth == 0)
 					if (ioPixelContext.mPixelIndex.x == mConstants.mPixelDebugCoord.x && ioPixelContext.mPixelIndex.y == mConstants.mPixelDebugCoord.y)
-						PixelInspectionUAV[0].mPixelInstanceID = hit_context.mInstanceID;
-				
-				DebugValue(DebugMode::PositionWS, path_context.mRecursionDepth, float3(hit_context.PositionWS()));
-				DebugValue(DebugMode::DirectionWS, path_context.mRecursionDepth, float3(hit_context.DirectionWS()));
-				DebugValue(DebugMode::InstanceID, path_context.mRecursionDepth, float3(hit_context.mInstanceID, 0.0, 0.0));
+						PixelInspectionUAV[0].mPixelInstanceID = medium_context.mInstanceID;
+
+				DebugValue(DebugMode::PositionWS, path_context.mRecursionDepth, float3(medium_context.PositionWS()));
+				DebugValue(DebugMode::DirectionWS, path_context.mRecursionDepth, float3(medium_context.DirectionWS()));
+				DebugValue(DebugMode::InstanceID, path_context.mRecursionDepth, float3(medium_context.mInstanceID, 0.0, 0.0));
 			}
 
-			// Participating media
+			// Participating media (Atmosphere)
 			{
 				float3 in_scattering			= 0;
 				float3 transmittance			= 1;
+
 				GetSkyLuminanceToPoint(hit_context.mRayWS, in_scattering, transmittance);
 
 				path_context.mEmission			+= in_scattering;
@@ -150,7 +176,11 @@ void TraceRay(inout PixelContext ioPixelContext)
 			}
 			
 			// Ray hit a light / [Mitsuba] Direct emission
-			if (hit_context.BSDF() == BSDF::Light)
+			if (medium_context.mScatteringEvent)
+			{
+				// To next bounce, prepared above
+			}
+			else if (hit_context.BSDF() == BSDF::Light)
 			{
 				if (path_context.mRecursionDepth == 0 ||					// Camera ray hit the light
 					path_context.mPrevDiracDeltaDistribution || 			// Prev hit is DiracDeltaDistribution -> no light sample
@@ -227,10 +257,10 @@ void TraceRay(inout PixelContext ioPixelContext)
 							BSDFContext bsdf_context			= BSDFContext::Generate(BSDFContext::Mode::Light, light_context.mL, hit_context);
 							BSDFResult bsdf_result				= BSDFEvaluation::Evaluate(bsdf_context, hit_context, path_context);
 							
-							DebugValue(DebugMode::Light_L, 	path_context.mRecursionDepth, float3(bsdf_context.mL));
-							DebugValue(DebugMode::Light_V, 	path_context.mRecursionDepth, float3(bsdf_context.mV));
-							DebugValue(DebugMode::Light_N, 	path_context.mRecursionDepth, float3(bsdf_context.mN));
-							DebugValue(DebugMode::Light_H, 	path_context.mRecursionDepth, float3(bsdf_context.mH));
+							DebugValue(DebugMode::Light_L, 		path_context.mRecursionDepth, float3(bsdf_context.mL));
+							DebugValue(DebugMode::Light_V, 		path_context.mRecursionDepth, float3(bsdf_context.mV));
+							DebugValue(DebugMode::Light_N, 		path_context.mRecursionDepth, float3(bsdf_context.mN));
+							DebugValue(DebugMode::Light_H, 		path_context.mRecursionDepth, float3(bsdf_context.mH));
 
 							DebugValue(DebugMode::Light_BSDF,	path_context.mRecursionDepth, float3(bsdf_result.mBSDF));
 							DebugValue(DebugMode::Light_PDF,	path_context.mRecursionDepth, float3(1.0 / light_weight, 0, 0));
@@ -269,10 +299,6 @@ void TraceRay(inout PixelContext ioPixelContext)
 
 					DebugValue(DebugMode::DiracDelta,			path_context.mRecursionDepth, float3(hit_context.DiracDeltaDistribution(), 0, 0));
 					DebugValue(DebugMode::LobeIndex,			path_context.mRecursionDepth, float3(bsdf_result.mLobeIndex, 0, 0));
-					DebugValue(DebugMode::MediumInstanceID,		path_context.mRecursionDepth, float3(bsdf_result.mMediumInstanceID == InvalidInstanceID ? -1.0 : path_context.mMediumInstanceID, 0, 0));
-
-					DebugValue(DebugMode::Throughput,			path_context.mRecursionDepth, float3(path_context.mThroughput));
-					DebugValue(DebugMode::EtaScale,				path_context.mRecursionDepth, float3(path_context.mEtaScale, 0, 0));
 
 					// Prepare for next bounce
 					ray.Origin									= hit_context.PositionWS();
@@ -329,6 +355,8 @@ void TraceRay(inout PixelContext ioPixelContext)
 		}
 		
 		DebugValue(DebugMode::Emission,			path_context.mRecursionDepth, path_context.mEmission);
+		DebugValue(DebugMode::Throughput,		path_context.mRecursionDepth, float3(path_context.mThroughput));
+		DebugValue(DebugMode::EtaScale,			path_context.mRecursionDepth, float3(path_context.mEtaScale, 0, 0));
 		
 		if (!continue_bounce)
 			break;

@@ -135,7 +135,7 @@ struct SurfaceContext
 		return InstanceData().mEmission; 
 	}
 
-	bool			HasMedium() { return InstanceData().mMediumSigmaT > 0; }
+	bool			HasMedium()					{ return MaxComponent(InstanceData().mMediumSigmaT) > 0; }
 
 	// https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#metal-brdf-and-dielectric-brdf
 	float3			AlbedoGLTF()						
@@ -395,4 +395,44 @@ struct BSDFContext
 	bool			mLobe0Selected;				// [TODO] More than 2 lobes? Use lobe index? Still coupled with implementaion detail
 
 	float			mLPDF;						// For light sample
+};
+
+// Assume Homogeneous, for now
+struct MediumContext
+{
+	template<RAY_FLAG RayFlags>
+	static MediumContext Generate(RayDesc inRayDesc, RayQuery<RayFlags> inRayQuery)
+	{
+		MediumContext context					= (MediumContext)0;
+
+		context.mInstanceID						= inRayQuery.CommittedInstanceID();
+
+		context.mRayWS.mOrigin					= inRayDesc.Origin;
+		context.mRayWS.mDirection				= inRayDesc.Direction;
+		context.mRayWS.mTCurrent				= inRayQuery.CommittedRayT();
+
+		context.mScatteringEvent				= false;
+
+		return context;
+	}
+
+	InstanceData	InstanceData()				{ return InstanceDatas[mInstanceID]; }
+
+	float3			PositionWS()				{ return mRayWS.Target(); }
+	float3			DirectionWS()				{ return mRayWS.mDirection; }
+	float3			ViewWS()					{ return -mRayWS.mDirection; }
+
+	void			Scatter(float inT)			{ mRayWS.mTCurrent = inT; mScatteringEvent = true; }
+
+	float3			Albedo()					{ return InstanceData().mMediumAlbedo; }
+	float3			SigmaT()					{ return InstanceData().mMediumSigmaT; }
+	float			Phase()						{ return InstanceData().mMediumPhase; }
+
+	float3			Transmittance(float inDistance) { return exp(-SigmaT() * inDistance); }
+
+	uint			mInstanceID;
+
+	Ray				mRayWS;
+
+	bool			mScatteringEvent;
 };
