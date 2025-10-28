@@ -300,14 +300,10 @@ ComPtr<ID3D12RootSignature> gCreateLocalRootSignature()
 		// D3D12_ROOT_PARAMETER {.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE, .DescriptorTable = D3D12_ROOT_DESCRIPTOR_TABLE {.NumDescriptorRanges = 1, .pDescriptorRanges = &nvapi_range } },
 	};
 
-	uint parameter_count = gArraySize(local_root_parameters);
-	if (!gNVAPI.mFakeUAVEnabled)
-		parameter_count--;
-
 	ComPtr<ID3D12RootSignature> local_root_signature = gCreateRootSignature(
 		D3D12_ROOT_SIGNATURE_DESC
 		{
-			.NumParameters = parameter_count,
+			.NumParameters = gArraySize(local_root_parameters),
 			.pParameters = local_root_parameters,
 			.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE,
 		});
