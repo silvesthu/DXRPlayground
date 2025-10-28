@@ -286,7 +286,7 @@ namespace BSDFEvaluation
 			//		  [PBRT3] > It lets us sometimes avoid terminating refracted rays that are about to be refracted back out of a medium and thus have their beta value increased.
 			//                https://github.com/mmp/pbrt-v3/blob/master/src/integrators/path.cpp#L72
 			result.mEta							= select(selected_r, 1.0, eta_it);
-			result.mMediumInstanceID			= select(selected_r, InvalidInstanceID, inHitContext.mInstanceID);
+			result.mMediumInstanceID			= select(inHitContext.HasMedium() && inBSDFContext.mNdotL < 0, inHitContext.mInstanceID, InvalidInstanceID);
 
 			return result;
 		}
@@ -407,7 +407,7 @@ namespace BSDFEvaluation
 			result.mBSDF						*= select(selected_r, 1.0, sqr(eta_ti));
 			result.mLobeIndex					= select(selected_r, 0, 1);
 			result.mEta							= select(selected_r, 1.0, eta_it);
-			result.mMediumInstanceID			= select(selected_r, InvalidInstanceID, inHitContext.mInstanceID);
+			result.mMediumInstanceID			= select(inHitContext.HasMedium() && inBSDFContext.mNdotL < 0, inHitContext.mInstanceID, InvalidInstanceID);
 
 			return result;
 		}

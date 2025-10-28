@@ -705,6 +705,8 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 					std::string_view medium_type = medium->Attribute("type");
 					gAssert(medium_type == "homogeneous"); // heterogeneous not supported
 
+					instance_data.mMedium = 1;
+
 					if (get_child_type(medium, "albedo") == "float")
 					{
 						float value = 0;

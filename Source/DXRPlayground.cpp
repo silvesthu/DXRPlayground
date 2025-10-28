@@ -274,10 +274,10 @@ static void sPrepareImGui()
 			ImGui::Checkbox("Vsync", &gDisplaySettings.mVsync);
 
 			if (!gRenderer.mAccumulationFrameUnlimited)
-				if (ImGui::SliderInt("Frame Count", reinterpret_cast<int*>(&gRenderer.mAccumulationFrameCount), 1, 64))
+				if (ImGui::SliderInt("Frame Count", reinterpret_cast<int*>(&gRenderer.mAccumulationFrameCount), 1, 512))
 					gRenderer.mAccumulationResetRequested = true;
 
-			ImGui::SliderInt("Recursion Depth Max", reinterpret_cast<int*>(&gConstants.mRecursionDepthCountMax), 1, 16);
+			ImGui::SliderInt("Recursion Depth Max", reinterpret_cast<int*>(&gConstants.mRecursionDepthCountMax), 1, 64);
 			ImGui::SliderInt("Russian Roulette Depth", reinterpret_cast<int*>(&gConstants.mRussianRouletteDepth), 1, 16);
 
 			ImGui::TreePop();
@@ -496,6 +496,7 @@ static void sPrepareImGui()
 					"Transmittance",
 					"Eta",
 					"K",
+					"Medium",
 					"MediumAlbedo",
 					"MediumSigmaT",
 					"MediumPhase",
@@ -526,6 +527,7 @@ static void sPrepareImGui()
 					for (int row = 0; row < gScene.GetInstanceCount(); row++)
 					{
 						ImGui::TableNextRow();
+						ImGui::PushID(row);
 
 						const InstanceInfo& instance_info = gScene.GetInstanceInfo(row);
 						const InstanceData& instance_data = gScene.GetInstanceData(row);
@@ -586,6 +588,10 @@ static void sPrepareImGui()
 						ImGui::Text(k.c_str());
 
 						ImGui::TableSetColumnIndex(column_index++);
+						bool medium = instance_data.mMedium != 0;
+						ImGui::Checkbox("##Medium", &medium);
+
+						ImGui::TableSetColumnIndex(column_index++);
 						std::string medium_albedo = std::format("{:.2f} {:.2f} {:.2f} ", instance_data.mMediumAlbedo.x, instance_data.mMediumAlbedo.y, instance_data.mMediumAlbedo.z);
 						medium_albedo = instance_data.mMediumAlbedo != InstanceData().mMediumAlbedo ? medium_albedo : "";
 						ImGui::Text(medium_albedo.c_str());
@@ -623,6 +629,7 @@ static void sPrepareImGui()
 						std::string index_count = std::format("{} ", instance_data.mIndexCount / kIndexCountPerTriangle);
 						ImGui::Text(index_count.c_str());
 
+						ImGui::PopID();
 						gAssert(column_index == column_count);
 					}
 					ImGui::EndTable();

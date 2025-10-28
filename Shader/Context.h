@@ -135,7 +135,7 @@ struct SurfaceContext
 		return InstanceData().mEmission; 
 	}
 
-	bool			HasMedium()					{ return MaxComponent(InstanceData().mMediumSigmaT) > 0; }
+	bool			HasMedium()					{ return InstanceData().mMedium != 0; }
 
 	// https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#metal-brdf-and-dielectric-brdf
 	float3			AlbedoGLTF()						
@@ -421,8 +421,6 @@ struct MediumContext
 	float3			PositionWS()				{ return mRayWS.Target(); }
 	float3			DirectionWS()				{ return mRayWS.mDirection; }
 	float3			ViewWS()					{ return -mRayWS.mDirection; }
-
-	void			Scatter(float inT)			{ mRayWS.mTCurrent = inT; mScatteringEvent = true; }
 
 	float3			Albedo()					{ return InstanceData().mMediumAlbedo; }
 	float3			SigmaT()					{ return InstanceData().mMediumSigmaT; }

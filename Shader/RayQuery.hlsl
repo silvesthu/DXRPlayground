@@ -116,12 +116,14 @@ void TraceRay(inout PixelContext ioPixelContext)
 
 				if (free_flight_distance < hit_context.mRayWS.mTCurrent)
 				{
-					ray.Origin					= ray.Origin + ray.Direction * free_flight_distance;
-					ray.Direction				= RandomUnitVector(path_context.mRandomState);
+					medium_context.mRayWS.mTCurrent = free_flight_distance;
+					medium_context.mScatteringEvent = true;
 
 					path_context.mThroughput	*= medium_context.Albedo();
 
-					medium_context.Scatter(free_flight_distance);
+					// Prepare for next bounce
+					ray.Origin					= ray.Origin + ray.Direction * free_flight_distance;
+					ray.Direction				= RandomUnitVector(path_context.mRandomState);
 					continue_bounce				= true;
 				}
 

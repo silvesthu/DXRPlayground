@@ -509,7 +509,7 @@ struct InstanceData
 	TextureInfo					mEmissionTexture;
 
 	float3						mMediumAlbedo					CONSTANT_DEFAULT(float3(0.75f, 0.75f, 0.75f));
-	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	uint						mMedium							CONSTANT_DEFAULT(0);
 
 	float3						mMediumSigmaT					CONSTANT_DEFAULT(float3(1.0f, 1.0f, 1.0f));
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
@@ -770,8 +770,8 @@ struct Constants
 	int							mDebugInstanceIndex				CONSTANT_DEFAULT(-1);
 	int							mDebugLightIndex				CONSTANT_DEFAULT(-1);
 
-	uint						mRecursionDepthCountMax			CONSTANT_DEFAULT(16);
-	uint						mRussianRouletteDepth			CONSTANT_DEFAULT(16);
+	uint						mRecursionDepthCountMax			CONSTANT_DEFAULT(64);
+	uint						mRussianRouletteDepth			CONSTANT_DEFAULT(5);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 

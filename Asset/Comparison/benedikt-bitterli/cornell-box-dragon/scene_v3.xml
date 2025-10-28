@@ -93,7 +93,7 @@
 		<float name="ext_ior" value="1.000277"/>
 	</bsdf>
 
-<!-- 	<shape type="obj" id="Dragon">
+	<shape type="obj" id="Dragon">
 		<string name="filename" value="Dragon.obj" />
 		<transform name="to_world">
 			<matrix value="0.01 0 0 0 0 0.01 0 0.5 0 0 0.01 0 0 0 0 1" />
@@ -103,25 +103,25 @@
 
 		<medium type="homogeneous" name="interior">
 			<rgb name="albedo" value="0.921, 0.64, 0.064" />
-			<float name="sigma_t" value="5.0" />
+			<float name="sigma_t" value="50.0" />
 		</medium>
-	</shape> -->
+	</shape>
 
-	<shape type="cube" id="Box">
+<!-- 	<shape type="cube" id="Box">
 		<transform name="to_world">
 			<matrix value="0.5 0 0 0 0 0.5 0 1.0 0 0 0.5 0 0 0 0 1" />
 		</transform>
 		
 		<ref id="DragonBSDF" />
 
-<!-- 		<medium type="homogeneous" name="interior">
+		<medium type="homogeneous" name="interior">
 			<rgb name="albedo" value="0.921, 0.64, 0.064" />
 			<float name="sigma_t" value="5.0" />
 			<boolean name="has_spectral_extinction" value="false" />
 			<boolean name="sample_emitters" value="false" />
-		</medium> -->
+		</medium>
 
-	</shape>
+	</shape> -->
 
 	<shape type="rectangle" id="Light">
 		<transform name="to_world">
