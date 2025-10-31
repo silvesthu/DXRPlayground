@@ -80,12 +80,18 @@ void Renderer::InitializeShaders()
 	gCombineShader(gRenderer.mRuntime.mRayGenerationShader, gRenderer.mRuntime.mCollectionShaders, gRenderer.mRuntime.mLibShader);
 	gRenderer.mRuntime.mLibShaderTable = gCreateShaderTable(gRenderer.mRuntime.mLibShader);
 
-	for (auto&& shaders : gAtmosphere.mRuntime.mShadersSet)
-		for (auto&& shader : shaders)
-			gCreatePipelineState(shader);
+	if (gAtmosphere.mEnabled)
+	{
+		for (auto&& shaders : gAtmosphere.mRuntime.mShadersSet)
+			for (auto&& shader : shaders)
+				gCreatePipelineState(shader);
+	}
 
-	for (auto&& shader : gCloud.mRuntime.mShaders)
-		gCreatePipelineState(shader);
+	if (gCloud.mEnabled)
+	{
+		for (auto&& shader : gCloud.mRuntime.mShaders)
+			gCreatePipelineState(shader);
+	}
 }
 
 void Renderer::FinalizeShaders()

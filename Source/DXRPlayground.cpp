@@ -21,8 +21,8 @@
 extern "C" { __declspec(dllexport) extern const UINT			D3D12SDKVersion = 614; }
 extern "C" { __declspec(dllexport) extern const char8_t*		D3D12SDKPath = u8".\\D3D12\\"; }
 
-#define DX12_ENABLE_DEBUG_LAYER			(1)
-#define DX12_ENABLE_INFO_QUEUE_CALLBACK (1)
+#define DX12_ENABLE_DEBUG_LAYER			(0)
+#define DX12_ENABLE_INFO_QUEUE_CALLBACK (0)
 #define DX12_ENABLE_GBV					(0)
 
 static const wchar_t*											kApplicationTitleW = L"DXR Playground";
