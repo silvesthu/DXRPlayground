@@ -780,7 +780,7 @@ struct Constants
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
 	int							mSequenceFrameIndex				CONSTANT_DEFAULT(0);
-	int							mSequenceFrameCount				CONSTANT_DEFAULT(16);
+	int							mSequenceFrameCount				CONSTANT_DEFAULT(4);
 	float						mSequenceFrameRatio				CONSTANT_DEFAULT(0.0f);
 	int							mSequenceFrameRecorded			CONSTANT_DEFAULT(-1);
 

@@ -10,6 +10,8 @@
 #endif
 
 // System
+bool								gHeadless = false;
+
 ID3D12Device7*						gDevice = nullptr;
 ID3D12DescriptorHeap*				gRTVDescriptorHeap = nullptr;
 ID3D12CommandQueue*					gCommandQueue = nullptr;

@@ -133,7 +133,6 @@ struct Renderer
 	bool										mTestLibShader = false;
 	bool										mTestMultipleHitShaders = false;
 
-	bool										mAccumulationDone = false;
 	bool										mAccumulationFrameUnlimited = false;
 	bool										mAccumulationPaused = false;
 	uint										mAccumulationFrameCount = 64;

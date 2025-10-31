@@ -16,6 +16,8 @@
 #include "Thirdparty/filewatch/FileWatch.hpp"
 #pragma warning(pop)
 
+#include "Thirdparty/fpng/src/fpng.h"
+
 extern "C" { __declspec(dllexport) extern const UINT			D3D12SDKVersion = 614; }
 extern "C" { __declspec(dllexport) extern const char8_t*		D3D12SDKPath = u8".\\D3D12\\"; }
 
@@ -443,6 +445,7 @@ static void sPrepareImGui()
 			if (ImGui::Button("Record"))
 			{
 				gConstants.mSequenceFrameRecorded = 0;
+				gConstants.mCurrentFrameIndex = 0;
 			}
 
 			ImGui::SliderInt("Sequence Frame Index", &gConstants.mSequenceFrameIndex, 0, gConstants.mSequenceFrameCount - 1);
@@ -1141,9 +1144,6 @@ void sRender()
 				gRenderer.mAccumulationResetRequested = true;
 
 			{
-				if (!gRenderer.mAccumulationPaused)
-					gConstants.mCurrentFrameIndex++;
-
 				if (gRenderer.mAccumulationResetRequested)
 					gConstants.mCurrentFrameIndex = 0;
 
@@ -1303,11 +1303,6 @@ void sRender()
 		gBarrierUAV(gCommandList, nullptr);
 	}
 
-	// [TODO] RayQuery for recorded paths, decouple those from camera view
-	{
-
-	}
-
 	// Test Hit Shader
 	if (gRenderer.mTestLibShader)
 	{
@@ -1392,11 +1387,17 @@ void sRender()
 		gBarrierTransition(gCommandList, gRenderer.mRuntime.mPixelInspectionBuffer.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_SOURCE);
 		gCommandList->CopyResource(gRenderer.mRuntime.mPixelInspectionBuffer.mReadbackResource[gGetFrameContextIndex()].Get(), gRenderer.mRuntime.mPixelInspectionBuffer.mResource.Get());
 		gBarrierTransition(gCommandList, gRenderer.mRuntime.mPixelInspectionBuffer.mResource.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COMMON);
+
+		// Readback result
+		if (gHeadless)
+		{
+		}
 	}
 
 SkipRender:
 
 	// Draw ImGui
+	if (!gHeadless)
 	{
 		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "ImGui");
 
@@ -1421,13 +1422,6 @@ SkipRender:
 		gConstants.mTime += ImGui::GetIO().DeltaTime;
 	}
 
-	// Record
-	if (gConstants.mSequenceFrameRecorded >= 0)
-	{
-		// [TODO]
-		// Multiple-buffered readback textures, sync with fence
-	}
-
 	// Dump Texture
 	{
 		if (gCPUContext.mDumpTextureRef != nullptr && gCPUContext.mDumpTextureRef->mResource != nullptr)
@@ -1446,6 +1440,21 @@ SkipRender:
 		}
 	}
 
+	// Write Output
+	if (gConstants.mSequenceFrameRecorded >= 0 && gConstants.mCurrentFrameIndex + 1 == gRenderer.mAccumulationFrameCount)
+	{
+		static std::vector<glm::u8vec4> pixels(gRenderer.mScreenWidth* gRenderer.mScreenHeight);
+		gAssert(pixels.size() == gRenderer.mScreenWidth * gRenderer.mScreenHeight);
+
+		char filename[256];
+		sprintf_s(filename, "%03u.png", gConstants.mSequenceFrameRecorded);
+		fpng::fpng_encode_image_to_file(filename, pixels.data(), gRenderer.mScreenWidth, gRenderer.mScreenHeight, 4, 0);
+
+		gConstants.mSequenceFrameRecorded++;
+		if (gConstants.mSequenceFrameRecorded == gConstants.mSequenceFrameCount)
+			gConstants.mSequenceFrameRecorded = -1;
+	}
+
 	// Present
 	{
 		if (gDisplaySettings.mVsync)
@@ -1458,6 +1467,10 @@ SkipRender:
 		gFenceLastSignaledValue = fence_value;
 		frame_context.mFenceValue = fence_value;
 	}
+
+	// Next Frame
+	if (!gRenderer.mAccumulationPaused)
+		gConstants.mCurrentFrameIndex++;
 }
 
 static void sMessageCallback(D3D12_MESSAGE_CATEGORY inCategory, D3D12_MESSAGE_SEVERITY inSeverity, D3D12_MESSAGE_ID inID, LPCSTR inDescription, void* inContext)
