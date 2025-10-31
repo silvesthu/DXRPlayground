@@ -27,8 +27,6 @@ UINT64                       		gFenceLastSignaledValue = 0;
 IDXGISwapChain3*					gSwapChain = nullptr;
 HANDLE                       		gSwapChainWaitableObject = nullptr;
 
-HMODULE								gPIXHandle = nullptr;
-
 NVAPI								gNVAPI;
 
 // Frame
@@ -213,6 +211,14 @@ void Texture::Initialize()
 		desc.Format = mFormat;
 		desc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
 		gDevice->CreateDepthStencilView(mResource.Get(), &desc, gCPUContext.mDSVDescriptorHeap.GetCPUHandle(mDSVIndex));
+	}
+
+	// Readback
+	if (mReadback)
+	{
+		gAssert(mFormat == DXGI_FORMAT_R8G8B8A8_UNORM); // only support this for now
+		mReadbackBuffer = Buffer().ByteCount(4 * mWidth * mHeight).Name(mName).GPU(false).Readback(true);
+		mReadbackBuffer.Initialize();
 	}
 
 	// UIScale

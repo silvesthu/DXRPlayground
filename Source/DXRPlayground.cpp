@@ -21,10 +21,9 @@
 extern "C" { __declspec(dllexport) extern const UINT			D3D12SDKVersion = 614; }
 extern "C" { __declspec(dllexport) extern const char8_t*		D3D12SDKPath = u8".\\D3D12\\"; }
 
-#define DX12_ENABLE_DEBUG_LAYER			(0)
+#define DX12_ENABLE_DEBUG_LAYER			(1)
+#define DX12_ENABLE_INFO_QUEUE_CALLBACK (1)
 #define DX12_ENABLE_GBV					(0)
-#define DX12_ENABLE_INFO_QUEUE_CALLBACK (0)
-#define DX12_ENABLE_PIX_CAPTURE			(0)
 
 static const wchar_t*											kApplicationTitleW = L"DXR Playground";
 static const std::wstring										kINIPathStringW = std::filesystem::absolute(L"DXRPlayground.ini").wstring();
@@ -853,6 +852,14 @@ static void sUpdate()
 			gConstants.mPixelDebugCoord += int2(1, 0);
 	}
 
+	// Common
+	{
+		gConstants.mScreenWidth					= gRenderer.mScreenWidth;
+		gConstants.mScreenHeight				= gRenderer.mScreenHeight;
+
+		gConstants.mFrameIndex					= gFrameIndex;
+	}
+
 	// Sequence
 	{
 		gConstants.mSequenceFrameRatio			= gConstants.mSequenceFrameIndex * 1.0f / gConstants.mSequenceFrameCount;
@@ -860,9 +867,6 @@ static void sUpdate()
 
 	// Setup matrices
 	{
-		gConstants.mScreenWidth					= gRenderer.mScreenWidth;
-		gConstants.mScreenHeight				= gRenderer.mScreenHeight;
-
 		float horizontal_fov_radian				= gCameraSettings.mHorizontalFovDegree * glm::pi<float>() / 180.0f;
 		float horizontal_tan					= glm::tan(horizontal_fov_radian * 0.5f);
 		float vertical_tan						= horizontal_tan * (gDisplaySettings.mRenderResolution.y * 1.0f / gDisplaySettings.mRenderResolution.x);
@@ -1085,12 +1089,6 @@ void sRender()
 	FrameContext& frame_context									= gGetFrameContext();
 	uint32_t back_buffer_index									= gSwapChain->GetCurrentBackBufferIndex();
 	ID3D12Resource* back_buffer									= gRenderer.mRuntime.mBackBuffers[back_buffer_index].mResource.Get();
-	
-	if (DX12_ENABLE_PIX_CAPTURE)
-	{
-		if (gFrameIndex == 1) // PIXGpuCaptureNextFrames will capture the second frame, so skip the first one
-			goto SkipRender;
-	}
 
 	// Frame Begin
 	{
@@ -1132,6 +1130,7 @@ void sRender()
 				gConstants.mDebugFlag |= DebugFlag::UpdateRayInspection;
 
 			// Whitelist to ignore for accumulation reset
+			sConstantsCopy.mFrameIndex				= gConstants.mFrameIndex;
 			sConstantsCopy.mTime					= gConstants.mTime;
 			sConstantsCopy.mCurrentFrameIndex		= gConstants.mCurrentFrameIndex;
 			sConstantsCopy.mCurrentFrameWeight		= gConstants.mCurrentFrameWeight;
@@ -1295,11 +1294,8 @@ void sRender()
 	{
 		TIMING_SCOPE("RayQuery", gStats.mTimeMS.mRayQuery);
 
-		DXGI_SWAP_CHAIN_DESC1 swap_chain_desc;
-		gSwapChain->GetDesc1(&swap_chain_desc);
-				
 		gRenderer.Setup(gRenderer.mRuntime.mRayQueryShader);
-		gCommandList->Dispatch(gAlignUpDiv(swap_chain_desc.Width, 8u), gAlignUpDiv(swap_chain_desc.Height, 8u), 1);
+		gCommandList->Dispatch(gAlignUpDiv(gRenderer.mScreenWidth, 8u), gAlignUpDiv(gRenderer.mScreenHeight, 8u), 1);
 
 		gBarrierUAV(gCommandList, nullptr);
 	}
@@ -1342,6 +1338,7 @@ void sRender()
 	// Composite
 	{
 		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Composite");
+		TIMING_SCOPE("Composite", gStats.mTimeMS.mComposite);
 
 		gBarrierTransition(gCommandList, back_buffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		BarrierScope depth_scope(gCommandList, gRenderer.mRuntime.mScreenDepthTexture.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_DEPTH_READ);
@@ -1372,30 +1369,37 @@ void sRender()
 		gRenderer.Setup(gRenderer.mRuntime.mCompositeShader);
 		gCommandList->DrawInstanced(3, 1, 0, 0);
 
-		gCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
-		gRenderer.Setup(gRenderer.mRuntime.mLineShader);
-		gCommandList->DrawInstanced(RayInspection::kArraySize * 3 /* Position, Normal, LightPosition */ * 2 /* 2 vertex per line */, 1, 0, 0);
+		if (!gHeadless)
+		{
+			gCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
+			gRenderer.Setup(gRenderer.mRuntime.mLineShader);
+			gCommandList->DrawInstanced(RayInspection::kArraySize * 3 /* Position, Normal, LightPosition */ * 2 /* 2 vertex per line */, 1, 0, 0);
 
-		gCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
-		gRenderer.Setup(gRenderer.mRuntime.mLineHiddenShader);
-		gCommandList->DrawInstanced(RayInspection::kArraySize * 3 /* Position, Normal, LightPosition */ * 2 /* 2 vertex per line */, 1, 0, 0);
+			gCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
+			gRenderer.Setup(gRenderer.mRuntime.mLineHiddenShader);
+			gCommandList->DrawInstanced(RayInspection::kArraySize * 3 /* Position, Normal, LightPosition */ * 2 /* 2 vertex per line */, 1, 0, 0);
+		}
 	}
 
-	// Readback
+	// Record
+	bool record_frame = gConstants.mSequenceFrameRecorded >= 0 && gConstants.mCurrentFrameIndex + 1 == gRenderer.mAccumulationFrameCount;
+	if (record_frame)
+	{
+		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Record");
+
+		gRenderer.Setup(gRenderer.mRuntime.mReadbackShader);
+		gCommandList->Dispatch(gAlignUpDiv(gRenderer.mScreenWidth, 8u), gAlignUpDiv(gRenderer.mScreenHeight, 8u), 1);
+	}
+
+	// Readback PixelInspection
+	if (!gHeadless)
 	{
 		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Readback");
 
 		gBarrierTransition(gCommandList, gRenderer.mRuntime.mPixelInspectionBuffer.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_SOURCE);
 		gCommandList->CopyResource(gRenderer.mRuntime.mPixelInspectionBuffer.mReadbackResource[gGetFrameContextIndex()].Get(), gRenderer.mRuntime.mPixelInspectionBuffer.mResource.Get());
 		gBarrierTransition(gCommandList, gRenderer.mRuntime.mPixelInspectionBuffer.mResource.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COMMON);
-
-		// Readback result
-		if (gHeadless)
-		{
-		}
 	}
-
-SkipRender:
 
 	// Draw ImGui
 	if (!gHeadless)
@@ -1442,7 +1446,7 @@ SkipRender:
 	}
 
 	// Write Output
-	if (gConstants.mSequenceFrameRecorded >= 0 && gConstants.mCurrentFrameIndex + 1 == gRenderer.mAccumulationFrameCount)
+	if (record_frame)
 	{
 		static std::vector<glm::u8vec4> pixels(gRenderer.mScreenWidth* gRenderer.mScreenHeight);
 		gAssert(pixels.size() == gRenderer.mScreenWidth * gRenderer.mScreenHeight);
@@ -1457,21 +1461,24 @@ SkipRender:
 	}
 
 	// Present
+	if (!gHeadless)
 	{
 		if (gDisplaySettings.mVsync)
 			gSwapChain->Present(1, 0);
- 		else
+		else
 			gSwapChain->Present(0, DXGI_PRESENT_ALLOW_TEARING);
+	}
 
+	// Finish Frame
+	{
 		UINT64 fence_value = gFenceLastSignaledValue + 1;
 		gCommandQueue->Signal(gIncrementalFence, fence_value);
 		gFenceLastSignaledValue = fence_value;
 		frame_context.mFenceValue = fence_value;
-	}
 
-	// Next Frame
-	if (!gRenderer.mAccumulationPaused)
-		gConstants.mCurrentFrameIndex++;
+		if (!gRenderer.mAccumulationPaused)
+			gConstants.mCurrentFrameIndex++;
+	}
 }
 
 static void sMessageCallback(D3D12_MESSAGE_CATEGORY inCategory, D3D12_MESSAGE_SEVERITY inSeverity, D3D12_MESSAGE_ID inID, LPCSTR inDescription, void* inContext)
@@ -1489,12 +1496,6 @@ static void sMessageCallback(D3D12_MESSAGE_CATEGORY inCategory, D3D12_MESSAGE_SE
 // Helper functions
 static bool sCreateDeviceD3D(HWND hWnd)
 {
-	if (DX12_ENABLE_PIX_CAPTURE)
-	{
-		gPIXHandle = PIXLoadLatestWinPixGpuCapturerLibrary();
-		PIXGpuCaptureNextFrames(L"Dump/pix.wpix", 1);
-	}
-
 	// Setup swap chain
 	DXGI_SWAP_CHAIN_DESC1 sd = {};
 	{
@@ -1714,6 +1715,9 @@ static bool sCreateDeviceD3D(HWND hWnd)
 
 static void sCleanupDeviceD3D()
 {
+	if (gNVAPI.mInitialized)
+		NvAPI_Unload();
+
 	gSafeRelease(gSwapChain);
 	gSafeCloseHandle(gSwapChainWaitableObject);
 
@@ -1738,9 +1742,6 @@ static void sCleanupDeviceD3D()
 		if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgi_debug))))
 			dxgi_debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_FLAGS(DXGI_DEBUG_RLO_DETAIL | DXGI_DEBUG_RLO_IGNORE_INTERNAL));
 	}
-
-	if (gPIXHandle != nullptr)
-		FreeLibrary(gPIXHandle);
 }
 
 static void sWaitForGPU()

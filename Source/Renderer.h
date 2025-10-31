@@ -15,6 +15,7 @@ struct Renderer
 		Shader									mClearShader				= Shader().FileName("Shader/Composite.hlsl").CSName("ClearCS");
 		Shader									mGenerateTextureShader		= Shader().FileName("Shader/Composite.hlsl").CSName("GeneratTextureCS");
 		Shader									mBRDFSliceShader			= Shader().FileName("Shader/Composite.hlsl").CSName("BRDFSliceCS");
+		Shader									mReadbackShader				= Shader().FileName("Shader/Composite.hlsl").CSName("ReadbackCS");
 		Shader									mDiffTexture2DShader		= Shader().FileName("Shader/DiffTexture.hlsl").CSName("DiffTexture2DShader");
 		Shader									mDiffTexture3DShader		= Shader().FileName("Shader/DiffTexture.hlsl").CSName("DiffTexture3DShader");
 		Shader									mLineShader					= Shader().FileName("Shader/Composite.hlsl").VSName("LineVS").PSName("LinePS").Topology(D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE).DepthFunc(D3D12_COMPARISON_FUNC_LESS).RTVFormat(kBackBufferFormat).DSVFormat(DXGI_FORMAT_D32_FLOAT);
@@ -38,6 +39,7 @@ struct Renderer
 
 		Texture									mScreenColorTexture			= Texture().Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(ViewDescriptorIndex::ScreenColorUAV).SRVIndex(ViewDescriptorIndex::ScreenColorSRV).Name("Renderer.ScreenColorTexture");
 		Texture									mScreenDebugTexture			= Texture().Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(ViewDescriptorIndex::ScreenDebugUAV).SRVIndex(ViewDescriptorIndex::ScreenDebugSRV).Name("Renderer.ScreenDebugTexture");
+		Texture									mScreenReadbackTexture		= Texture().Format(DXGI_FORMAT_R8G8B8A8_UNORM).UAVIndex(ViewDescriptorIndex::ScreenReadbackUAV).SRVIndex(ViewDescriptorIndex::ScreenReadbackSRV).Name("Renderer.ScreenReadbackTexture").Readback(true);
 		Texture									mScreenDepthTexture			= Texture().Format(DXGI_FORMAT_D32_FLOAT).DSVIndex(DSVDescriptorIndex::ScreenDepth).SRVIndex(ViewDescriptorIndex::ScreenDepthSRV).SRVFormat(DXGI_FORMAT_R32_FLOAT).Name("Renderer.ScreenDepthTexture");
 		Texture									mScreenReservoirTexture		= Texture().Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(ViewDescriptorIndex::ScreenReservoirUAV).SRVIndex(ViewDescriptorIndex::ScreenReservoirSRV).Name("Renderer.ScreenReservoirTexture");
 

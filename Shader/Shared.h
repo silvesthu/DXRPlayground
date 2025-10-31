@@ -98,6 +98,8 @@ enum class ViewDescriptorIndex : uint
 	ScreenDepthSRV,
 	ScreenReservoirSRV,
 	ScreenReservoirUAV,
+	ScreenReadbackSRV,
+	ScreenReadbackUAV,
 
 	// [Debug]
 	ConstantsCBV,
@@ -739,7 +741,7 @@ struct Constants
 
 	uint						mScreenWidth					CONSTANT_DEFAULT(0);
 	uint						mScreenHeight					CONSTANT_DEFAULT(0);
-	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	uint						mFrameIndex						CONSTANT_DEFAULT(0);
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
 	float						mEV100							CONSTANT_DEFAULT(16.0f);

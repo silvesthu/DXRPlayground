@@ -189,6 +189,20 @@ void BRDFSliceCS(
 	texture[inDispatchThreadID.xy] = fragColor;
 }
 
+[RootSignature(ROOT_SIGNATURE_COMMON)]
+[numthreads(8, 8, 1)]
+void ReadbackCS(
+	uint3 inGroupThreadID : SV_GroupThreadID,
+	uint3 inGroupID : SV_GroupID,
+	uint3 inDispatchThreadID : SV_DispatchThreadID,
+	uint inGroupIndex : SV_GroupIndex)
+{
+	Texture2D<float4> Input = ResourceDescriptorHeap[(int)ViewDescriptorIndex::ScreenColorSRV];
+	RWTexture2D<float4> Output = ResourceDescriptorHeap[(int)ViewDescriptorIndex::ScreenReadbackUAV];
+
+	Output[inDispatchThreadID.xy] = Input[inDispatchThreadID.xy];
+}
+
 float4 LineVS(uint inVertexID : SV_VertexID, out float4 outColor : COLOR) : SV_POSITION
 {
 	float4 position_ws = 0;

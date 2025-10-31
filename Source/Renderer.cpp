@@ -19,10 +19,7 @@ void Renderer::Initialize()
 
 void Renderer::Finalize()
 {
-	FinalizeScreenSizeTextures();
-
 	mRuntime.Reset();
-
 	gFinalizeDxcInterfaces();
 }
 

@@ -304,7 +304,8 @@ struct Stats
 		float								mClear = 0;
 		float								mDepths = 0;
 		float								mPrepareLights = 0;
-		float								mRayQuery = 0;			
+		float								mRayQuery = 0;
+		float								mComposite = 0;
 	};
 	TimeMS									mTimeMS;
 };
@@ -316,8 +317,6 @@ extern UINT64                       		gFenceLastSignaledValue;
 
 extern IDXGISwapChain3* 					gSwapChain;
 extern HANDLE                       		gSwapChainWaitableObject;
-
-extern HMODULE								gPIXHandle;
 
 struct NVAPI
 {
@@ -484,6 +483,7 @@ struct Texture
 	TEXTURE_MEMBER(DXGI_FORMAT,				SRVFormat,		DXGI_FORMAT_UNKNOWN);
 	TEXTURE_MEMBER(RTVDescriptorIndex,		RTVIndex,		RTVDescriptorIndex::Invalid);
 	TEXTURE_MEMBER(DSVDescriptorIndex,		DSVIndex,		DSVDescriptorIndex::Invalid);
+	TEXTURE_MEMBER(bool,					Readback,		false);
 
 	Texture& Dimension(glm::uvec3 dimension) 
 	{
@@ -506,6 +506,8 @@ struct Texture
 	bool mLoaded = false;
 	std::vector<uint8_t> mUploadData;
 	float* mEXRData = nullptr;
+
+	Buffer mReadbackBuffer;
 };
 
 struct ShaderTable
