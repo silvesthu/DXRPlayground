@@ -89,5 +89,6 @@ public:
 	void ImGuiShowTextures();
 
 	bool mRecomputeRequested = true;
+	bool mEnabled = false;
 };
 extern Cloud gCloud;

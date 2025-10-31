@@ -362,6 +362,7 @@ static void sPrepareImGui()
 		if (ImGui::TreeNodeEx("Atmosphere"))
 		{
 			gAtmosphere.ImGuiShowMenus();
+
 			ImGui::TreePop();
 		}
 

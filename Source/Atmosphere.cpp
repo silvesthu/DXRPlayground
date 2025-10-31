@@ -3,13 +3,11 @@
 #include "Renderer.h"
 #include "ImGui/imgui_impl_helper.h"
 
-void Atmosphere::Update()
-{
-	UpdateProfile();
-}
-
 void Atmosphere::Render()
 {
+	if (!mEnabled)
+		return;
+
 	for (auto&& textures : mRuntime.mTexturesSet)
 		for (auto&& texture : textures)
 			texture.Update();
@@ -27,9 +25,16 @@ void Atmosphere::Render()
 	}
 }
 
-void Atmosphere::UpdateProfile()
+void Atmosphere::Update()
 {
 	AtmosphereConstants& constants				= gConstants.mAtmosphere;
+	constants.mConstantColor					= mProfile.mConstantColor;
+
+	if (!mEnabled)
+	{
+		constants.mMode							= AtmosphereMode::ConstantColor;
+		return;
+	}
 
 	auto inv_m_to_inv_km						= [](glm::f64 inInvM) { return static_cast<float>(inInvM * 1000.0); };
 
@@ -40,8 +45,6 @@ void Atmosphere::UpdateProfile()
 	constants.mMode								= mProfile.mMode;
 	constants.mMuSEncodingMode					= mRuntime.mBruneton17.mMuSEncodingMode;
 	constants.mSliceCount						= mRuntime.mSliceCount;
-
-	constants.mConstantColor					= mProfile.mConstantColor;
 
 	constants.mSolarIrradiance					= mProfile.mSolarIrradiance;
 	constants.mSunAngularRadius					= static_cast<float>(mProfile.kSunAngularRadius);
@@ -253,6 +256,9 @@ void Atmosphere::Runtime::Hillaire20::Validate()
 
 void Atmosphere::Initialize()
 {
+	if (!mEnabled)
+		return;
+
 	// Texture
 	{
 		for (auto&& texture_set : mRuntime.mTexturesSet)
@@ -267,11 +273,20 @@ void Atmosphere::Initialize()
 
 void Atmosphere::Finalize()
 {
+	if (!mEnabled)
+		return;
+
 	mRuntime.Reset();
 }
 
 void Atmosphere::ImGuiShowMenus()
 {
+	if (!mEnabled)
+	{
+		ImGui::ColorEdit3("Color", reinterpret_cast<float*>(&mProfile.mConstantColor), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
+		return;
+	}
+
 #define SMALL_BUTTON(func) if (ImGui::SmallButton(NAMEOF(func).c_str())) func(mProfile);
 
 	if (ImGui::TreeNodeEx("Mode", ImGuiTreeNodeFlags_DefaultOpen))
@@ -598,6 +613,9 @@ void Atmosphere::ImGuiShowMenus()
 
 void Atmosphere::ImGuiShowTextures()
 {
+	if (!mEnabled)
+		return;
+
 	ImGui::Textures(mRuntime.mBruneton17.mTextures,					"Atmosphere.Bruneton17",											ImGuiTreeNodeFlags_None);
 	ImGui::Textures(mRuntime.mHillaire20.mTextures,					"Atmosphere.Hillaire20",											ImGuiTreeNodeFlags_None);
 	ImGui::Textures(mRuntime.mHillaire20.mValidationTextures,		"Atmosphere.Hillaire20.Validation (Requires Hillaire20 scene)",		ImGuiTreeNodeFlags_None);

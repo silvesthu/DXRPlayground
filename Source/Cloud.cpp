@@ -4,6 +4,9 @@
 
 void Cloud::Update()
 {
+	if (!mEnabled)
+		return;
+
 	mProfile.mShapeNoise.mOffset += mProfile.mWind * ImGui::GetIO().DeltaTime;
 
 	CloudConstants& constants	= gConstants.mCloud;
@@ -15,6 +18,9 @@ void Cloud::Update()
 
 void Cloud::Render()
 {
+	if (!mEnabled)
+		return;
+
 	// Texture
 	for (auto&& texture : mRuntime.mTextures)
 		texture.Update();
@@ -43,6 +49,9 @@ void Cloud::Render()
 
 void Cloud::Initialize()
 {
+	if (!mEnabled)
+		return;
+
 	// Texture
 	for (auto&& texture : mRuntime.mTextures)
 		texture.Initialize();
@@ -50,11 +59,17 @@ void Cloud::Initialize()
 
 void Cloud::Finalize()
 {
+	if (!mEnabled)
+		return;
+
 	mRuntime.Reset();
 }
 
 void Cloud::ImGuiShowMenus()
 {
+	if (!mEnabled)
+		return;
+
 #define SMALL_BUTTON(func) if (ImGui::SmallButton(NAMEOF(func).c_str())) func(gCloud.mProfile);
 
 	if (ImGui::TreeNodeEx("Mode", ImGuiTreeNodeFlags_DefaultOpen))
@@ -118,6 +133,9 @@ void Cloud::ImGuiShowMenus()
 
 void Cloud::ImGuiShowTextures()
 {
+	if (!mEnabled)
+		return;
+
 	ImGui::Textures(mRuntime.mTextures, "Cloud", ImGuiTreeNodeFlags_None);
 }
 

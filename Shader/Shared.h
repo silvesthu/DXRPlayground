@@ -612,6 +612,8 @@ struct DensityProfile
 
 struct AtmosphereConstants
 {
+	float4						mConstantColor					CONSTANT_DEFAULT(float4(0.0f, 0.0f, 0.0f, 1.0));
+
 	float						mBottomRadius					CONSTANT_DEFAULT(0);
 	float						mTopRadius						CONSTANT_DEFAULT(0);
 	float						mSceneScale						CONSTANT_DEFAULT(0);
@@ -621,8 +623,6 @@ struct AtmosphereConstants
 	uint						mSliceCount						CONSTANT_DEFAULT(0);
 	AtmosphereMuSEncodingMode	mMuSEncodingMode				CONSTANT_DEFAULT(AtmosphereMuSEncodingMode::Bruneton17);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
-
-	float4						mConstantColor					CONSTANT_DEFAULT(float4(0.0f, 0.0f, 0.0f, 1.0));
 
 	float3						mRayleighScattering				CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
