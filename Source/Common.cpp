@@ -11,6 +11,7 @@
 
 // System
 bool								gHeadless = false;
+bool								gHeadlessDone = false;
 
 ID3D12Device7*						gDevice = nullptr;
 ID3D12DescriptorHeap*				gRTVDescriptorHeap = nullptr;
@@ -211,14 +212,6 @@ void Texture::Initialize()
 		desc.Format = mFormat;
 		desc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
 		gDevice->CreateDepthStencilView(mResource.Get(), &desc, gCPUContext.mDSVDescriptorHeap.GetCPUHandle(mDSVIndex));
-	}
-
-	// Readback
-	if (mReadback)
-	{
-		gAssert(mFormat == DXGI_FORMAT_R8G8B8A8_UNORM); // only support this for now
-		mReadbackBuffer = Buffer().ByteCount(4 * mWidth * mHeight).Name(mName).GPU(false).Readback(true);
-		mReadbackBuffer.Initialize();
 	}
 
 	// UIScale

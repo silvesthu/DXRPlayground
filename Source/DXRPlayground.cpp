@@ -16,13 +16,13 @@
 #include "Thirdparty/filewatch/FileWatch.hpp"
 #pragma warning(pop)
 
-#include "Thirdparty/fpng/src/fpng.h"
+#include "wincodec.h" // GUID_ContainerFormatPng
 
 extern "C" { __declspec(dllexport) extern const UINT			D3D12SDKVersion = 614; }
 extern "C" { __declspec(dllexport) extern const char8_t*		D3D12SDKPath = u8".\\D3D12\\"; }
 
-#define DX12_ENABLE_DEBUG_LAYER			(0)
-#define DX12_ENABLE_INFO_QUEUE_CALLBACK (0)
+#define DX12_ENABLE_DEBUG_LAYER			(1)
+#define DX12_ENABLE_INFO_QUEUE_CALLBACK (1)
 #define DX12_ENABLE_GBV					(0)
 
 static const wchar_t*											kApplicationTitleW = L"DXR Playground";
@@ -97,7 +97,7 @@ CameraSettings		gCameraSettings = {};
 
 struct DisplaySettings
 {
-	glm::ivec2		mRenderResolution	= glm::ivec2(0, 0);
+	glm::ivec2		mWindowSize	= glm::ivec2(0, 0);
 	bool			mVsync				= true;
 };
 DisplaySettings		gDisplaySettings	= {};
@@ -106,7 +106,6 @@ DisplaySettings		gDisplaySettings	= {};
 static bool sCreateDeviceD3D(HWND hWnd);
 static void sCleanupDeviceD3D();
 static void sWaitForGPU();
-static void sWaitForFrameContext();
 static void sUpdate();
 static void sLoadShader() { gRenderer.mReloadShader = true; }
 static void sLoadCamera();
@@ -128,8 +127,8 @@ static void sPrepareImGui()
 		gConstants.mTime,
 		1000.0f / ImGui::GetIO().Framerate,
 		ImGui::GetIO().Framerate,
-		gDisplaySettings.mRenderResolution.x,
-		gDisplaySettings.mRenderResolution.y);
+		gRenderer.mScreenWidth,
+		gRenderer.mScreenHeight);
 	if (ImGui::Begin(stat.c_str()))
 	{
 		{
@@ -444,12 +443,15 @@ static void sPrepareImGui()
 		{
 			if (ImGui::Button("Record"))
 			{
-				gConstants.mSequenceFrameRecorded = 0;
 				gConstants.mCurrentFrameIndex = 0;
+				gConstants.mSequenceFrameIndex = 0;
+				gConstants.mSequenceFrameDumped = 0;
 			}
 
-			ImGui::SliderInt("Sequence Frame Index", &gConstants.mSequenceFrameIndex, 0, gConstants.mSequenceFrameCount - 1);
+			int accumulation_frame_index = gConstants.mCurrentFrameIndex;
 			ImGui::SliderInt("Sequence Frame Count", &gConstants.mSequenceFrameCount, 1, 600);
+			ImGui::SliderInt("Sequence Frame Index", &gConstants.mSequenceFrameIndex, 0, gConstants.mSequenceFrameCount - 1);
+			ImGui::SliderInt("Accumulation Frame Index", &accumulation_frame_index, 0, gRenderer.mAccumulationFrameCount - 1);
 
 			ImGui::TreePop();
 		}
@@ -773,6 +775,7 @@ static void sUpdate()
 	}
 
 	// Rotate Camera
+	if (!gHeadless)
 	{
 		static ImVec2 mouse_prev_position(0, 0);
 		static bool mouse_prev_right_button_pressed = false;
@@ -803,6 +806,7 @@ static void sUpdate()
 	}
 
 	// Move Camera
+	if (!gHeadless)
 	{
 		float frame_speed_scale = ImGui::GetIO().DeltaTime / (1.0f / 60.0f);
 		float move_speed = gCameraSettings.mMoveSpeed * frame_speed_scale;
@@ -869,7 +873,7 @@ static void sUpdate()
 	{
 		float horizontal_fov_radian				= gCameraSettings.mHorizontalFovDegree * glm::pi<float>() / 180.0f;
 		float horizontal_tan					= glm::tan(horizontal_fov_radian * 0.5f);
-		float vertical_tan						= horizontal_tan * (gDisplaySettings.mRenderResolution.y * 1.0f / gDisplaySettings.mRenderResolution.x);
+		float vertical_tan						= horizontal_tan * (gConstants.mScreenHeight * 1.0f / gConstants.mScreenWidth);
 		float vertical_fov_radian				= glm::atan(vertical_tan) * 2.0f;
 		
 		gConstants.mViewMatrix					= glm::lookAtRH(float3(gConstants.CameraPosition()), float3(gConstants.CameraPosition() + gConstants.CameraFront()), float3(gConstants.CameraUp()));
@@ -888,68 +892,78 @@ static void sUpdate()
 // Main code
 int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLine*/, int /*nCmdShow*/)
 {
-	// INI
-	int window_x = GetPrivateProfileInt(L"Main", L"Window_X", 100, kINIPathW);
-	int window_y = GetPrivateProfileInt(L"Main", L"Window_Y", 100, kINIPathW);
-	
-	// Create application window
-	WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, sWndProc, 0L, 0L, GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, kApplicationTitleW, nullptr };
-	::RegisterClassEx(&wc);
+	WNDCLASSEX wc = {};
+	HWND hwnd = 0;
 
-	RECT rect = { 0, 0, 1920, 1080 };
-	AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, false);
-	HWND hwnd = ::CreateWindow(wc.lpszClassName, kApplicationTitleW, WS_OVERLAPPEDWINDOW, window_x, window_y, rect.right - rect.left, rect.bottom - rect.top, nullptr, nullptr, wc.hInstance, nullptr);
+	if (!gHeadless)
+	{
+		// INI
+		int window_x = GetPrivateProfileInt(L"Main", L"Window_X", 100, kINIPathW);
+		int window_y = GetPrivateProfileInt(L"Main", L"Window_Y", 100, kINIPathW);
+
+		// Create application window
+		wc = { sizeof(WNDCLASSEX), CS_CLASSDC, sWndProc, 0L, 0L, GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, kApplicationTitleW, nullptr };
+		::RegisterClassEx(&wc);
+
+		RECT rect = { 0, 0, kScreenWidth, kScreenHeight };
+		AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, false);
+		hwnd = ::CreateWindow(wc.lpszClassName, kApplicationTitleW, WS_OVERLAPPEDWINDOW, window_x, window_y, rect.right - rect.left, rect.bottom - rect.top, nullptr, nullptr, wc.hInstance, nullptr);
+	}
 
 	// Initialize Direct3D
 	if (!sCreateDeviceD3D(hwnd))
 	{
 		sCleanupDeviceD3D();
-		::UnregisterClass(wc.lpszClassName, wc.hInstance);
+		if (!gHeadless)
+			::UnregisterClass(wc.lpszClassName, wc.hInstance);
 		return 1;
 	}
 
-	// Setup Dear ImGui context
-	IMGUI_CHECKVERSION();
-	ImGui::CreateContext();
-	ImGuiIO& io = ImGui::GetIO(); (void)io;
-	// io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
-	// io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;   // Enable Gamepad Controls
-
-	// Setup Dear ImGui style
-	ImGui::StyleColorsDark();
-
-	ImGui_ImplDX12_CreateShaderResourceViewCallback = [](ID3D12Resource* resource, D3D12_SHADER_RESOURCE_VIEW_DESC& desc)
+	if (!gHeadless)
 	{
-		for (glm::uint i = 0; i < kFrameInFlightCount; i++)
+		// Setup Dear ImGui context
+		IMGUI_CHECKVERSION();
+		ImGui::CreateContext();
+		ImGuiIO& io = ImGui::GetIO(); (void)io;
+		// io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
+		// io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;   // Enable Gamepad Controls
+
+		// Setup Dear ImGui style
+		ImGui::StyleColorsDark();
+
+		ImGui_ImplDX12_CreateShaderResourceViewCallback = [](ID3D12Resource* resource, D3D12_SHADER_RESOURCE_VIEW_DESC& desc)
+			{
+				for (glm::uint i = 0; i < kFrameInFlightCount; i++)
+				{
+					gDevice->CreateShaderResourceView(resource, &desc, gFrameContexts[i].mViewDescriptorHeap.GetCPUHandle(ViewDescriptorIndex::ImGuiFont));
+
+					D3D12_SHADER_RESOURCE_VIEW_DESC null_desc = {};
+					null_desc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+					null_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+					null_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+					gDevice->CreateShaderResourceView(nullptr, &null_desc, gFrameContexts[i].mViewDescriptorHeap.GetCPUHandle(ViewDescriptorIndex::ImGuiNull2D));
+					null_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
+					gDevice->CreateShaderResourceView(nullptr, &null_desc, gFrameContexts[i].mViewDescriptorHeap.GetCPUHandle(ViewDescriptorIndex::ImGuiNull3D));
+				}
+			};
+
+		// Setup Platform/Renderer bindings
+		ImGui_ImplWin32_Init(hwnd);
+		ImGui_ImplDX12_Init(gDevice, kFrameInFlightCount, DXGI_FORMAT_R8G8B8A8_UNORM, nullptr, {}, {});
 		{
-			gDevice->CreateShaderResourceView(resource, &desc, gFrameContexts[i].mViewDescriptorHeap.GetCPUHandle(ViewDescriptorIndex::ImGuiFont));
+			// DPI
+			UINT dpi = GetDpiForWindow(hwnd);
+			float scale = dpi * 1.0f / USER_DEFAULT_SCREEN_DPI;
+			ImGui::GetStyle().ScaleAllSizes(scale / ImGui::gDpiScale);
+			ImGui::gDpiScale = scale;
 
-			D3D12_SHADER_RESOURCE_VIEW_DESC null_desc = {};
-			null_desc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-			null_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-			null_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			gDevice->CreateShaderResourceView(nullptr, &null_desc, gFrameContexts[i].mViewDescriptorHeap.GetCPUHandle(ViewDescriptorIndex::ImGuiNull2D));
-			null_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
-			gDevice->CreateShaderResourceView(nullptr, &null_desc, gFrameContexts[i].mViewDescriptorHeap.GetCPUHandle(ViewDescriptorIndex::ImGuiNull3D));
+			// [TODO] This should also update on WM_DPICHANGED, which requires rebuild of font texture
+			std::filesystem::path font_path = "C:\\Windows\\Fonts\\Consola.ttf";
+			ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path.string().c_str(), 13 * scale, nullptr, nullptr);
+			ImGui::GetIO().Fonts->Build();
 		}
-	};
-
-	// Setup Platform/Renderer bindings
-	ImGui_ImplWin32_Init(hwnd);
-	ImGui_ImplDX12_Init(gDevice, kFrameInFlightCount, DXGI_FORMAT_R8G8B8A8_UNORM, nullptr, {}, {});
-	{
-		// DPI
-		UINT dpi = GetDpiForWindow(hwnd);
-		float scale = dpi * 1.0f / USER_DEFAULT_SCREEN_DPI;
-		ImGui::GetStyle().ScaleAllSizes(scale / ImGui::gDpiScale);
-		ImGui::gDpiScale = scale;
-
-		// [TODO] This should also update on WM_DPICHANGED, which requires rebuild of font texture
-		std::filesystem::path font_path = "C:\\Windows\\Fonts\\Consola.ttf";
-		ImGui::GetIO().Fonts->AddFontFromFileTTF(font_path.string().c_str(), 13 * scale, nullptr, nullptr);
-		ImGui::GetIO().Fonts->Build();
+		ImGui_ImplDX12_CreateDeviceObjects();
 	}
-	ImGui_ImplDX12_CreateDeviceObjects();
 
 	// Renderer
 	gRenderer.Initialize();
@@ -961,38 +975,52 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 	gAtmosphere.Initialize();
 	gCloud.Initialize();
 
-	// File watch
-	filewatch::FileWatch<std::string> file_watch("Shader/", 
-		[] (const std::string& inPath, const filewatch::Event inChangeType) 
-		{
-			(void)inChangeType;
-			std::regex pattern(".*\\.(hlsl|hlsli|h|inl)");
-			if (std::regex_match(inPath, pattern) && inChangeType == filewatch::Event::modified)
+	if (!gHeadless)
+	{
+		// File watch
+		filewatch::FileWatch<std::string> file_watch("Shader/",
+			[](const std::string& inPath, const filewatch::Event inChangeType)
 			{
-				std::string msg = "Reload triggered by " + inPath + "\n";
-				gTrace(msg.c_str());
+				(void)inChangeType;
+				std::regex pattern(".*\\.(hlsl|hlsli|h|inl)");
+				if (std::regex_match(inPath, pattern) && inChangeType == filewatch::Event::modified)
+				{
+					std::string msg = "Reload triggered by " + inPath + "\n";
+					gTrace(msg.c_str());
 
-				gRenderer.mReloadShader = true;
-			}
-		});
+					gRenderer.mReloadShader = true;
+				}
+			});
+	}
 
 	gCommandList->Close();
 	gCommandQueue->ExecuteCommandLists(1, reinterpret_cast<ID3D12CommandList* const*>(&gCommandList));
-	uint64_t one_shot_fence_value = 0xff;
-	gCommandQueue->Signal(gIncrementalFence, one_shot_fence_value); // abuse fence to wait only during initialization
-	gIncrementalFence->SetEventOnCompletion(one_shot_fence_value, gIncrementalFenceEvent);
+	UINT64 signal_value = ++gFenceLastSignaledValue;
+	gCommandQueue->Signal(gIncrementalFence, signal_value); // abuse fence to wait only during initialization
+	gIncrementalFence->SetEventOnCompletion(signal_value, gIncrementalFenceEvent);
 	WaitForSingleObject(gIncrementalFenceEvent, INFINITE);
+	
+	if (!gHeadless)
+	{
+		// Show the window
+		::ShowWindow(hwnd, SW_SHOWDEFAULT);
+		::UpdateWindow(hwnd);
+	}
 
-	// Show the window
-	::ShowWindow(hwnd, SW_SHOWDEFAULT);
-	::UpdateWindow(hwnd);
+	if (gHeadless)
+	{
+		// Start Sequence
+		gConstants.mCurrentFrameIndex = 0;
+		gConstants.mSequenceFrameIndex = 0;
+		gConstants.mSequenceFrameDumped = 0;
+	}
 
 	// Main loop
 	MSG msg;
 	ZeroMemory(&msg, sizeof(msg));
 	while (msg.message != WM_QUIT)
 	{
-		if (::PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE))
+		if (!gHeadless && ::PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE))
 		{
 			::TranslateMessage(&msg);
 			::DispatchMessage(&msg);
@@ -1002,17 +1030,23 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 		// New frame	
 		gFrameIndex++;
 
-		// Start the Dear ImGui frame
-		ImGui_ImplDX12_FontTextureID = (ImTextureID)gGetFrameContext().mViewDescriptorHeap.GetGPUHandle(ViewDescriptorIndex::ImGuiFont).ptr;
-		ImGui_ImplDX12_NullTexture2D = (ImTextureID)gGetFrameContext().mViewDescriptorHeap.GetGPUHandle(ViewDescriptorIndex::ImGuiNull2D).ptr;
-		ImGui_ImplDX12_NullTexture3D = (ImTextureID)gGetFrameContext().mViewDescriptorHeap.GetGPUHandle(ViewDescriptorIndex::ImGuiNull3D).ptr;
-		ImGui::GetIO().Fonts->SetTexID(ImGui_ImplDX12_FontTextureID);
-		ImGui_ImplDX12_NewFrame();
-		ImGui_ImplWin32_NewFrame();
-		ImGui::NewFrame();
+		if (!gHeadless)
+		{
+			// Start the Dear ImGui frame
+			ImGui_ImplDX12_FontTextureID = (ImTextureID)gGetFrameContext().mViewDescriptorHeap.GetGPUHandle(ViewDescriptorIndex::ImGuiFont).ptr;
+			ImGui_ImplDX12_NullTexture2D = (ImTextureID)gGetFrameContext().mViewDescriptorHeap.GetGPUHandle(ViewDescriptorIndex::ImGuiNull2D).ptr;
+			ImGui_ImplDX12_NullTexture3D = (ImTextureID)gGetFrameContext().mViewDescriptorHeap.GetGPUHandle(ViewDescriptorIndex::ImGuiNull3D).ptr;
+			ImGui::GetIO().Fonts->SetTexID(ImGui_ImplDX12_FontTextureID);
+			ImGui_ImplDX12_NewFrame();
+			ImGui_ImplWin32_NewFrame();
+			ImGui::NewFrame();
+		}
 
 		sUpdate();
 		sRender();
+
+		if (gHeadless && gHeadlessDone)
+			break;
 	}
 
 	// Shutdown
@@ -1022,17 +1056,24 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 		gAtmosphere.Finalize();
 		gCloud.Finalize();
 
-		ImGui_ImplDX12_Shutdown();
-		ImGui_ImplWin32_Shutdown();
-		ImGui::DestroyContext();
+		if (!gHeadless)
+		{
+			ImGui_ImplDX12_Shutdown();
+			ImGui_ImplWin32_Shutdown();
+			ImGui::DestroyContext();
+		}
 
 		gScene.Unload();
 
 		gRenderer.Finalize();
 
 		sCleanupDeviceD3D();
-		::DestroyWindow(hwnd);
-		::UnregisterClass(wc.lpszClassName, wc.hInstance);
+
+		if (!gHeadless)
+		{
+			::DestroyWindow(hwnd);
+			::UnregisterClass(wc.lpszClassName, wc.hInstance);
+		}
 	}
 
 	return 0;
@@ -1084,11 +1125,31 @@ void sLoadScene(bool inLoadCamera)
 
 void sRender()
 {
+	HANDLE wait_objects[]						= { nullptr, nullptr };
+	DWORD wait_object_count						= 0;
+	if (!gHeadless)
+	{
+		wait_objects[wait_object_count++]		= gSwapChainWaitableObject;
+	}
+	FrameContext& frame_context					= gGetFrameContext();
+	UINT64 wait_value							= frame_context.mFenceValue;
+	UINT64 completed_value						= gIncrementalFence->GetCompletedValue();
+	if (wait_value != 0 && completed_value < wait_value) // 0 means no fence was signaled
+	{
+		gIncrementalFence->SetEventOnCompletion(frame_context.mFenceValue, gIncrementalFenceEvent);
+		wait_objects[wait_object_count++]		= gIncrementalFenceEvent;
+	}
+	WaitForMultipleObjects(wait_object_count, wait_objects, TRUE, INFINITE);
+
 	// Frame Context
-	sWaitForFrameContext();
-	FrameContext& frame_context									= gGetFrameContext();
-	uint32_t back_buffer_index									= gSwapChain->GetCurrentBackBufferIndex();
-	ID3D12Resource* back_buffer									= gRenderer.mRuntime.mBackBuffers[back_buffer_index].mResource.Get();
+	uint32_t back_buffer_index					= 0;
+	ID3D12Resource* back_buffer					= nullptr;
+
+	if (!gHeadless)
+	{
+		back_buffer_index						= gSwapChain->GetCurrentBackBufferIndex();
+		back_buffer								= gRenderer.mRuntime.mBackBuffers[back_buffer_index].mResource.Get();
+	}
 
 	// Frame Begin
 	{
@@ -1118,7 +1179,7 @@ void sRender()
 			gConstants.mSunDirection	= glm::vec4(0,1,0,0) * glm::rotate(gConstants.mSunZenith, glm::vec3(0, 0, 1)) * glm::rotate(gConstants.mSunAzimuth + glm::pi<float>() / 2.0f, glm::vec3(0, 1, 0));
 			gConstants.mLightCount		= gConstants.mLightSourceMode != LightSourceMode::TriangleLights ? (glm::uint)gScene.GetSceneContent().mLights.size() : 0;
 
-			if (ImGui::IsMouseDown(ImGuiMouseButton_Middle))
+			if (!gHeadless && ImGui::IsMouseDown(ImGuiMouseButton_Middle))
 				gConstants.mPixelDebugCoord = glm::uvec2(static_cast<uint32_t>(ImGui::GetMousePos().x), (uint32_t)ImGui::GetMousePos().y);
 		}
 
@@ -1305,13 +1366,10 @@ void sRender()
 	{
 		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Test Hit Shader");
 
-		DXGI_SWAP_CHAIN_DESC1 swap_chain_desc;
-		gSwapChain->GetDesc1(&swap_chain_desc);
-
 		D3D12_DISPATCH_RAYS_DESC dispatch_rays_desc = {};
 		{
-			dispatch_rays_desc.Width = swap_chain_desc.Width;
-			dispatch_rays_desc.Height = swap_chain_desc.Height;
+			dispatch_rays_desc.Width = gRenderer.mScreenWidth;
+			dispatch_rays_desc.Height = gRenderer.mScreenHeight;
 			dispatch_rays_desc.Depth = 1;
 
 			// RayGen
@@ -1336,6 +1394,7 @@ void sRender()
 	}
 
 	// Composite
+	if (!gHeadless)
 	{
 		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Composite");
 		TIMING_SCOPE("Composite", gStats.mTimeMS.mComposite);
@@ -1369,23 +1428,22 @@ void sRender()
 		gRenderer.Setup(gRenderer.mRuntime.mCompositeShader);
 		gCommandList->DrawInstanced(3, 1, 0, 0);
 
-		if (!gHeadless)
-		{
-			gCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
-			gRenderer.Setup(gRenderer.mRuntime.mLineShader);
-			gCommandList->DrawInstanced(RayInspection::kArraySize * 3 /* Position, Normal, LightPosition */ * 2 /* 2 vertex per line */, 1, 0, 0);
+		// Line
+		gCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
+		gRenderer.Setup(gRenderer.mRuntime.mLineShader);
+		gCommandList->DrawInstanced(RayInspection::kArraySize * 3 /* Position, Normal, LightPosition */ * 2 /* 2 vertex per line */, 1, 0, 0);
 
-			gCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
-			gRenderer.Setup(gRenderer.mRuntime.mLineHiddenShader);
-			gCommandList->DrawInstanced(RayInspection::kArraySize * 3 /* Position, Normal, LightPosition */ * 2 /* 2 vertex per line */, 1, 0, 0);
-		}
+		// Line Hidden
+		gCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
+		gRenderer.Setup(gRenderer.mRuntime.mLineHiddenShader);
+		gCommandList->DrawInstanced(RayInspection::kArraySize * 3 /* Position, Normal, LightPosition */ * 2 /* 2 vertex per line */, 1, 0, 0);
 	}
 
-	// Record
-	bool record_frame = gConstants.mSequenceFrameRecorded >= 0 && gConstants.mCurrentFrameIndex + 1 == gRenderer.mAccumulationFrameCount;
+	// Readback Sequence
+	bool record_frame = gConstants.mSequenceFrameDumped >= 0 && gConstants.mCurrentFrameIndex + 1 == gRenderer.mAccumulationFrameCount;
 	if (record_frame)
 	{
-		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Record");
+		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Readback Sequence");
 
 		gRenderer.Setup(gRenderer.mRuntime.mReadbackShader);
 		gCommandList->Dispatch(gAlignUpDiv(gRenderer.mScreenWidth, 8u), gAlignUpDiv(gRenderer.mScreenHeight, 8u), 1);
@@ -1394,7 +1452,7 @@ void sRender()
 	// Readback PixelInspection
 	if (!gHeadless)
 	{
-		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Readback");
+		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Readback PixelInspection");
 
 		gBarrierTransition(gCommandList, gRenderer.mRuntime.mPixelInspectionBuffer.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_SOURCE);
 		gCommandList->CopyResource(gRenderer.mRuntime.mPixelInspectionBuffer.mReadbackResource[gGetFrameContextIndex()].Get(), gRenderer.mRuntime.mPixelInspectionBuffer.mResource.Get());
@@ -1418,13 +1476,12 @@ void sRender()
 
 	// Frame End
 	{
-		gTiming.FrameEnd(gRenderer.mRuntime.mQueryBuffer.mReadbackResource[gGetFrameContextIndex()].Get());
+		if (!gHeadless)
+			gBarrierTransition(gCommandList, back_buffer, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
 
-		gBarrierTransition(gCommandList, back_buffer, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+		gTiming.FrameEnd(gRenderer.mRuntime.mQueryBuffer.mReadbackResource[gGetFrameContextIndex()].Get());
 		gCommandList->Close();
 		gCommandQueue->ExecuteCommandLists(1, reinterpret_cast<ID3D12CommandList* const*>(&gCommandList));
-
-		gConstants.mTime += ImGui::GetIO().DeltaTime;
 	}
 
 	// Dump Texture
@@ -1445,19 +1502,29 @@ void sRender()
 		}
 	}
 
-	// Write Output
+	// Dump Texture for Sequence
 	if (record_frame)
 	{
-		static std::vector<glm::u8vec4> pixels(gRenderer.mScreenWidth* gRenderer.mScreenHeight);
-		gAssert(pixels.size() == gRenderer.mScreenWidth * gRenderer.mScreenHeight);
+		DirectX::ScratchImage image;
+		DirectX::CaptureTexture(gCommandQueue, gRenderer.mRuntime.mScreenReadbackTexture.mResource.Get(), false, image, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COMMON);
 
-		char filename[256];
-		sprintf_s(filename, "%03u.png", gConstants.mSequenceFrameRecorded);
-		fpng::fpng_encode_image_to_file(filename, pixels.data(), gRenderer.mScreenWidth, gRenderer.mScreenHeight, 4, 0);
+		wchar_t filename[256];
+		swprintf_s(filename, L"%03u.png", gConstants.mSequenceFrameDumped);
+		DirectX::SaveToWICFile(image.GetImages(), image.GetImageCount(), DirectX::WIC_FLAGS_NONE, GUID_ContainerFormatPng, filename);
 
-		gConstants.mSequenceFrameRecorded++;
-		if (gConstants.mSequenceFrameRecorded == gConstants.mSequenceFrameCount)
-			gConstants.mSequenceFrameRecorded = -1;
+		gConstants.mSequenceFrameIndex++;
+		gConstants.mSequenceFrameDumped++;
+
+		std::string text = std::format("Sequence {}/{}\n", gConstants.mSequenceFrameDumped, gConstants.mSequenceFrameCount);
+		gTrace(text.c_str());
+
+		if (gConstants.mSequenceFrameDumped == gConstants.mSequenceFrameCount)
+		{
+			gConstants.mSequenceFrameIndex = 0;
+			gConstants.mSequenceFrameDumped = -1;
+			if (gHeadless)
+				gHeadlessDone = true;
+		}
 	}
 
 	// Present
@@ -1471,13 +1538,15 @@ void sRender()
 
 	// Finish Frame
 	{
-		UINT64 fence_value = gFenceLastSignaledValue + 1;
-		gCommandQueue->Signal(gIncrementalFence, fence_value);
-		gFenceLastSignaledValue = fence_value;
-		frame_context.mFenceValue = fence_value;
+		UINT64 signal_value = ++gFenceLastSignaledValue;
+		gCommandQueue->Signal(gIncrementalFence, signal_value);
+		frame_context.mFenceValue = signal_value;
 
 		if (!gRenderer.mAccumulationPaused)
 			gConstants.mCurrentFrameIndex++;
+
+		if (!gHeadless) // [TODO] Calculate DeltaTime without ImGui
+			gConstants.mTime += ImGui::GetIO().DeltaTime;
 	}
 }
 
@@ -1496,6 +1565,8 @@ static void sMessageCallback(D3D12_MESSAGE_CATEGORY inCategory, D3D12_MESSAGE_SE
 // Helper functions
 static bool sCreateDeviceD3D(HWND hWnd)
 {
+	gValidate(CoInitialize(NULL)); // Required by WICFactory
+
 	// Setup swap chain
 	DXGI_SWAP_CHAIN_DESC1 sd = {};
 	{
@@ -1690,6 +1761,7 @@ static bool sCreateDeviceD3D(HWND hWnd)
 	if (gIncrementalFenceEvent == nullptr)
 		return false;
 
+	if (!gHeadless)
 	{
 		ComPtr<IDXGIFactory4> dxgi_factory = nullptr;
 		ComPtr<IDXGISwapChain1> swap_chain = nullptr;
@@ -1698,9 +1770,13 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		if (DX12_ENABLE_DEBUG_LAYER)
 			flags = DXGI_CREATE_FACTORY_DEBUG;
 
-		if (CreateDXGIFactory2(flags, IID_PPV_ARGS(&dxgi_factory)) != S_OK ||
-			dxgi_factory->CreateSwapChainForHwnd(gCommandQueue, hWnd, &sd, nullptr, nullptr, &swap_chain) != S_OK ||
-			swap_chain->QueryInterface(IID_PPV_ARGS(&gSwapChain)) != S_OK)
+		if (CreateDXGIFactory2(flags, IID_PPV_ARGS(&dxgi_factory)) != S_OK)
+			return false;
+		
+		if (dxgi_factory->CreateSwapChainForHwnd(gCommandQueue, hWnd, &sd, nullptr, nullptr, &swap_chain) != S_OK)
+			return false;
+
+		if (swap_chain->QueryInterface(IID_PPV_ARGS(&gSwapChain)) != S_OK)
 			return false;
 
 		// Fullscreen -> Windowed cause crash on resource reference in WM_SIZE handling, disable fullscreen for now
@@ -1742,6 +1818,8 @@ static void sCleanupDeviceD3D()
 		if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgi_debug))))
 			dxgi_debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_FLAGS(DXGI_DEBUG_RLO_DETAIL | DXGI_DEBUG_RLO_IGNORE_INTERNAL));
 	}
+
+	CoUninitialize();
 }
 
 static void sWaitForGPU()
@@ -1751,24 +1829,6 @@ static void sWaitForGPU()
 
 	gIncrementalFence->SetEventOnCompletion(gFenceLastSignaledValue, gIncrementalFenceEvent);
 	WaitForSingleObject(gIncrementalFenceEvent, INFINITE);
-}
-
-static void sWaitForFrameContext()
-{
-	HANDLE waitableObjects[] = { gSwapChainWaitableObject, nullptr };
-	DWORD numWaitableObjects = 1;
-
-	FrameContext& frame_context = gGetFrameContext();
-	UINT64 fenceValue = frame_context.mFenceValue;
-	if (fenceValue != 0) // means no fence was signaled
-	{
-		gIncrementalFence->SetEventOnCompletion(frame_context.mFenceValue, gIncrementalFenceEvent);
-		frame_context.mFenceValue = 0;
-		waitableObjects[1] = gIncrementalFenceEvent;
-		numWaitableObjects = 2;
-	}
-
-	WaitForMultipleObjects(numWaitableObjects, waitableObjects, TRUE, INFINITE);
 }
 
 // Win32 message handler
@@ -1786,14 +1846,14 @@ static LRESULT WINAPI sWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam
 			sWaitForGPU();
 			gRenderer.FinalizeScreenSizeTextures();
 
-			gDisplaySettings.mRenderResolution.x = gMax((UINT)LOWORD(lParam), 8u);
-			gDisplaySettings.mRenderResolution.y = gMax((UINT)HIWORD(lParam), 8u);
+			gDisplaySettings.mWindowSize.x = gMax((UINT)LOWORD(lParam), 8u);
+			gDisplaySettings.mWindowSize.y = gMax((UINT)HIWORD(lParam), 8u);
 			DXGI_SWAP_CHAIN_DESC1 swap_chain_desc;
 			gSwapChain->GetDesc1(&swap_chain_desc);
 			gSwapChain->ResizeBuffers(
 				swap_chain_desc.BufferCount,
-				gDisplaySettings.mRenderResolution.x,
-				gDisplaySettings.mRenderResolution.y,
+				gDisplaySettings.mWindowSize.x,
+				gDisplaySettings.mWindowSize.y,
 				swap_chain_desc.Format,
 				swap_chain_desc.Flags);
 

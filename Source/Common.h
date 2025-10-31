@@ -273,9 +273,13 @@ inline void gSetName(ComPtr<T>& inObject, std::string_view inPrefix, std::string
 	gSetName(inObject, gToWString(inPrefix), gToWString(inName), gToWString(inSuffix));
 }
 
+constexpr int								kScreenWidth = 1920;
+constexpr int								kScreenHeight = 1080;
+
 constexpr int								kVertexCountPerTriangle = 3;
 
 extern bool									gHeadless;
+extern bool									gHeadlessDone;
 
 extern ID3D12Device7*						gDevice;
 extern ID3D12DescriptorHeap* 				gRTVDescriptorHeap;
@@ -483,7 +487,6 @@ struct Texture
 	TEXTURE_MEMBER(DXGI_FORMAT,				SRVFormat,		DXGI_FORMAT_UNKNOWN);
 	TEXTURE_MEMBER(RTVDescriptorIndex,		RTVIndex,		RTVDescriptorIndex::Invalid);
 	TEXTURE_MEMBER(DSVDescriptorIndex,		DSVIndex,		DSVDescriptorIndex::Invalid);
-	TEXTURE_MEMBER(bool,					Readback,		false);
 
 	Texture& Dimension(glm::uvec3 dimension) 
 	{
@@ -498,6 +501,7 @@ struct Texture
 	void Initialize();
 	void Update();
 	void InitializeUpload();
+	void Readback();
 
 	ComPtr<ID3D12Resource> mResource;
 	ComPtr<ID3D12Resource> mUploadResource;
@@ -506,8 +510,6 @@ struct Texture
 	bool mLoaded = false;
 	std::vector<uint8_t> mUploadData;
 	float* mEXRData = nullptr;
-
-	Buffer mReadbackBuffer;
 };
 
 struct ShaderTable

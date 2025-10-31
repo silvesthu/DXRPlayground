@@ -272,7 +272,6 @@
     <ClCompile Include="Source\Thirdparty\Thirdparty.cpp">
       <Filter>Source\Thirdparty</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Thirdparty\fpng\src\fpng.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

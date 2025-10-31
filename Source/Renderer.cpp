@@ -37,29 +37,34 @@ void Renderer::ImGuiShowTextures()
 
 void Renderer::InitializeScreenSizeTextures()
 {
-	DXGI_SWAP_CHAIN_DESC1 swap_chain_desc;
-	gSwapChain->GetDesc1(&swap_chain_desc);
-
-	for (int i = 0; i < kFrameInFlightCount; i++)
+	if (!gHeadless)
 	{
-		gSwapChain->GetBuffer(i, IID_PPV_ARGS(mRuntime.mBackBuffers[i].mResource.GetAddressOf()));
-		std::wstring name = gToWString(mRuntime.mBackBuffers[i].mName + gToString(i));
-		mRuntime.mBackBuffers[i].mResource->SetName(name.c_str());
+		DXGI_SWAP_CHAIN_DESC1 swap_chain_desc;
+		gSwapChain->GetDesc1(&swap_chain_desc);
 
-		mRuntime.mBackBuffers[i].mWidth = swap_chain_desc.Width;
-		mRuntime.mBackBuffers[i].mHeight = swap_chain_desc.Height;
-		mRuntime.mBackBuffers[i].mFormat = swap_chain_desc.Format;
+		for (int i = 0; i < kFrameInFlightCount; i++)
+		{
+			gSwapChain->GetBuffer(i, IID_PPV_ARGS(mRuntime.mBackBuffers[i].mResource.GetAddressOf()));
+			std::wstring name = gToWString(mRuntime.mBackBuffers[i].mName + gToString(i));
+			mRuntime.mBackBuffers[i].mResource->SetName(name.c_str());
 
-		RTVDescriptorIndex index = RTVDescriptorIndex((uint)mRuntime.mBackBuffers[i].mRTVIndex);
-		D3D12_CPU_DESCRIPTOR_HANDLE handle = gCPUContext.mRTVDescriptorHeap.GetCPUHandle(index);
-		gDevice->CreateRenderTargetView(mRuntime.mBackBuffers[i].mResource.Get(), nullptr, handle);
+			mRuntime.mBackBuffers[i].mWidth = swap_chain_desc.Width;
+			mRuntime.mBackBuffers[i].mHeight = swap_chain_desc.Height;
+			mRuntime.mBackBuffers[i].mFormat = swap_chain_desc.Format;
+
+			RTVDescriptorIndex index = RTVDescriptorIndex((uint)mRuntime.mBackBuffers[i].mRTVIndex);
+			D3D12_CPU_DESCRIPTOR_HANDLE handle = gCPUContext.mRTVDescriptorHeap.GetCPUHandle(index);
+			gDevice->CreateRenderTargetView(mRuntime.mBackBuffers[i].mResource.Get(), nullptr, handle);
+		}
+
+		mScreenWidth = swap_chain_desc.Width;
+		mScreenHeight = swap_chain_desc.Height;
 	}
 
 	for (auto&& screen_texture : mRuntime.mScreenTextures)
-		screen_texture.Width(swap_chain_desc.Width).Height(swap_chain_desc.Height).Initialize();
+		screen_texture.Width(mScreenWidth).Height(mScreenHeight).Initialize();
 
-	mScreenWidth = swap_chain_desc.Width;
-	mScreenHeight = swap_chain_desc.Height;
+
 }
 
 void Renderer::FinalizeScreenSizeTextures()

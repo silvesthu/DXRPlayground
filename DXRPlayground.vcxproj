@@ -107,7 +107,6 @@
     <ClCompile Include="Source\Scene.cpp" />
     <ClCompile Include="Source\Thirdparty\ArHosekSkyModel\ArHosekSkyModel.cpp" />
     <ClCompile Include="Source\Thirdparty\ArPragueSkyModelGround\ArPragueSkyModelGround.cpp" />
-    <ClCompile Include="Source\Thirdparty\fpng\src\fpng.cpp" />
     <ClCompile Include="Source\Thirdparty\imgui\imgui.cpp" />
     <ClCompile Include="Source\Thirdparty\imgui\imgui_demo.cpp" />
     <ClCompile Include="Source\Thirdparty\imgui\imgui_draw.cpp" />
