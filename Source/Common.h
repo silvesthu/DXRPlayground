@@ -20,6 +20,7 @@ using Microsoft::WRL::ComPtr;
 #include <functional>
 #include <filesystem>
 #include <span>
+#include <chrono>
 
 #include "Thirdparty/glm.h"
 #include "Thirdparty/nameof/include/nameof.hpp"
@@ -795,3 +796,33 @@ namespace ImGui
 	void Texture1(Texture& inTexture);
 	void Textures(std::span<Texture> inTextures, const std::string& inName = "Texture", ImGuiTreeNodeFlags inFlags = 0);
 }
+
+namespace
+{
+	using std::chrono::high_resolution_clock;
+	using std::chrono::duration_cast;
+	using std::chrono::duration;
+	using std::chrono::milliseconds;
+}
+
+struct CPUTimeScope
+{
+	CPUTimeScope(std::string_view inText)
+	{
+		mText = inText;
+		mStart = std::chrono::high_resolution_clock::now();
+	}
+
+	~CPUTimeScope()
+	{
+		mEnd = std::chrono::high_resolution_clock::now();
+
+		std::chrono::duration<float, std::milli> ms = mEnd - mStart;
+		std::string message = std::format("{} costs {:.2f} ms\n", mText, ms.count());
+		gTrace(message);
+	}
+
+	std::chrono::high_resolution_clock::time_point mStart;
+	std::chrono::high_resolution_clock::time_point mEnd;
+	std::string_view mText;
+};

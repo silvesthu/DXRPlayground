@@ -438,8 +438,16 @@ static void sPrepareImGui()
 			ImGui::TreePop();
 		}
 
-		if (ImGui::TreeNodeEx("Misc"))
+		if (ImGui::TreeNodeEx("Sequence", ImGuiTreeNodeFlags_DefaultOpen))
 		{
+			if (ImGui::Button("Record"))
+			{
+				gConstants.mSequenceFrameRecorded = 0;
+			}
+
+			ImGui::SliderInt("Sequence Frame Index", &gConstants.mSequenceFrameIndex, 0, gConstants.mSequenceFrameCount - 1);
+			ImGui::SliderInt("Sequence Frame Count", &gConstants.mSequenceFrameCount, 1, 600);
+
 			ImGui::TreePop();
 		}
 
@@ -839,6 +847,11 @@ static void sUpdate()
 			gConstants.mPixelDebugCoord -= int2(1, 0);
 		if (!ImGui::IsAnyItemFocused() && ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_RightArrow))
 			gConstants.mPixelDebugCoord += int2(1, 0);
+	}
+
+	// Sequence
+	{
+		gConstants.mSequenceFrameRatio			= gConstants.mSequenceFrameIndex * 1.0f / gConstants.mSequenceFrameCount;
 	}
 
 	// Setup matrices
@@ -1408,10 +1421,19 @@ SkipRender:
 		gConstants.mTime += ImGui::GetIO().DeltaTime;
 	}
 
+	// Record
+	if (gConstants.mSequenceFrameRecorded >= 0)
+	{
+		// [TODO]
+		// Multiple-buffered readback textures, sync with fence
+	}
+
 	// Dump Texture
 	{
 		if (gCPUContext.mDumpTextureRef != nullptr && gCPUContext.mDumpTextureRef->mResource != nullptr)
 		{
+			CPUTimeScope cpu_time_scope("Dump Texture");
+
 			DirectX::ScratchImage image;
 			DirectX::CaptureTexture(gCommandQueue, gCPUContext.mDumpTextureRef->mResource.Get(), false, image, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COMMON);
 

@@ -297,7 +297,6 @@ enum class DebugMode : uint
 	
 	MediumInstanceID,
 	MediumFreeFlight,
-	MediumTransmittance,
 
 	GENERATE_NEW_LINE_NAME,
 
@@ -779,6 +778,11 @@ struct Constants
 	float						mCurrentFrameWeight				CONSTANT_DEFAULT(1);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+
+	int							mSequenceFrameIndex				CONSTANT_DEFAULT(0);
+	int							mSequenceFrameCount				CONSTANT_DEFAULT(16);
+	float						mSequenceFrameRatio				CONSTANT_DEFAULT(0.0f);
+	int							mSequenceFrameRecorded			CONSTANT_DEFAULT(-1);
 
 	int2						mPixelDebugCoord				CONSTANT_DEFAULT(int2(-1, -1));
 	int							mPixelDebugLightIndex			CONSTANT_DEFAULT(0);

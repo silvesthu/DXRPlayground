@@ -59,7 +59,8 @@ void PrepareLightsCS(
     RAB_LightInfo lightInfo					= (RAB_LightInfo)0;
  
 	{
-		SurfaceContext surface_context		= (SurfaceContext)0;
+		SurfaceContext surface_context;
+		surface_context.mInstanceData		= InstanceDatas[task.mInstanceIndex];
 		surface_context.mInstanceID			= task.mInstanceIndex;
 		surface_context.mPrimitiveIndex		= light_index;
 		surface_context.mBarycentrics		= 1.0 / 3.0; // use barycenter
@@ -67,9 +68,9 @@ void PrepareLightsCS(
 		surface_context.LoadSurface();
 		
 		float3 positions[3];
-		positions[0] 						= mul(surface_context.InstanceData().mTransform, float4(surface_context.mVertexPositions[0], 1)).xyz;
-		positions[1] 						= mul(surface_context.InstanceData().mTransform, float4(surface_context.mVertexPositions[1], 1)).xyz;
-		positions[2] 						= mul(surface_context.InstanceData().mTransform, float4(surface_context.mVertexPositions[2], 1)).xyz;
+		positions[0] 						= mul(surface_context.mInstanceData.mTransform, float4(surface_context.mVertexPositions[0], 1)).xyz;
+		positions[1] 						= mul(surface_context.mInstanceData.mTransform, float4(surface_context.mVertexPositions[1], 1)).xyz;
+		positions[2] 						= mul(surface_context.mInstanceData.mTransform, float4(surface_context.mVertexPositions[2], 1)).xyz;
  
 		TriangleLight triLight;
 		triLight.mBase = positions[0];
