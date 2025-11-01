@@ -41,3 +41,6 @@
 [submodule "Source/Thirdparty/nvapi"]
 	path = Source/Thirdparty/nvapi
 	url = https://github.com/NVIDIA/nvapi.git
+[submodule "Source/Thirdparty/implot"]
+	path = Source/Thirdparty/implot
+	url = https://github.com/epezent/implot.git
