@@ -38,7 +38,7 @@ static const std::array kScenePresets =
 	ScenePreset().Name("CornellBoxDielectric").Path("Asset/Comparison/benedikt-bitterli/cornell-box-dielectric/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("CornellBoxTeapot").Path("Asset/Comparison/benedikt-bitterli/cornell-box-teapot/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("CornellMonkey").Path("Asset/Comparison/benedikt-bitterli/cornell-box-monkey/scene_v3.xml").EmissionBoost(1E4f),
-	ScenePreset().Name("CornellDragon").Path("Asset/Comparison/benedikt-bitterli/cornell-box-dragon/scene_v3.xml").EmissionBoost(1E4f),
+	ScenePreset().Name("CornellDragon").Path("Asset/Comparison/benedikt-bitterli/cornell-box-dragon/scene_v3.xml").EmissionBoost(1E4f).CameraAnimationPath("Asset/Comparison/benedikt-bitterli/cornell-box-dragon/camera_animation.gltf"),
 
 	// MIS
 	ScenePreset().Name("VeachMIS").Path("Asset/Comparison/benedikt-bitterli/veach-mis/scene_ggx_v3.xml").EmissionBoost(1E4f),
@@ -221,7 +221,7 @@ static void sPrepareImGui()
 			ImGui::TreePop();
 		}
 
-		if (ImGui::TreeNodeEx("Sampling", ImGuiTreeNodeFlags_DefaultOpen))
+		if (ImGui::TreeNodeEx("Sampling", ImGuiTreeNodeFlags_None /*ImGuiTreeNodeFlags_DefaultOpen*/))
 		{
 			ImGui::Text("Offset Mode");
 			for (int i = 0; i < static_cast<int>(OffsetMode::Count); i++)
@@ -274,8 +274,14 @@ static void sPrepareImGui()
 			ImGui::Checkbox("Vsync", &gDisplaySettings.mVsync);
 
 			if (!gRenderer.mAccumulationFrameUnlimited)
+			{
 				if (ImGui::SliderInt("Frame Count", reinterpret_cast<int*>(&gRenderer.mAccumulationFrameCount), 1, 512))
 					gRenderer.mAccumulationResetRequested = true;
+
+				ImGui::BeginDisabled();
+				ImGui::SliderInt("Accumulation Frame Index", &gConstants.mCurrentFrameIndex, 0, gRenderer.mAccumulationFrameCount - 1);
+				ImGui::EndDisabled();
+			}
 
 			ImGui::SliderInt("Recursion Depth Max", reinterpret_cast<int*>(&gConstants.mRecursionDepthCountMax), 1, 64);
 			ImGui::SliderInt("Russian Roulette Depth", reinterpret_cast<int*>(&gConstants.mRussianRouletteDepth), 1, 16);
@@ -418,7 +424,7 @@ static void sPrepareImGui()
 			ImGui::TreePop();
 		}
 
-		if (ImGui::TreeNodeEx("NVAPI", ImGuiTreeNodeFlags_DefaultOpen))
+		if (ImGui::TreeNodeEx("NVAPI", ImGuiTreeNodeFlags_None /*ImGuiTreeNodeFlags_DefaultOpen*/))
 		{
 			if (ImGui::TreeNodeEx("LSS (Wireframe)", ImGuiTreeNodeFlags_DefaultOpen))
 			{
@@ -445,13 +451,16 @@ static void sPrepareImGui()
 			{
 				gConstants.mCurrentFrameIndex = 0;
 				gConstants.mSequenceFrameIndex = 0;
-				gConstants.mSequenceFrameDumped = 0;
+				gConstants.mSequenceFrameRecord = 0;
 			}
 
-			int accumulation_frame_index = gConstants.mCurrentFrameIndex;
+			ImGui::Checkbox("Preview", &gRenderer.mSequencePreview);
+
 			ImGui::SliderInt("Sequence Frame Count", &gConstants.mSequenceFrameCount, 1, 600);
 			ImGui::SliderInt("Sequence Frame Index", &gConstants.mSequenceFrameIndex, 0, gConstants.mSequenceFrameCount - 1);
-			ImGui::SliderInt("Accumulation Frame Index", &accumulation_frame_index, 0, gRenderer.mAccumulationFrameCount - 1);
+			ImGui::BeginDisabled();
+			ImGui::SliderInt("Accumulation Frame Index", &gConstants.mCurrentFrameIndex, 0, gRenderer.mAccumulationFrameCount - 1);
+			ImGui::EndDisabled();
 
 			ImGui::TreePop();
 		}
@@ -865,8 +874,34 @@ static void sUpdate()
 	}
 
 	// Sequence
+	if (gConstants.mSequenceFrameRecord >= 0 || gRenderer.mSequencePreview)
 	{
 		gConstants.mSequenceFrameRatio			= gConstants.mSequenceFrameIndex * 1.0f / gConstants.mSequenceFrameCount;
+
+		// Camera Animation
+		const SceneContent::Camera& camera		= gScene.GetSceneContent().mCamera;
+		if (camera.mHasAnimation)
+		{
+			if (!camera.mAnimation.mTranslation.empty())
+			{
+				auto [from, to, fraction]		= gMakeLerpTuple(camera.mAnimation.mTranslation, gConstants.mSequenceFrameRatio);
+				gConstants.CameraPosition()		= glm::vec4(glm::lerp(from, to, fraction), 1);
+			}
+			if (!camera.mAnimation.mRotation.empty())
+			{
+				constexpr glm::vec3 cLeft		= glm::vec3(1.0f, 0.0f, 0.0f);
+				constexpr glm::vec3 cFront		= glm::vec3(0.0f, 0.0f, -1.0f);
+				constexpr glm::vec3 cUp			= glm::vec3(0.0f, 1.0f, 0.0f);
+
+				auto [from, to, fraction]		= gMakeLerpTuple(camera.mAnimation.mRotation, gConstants.mSequenceFrameRatio);
+				glm::quat rotation				= glm::slerp(glm::quat(from.w, from), glm::quat(to.w, to), fraction); // glm::quat is wxyz, gltf quat is xyzw
+
+				gConstants.CameraLeft()			= glm::vec4(rotation * cLeft, 0);
+				gConstants.CameraUp()			= glm::vec4(rotation * cUp, 0);
+				gConstants.CameraFront()		= glm::vec4(rotation * cFront, 0);
+			}
+			// mAnimation.mScale is ignored
+		}
 	}
 
 	// Setup matrices
@@ -1013,7 +1048,7 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 		// Start Sequence
 		gConstants.mCurrentFrameIndex = 0;
 		gConstants.mSequenceFrameIndex = 0;
-		gConstants.mSequenceFrameDumped = 0;
+		gConstants.mSequenceFrameRecord = 0;
 	}
 
 	// Main loop
@@ -1210,7 +1245,7 @@ void sRender()
 				if (gRenderer.mAccumulationResetRequested)
 					gConstants.mCurrentFrameIndex = 0;
 
-				uint accumulation_frame_count = gRenderer.mAccumulationFrameUnlimited ? UINT_MAX : gRenderer.mAccumulationFrameCount;
+				int accumulation_frame_count = gRenderer.mAccumulationFrameUnlimited ? INT_MAX : gRenderer.mAccumulationFrameCount;
 				bool accumulation_done = gConstants.mCurrentFrameIndex + 1 > accumulation_frame_count;
 				gConstants.mCurrentFrameIndex = gMin(gConstants.mCurrentFrameIndex, accumulation_frame_count - 1);
 
@@ -1442,7 +1477,7 @@ void sRender()
 	}
 
 	// Readback Sequence
-	bool record_frame = gConstants.mSequenceFrameDumped >= 0 && gConstants.mCurrentFrameIndex + 1 == gRenderer.mAccumulationFrameCount;
+	bool record_frame = gConstants.mSequenceFrameRecord >= 0 && gConstants.mCurrentFrameIndex + 1 == gRenderer.mAccumulationFrameCount;
 	if (record_frame)
 	{
 		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Readback Sequence");
@@ -1511,19 +1546,19 @@ void sRender()
 		DirectX::CaptureTexture(gCommandQueue, gRenderer.mRuntime.mScreenReadbackTexture.mResource.Get(), false, image, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COMMON);
 
 		wchar_t filename[256];
-		swprintf_s(filename, L"%03u.png", gConstants.mSequenceFrameDumped);
+		swprintf_s(filename, L"%03u.png", gConstants.mSequenceFrameRecord);
 		DirectX::SaveToWICFile(image.GetImages(), image.GetImageCount(), DirectX::WIC_FLAGS_NONE, GUID_ContainerFormatPng, filename);
 
 		gConstants.mSequenceFrameIndex++;
-		gConstants.mSequenceFrameDumped++;
+		gConstants.mSequenceFrameRecord++;
 
-		std::string text = std::format("Sequence {}/{}\n", gConstants.mSequenceFrameDumped, gConstants.mSequenceFrameCount);
+		std::string text = std::format("Sequence {}/{}\n", gConstants.mSequenceFrameRecord, gConstants.mSequenceFrameCount);
 		gTrace(text.c_str());
 
-		if (gConstants.mSequenceFrameDumped == gConstants.mSequenceFrameCount)
+		if (gConstants.mSequenceFrameRecord == gConstants.mSequenceFrameCount)
 		{
 			gConstants.mSequenceFrameIndex = 0;
-			gConstants.mSequenceFrameDumped = -1;
+			gConstants.mSequenceFrameRecord = -1;
 			if (gHeadless)
 				gHeadlessDone = true;
 		}

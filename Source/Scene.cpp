@@ -821,16 +821,67 @@ bool Scene::LoadGLTF(const std::string& inFilename, SceneContent& ioSceneContent
 		return ret;
 	}
 
-	auto visit_node = [&](const Node& inNode, std::string& ioName, mat4x4& ioMatrix)
+	std::map<int, SceneContent::InstanceAnimation> animation_by_node;
+	for (auto&& animation : model.animations)
 	{
-		if (inNode.translation.size() > 0) // not all nodes have transform
+		for (auto&& channel : animation.channels)
 		{
-			mat4x4 T = translate(vec3((float)inNode.translation[0], (float)inNode.translation[1], (float)inNode.translation[2]));
-			mat4x4 R = toMat4(quat((float)inNode.rotation[3], (float)inNode.rotation[0], (float)inNode.rotation[1], (float)inNode.rotation[2]));
-			mat4x4 S = scale(vec3((float)inNode.scale[0], (float)inNode.scale[1], (float)inNode.scale[2]));
-			ioMatrix = ioMatrix * (T * R * S);	
+			SceneContent::InstanceAnimation& instance_animation = animation_by_node[channel.target_node];
+
+			int output							= animation.samplers[channel.sampler].output;
+			Accessor& accessor					= model.accessors[output];
+			BufferView& buffer_view				= model.bufferViews[accessor.bufferView];
+
+			gAssert(accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT);
+
+			uint8* data							= model.buffers[buffer_view.buffer].data.data() + buffer_view.byteOffset;
+			size_t size							= buffer_view.byteLength;
+			
+			if (channel.target_path == "translation")
+			{
+				// times accessor, assume animation is baked to each frame, for now
+				// int input = animation.samplers[channel.sampler].input;
+
+				gAssert(size == sizeof(glm::vec3) * accessor.count);
+				instance_animation.mTranslation.resize(accessor.count);
+				memcpy(instance_animation.mTranslation.data(), data, size);
+			}
+			else if (channel.target_path == "rotation")
+			{
+				gAssert(size == sizeof(glm::vec4) * accessor.count);
+				instance_animation.mRotation.resize(accessor.count);
+				memcpy(instance_animation.mRotation.data(), data, size);
+			}
+			else if (channel.target_path == "scale")
+			{
+				gAssert(size == sizeof(glm::vec3) * accessor.count);
+				instance_animation.mScale.resize(accessor.count);
+				memcpy(instance_animation.mScale.data(), data, size);
+			}
 		}
+	}
+
+	auto visit_node = [&](int inNodeIndex, const Node& inNode, std::string& ioName, mat4x4& ioMatrix)
+	{
+		if (inNode.translation.size() == 3)
+			ioMatrix = ioMatrix * translate(vec3((float)inNode.translation[0], (float)inNode.translation[1], (float)inNode.translation[2]));
+		if (inNode.rotation.size() == 4)
+			ioMatrix = ioMatrix * toMat4(quat((float)inNode.rotation[3], (float)inNode.rotation[0], (float)inNode.rotation[1], (float)inNode.rotation[2]));
+		if (inNode.scale.size() == 3)
+			ioMatrix = ioMatrix * scale(vec3((float)inNode.scale[0], (float)inNode.scale[1], (float)inNode.scale[2]));
+
 		ioName = std::format("{}.{}", ioName, inNode.name);
+
+		if (inNode.camera != -1)
+		{
+			auto animation_iter = animation_by_node.find(inNodeIndex);
+			if (animation_iter != animation_by_node.end())
+			{
+				gAssert(!ioSceneContent.mCamera.mHasAnimation); // assume at most 1 camera animation
+				ioSceneContent.mCamera.mAnimation = std::move((*animation_iter).second);
+				ioSceneContent.mCamera.mHasAnimation = true;
+			}
+		}
 
 		if (inNode.mesh == -1)
 			return;
@@ -1006,17 +1057,17 @@ bool Scene::LoadGLTF(const std::string& inFilename, SceneContent& ioSceneContent
 		}
 	};
 
-	auto visit_node_and_children = [&](const auto &self, const Node& inNode, const std::string& inParentName, const mat4x4& inParentMatrix) -> void
+	auto visit_node_and_children = [&](const auto &self, int inNodeIndex, const Node& inNode, const std::string& inParentName, const mat4x4& inParentMatrix) -> void
 	{
 		std::string name = inParentName;
 		mat4x4 matrix = inParentMatrix;
-		visit_node(inNode, name, matrix);
+		visit_node(inNodeIndex, inNode, name, matrix);
 		for (int child_node_index : inNode.children)
-			self(self, model.nodes[child_node_index], name, matrix);
+			self(self, inNodeIndex, model.nodes[child_node_index], name, matrix);
 	};
 
 	for (int node_index : model.scenes[model.defaultScene].nodes)
-		visit_node_and_children(visit_node_and_children, model.nodes[node_index], std::string(), mat4x4(1.0f));
+		visit_node_and_children(visit_node_and_children, node_index, model.nodes[node_index], std::string(), mat4x4(1.0f));
 
 	return ret;
 }
@@ -1035,19 +1086,31 @@ void Scene::Load(const ScenePreset& inPreset)
 
 	mSceneContent = {}; // Reset
 
-	std::string filename_lower = gToLower(inPreset.mPath);
-	if (std::filesystem::exists(filename_lower))
+	std::string path_lower = gToLower(inPreset.mPath);
+	if (std::filesystem::exists(path_lower))
 	{
 		bool loaded = false;
 
-		if (!loaded && filename_lower.ends_with(".obj"))
-			loaded |= LoadObj(filename_lower, inPreset.mTransform, false, mSceneContent);
+		if (!loaded && path_lower.ends_with(".obj"))
+			loaded |= LoadObj(path_lower, inPreset.mTransform, false, mSceneContent);
 
-		if (!loaded && filename_lower.ends_with(".xml"))
-			loaded |= LoadMitsuba(filename_lower, mSceneContent);
+		if (!loaded && path_lower.ends_with(".xml"))
+			loaded |= LoadMitsuba(path_lower, mSceneContent);
 
-		if (!loaded && filename_lower.ends_with(".gltf"))
-			loaded |= LoadGLTF(filename_lower, mSceneContent);
+		if (!loaded && path_lower.ends_with(".gltf"))
+			loaded |= LoadGLTF(path_lower, mSceneContent);
+	}
+
+	std::string camera_animation_path_lower = gToLower(inPreset.mCameraAnimationPath);
+	if (std::filesystem::exists(camera_animation_path_lower))
+	{
+		bool loaded = false;
+
+		SceneContent scene_context;
+		if (!loaded && camera_animation_path_lower.ends_with(".gltf"))
+			loaded |= LoadGLTF(camera_animation_path_lower, scene_context);
+
+		mSceneContent.mCamera = std::move(scene_context.mCamera);
 	}
 
 	if (mSceneContent.mInstanceDatas.empty())

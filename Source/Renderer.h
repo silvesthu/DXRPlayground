@@ -137,8 +137,10 @@ struct Renderer
 
 	bool										mAccumulationFrameUnlimited = false;
 	bool										mAccumulationPaused = false;
-	uint										mAccumulationFrameCount = 64;
+	int											mAccumulationFrameCount = 64;
 	bool										mAccumulationResetRequested = false;
+
+	bool										mSequencePreview = false;
 
 	uint										mScreenWidth = kScreenWidth;
 	uint										mScreenHeight = kScreenHeight;

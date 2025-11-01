@@ -97,6 +97,19 @@ struct SceneContent
 	std::vector<InstanceInfo>					mInstanceInfos;
 	std::vector<InstanceData>					mInstanceDatas;
 
+	struct InstanceAnimation
+	{
+		std::vector<glm::vec3>					mTranslation;
+		std::vector<glm::vec4>					mRotation;
+		std::vector<glm::vec3>					mScale;
+	};
+	struct Camera
+	{
+		bool									mHasAnimation = false;
+		InstanceAnimation						mAnimation;
+	};
+	Camera										mCamera;
+
 	struct EmissiveInstance
 	{
 		uint									mInstanceIndex;
@@ -150,6 +163,7 @@ struct ScenePreset
 	SCENE_PRESET_MEMBER(AtmosphereMode,			Atmosphere,				AtmosphereMode::ConstantColor);
 	SCENE_PRESET_MEMBER(glm::vec4,				ConstantColor,			glm::vec4(0, 0, 0, 0));
 	SCENE_PRESET_MEMBER(bool,					TriangleAsLSSAllowed,	false);
+	SCENE_PRESET_MEMBER(std::string_view, 		CameraAnimationPath,	"");
 };
 
 class Scene

@@ -776,7 +776,7 @@ struct Constants
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
-	uint						mCurrentFrameIndex				CONSTANT_DEFAULT(0);
+	int							mCurrentFrameIndex				CONSTANT_DEFAULT(0);
 	float						mCurrentFrameWeight				CONSTANT_DEFAULT(1);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
@@ -784,7 +784,7 @@ struct Constants
 	int							mSequenceFrameIndex				CONSTANT_DEFAULT(0);
 	int							mSequenceFrameCount				CONSTANT_DEFAULT(4);
 	float						mSequenceFrameRatio				CONSTANT_DEFAULT(0.0f);
-	int							mSequenceFrameDumped			CONSTANT_DEFAULT(-1);
+	int							mSequenceFrameRecord			CONSTANT_DEFAULT(-1);
 
 	int2						mPixelDebugCoord				CONSTANT_DEFAULT(int2(-1, -1));
 	int							mPixelDebugLightIndex			CONSTANT_DEFAULT(0);

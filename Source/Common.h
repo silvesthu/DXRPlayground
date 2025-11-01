@@ -98,6 +98,33 @@ inline std::string gToLower(const std::string_view& inStringView)
 	return result;
 }
 
+namespace glm
+{
+	template<length_t L, typename T, qualifier Q = defaultp>
+	GLM_FUNC_QUALIFIER vec<L, T, Q> lerp(vec<L, T, Q> const& x, vec<L, T, Q> const& y, T a)
+	{
+		GLM_STATIC_ASSERT(std::numeric_limits<T>::is_iec559, "'lerp' only accept floating-point inputs");
+
+		// Lerp is only defined in [0, 1]
+		assert(a >= static_cast<T>(0));
+		assert(a <= static_cast<T>(1));
+
+		return x * (static_cast<T>(1) - a) + (y * a);
+	}
+}
+
+template<typename T>
+std::tuple<T, T, float> gMakeLerpTuple(const std::vector<T>& inArray, float inRatio)
+{
+	int size									= static_cast<int>(inArray.size());
+	float float_index							= inRatio * size;
+	int int_index								= static_cast<int>(std::floor(float_index));
+	const T& from								= inArray[std::clamp(int_index, 0, size - 1)];
+	const T& to									= inArray[std::clamp(int_index + 1, 0, size - 1)];
+	float fraction								= std::clamp(float_index - int_index, 0.0f, 1.0f);
+	return std::make_tuple(from, to, fraction);
+};
+
 inline void gTrace(const char* inString)
 {
 	OutputDebugStringA(inString);
