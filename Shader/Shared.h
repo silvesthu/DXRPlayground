@@ -117,6 +117,10 @@ enum class ViewDescriptorIndex : uint
 	BRDFSliceSRV,
 	BRDFSliceUAV,
 
+	// [Noise]
+	ShapeNoise3DSRV,
+	ErosionNoise3DSRV,
+
 	// [Misc]
 	IESSRV,
 
