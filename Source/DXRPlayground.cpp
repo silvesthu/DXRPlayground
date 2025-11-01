@@ -1011,23 +1011,20 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 	gAtmosphere.Initialize();
 	gCloud.Initialize();
 
-	if (!gHeadless)
-	{
-		// File watch
-		filewatch::FileWatch<std::string> file_watch("Shader/",
-			[](const std::string& inPath, const filewatch::Event inChangeType)
+	// File watch
+	filewatch::FileWatch<std::string> file_watch("Shader/",
+		[](const std::string& inPath, const filewatch::Event inChangeType)
+		{
+			(void)inChangeType;
+			std::regex pattern(".*\\.(hlsl|hlsli|h|inl)");
+			if (std::regex_match(inPath, pattern) && inChangeType == filewatch::Event::modified)
 			{
-				(void)inChangeType;
-				std::regex pattern(".*\\.(hlsl|hlsli|h|inl)");
-				if (std::regex_match(inPath, pattern) && inChangeType == filewatch::Event::modified)
-				{
-					std::string msg = "Reload triggered by " + inPath + "\n";
-					gTrace(msg.c_str());
+				std::string msg = "Reload triggered by " + inPath + "\n";
+				gTrace(msg.c_str());
 
-					gRenderer.mReloadShader = true;
-				}
-			});
-	}
+				gRenderer.mReloadShader = true;
+			}
+		});
 
 	gCommandList->Close();
 	gCommandQueue->ExecuteCommandLists(1, reinterpret_cast<ID3D12CommandList* const*>(&gCommandList));
