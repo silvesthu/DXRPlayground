@@ -49,8 +49,8 @@ struct Renderer
 		Texture									mBRDFSliceTexture			= Texture().Width(512).Height(512).Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(ViewDescriptorIndex::BRDFSliceUAV).SRVIndex(ViewDescriptorIndex::BRDFSliceSRV).Name("Renderer.BRDFSlice");
 		Texture									mGenerateTexture			= Texture().Width(2 * 20).Height(2 * 80).Format(DXGI_FORMAT_R8G8B8A8_UNORM).UAVIndex(ViewDescriptorIndex::GeneratedUAV).SRVIndex(ViewDescriptorIndex::GeneratedSRV).Name("Renderer.Generated");
 
-		Texture									mShapeNoise3DTexture		= Texture().Width(128).Height(128).Depth(128).Format(DXGI_FORMAT_R8_UNORM).SRVIndex(ViewDescriptorIndex::ShapeNoise3DSRV).Name("Renderer.ShapeNoise3D").Path(L"Asset/TileableVolumeNoise/noiseShapePacked.dds");
-		// Texture									mErosionNoise3DTexture		= Texture().Width(32).Height(32).Depth(32).Format(DXGI_FORMAT_R8_UNORM).SRVIndex(ViewDescriptorIndex::ErosionNoise3DSRV).Name("Renderer.ErosionNoise3D").Path(L"Asset/TileableVolumeNoise/noiseErosionPacked.dds");
+		// Texture									mShapeNoise3DTexture		= Texture().Width(128).Height(128).Depth(128).Format(DXGI_FORMAT_R8_UNORM).SRVIndex(ViewDescriptorIndex::ShapeNoise3DSRV).Name("Renderer.ShapeNoise3D").Path(L"Asset/TileableVolumeNoise/noiseShapePacked.dds");
+		Texture									mErosionNoise3DTexture		= Texture().Width(32).Height(32).Depth(32).Format(DXGI_FORMAT_R8_UNORM).SRVIndex(ViewDescriptorIndex::ErosionNoise3DSRV).Name("Renderer.ErosionNoise3D").Path(L"Asset/TileableVolumeNoise/noiseErosionPacked.dds");
 		// Texture									mUVCheckerTexture			= Texture().Width(1024).Height(1024).Format(DXGI_FORMAT_R8G8B8A8_UNORM_SRGB).SRVIndex(ViewDescriptorIndex::UVCheckerSRV).Name("Renderer.UVCheckerMap").Path(L"Asset/UVChecker-map/UVCheckerMaps/UVCheckerMap01-1024.png");
 		// Texture									mIESTexture					= Texture().Width(256).Height(16).Format(DXGI_FORMAT_R32_FLOAT).SRVIndex(ViewDescriptorIndex::IESSRV).Name("Renderer.IES").Path(L"Asset/IES/007cfb11e343e2f42e3b476be4ab684e/IES.hdr");
 
@@ -143,7 +143,8 @@ struct Renderer
 	int											mAccumulationFrameCount = 64;
 	bool										mAccumulationResetRequested = false;
 
-	bool										mSequencePreview = false;
+	bool										mSequenceCameraEnabled = true;
+	int											mSequenceFrameRecording = -1;
 
 	uint										mScreenWidth = kScreenWidth;
 	uint										mScreenHeight = kScreenHeight;

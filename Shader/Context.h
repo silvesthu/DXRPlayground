@@ -400,6 +400,24 @@ struct BSDFContext
 // Assume Homogeneous, for now
 struct MediumContext
 {
+	static void ApplySequence(inout MediumContext ioContext)
+	{
+		if (mConstants.mSequenceEnabled == 0)
+			return;
+
+		float ratio								= mConstants.mSequenceFrameRatio;
+
+		Texture3D<float> ErosionNoise3D			= ResourceDescriptorHeap[(int)ViewDescriptorIndex::ErosionNoise3DSRV];
+		float3 offset							= float3(0, -mConstants.mSequenceFrameRatio * 5.0, 0);
+		float noise_value						= ErosionNoise3D.SampleLevel(BilinearWrapSampler, (ioContext.PositionWS() + offset) * 1.0, 0);
+		noise_value								= saturate(pow(noise_value * 1.2, 4.0));
+
+		float y_gradient						= pow(saturate(ioContext.PositionWS().y + 0.1), 0.2);
+		noise_value								= lerp(noise_value, 0.0f, lerp(y_gradient, 0.0, pow(ratio, 16.0)));
+		
+		ioContext.mInstanceData.mMediumSigmaT	*= noise_value;
+	}
+
 	template<RAY_FLAG RayFlags>
 	static MediumContext Generate(RayDesc inRayDesc, RayQuery<RayFlags> inRayQuery)
 	{
@@ -412,6 +430,8 @@ struct MediumContext
 		medium_context.mRayWS.mTCurrent			= inRayQuery.CommittedRayT();
 
 		medium_context.mScatteringEvent			= false;
+
+		ApplySequence(medium_context);
 
 		return medium_context;
 	}

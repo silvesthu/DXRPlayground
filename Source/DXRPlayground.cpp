@@ -449,12 +449,16 @@ static void sPrepareImGui()
 		{
 			if (ImGui::Button("Record"))
 			{
+				gConstants.mSequenceEnabled = 1;
 				gConstants.mCurrentFrameIndex = 0;
 				gConstants.mSequenceFrameIndex = 0;
-				gConstants.mSequenceFrameRecord = 0;
+
+				gRenderer.mSequenceFrameRecording = 0;
 			}
 
-			ImGui::Checkbox("Preview", &gRenderer.mSequencePreview);
+			ImGui::Checkbox("Enabled", (bool*)&gConstants.mSequenceEnabled);
+			ImGui::SameLine();
+			ImGui::Checkbox("Camera", &gRenderer.mSequenceCameraEnabled);			
 
 			ImGui::SliderInt("Sequence Frame Count", &gConstants.mSequenceFrameCount, 1, 600);
 			ImGui::SliderInt("Sequence Frame Index", &gConstants.mSequenceFrameIndex, 0, gConstants.mSequenceFrameCount - 1);
@@ -874,13 +878,14 @@ static void sUpdate()
 	}
 
 	// Sequence
-	if (gConstants.mSequenceFrameRecord >= 0 || gRenderer.mSequencePreview)
 	{
 		gConstants.mSequenceFrameRatio			= gConstants.mSequenceFrameIndex * 1.0f / gConstants.mSequenceFrameCount;
 
+		bool apply_sequence_camera				= gConstants.mSequenceEnabled && (gRenderer.mSequenceFrameRecording >= 0 || gRenderer.mSequenceCameraEnabled);
+
 		// Camera Animation
 		const SceneContent::Camera& camera		= gScene.GetSceneContent().mCamera;
-		if (camera.mHasAnimation)
+		if (apply_sequence_camera && camera.mHasAnimation)
 		{
 			if (!camera.mAnimation.mTranslation.empty())
 			{
@@ -1043,9 +1048,11 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLi
 	if (gHeadless)
 	{
 		// Start Sequence
+		gConstants.mSequenceEnabled = 1;
 		gConstants.mCurrentFrameIndex = 0;
 		gConstants.mSequenceFrameIndex = 0;
-		gConstants.mSequenceFrameRecord = 0;
+
+		gRenderer.mSequenceFrameRecording = 0;
 	}
 
 	// Main loop
@@ -1474,7 +1481,7 @@ void sRender()
 	}
 
 	// Readback Sequence
-	bool record_frame = gConstants.mSequenceFrameRecord >= 0 && gConstants.mCurrentFrameIndex + 1 == gRenderer.mAccumulationFrameCount;
+	bool record_frame = gRenderer.mSequenceFrameRecording >= 0 && gConstants.mCurrentFrameIndex + 1 == gRenderer.mAccumulationFrameCount;
 	if (record_frame)
 	{
 		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Readback Sequence");
@@ -1543,19 +1550,20 @@ void sRender()
 		DirectX::CaptureTexture(gCommandQueue, gRenderer.mRuntime.mScreenReadbackTexture.mResource.Get(), false, image, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COMMON);
 
 		wchar_t filename[256];
-		swprintf_s(filename, L"%03u.png", gConstants.mSequenceFrameRecord);
+		swprintf_s(filename, L"%03u.png", gRenderer.mSequenceFrameRecording);
 		DirectX::SaveToWICFile(image.GetImages(), image.GetImageCount(), DirectX::WIC_FLAGS_NONE, GUID_ContainerFormatPng, filename);
 
 		gConstants.mSequenceFrameIndex++;
-		gConstants.mSequenceFrameRecord++;
+		gRenderer.mSequenceFrameRecording++;
 
-		std::string text = std::format("Sequence {}/{}\n", gConstants.mSequenceFrameRecord, gConstants.mSequenceFrameCount);
+		std::string text = std::format("Sequence {}/{}\n", gRenderer.mSequenceFrameRecording, gConstants.mSequenceFrameCount);
 		gTrace(text.c_str());
 
-		if (gConstants.mSequenceFrameRecord == gConstants.mSequenceFrameCount)
+		if (gRenderer.mSequenceFrameRecording == gConstants.mSequenceFrameCount)
 		{
+			gConstants.mSequenceEnabled = 0;
 			gConstants.mSequenceFrameIndex = 0;
-			gConstants.mSequenceFrameRecord = -1;
+			gRenderer.mSequenceFrameRecording = -1;
 			if (gHeadless)
 				gHeadlessDone = true;
 		}

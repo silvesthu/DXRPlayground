@@ -492,12 +492,16 @@ namespace BSDFEvaluation
 		}
 	};
 
-	void ApplySequence(inout HitContext ioHitContext)
+	static void ApplySequence(inout HitContext ioContext)
 	{
+		if (mConstants.mSequenceEnabled == 0)
+			return;
+
 		float ratio								= mConstants.mSequenceFrameRatio;
-		float eta_animation_ratio				= pow(ratio, 0.5f);
-		float eta_animation						= saturate(remap(ioHitContext.PositionWS().y, 1.0f - eta_animation_ratio, 1.0f + 0.1f - eta_animation_ratio, 0.0f, 1.0f));
-		ioHitContext.mInstanceData.mEta			= lerp(ioHitContext.mInstanceData.mEta, 1.0f, eta_animation);
+
+		float y_animation_ratio					= pow(saturate(1.0 - ratio), 0.5f);
+		float y_animation						= saturate(remap(ioContext.PositionWS().y, 1.0f - y_animation_ratio, 1.0f + lerp(0.0f, 0.2f, ratio) - y_animation_ratio, 0.0f, 1.0f));
+		ioContext.mInstanceData.mEta			= lerp(2.0, 1.0f, y_animation);
 	}
 
 	BSDFContext GenerateContext(HitContext inHitContext, inout PathContext ioPathContext)

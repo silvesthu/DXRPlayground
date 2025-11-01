@@ -146,6 +146,12 @@ void TraceRay(inout PixelContext ioPixelContext)
 				DebugValue(DebugMode::PositionWS, path_context.mRecursionDepth, float3(medium_context.PositionWS()));
 				DebugValue(DebugMode::DirectionWS, path_context.mRecursionDepth, float3(medium_context.DirectionWS()));
 				DebugValue(DebugMode::InstanceID, path_context.mRecursionDepth, float3(medium_context.mInstanceID, 0.0, 0.0));
+
+				//Texture3D<float> ErosionNoise3D = ResourceDescriptorHeap[(int)ViewDescriptorIndex::ErosionNoise3DSRV];
+				//float3 offset = float3(0, -mConstants.mSequenceFrameRatio * 5.0, 0);
+				//float noise_value = ErosionNoise3D.SampleLevel(BilinearWrapSampler, (hit_context.PositionWS() + offset) * 1.0, 0);
+				//noise_value = saturate(pow(noise_value * 1.2, 4.0));
+				//DebugValue(DebugMode::Manual, path_context.mRecursionDepth, noise_value);
 			}
 
 			// Participating media (Atmosphere)
