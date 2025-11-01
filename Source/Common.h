@@ -29,6 +29,7 @@ using Microsoft::WRL::ComPtr;
 #include "Thirdparty/nvapi/nvapi.h"
 #include "ImGui/imgui_impl_helper.h"
 #include "ImGui/imgui_impl_dx12.h"
+#include "Thirdparty/implot/implot.h"
 
 #include "../Shader/Shared.h"
 

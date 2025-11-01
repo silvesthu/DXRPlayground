@@ -44,6 +44,8 @@
     <None Include="Source\Thirdparty\nvapi\nvHLSLExtns.h" />
     <None Include="Source\Thirdparty\nvapi\nvHLSLExtnsInternal.h" />
     <None Include="Source\Thirdparty\nvapi\nvShaderExtnEnums.h" />
+    <ClInclude Include="Source\Thirdparty\implot\implot.h" />
+    <ClInclude Include="Source\Thirdparty\implot\implot_internal.h" />
     <ClInclude Include="Source\Thirdparty\tiny_gltf.h" />
     <ClInclude Include="Source\Renderer.h" />
     <ClInclude Include="Source\Renderer.inl" />
@@ -113,6 +115,8 @@
     <ClCompile Include="Source\Thirdparty\imgui\imgui_tables.cpp" />
     <ClCompile Include="Source\Thirdparty\imgui\imgui_widgets.cpp" />
     <ClInclude Include="Source\Thirdparty\tinygltf\tiny_gltf.cc" />
+    <ClCompile Include="Source\Thirdparty\implot\implot.cpp" />
+    <ClCompile Include="Source\Thirdparty\implot\implot_items.cpp" />
     <ClCompile Include="Source\Thirdparty\Thirdparty.cpp" />
     <ClCompile Include="Source\Thirdparty\tinyobjloader\tiny_obj_loader.cc">
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4244</DisableSpecificWarnings>

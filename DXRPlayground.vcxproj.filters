@@ -210,6 +210,8 @@
     <ClInclude Include="Shader\BRDFExplorer.h">
       <Filter>Shader</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Thirdparty\implot\implot.h" />
+    <ClInclude Include="Source\Thirdparty\implot\implot_internal.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\DXRPlayground.cpp">
@@ -272,6 +274,8 @@
     <ClCompile Include="Source\Thirdparty\Thirdparty.cpp">
       <Filter>Source\Thirdparty</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Thirdparty\implot\implot.cpp" />
+    <ClCompile Include="Source\Thirdparty\implot\implot_items.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
