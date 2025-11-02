@@ -17,8 +17,11 @@ ConstantBuffer<Constants> mConstantsUnused : register(b0, space0);
 ConstantBuffer<Constants> mConstants : register(b0, space0);
 #endif // USE_DYNAMIC_RESOURCE_CBV
 
+#define ROOT_SIGNATURE_BASE \
+"RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0)" // RootParameterIndex::Constants
+
 #define ROOT_SIGNATURE_COMMON \
-"RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0), CBV(b1, space = 0)" \
+ROOT_SIGNATURE_BASE \
 ROOT_SIGNATURE_NVAPI
 
 cbuffer RootConstantsPrepareLights : register(b0, space1)
@@ -37,12 +40,12 @@ cbuffer RootConstantsDiff : register(b0, space1)
 #define ROOT_SIGNATURE_DIFF \
 "RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0), RootConstants(num32BitConstants=3, b0, space = 1)"
 
-cbuffer RootConstantsAtmosphere : register(b0, space2)
+cbuffer RootConstantsAtmosphere : register(b0, space1)
 {
 	uint mScatteringOrder;
 }
 #define ROOT_SIGNATURE_ATMOSPHERE \
-"RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0), RootConstants(num32BitConstants=1, b0, space = 2)"
+"RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0), RootConstants(num32BitConstants=1, b0, space = 1)"
 
 // Local Root Parameters, see also ShaderTableEntry, gCreateLocalRootSignature
 ConstantBuffer<LocalConstants> mLocalConstants : register(b0, space100);

@@ -27,7 +27,13 @@ struct InstanceInfo
 			std::wstring wstring() const { return mPath.wstring(); }
 
 			std::filesystem::path mPath;
+
 			bool mPointSampler = false;
+		};
+
+		struct NanoVDB
+		{
+			std::filesystem::path mPath;
 		};
 
 		Texture mAlbedoTexture;
@@ -35,6 +41,8 @@ struct InstanceInfo
 		Texture mReflectanceTexture;
 		Texture mRoughnessTexture;
 		Texture mEmissionTexture;
+
+		NanoVDB mNanoVDB;
 	};
 
 	std::string mName;
@@ -184,7 +192,7 @@ public:
 	int GetLightCount() const									{ return static_cast<int>(mSceneContent.mLights.size()); }
 	const Light& GetLight(int inIndex) const					{ return mSceneContent.mLights[inIndex]; }
 
-	int GetPrepareLightsTaskCount() const						{ return static_cast<int>(mBuffers.mTaskBufferCPU.size()); }
+	int GetPrepareLightsTaskCount() const						{ return static_cast<int>(mRuntime.mTaskBufferCPU.size()); }
 
 	void ImGuiShowTextures()									{ ImGui::Textures(mTextures, "Scene", ImGuiTreeNodeFlags_None); }
 
@@ -199,6 +207,7 @@ private:
 	void GenerateLSSFromTriangle();
 	void InitializeTextures();
 	void InitializeBuffers();
+	void InitializeRuntime();
 	void InitializeAccelerationStructures();
 	void InitializeViews();
 
@@ -215,7 +224,7 @@ private:
 	std::vector<BLASRef>					mBlases;
 	TLASRef									mTLAS;
 
-	struct Buffers
+	struct Runtime
 	{
 		ComPtr<ID3D12Resource>				mIndices;
 		ComPtr<ID3D12Resource>				mVertices;
@@ -234,10 +243,20 @@ private:
 		ComPtr<ID3D12Resource>				mLSSIndices;
 		ComPtr<ID3D12Resource>				mLSSRadii;
 	};
-	Buffers									mBuffers;
+	Runtime									mRuntime;
 
 	std::vector<Texture>					mTextures;
-	uint									mNextSRVIndex = 0;
+ 	std::vector<Buffer>						mBuffers;
+
+	struct BufferVisualization
+	{
+		uint								mInstanceIndex = 0;
+		uint								mBufferIndex = 0;
+		uint								mTexutureIndex = 0;
+	};
+	std::vector<BufferVisualization>		mBufferVisualizations;
+
+	uint									mNextViewDescriptorIndex = 0;
 };
 
 extern Scene gScene;

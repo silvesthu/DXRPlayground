@@ -1,7 +1,7 @@
 #include "Scene.h"
 
 #include "Common.h"
-
+#include "Renderer.h"
 #include "Atmosphere.h"
 #include "Cloud.h"
 
@@ -11,6 +11,12 @@
 #include "Thirdparty/tinyobjloader/tiny_obj_loader.h"
 #include "Thirdparty/tiny_gltf.h"
 #include "Thirdparty/tinyexr.h"
+
+#pragma warning(disable: 4244)
+#pragma warning(disable: 4324)
+#include "Thirdparty/openvdb/nanovdb/NanoVDB.h"
+#pragma warning(default: 4244)
+#pragma warning(default: 4324)
 
 Scene gScene;
 
@@ -731,6 +737,17 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 
 						gFromString(get_child_value(medium, "g").data(), instance_data.mMediumPhase);
 					}
+
+					if (const char* medium_id_raw = medium->Attribute("id"))
+					{
+						std::string_view medium_id = medium_id_raw;
+						if (medium_id.ends_with(".nvdb"))
+						{
+							std::filesystem::path path = inFilename;
+							path.replace_filename(std::filesystem::path(medium_id));
+							instance_info.mMaterial.mNanoVDB = { .mPath = path };
+						}
+					}
 				}
 			}
 
@@ -1121,6 +1138,7 @@ void Scene::Load(const ScenePreset& inPreset)
 
 	InitializeTextures();
 	InitializeBuffers();
+	InitializeRuntime();
 	InitializeAccelerationStructures();
 	InitializeViews();
 }
@@ -1131,9 +1149,10 @@ void Scene::Unload()
 	mSceneContent = {};
 	mBlases = {};
 	mTLAS = {};
-	mBuffers = {};
+	mRuntime = {};
 	mTextures = {};
-	mNextSRVIndex = 0;
+	mBuffers = {};
+	mNextViewDescriptorIndex = 0;
 }
 
 void Scene::Build()
@@ -1152,6 +1171,29 @@ void Scene::Render()
 {
 	for (auto&& texture : mTextures)
 		texture.Update();
+
+	for (auto&& buffer : mBuffers)
+		buffer.Update();
+
+	for (auto&& buffer_visualization : mBufferVisualizations)
+	{
+		gRenderer.Setup(gRenderer.mRuntime.mNanoVDBVisualizeShader);
+
+		Buffer& buffer = mBuffers[buffer_visualization.mBufferIndex];
+		Texture& texture = mTextures[buffer_visualization.mTexutureIndex];
+
+		RootConstantsNanoVDBVisualize constants =
+		{
+			.mInstanceIndex = buffer_visualization.mInstanceIndex,
+			.mBufferSRVIndex = (uint)buffer.mSRVIndex,
+			.mTexutureUAVIndex = (uint)texture.mUAVIndex,
+		};
+		gCommandList->SetComputeRoot32BitConstants((int)RootParameterIndex::ConstantsNanoVDBVisualize, 4, &constants, 0);
+
+		BarrierScope scope(gCommandList, texture.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		gCommandList->Dispatch(gAlignUpDiv(texture.mWidth, 8u), gAlignUpDiv(texture.mHeight, 8u), texture.mDepth);
+	}
+	mBufferVisualizations.clear();
 }
 
 void Scene::InitializeTextures()
@@ -1202,7 +1244,7 @@ void Scene::InitializeTextures()
 			Texture& texture = mTextures.back();
 			texture.Width(x).Height(y).
 				Format(format).
-				SRVIndex(ViewDescriptorIndex((uint)ViewDescriptorIndex::SceneAutoSRV + mNextSRVIndex++)).
+				SRVIndex(ViewDescriptorIndex((uint)ViewDescriptorIndex::SceneAutoIndex + mNextViewDescriptorIndex++)).
 				Name(inTexture.filename().string().c_str()).
 				Path(inTexture.wstring());
 			texture.mEXRData = exr_data;
@@ -1223,6 +1265,99 @@ void Scene::InitializeTextures()
 
 void Scene::InitializeBuffers()
 {
+	for (int i = 0; i < mSceneContent.mInstanceDatas.size(); i++)
+	{
+		InstanceInfo& instance_info = mSceneContent.mInstanceInfos[i];
+		InstanceData& instance_data = mSceneContent.mInstanceDatas[i];
+
+		if (!instance_info.mMaterial.mNanoVDB.mPath.empty())
+		{
+			// Read .nvdb
+			std::ifstream file(instance_info.mMaterial.mNanoVDB.mPath, std::ios::in | std::ios::binary | std::ios::ate);
+			gVerify(file.is_open());
+
+			std::streamsize file_size = file.tellg();
+			file.seekg(0, std::ios::beg);
+
+			std::vector<char> file_bytes;
+			file_bytes.resize(file_size);
+			gVerify(file.read(file_bytes.data(), file_size));
+
+			// Parse .nvdb with minimum dependency on nanovdb library, i.e. NanoVDB.h and its mandatory dependencies
+			// Formal implementation see https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/io/IO.h
+			// In short, .nvdb can have M Segments (Files), each Segment has 1 FileHeader and N (FileMetaData + gridName + GridData with size of FileMetaData::gridSize)
+			// Or can be raw grids, not supported here
+			nanovdb::io::FileHeader* header = (nanovdb::io::FileHeader*)file_bytes.data();
+			gVerify(header->isValid());
+			gVerify(header->gridCount > 0);
+
+			nanovdb::io::FileMetaData* meta_data = (nanovdb::io::FileMetaData*)(header + 1);
+			gVerify(meta_data->gridSize > 0 && meta_data->gridType == nanovdb::GridType::Float);
+
+			char* grid_name = (char*)(meta_data + 1);
+
+			// nanovdb::NanoGrid<float>, nanovdb::GridData, nanovdb::GridMetaData are all views of grid (same address)
+			nanovdb::NanoGrid<float>* grid = (nanovdb::NanoGrid<float>*)(grid_name + meta_data->nameSize);
+			gVerify(grid->isValid());
+
+			float grid_min = 0;
+			float grid_max = 0;
+			grid->tree().extrema(grid_min, grid_max);
+
+			// Upload
+			mBuffers.push_back({});
+			Buffer& buffer = mBuffers.back();
+			buffer = buffer.
+				ByteCount((uint)meta_data->gridSize).
+				Stride(sizeof(uint)).
+				SRVIndex(ViewDescriptorIndex((uint)ViewDescriptorIndex::SceneAutoIndex + mNextViewDescriptorIndex++)).
+				GPU(true).
+				UploadOnce(true).
+				Name(instance_info.mMaterial.mNanoVDB.mPath.filename().string());
+			buffer.Initialize();
+			gAssert(buffer.mUploadPointer[0] != nullptr);
+			memcpy(buffer.mUploadPointer[0], grid, meta_data->gridSize);
+			buffer.mUploadResource[0]->Unmap(0, nullptr);
+			buffer.mUploadPointer[0] = nullptr;
+
+			auto offset = meta_data->indexBBox.min();
+			auto dim = meta_data->indexBBox.dim();
+
+			instance_data.mMediumNanoVBD =
+			{
+				.mBufferIndex = (uint)buffer.mSRVIndex,
+				.mOffset = uint3(offset.x(), offset.y(), offset.z()),
+				.mMinimum = grid_min,
+				.mSize = uint3(dim.x(), dim.y(), dim.z()),
+				.mMaximum = grid_max,
+			};
+
+			if (gConfigs.mVisualizeNanoVDB)
+			{
+				mTextures.push_back({});
+				Texture& texture = mTextures.back();
+				texture.Width(dim.x()).Height(dim.y()).Depth(dim.z()).
+					Format(DXGI_FORMAT_R8_UNORM).
+					UAVIndex(ViewDescriptorIndex((uint)ViewDescriptorIndex::SceneAutoIndex + mNextViewDescriptorIndex++)).
+					SRVIndex(ViewDescriptorIndex((uint)ViewDescriptorIndex::SceneAutoIndex + mNextViewDescriptorIndex++)).
+					Name(buffer.mName);
+				texture.Initialize();
+
+				mBufferVisualizations.push_back({});
+				BufferVisualization& buffer_visualization = mBufferVisualizations.back();
+				buffer_visualization =
+				{
+					.mInstanceIndex = uint(i),
+					.mBufferIndex = uint(&buffer - mBuffers.data()),
+					.mTexutureIndex = uint(&texture - mTextures.data()),
+				};
+			}
+		}
+	}
+}
+
+void Scene::InitializeRuntime()
+{
 	D3D12_RESOURCE_DESC desc_upload = gGetBufferResourceDesc(0);
 	D3D12_RESOURCE_DESC desc_uav = gGetUAVResourceDesc(0);
 	D3D12_HEAP_PROPERTIES props_upload = gGetUploadHeapProperties();
@@ -1232,73 +1367,73 @@ void Scene::InitializeBuffers()
 
 	{
 		desc_upload.Width = sizeof(IndexType) * mSceneContent.mIndices.size();
-		gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mBuffers.mIndices)));
-		gSetName(mBuffers.mIndices, "Scene.", "mBuffers.mIndices", "");
+		gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mRuntime.mIndices)));
+		gSetName(mRuntime.mIndices, "Scene.", "mBuffers.mIndices", "");
 
 		uint8_t* pData = nullptr;
-		mBuffers.mIndices->Map(0, nullptr, reinterpret_cast<void**>(&pData));
+		mRuntime.mIndices->Map(0, nullptr, reinterpret_cast<void**>(&pData));
 		memcpy(pData, mSceneContent.mIndices.data(), desc_upload.Width);
-		mBuffers.mIndices->Unmap(0, nullptr);
+		mRuntime.mIndices->Unmap(0, nullptr);
 	}
 
 	{
 		desc_upload.Width = sizeof(VertexType) * mSceneContent.mVertices.size();
-		gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mBuffers.mVertices)));
-		gSetName(mBuffers.mVertices, "Scene.", "mBuffers.mVertices", "");
+		gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mRuntime.mVertices)));
+		gSetName(mRuntime.mVertices, "Scene.", "mBuffers.mVertices", "");
 
 		uint8_t* pData = nullptr;
-		mBuffers.mVertices->Map(0, nullptr, reinterpret_cast<void**>(&pData));
+		mRuntime.mVertices->Map(0, nullptr, reinterpret_cast<void**>(&pData));
 		memcpy(pData, mSceneContent.mVertices.data(), desc_upload.Width);
-		mBuffers.mVertices->Unmap(0, nullptr);
+		mRuntime.mVertices->Unmap(0, nullptr);
 	}
 
 	{
 		desc_upload.Width = sizeof(NormalType) * mSceneContent.mNormals.size();
-		gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mBuffers.mNormals)));
-		gSetName(mBuffers.mNormals, "Scene.", "mBuffers.mNormals", "");
+		gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mRuntime.mNormals)));
+		gSetName(mRuntime.mNormals, "Scene.", "mBuffers.mNormals", "");
 
 		uint8_t* pData = nullptr;
-		mBuffers.mNormals->Map(0, nullptr, reinterpret_cast<void**>(&pData));
+		mRuntime.mNormals->Map(0, nullptr, reinterpret_cast<void**>(&pData));
 		memcpy(pData, mSceneContent.mNormals.data(), desc_upload.Width);
-		mBuffers.mNormals->Unmap(0, nullptr);
+		mRuntime.mNormals->Unmap(0, nullptr);
 	}
 
 	{
 		desc_upload.Width = sizeof(UVType) * mSceneContent.mUVs.size();
-		gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mBuffers.mUVs)));
-		gSetName(mBuffers.mUVs, "Scene.", "mBuffers.mUVs", "");
+		gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mRuntime.mUVs)));
+		gSetName(mRuntime.mUVs, "Scene.", "mBuffers.mUVs", "");
 
 		uint8_t* pData = nullptr;
-		mBuffers.mUVs->Map(0, nullptr, reinterpret_cast<void**>(&pData));
+		mRuntime.mUVs->Map(0, nullptr, reinterpret_cast<void**>(&pData));
 		memcpy(pData, mSceneContent.mUVs.data(), desc_upload.Width);
-		mBuffers.mUVs->Unmap(0, nullptr);
+		mRuntime.mUVs->Unmap(0, nullptr);
 	}
 
 	{
 		desc_upload.Width = sizeof(InstanceData)  * gMax(1ull, mSceneContent.mInstanceDatas.size());
-		gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mBuffers.mInstanceDatas)));
-		gSetName(mBuffers.mInstanceDatas, "Scene.", "mBuffers.mInstanceDatas", "");
+		gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mRuntime.mInstanceDatas)));
+		gSetName(mRuntime.mInstanceDatas, "Scene.", "mBuffers.mInstanceDatas", "");
 
 		if (!mSceneContent.mInstanceDatas.empty())
 		{
 			uint8_t* pData = nullptr;
-			mBuffers.mInstanceDatas->Map(0, nullptr, reinterpret_cast<void**>(&pData));
+			mRuntime.mInstanceDatas->Map(0, nullptr, reinterpret_cast<void**>(&pData));
 			memcpy(pData, mSceneContent.mInstanceDatas.data(), desc_upload.Width);
-			mBuffers.mInstanceDatas->Unmap(0, nullptr);
+			mRuntime.mInstanceDatas->Unmap(0, nullptr);
 		}
 	}
 
 	{
 		desc_upload.Width = sizeof(Light) * gMax(1ull, mSceneContent.mLights.size());
-		gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mBuffers.mLights)));
-		gSetName(mBuffers.mLights, "Scene.", "mBuffers.mLights", "");
+		gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mRuntime.mLights)));
+		gSetName(mRuntime.mLights, "Scene.", "mBuffers.mLights", "");
 
 		if (!mSceneContent.mLights.empty())
 		{
 			uint8_t* pData = nullptr;
-			mBuffers.mLights->Map(0, nullptr, reinterpret_cast<void**>(&pData));
+			mRuntime.mLights->Map(0, nullptr, reinterpret_cast<void**>(&pData));
 			memcpy(pData, mSceneContent.mLights.data(), desc_upload.Width);
-			mBuffers.mLights->Unmap(0, nullptr);
+			mRuntime.mLights->Unmap(0, nullptr);
 		}
 	}
 
@@ -1306,8 +1441,8 @@ void Scene::InitializeBuffers()
 	{
 		{
 			desc_upload.Width = sizeof(PrepareLightsTask) * gMax(1ull, mSceneContent.mEmissiveInstances.size());
-			gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mBuffers.mTaskBuffer)));
-			gSetName(mBuffers.mTaskBuffer, "Scene.", "mBuffers.mTaskBuffer", "");
+			gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mRuntime.mTaskBuffer)));
+			gSetName(mRuntime.mTaskBuffer, "Scene.", "mBuffers.mTaskBuffer", "");
 
 			if (!mSceneContent.mEmissiveInstances.empty())
 			{
@@ -1324,22 +1459,22 @@ void Scene::InitializeBuffers()
 					task.mTriangleCount = instance_data.mIndexCount / kVertexCountPerTriangle;
 					task.mLightBufferOffset = light_buffer_offset;
 
-					mBuffers.mTaskBufferCPU.push_back(task);
+					mRuntime.mTaskBufferCPU.push_back(task);
 
 					light_buffer_offset += task.mTriangleCount;
 				}
 
 				uint8_t* pData = nullptr;
-				mBuffers.mTaskBuffer->Map(0, nullptr, reinterpret_cast<void**>(&pData));
-				memcpy(pData, mBuffers.mTaskBufferCPU.data(), desc_upload.Width);
-				mBuffers.mTaskBuffer->Unmap(0, nullptr);
+				mRuntime.mTaskBuffer->Map(0, nullptr, reinterpret_cast<void**>(&pData));
+				memcpy(pData, mRuntime.mTaskBufferCPU.data(), desc_upload.Width);
+				mRuntime.mTaskBuffer->Unmap(0, nullptr);
 			}
 		}
 
 		{
 			desc_uav.Width = sizeof(RAB_LightInfo) * gMax(1u, mSceneContent.mEmissiveTriangleCount);
-			gValidate(gDevice->CreateCommittedResource(&props_default, D3D12_HEAP_FLAG_NONE, &desc_uav, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mBuffers.mLightDataBuffer)));
-			gSetName(mBuffers.mLightDataBuffer, "Scene.", "mBuffers.mLightDataBuffer", "");
+			gValidate(gDevice->CreateCommittedResource(&props_default, D3D12_HEAP_FLAG_NONE, &desc_uav, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mRuntime.mLightDataBuffer)));
+			gSetName(mRuntime.mLightDataBuffer, "Scene.", "mBuffers.mLightDataBuffer", "");
 		}
 	}
 }
@@ -1396,13 +1531,13 @@ void Scene::GenerateLSSFromTriangle()
 			}
 
 			desc_upload.Width = sizeof(IndexType) * LSSIndices.size();
-			gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mBuffers.mLSSIndices)));
-			gSetName(mBuffers.mLSSIndices, "Scene.", "mBuffers.mLSSIndices", "");
+			gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mRuntime.mLSSIndices)));
+			gSetName(mRuntime.mLSSIndices, "Scene.", "mBuffers.mLSSIndices", "");
 
 			uint8_t* pData = nullptr;
-			mBuffers.mLSSIndices->Map(0, nullptr, reinterpret_cast<void**>(&pData));
+			mRuntime.mLSSIndices->Map(0, nullptr, reinterpret_cast<void**>(&pData));
 			memcpy(pData, LSSIndices.data(), desc_upload.Width);
-			mBuffers.mLSSIndices->Unmap(0, nullptr);
+			mRuntime.mLSSIndices->Unmap(0, nullptr);
 		}
 
 		{
@@ -1419,13 +1554,13 @@ void Scene::GenerateLSSFromTriangle()
 			}
 
 			desc_upload.Width = sizeof(RadiusType) * LSSRadii.size();
-			gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mBuffers.mLSSRadii)));
-			gSetName(mBuffers.mLSSRadii, "Scene.", "mBuffers.mLSSRadii", "");
+			gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mRuntime.mLSSRadii)));
+			gSetName(mRuntime.mLSSRadii, "Scene.", "mBuffers.mLSSRadii", "");
 
 			uint8_t* pData = nullptr;
-			mBuffers.mLSSRadii->Map(0, nullptr, reinterpret_cast<void**>(&pData));
+			mRuntime.mLSSRadii->Map(0, nullptr, reinterpret_cast<void**>(&pData));
 			memcpy(pData, LSSRadii.data(), desc_upload.Width);
-			mBuffers.mLSSRadii->Unmap(0, nullptr);
+			mRuntime.mLSSRadii->Unmap(0, nullptr);
 		}
 	}
 }
@@ -1444,10 +1579,10 @@ void Scene::InitializeAccelerationStructures()
 		{
 			.mInstanceInfo = instance_info,
 			.mInstanceData = instance_data,
-			.mVerticesBaseAddress = mBuffers.mVertices->GetGPUVirtualAddress(),
-			.mIndicesBaseAddress = mBuffers.mIndices->GetGPUVirtualAddress(),
-			.mLSSIndicesBaseAddress = mBuffers.mLSSIndices != nullptr ? mBuffers.mLSSIndices->GetGPUVirtualAddress() : 0,
-			.mLSSRadiiBaseAddress = mBuffers.mLSSRadii != nullptr ? mBuffers.mLSSRadii->GetGPUVirtualAddress() : 0,
+			.mVerticesBaseAddress = mRuntime.mVertices->GetGPUVirtualAddress(),
+			.mIndicesBaseAddress = mRuntime.mIndices->GetGPUVirtualAddress(),
+			.mLSSIndicesBaseAddress = mRuntime.mLSSIndices != nullptr ? mRuntime.mLSSIndices->GetGPUVirtualAddress() : 0,
+			.mLSSRadiiBaseAddress = mRuntime.mLSSRadii != nullptr ? mRuntime.mLSSRadii->GetGPUVirtualAddress() : 0,
 		});
 		mBlases.push_back(blas);
 
@@ -1506,15 +1641,15 @@ void Scene::InitializeViews()
 			gDevice->CreateUnorderedAccessView(inResource, nullptr, &desc, gFrameContexts[i].mViewDescriptorHeap.GetCPUHandle(inViewDescriptorIndex));
 	};
 	
-	create_buffer_SRV(mBuffers.mInstanceDatas.Get(), sizeof(InstanceData), ViewDescriptorIndex::RaytraceInstanceDataSRV);
-	create_buffer_SRV(mBuffers.mIndices.Get(), sizeof(IndexType), ViewDescriptorIndex::RaytraceIndicesSRV);
-	create_buffer_SRV(mBuffers.mVertices.Get(), sizeof(VertexType), ViewDescriptorIndex::RaytraceVerticesSRV);
-	create_buffer_SRV(mBuffers.mNormals.Get(), sizeof(NormalType), ViewDescriptorIndex::RaytraceNormalsSRV);
-	create_buffer_SRV(mBuffers.mUVs.Get(), sizeof(UVType), ViewDescriptorIndex::RaytraceUVsSRV);
-	create_buffer_SRV(mBuffers.mLights.Get(), sizeof(Light), ViewDescriptorIndex::RaytraceLightsSRV);
+	create_buffer_SRV(mRuntime.mInstanceDatas.Get(), sizeof(InstanceData), ViewDescriptorIndex::RaytraceInstanceDataSRV);
+	create_buffer_SRV(mRuntime.mIndices.Get(), sizeof(IndexType), ViewDescriptorIndex::RaytraceIndicesSRV);
+	create_buffer_SRV(mRuntime.mVertices.Get(), sizeof(VertexType), ViewDescriptorIndex::RaytraceVerticesSRV);
+	create_buffer_SRV(mRuntime.mNormals.Get(), sizeof(NormalType), ViewDescriptorIndex::RaytraceNormalsSRV);
+	create_buffer_SRV(mRuntime.mUVs.Get(), sizeof(UVType), ViewDescriptorIndex::RaytraceUVsSRV);
+	create_buffer_SRV(mRuntime.mLights.Get(), sizeof(Light), ViewDescriptorIndex::RaytraceLightsSRV);
 
 	// RTXDI - minimal-sample
-	create_buffer_SRV(mBuffers.mTaskBuffer.Get(), sizeof(PrepareLightsTask), ViewDescriptorIndex::TaskBufferSRV);
-	create_buffer_SRV(mBuffers.mLightDataBuffer.Get(), sizeof(RAB_LightInfo), ViewDescriptorIndex::LightDataBufferSRV);
-	create_buffer_UAV(mBuffers.mLightDataBuffer.Get(), sizeof(RAB_LightInfo), ViewDescriptorIndex::LightDataBufferUAV);
+	create_buffer_SRV(mRuntime.mTaskBuffer.Get(), sizeof(PrepareLightsTask), ViewDescriptorIndex::TaskBufferSRV);
+	create_buffer_SRV(mRuntime.mLightDataBuffer.Get(), sizeof(RAB_LightInfo), ViewDescriptorIndex::LightDataBufferSRV);
+	create_buffer_UAV(mRuntime.mLightDataBuffer.Get(), sizeof(RAB_LightInfo), ViewDescriptorIndex::LightDataBufferUAV);
 }

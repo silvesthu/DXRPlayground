@@ -16,12 +16,6 @@
 #include "Thirdparty/filewatch/FileWatch.hpp"
 #pragma warning(pop)
 
-#pragma warning(disable: 4244)
-#pragma warning(disable: 4324)
-#include "Thirdparty/openvdb/nanovdb/NanoVDB.h"
-#pragma warning(default: 4244)
-#pragma warning(default: 4324)
-
 #include "wincodec.h" // GUID_ContainerFormatPng
 
 extern "C" { __declspec(dllexport) extern const UINT			D3D12SDKVersion = 614; }
@@ -45,6 +39,7 @@ static const std::array kScenePresets =
 	ScenePreset().Name("CornellBoxTeapot").Path("Asset/Comparison/benedikt-bitterli/cornell-box-teapot/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("CornellMonkey").Path("Asset/Comparison/benedikt-bitterli/cornell-box-monkey/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("CornellDragon").Path("Asset/Comparison/benedikt-bitterli/cornell-box-dragon/scene_v3.xml").EmissionBoost(1E4f).CameraAnimationPath("Asset/Comparison/benedikt-bitterli/cornell-box-dragon/camera_animation.gltf"),
+	ScenePreset().Name("CornellVDB").Path("Asset/Comparison/benedikt-bitterli/cornell-box-vdb/scene_v3.xml").EmissionBoost(1E4f),
 
 	// MIS
 	ScenePreset().Name("VeachMIS").Path("Asset/Comparison/benedikt-bitterli/veach-mis/scene_ggx_v3.xml").EmissionBoost(1E4f),
@@ -80,7 +75,7 @@ int sFindScenePresetIndex(const std::string_view inName)
 {
 	return static_cast<int>(&sFindScenePreset(inName) - &kScenePresets.front());
 }
-static int sCurrentSceneIndex = sFindScenePresetIndex("CornellDragon");
+static int sCurrentSceneIndex = sFindScenePresetIndex("CornellVDB");
 static int sPreviousSceneIndex = sCurrentSceneIndex;
 
 struct CameraSettings
@@ -485,8 +480,11 @@ static void sPrepareImGui()
 
 		if (ImGui::TreeNodeEx("Misc"))
 		{
-			ImGui::Checkbox("Test Lib Shader (ShaderTable)", &gRenderer.mTestHitShader);
-			ImGui::Checkbox("Test NVDB Shader", &gRenderer.mTestNVDB);
+			if (ImGui::Checkbox("Test Lib Shader (ShaderTable)", &gConfigs.mTestHitShader))
+				gRenderer.mAccumulationResetRequested = true;
+
+			if (ImGui::Checkbox("Visualize NanoVDB in Scene Textures", &gConfigs.mVisualizeNanoVDB))
+				sLoadScene(false);
 
 			ImGui::TreePop();
 		}
@@ -750,7 +748,6 @@ static void sPrepareImGui()
 					ImGui::InputFloat("Cloud", &gStats.mTimeMS.mCloud, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
 					ImGui::InputFloat("TextureGenerator", &gStats.mTimeMS.mTextureGenerator, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
 					ImGui::InputFloat("BRDFSlice", &gStats.mTimeMS.mBRDFSlice, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
-					ImGui::InputFloat("NVDB", &gStats.mTimeMS.mNVDB, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
 					ImGui::InputFloat("Clear", &gStats.mTimeMS.mClear, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
 					ImGui::InputFloat("Depths", &gStats.mTimeMS.mDepths, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
 					ImGui::InputFloat("PrepareLights", &gStats.mTimeMS.mPrepareLights, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
@@ -1340,61 +1337,6 @@ void sRender()
 		gBarrierUAV(gCommandList, nullptr);
 	}
 
-	// NVDB
-	if (!gHeadless)
-	{
-		if (gRenderer.mTestNVDB && gRenderer.mRuntime.mNVDBSmoke1Buffer.mByteCount == 0)
-		{
-			// Read .nvdb
-			std::ifstream file("Asset/openvdb/smoke1/smoke1.nvdb", std::ios::in | std::ios::binary | std::ios::ate);
-			gVerify(file.is_open());
-
-			std::streamsize file_size = file.tellg();
-			file.seekg(0, std::ios::beg);
-
-			std::vector<char> buffer;
-			buffer.resize(file_size);
-			gVerify(file.read(buffer.data(), file_size));
-			
-			// Parse .nvdb with minimum dependency on nanovdb library, i.e. NanoVDB.h and its mandatory dependencies
-			// Formal implementation see https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/io/IO.h
-			// In short, .nvdb can have M Segments (Files), each Segment has 1 FileHeader and N (FileMetaData + gridName + GridData with size of FileMetaData::gridSize)
-			// Or can be raw grids, not supported here
-			nanovdb::io::FileHeader* header = (nanovdb::io::FileHeader*)buffer.data();
-			gVerify(header->isValid());
-			gVerify(header->gridCount > 0);
-
-			nanovdb::io::FileMetaData* meta_data = (nanovdb::io::FileMetaData*)(header + 1);
-			gVerify(meta_data->gridSize > 0 && meta_data->gridType == nanovdb::GridType::Float);
-
-			char* grid_name = (char*)(meta_data + 1);
-
-			nanovdb::GridData* grid_data = (nanovdb::GridData*)(grid_name + meta_data->nameSize);
-			gVerify(grid_data->isValid());
-
-			// Upload
-			gRenderer.mRuntime.mNVDBSmoke1Buffer = gRenderer.mRuntime.mNVDBSmoke1Buffer.ByteCount((uint)meta_data->gridSize).Stride(sizeof(uint)).GPU(true).UploadOnce(true);
-			gRenderer.mRuntime.mNVDBSmoke1Buffer.Initialize();
-			memcpy(gRenderer.mRuntime.mNVDBSmoke1Buffer.mUploadPointer[0], grid_data, meta_data->gridSize);
-			gRenderer.mRuntime.mNVDBSmoke1Buffer.mUploadResource[0]->Unmap(0, nullptr);
-			gRenderer.mRuntime.mNVDBSmoke1Buffer.mUploadPointer[0] = nullptr;
-			BarrierScope scope(gCommandList, gRenderer.mRuntime.mNVDBSmoke1Buffer.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
-			gCommandList->CopyResource(gRenderer.mRuntime.mNVDBSmoke1Buffer.mResource.Get(), gRenderer.mRuntime.mNVDBSmoke1Buffer.mUploadResource[0].Get());
-		}
-
-		if (gRenderer.mRuntime.mNVDBSmoke1Buffer.mByteCount != 0)
-		{
-			TIMING_SCOPE("NVDB", gStats.mTimeMS.mNVDB);
-
-			gRenderer.Setup(gRenderer.mRuntime.mNVDBCopyShader);
-
-			BarrierScope scope(gCommandList, gRenderer.mRuntime.mNVDBSmoke13DTexture.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-			gCommandList->Dispatch(gAlignUpDiv(gRenderer.mRuntime.mNVDBSmoke13DTexture.mWidth, 8u), gAlignUpDiv(gRenderer.mRuntime.mNVDBSmoke13DTexture.mHeight, 8u), gRenderer.mRuntime.mNVDBSmoke13DTexture.mDepth);
-
-			gBarrierUAV(gCommandList, nullptr);
-		}
-	}
-
 	// Clear
 	{
 		TIMING_SCOPE("Clear", gStats.mTimeMS.mClear);
@@ -1466,7 +1408,7 @@ void sRender()
 	}
 
 	// Test Hit Shader
-	if (gRenderer.mTestHitShader)
+	if (gConfigs.mTestHitShader)
 	{
 		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Test Hit Shader");
 

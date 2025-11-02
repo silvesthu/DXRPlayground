@@ -1,4 +1,5 @@
 #include "Common.h"
+#include "Renderer.h"
 #include "ImGui/imgui_impl_dx12.h"
 #include "Thirdparty/tinygltf/stb_image.h"
 
@@ -20,6 +21,7 @@ ID3D12GraphicsCommandList4*			gCommandList = nullptr;
 
 ID3D12QueryHeap*					gQueryHeap = nullptr;
 Stats								gStats;
+Configs								gConfigs;
 
 ID3D12Fence*						gIncrementalFence = nullptr;
 HANDLE                       		gIncrementalFenceEvent = nullptr;
@@ -122,6 +124,24 @@ void Buffer::Initialize()
 			mReadbackResource[i]->Map(0, nullptr, reinterpret_cast<void**>(&mReadbackPointer[i]));
 		}
 	}
+}
+
+void Buffer::Update()
+{
+	if (mLoaded)
+		return;
+
+	if (mUploadOnce)
+	{
+		gAssert(mUploadResource[0]);
+
+		{
+			BarrierScope scope(gCommandList, mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
+			gCommandList->CopyResource(mResource.Get(), mUploadResource[0].Get());
+		}
+	}
+
+	mLoaded = true;
 }
 
 int Texture::GetPixelSize() const
@@ -260,8 +280,6 @@ void Texture::Update()
 			InitializeUpload();
 			BarrierScope expected_scope(gCommandList, mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
 			UpdateSubresources(gCommandList, mResource.Get(), mUploadResource.Get(), 0, 0, mSubresourceCount, subresources.data());
-
-			mLoaded = true;
 		}
 		else if (extension == ".hdr")
 		{
@@ -320,9 +338,9 @@ void Texture::Update()
 		UpdateSubresources(gCommandList, mResource.Get(), mUploadResource.Get(), 0, 0, mSubresourceCount, &subresource);
 
 		mUploadData.clear();
-
-		mLoaded = true;
 	}
+
+	mLoaded = true;
 }
 
 void Texture::InitializeUpload()

@@ -311,7 +311,7 @@ void Atmosphere::ImGuiShowMenus()
 			}
 		}
 
-		if (ImGui::Checkbox("Dynamic Mode Switch", &gAtmosphere.mProfile.mDynamicModeSwitch))
+		if (ImGui::Checkbox("Dynamic Mode Switch (Uber Shader)", &gAtmosphere.mProfile.mDynamicModeSwitch))
 			gRenderer.mReloadShader = true;
 
 		{

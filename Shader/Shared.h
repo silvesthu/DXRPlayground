@@ -29,12 +29,14 @@ using float4x4 = glm::mat4x4;
 #define CONSTANT_DEFAULT(x) = x
 #define RETURN_AS_REFERENCE &
 #define GET_COLUMN(x, i) x[i]
+#define STATITC_ASSERT(x) static_assert(x)
 
 #else
 
 #define CONSTANT_DEFAULT(x)
 #define RETURN_AS_REFERENCE
 #define GET_COLUMN(x, i) transpose(x)[i]
+#define STATITC_ASSERT(x)
 
 #endif // __cplusplus
 
@@ -121,12 +123,6 @@ enum class ViewDescriptorIndex : uint
 	ShapeNoise3DSRV,
 	ErosionNoise3DSRV,
 
-	// [NVDB]
-	NVDBSmoke1SRV,
-	NVDBSmoke1UAV,
-	NVDBSmoke13DSRV,
-	NVDBSmoke13DUAV,
-
 	// [Misc]
 	IESSRV,
 
@@ -204,7 +200,7 @@ enum class ViewDescriptorIndex : uint
 
 	Count,
 
-	SceneAutoSRV = Count,		// Indices started from this are allocated incrementally by Scene
+	SceneAutoIndex = Count,		// Indices started from this are allocated incrementally by Scene
 };
 
 #define LOCAL_ROOT_SIGNATURE_REGISTER_SPACE 100
@@ -232,11 +228,12 @@ enum class SamplerDescriptorIndex : uint
 
 enum class RootParameterIndex : uint
 {
-	Constants = 0,				// ROOT_SIGNATURE_COMMON
+	Constants = 0,								// ROOT_SIGNATURE_BASE
 
-	ConstantsPrepareLights = 1,	// ROOT_SIGNATURE_PREPARE_LIGHTS
-	ConstantsDiff = 1,			// ROOT_SIGNATURE_DIFF
-	ConstantsAtmosphere = 1,	// ROOT_SIGNATURE_ATMOSPHERE
+	ConstantsNanoVDBVisualize = 1,				// ROOT_SIGNATURE_NANOVDB_VISUALIZE
+	ConstantsPrepareLights = 1,					// ROOT_SIGNATURE_PREPARE_LIGHTS
+	ConstantsDiff = 1,							// ROOT_SIGNATURE_DIFF
+	ConstantsAtmosphere = 1,					// ROOT_SIGNATURE_ATMOSPHERE
 };
 
 enum class VisualizeMode : uint
@@ -483,6 +480,20 @@ struct TextureInfo
 	uint						mSamplerIndex : 4				CONSTANT_DEFAULT((uint)SamplerDescriptorIndex::BilinearWrap);
 	uint						mUnused	: 12					CONSTANT_DEFAULT(0);
 };
+STATITC_ASSERT(sizeof(TextureInfo) == sizeof(float) * 1);
+
+struct NanoVDBInfo
+{
+	uint						mBufferIndex					CONSTANT_DEFAULT((uint)ViewDescriptorIndex::Invalid);
+	uint3						mPad							CONSTANT_DEFAULT(uint3(0, 0, 0));
+	
+	uint3						mOffset							CONSTANT_DEFAULT(uint3(0, 0, 0));
+	float						mMinimum						CONSTANT_DEFAULT(0);
+
+	uint3						mSize							CONSTANT_DEFAULT(uint3(0, 0, 0));
+	float						mMaximum						CONSTANT_DEFAULT(0);
+};
+STATITC_ASSERT(sizeof(NanoVDBInfo) == sizeof(float) * 12);
 
 enum : uint
 {
@@ -524,10 +535,9 @@ struct InstanceData
 	uint						mMedium							CONSTANT_DEFAULT(0);
 
 	float3						mMediumSigmaT					CONSTANT_DEFAULT(float3(1.0f, 1.0f, 1.0f));
-	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
-
 	float						mMediumPhase					CONSTANT_DEFAULT(0.5f);
-	float3						GENERATE_PAD_NAME				CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
+
+	NanoVDBInfo					mMediumNanoVBD;
 
 	float4x4					mTransform						CONSTANT_DEFAULT(float4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1));
 	float4x4					mInverseTranspose				CONSTANT_DEFAULT(float4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1));
@@ -542,6 +552,7 @@ struct InstanceData
 	uint						mLSSRadiusOffset				CONSTANT_DEFAULT(0);
 	uint						mLSSRadiusCount					CONSTANT_DEFAULT(0);
 };
+STATITC_ASSERT(sizeof(InstanceData) % sizeof(glm::vec4) == 0);
 
 struct Light
 {
@@ -564,6 +575,7 @@ struct Light
 	float3						mEmission						CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 };
+STATITC_ASSERT(sizeof(Light) % sizeof(glm::vec4) == 0);
 
 // RTXDI - minimal-sample
 struct PrepareLightsTask
@@ -838,6 +850,14 @@ struct LocalConstants
 {
 	uint						mShaderIndex					CONSTANT_DEFAULT(0);
 	uint3						mPad							CONSTANT_DEFAULT(uint3(0, 0, 0));
+};
+
+struct RootConstantsNanoVDBVisualize
+{
+	uint						mInstanceIndex					CONSTANT_DEFAULT(0);
+	uint						mBufferSRVIndex					CONSTANT_DEFAULT(0);
+	uint						mTexutureUAVIndex				CONSTANT_DEFAULT(0);
+	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 };
 
 #undef GET_COLUMN

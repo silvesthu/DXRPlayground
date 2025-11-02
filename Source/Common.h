@@ -333,7 +333,6 @@ struct Stats
 		float								mCloud = 0;
 		float								mTextureGenerator = 0;
 		float								mBRDFSlice = 0;
-		float								mNVDB = 0;
 		float								mClear = 0;
 		float								mDepths = 0;
 		float								mPrepareLights = 0;
@@ -343,6 +342,13 @@ struct Stats
 	TimeMS									mTimeMS;
 };
 extern Stats								gStats;
+
+struct Configs
+{
+	bool									mTestHitShader = false;
+	bool									mVisualizeNanoVDB = false;
+};
+extern Configs								gConfigs;
 
 extern ID3D12Fence* 						gIncrementalFence;			// Fence value increment each frame (most time)
 extern HANDLE                       		gIncrementalFenceEvent;		// Allow CPU to wait on fence
@@ -477,6 +483,8 @@ struct Shader
 	Data mData;
 };
 
+struct Texture;
+
 struct Buffer
 {
 #define BUFFER_MEMBER(type, name, default_value) MEMBER(Buffer, type, name, default_value)
@@ -493,6 +501,7 @@ struct Buffer
 	BUFFER_MEMBER(bool,						Readback,		false);
 	
 	void Initialize();
+	void Update();
 	template <typename T>
 	T* ReadbackAs(uint inFrameContextIndex) { return static_cast<T*>(mReadbackPointer[inFrameContextIndex]); }
 
@@ -501,6 +510,8 @@ struct Buffer
 	void*									mUploadPointer[kFrameInFlightCount] = { nullptr };
 	ComPtr<ID3D12Resource>					mReadbackResource[kFrameInFlightCount];
 	void*									mReadbackPointer[kFrameInFlightCount] = { nullptr };
+
+	bool									mLoaded = false;
 };
 
 struct Texture

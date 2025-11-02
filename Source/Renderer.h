@@ -16,7 +16,7 @@ struct Renderer
 		Shader									mGenerateTextureShader		= Shader().FileName("Shader/Composite.hlsl").CSName("GeneratTextureCS");
 		Shader									mBRDFSliceShader			= Shader().FileName("Shader/Composite.hlsl").CSName("BRDFSliceCS");
 		Shader									mReadbackShader				= Shader().FileName("Shader/Composite.hlsl").CSName("ReadbackCS");
-		Shader									mNVDBCopyShader				= Shader().FileName("Shader/Composite.hlsl").CSName("NVDBCopyCS");
+		Shader									mNanoVDBVisualizeShader		= Shader().FileName("Shader/Composite.hlsl").CSName("NanoVDBVisualizeCS");
 		Shader									mDiffTexture2DShader		= Shader().FileName("Shader/DiffTexture.hlsl").CSName("DiffTexture2DShader");
 		Shader									mDiffTexture3DShader		= Shader().FileName("Shader/DiffTexture.hlsl").CSName("DiffTexture3DShader");
 		Shader									mLineShader					= Shader().FileName("Shader/Composite.hlsl").VSName("LineVS").PSName("LinePS").Topology(D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE).DepthFunc(D3D12_COMPARISON_FUNC_LESS).RTVFormat(kBackBufferFormat).DSVFormat(DXGI_FORMAT_D32_FLOAT);
@@ -52,7 +52,6 @@ struct Renderer
 		Texture									mErosionNoise3DTexture		= Texture().Width(32).Height(32).Depth(32).Format(DXGI_FORMAT_R8_UNORM).SRVIndex(ViewDescriptorIndex::ErosionNoise3DSRV).Name("Renderer.ErosionNoise3D").Path(L"Asset/TileableVolumeNoise/noiseErosionPacked.dds");
 		// Texture									mUVCheckerTexture			= Texture().Width(1024).Height(1024).Format(DXGI_FORMAT_R8G8B8A8_UNORM_SRGB).SRVIndex(ViewDescriptorIndex::UVCheckerSRV).Name("Renderer.UVCheckerMap").Path(L"Asset/UVChecker-map/UVCheckerMaps/UVCheckerMap01-1024.png");
 		// Texture									mIESTexture					= Texture().Width(256).Height(16).Format(DXGI_FORMAT_R32_FLOAT).SRVIndex(ViewDescriptorIndex::IESSRV).Name("Renderer.IES").Path(L"Asset/IES/007cfb11e343e2f42e3b476be4ab684e/IES.hdr");
-		Texture									mNVDBSmoke13DTexture		= Texture().Width(111).Height(222).Depth(112).Format(DXGI_FORMAT_R8_UNORM).UAVIndex(ViewDescriptorIndex::NVDBSmoke13DUAV).SRVIndex(ViewDescriptorIndex::NVDBSmoke13DSRV).Name("Renderer.NVDBSmoke1");
 		Texture									mGenerateTexture			= Texture().Width(2 * 20).Height(2 * 80).Format(DXGI_FORMAT_R8G8B8A8_UNORM).UAVIndex(ViewDescriptorIndex::GeneratedUAV).SRVIndex(ViewDescriptorIndex::GeneratedSRV).Name("Renderer.Generated");
 
 		Texture									mSentinelTexture;
@@ -66,7 +65,6 @@ struct Renderer
 		Buffer									mPixelInspectionBuffer		= Buffer().ByteCount(sizeof(PixelInspection)).UAVIndex(ViewDescriptorIndex::PixelInspectionUAV).Name("PixelInspection").Readback(true);
 		Buffer									mRayInspectionBuffer		= Buffer().ByteCount(sizeof(RayInspection)).UAVIndex(ViewDescriptorIndex::RayInspectionUAV).Name("RayInspection");
 		Buffer									mQueryBuffer				= Buffer().ByteCount(sizeof(UINT64) * kTimestampCount).Name("Query").GPU(false).Readback(true);
-		Buffer									mNVDBSmoke1Buffer			= Buffer().ByteCount(0).UAVIndex(ViewDescriptorIndex::NVDBSmoke1UAV).SRVIndex(ViewDescriptorIndex::NVDBSmoke1SRV).Name("NVDBSmoke1").GPU(false);
 
 		Buffer									mSentinelBuffer;
 		std::span<Buffer>						mBuffers					= std::span<Buffer>(&mConstantsBuffer, &mSentinelBuffer);
@@ -137,8 +135,6 @@ struct Renderer
 
 	bool										mReloadShader = false;
 	bool										mDumpRayQuery = false;
-	bool										mTestHitShader = false;
-	bool										mTestNVDB = false;
 
 	bool										mAccumulationFrameUnlimited = false;
 	bool										mAccumulationPaused = false;

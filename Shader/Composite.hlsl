@@ -206,41 +206,6 @@ void ReadbackCS(
 	Output[inDispatchThreadID.xy] = Input[inDispatchThreadID.xy];
 }
 
-[RootSignature(ROOT_SIGNATURE_COMMON)]
-[numthreads(8, 8, 1)]
-void NVDBCopyCS(
-	uint3 inGroupThreadID : SV_GroupThreadID,
-	uint3 inGroupID : SV_GroupID,
-	uint3 inDispatchThreadID : SV_DispatchThreadID,
-	uint inGroupIndex : SV_GroupIndex)
-{
-	RWTexture3D<float> output					= ResourceDescriptorHeap[(int)ViewDescriptorIndex::NVDBSmoke13DUAV];
-	uint3 output_size							= 0;
-	output.GetDimensions(output_size.x, output_size.y, output_size.z);
-	if (any(inDispatchThreadID >= output_size))
-		return;
-
-	StructuredBuffer<uint> buf					= ResourceDescriptorHeap[(int)ViewDescriptorIndex::NVDBSmoke1SRV];
-	pnanovdb_coord_t ijk						= inDispatchThreadID.xyz;
-
-	// PrepareVdbVolume, https://github.com/eidosmontreal/unreal-vdb/blob/main/Shaders/Private/VdbToVolume.usf
-	pnanovdb_address_t Address;					Address.byte_offset = 0;
-	pnanovdb_grid_handle_t Grid;				Grid.address = Address;
-	pnanovdb_tree_handle_t Tree					= pnanovdb_grid_get_tree(buf, Grid);
-	pnanovdb_root_handle_t Root					= pnanovdb_tree_get_root(buf, Tree);
-	pnanovdb_uint32_t grid_type					= pnanovdb_grid_get_grid_type(buf, Grid);
-
-	pnanovdb_readaccessor_t acc;
-	pnanovdb_readaccessor_init(acc, Root);
-
-	// ReadValue, https://github.com/eidosmontreal/unreal-vdb/blob/main/Shaders/Private/VdbCommon.ush, adjusted
-	pnanovdb_uint32_t level;
-	pnanovdb_address_t address					= pnanovdb_readaccessor_get_value_address(grid_type, buf, acc, ijk);
-	float value									= pnanovdb_read_float(buf, address);
-
-	output[inDispatchThreadID.xyz]				= value;
-}
-
 float4 LineVS(uint inVertexID : SV_VertexID, out float4 outColor : COLOR) : SV_POSITION
 {
 	float4 position_ws = 0;
@@ -311,4 +276,43 @@ float4 LineHiddenPS(float4 position : SV_POSITION, in float4 inColor : COLOR) : 
 	}
 
 	return float4(inColor.xyz, 1.0);
+}
+
+ConstantBuffer<RootConstantsNanoVDBVisualize> mRootConstantsNanoVDBVisualize : register(b0, space1);
+#define ROOT_SIGNATURE_NANOVDB_VISUALIZE \
+ROOT_SIGNATURE_BASE ", RootConstants(num32BitConstants=4, b0, space = 1)"
+
+[RootSignature(ROOT_SIGNATURE_NANOVDB_VISUALIZE)]
+[numthreads(8, 8, 1)]
+void NanoVDBVisualizeCS(
+	uint3 inGroupThreadID : SV_GroupThreadID,
+	uint3 inGroupID : SV_GroupID,
+	uint3 inDispatchThreadID : SV_DispatchThreadID,
+	uint inGroupIndex : SV_GroupIndex)
+{
+	InstanceData instance_data					= InstanceDatas[mRootConstantsNanoVDBVisualize.mInstanceIndex];
+
+	RWTexture3D<float> output					= ResourceDescriptorHeap[mRootConstantsNanoVDBVisualize.mTexutureUAVIndex];
+	if (any(inDispatchThreadID >= instance_data.mMediumNanoVBD.mSize))
+		return;
+
+	StructuredBuffer<uint> buf					= ResourceDescriptorHeap[mRootConstantsNanoVDBVisualize.mBufferSRVIndex];
+	pnanovdb_coord_t ijk						= instance_data.mMediumNanoVBD.mOffset + inDispatchThreadID.xyz;
+
+	// PrepareVdbVolume, https://github.com/eidosmontreal/unreal-vdb/blob/main/Shaders/Private/VdbToVolume.usf
+	pnanovdb_address_t Address;					Address.byte_offset = 0;
+	pnanovdb_grid_handle_t Grid;				Grid.address = Address;
+	pnanovdb_tree_handle_t Tree					= pnanovdb_grid_get_tree(buf, Grid);
+	pnanovdb_root_handle_t Root					= pnanovdb_tree_get_root(buf, Tree);
+	pnanovdb_uint32_t grid_type					= pnanovdb_grid_get_grid_type(buf, Grid);
+
+	pnanovdb_readaccessor_t acc;
+	pnanovdb_readaccessor_init(acc, Root);
+
+	// ReadValue, https://github.com/eidosmontreal/unreal-vdb/blob/main/Shaders/Private/VdbCommon.ush, adjusted
+	pnanovdb_uint32_t level;
+	pnanovdb_address_t address					= pnanovdb_readaccessor_get_value_address(grid_type, buf, acc, ijk);
+	float value									= pnanovdb_read_float(buf, address);
+
+	output[inDispatchThreadID.xyz]				= value;
 }
