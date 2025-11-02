@@ -57,7 +57,7 @@ static const float kKW2W						= 1000.0f;
 static const float kSolarKW2LM					= kKW2W * kSolarLuminousEfficacy;
 static const float kSolarLM2KW					= 1.0f / kSolarKW2LM;
 
-static const uint kFrameInFlightCount			= 2;
+static const int kFrameInFlightCount			= 2;
 
 enum class RTVDescriptorIndex : uint
 {
@@ -120,6 +120,12 @@ enum class ViewDescriptorIndex : uint
 	// [Noise]
 	ShapeNoise3DSRV,
 	ErosionNoise3DSRV,
+
+	// [NVDB]
+	NVDBSmoke1SRV,
+	NVDBSmoke1UAV,
+	NVDBSmoke13DSRV,
+	NVDBSmoke13DUAV,
 
 	// [Misc]
 	IESSRV,

@@ -3,6 +3,9 @@
 #include "Common.h"
 #include "BRDFExplorer.h"
 
+#define PNANOVDB_HLSL
+#include "nanovdb/PNanoVDB.h"
+
 // https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
 float3 ToneMapping_ACES_Knarkowicz(float3 x)
 {
@@ -201,6 +204,41 @@ void ReadbackCS(
 	RWTexture2D<float4> Output = ResourceDescriptorHeap[(int)ViewDescriptorIndex::ScreenReadbackUAV];
 
 	Output[inDispatchThreadID.xy] = Input[inDispatchThreadID.xy];
+}
+
+[RootSignature(ROOT_SIGNATURE_COMMON)]
+[numthreads(8, 8, 1)]
+void NVDBCopyCS(
+	uint3 inGroupThreadID : SV_GroupThreadID,
+	uint3 inGroupID : SV_GroupID,
+	uint3 inDispatchThreadID : SV_DispatchThreadID,
+	uint inGroupIndex : SV_GroupIndex)
+{
+	RWTexture3D<float> output					= ResourceDescriptorHeap[(int)ViewDescriptorIndex::NVDBSmoke13DUAV];
+	uint3 output_size							= 0;
+	output.GetDimensions(output_size.x, output_size.y, output_size.z);
+	if (any(inDispatchThreadID >= output_size))
+		return;
+
+	StructuredBuffer<uint> buf					= ResourceDescriptorHeap[(int)ViewDescriptorIndex::NVDBSmoke1SRV];
+	pnanovdb_coord_t ijk						= inDispatchThreadID.xyz;
+
+	// PrepareVdbVolume, https://github.com/eidosmontreal/unreal-vdb/blob/main/Shaders/Private/VdbToVolume.usf
+	pnanovdb_address_t Address;					Address.byte_offset = 0;
+	pnanovdb_grid_handle_t Grid;				Grid.address = Address;
+	pnanovdb_tree_handle_t Tree					= pnanovdb_grid_get_tree(buf, Grid);
+	pnanovdb_root_handle_t Root					= pnanovdb_tree_get_root(buf, Tree);
+	pnanovdb_uint32_t grid_type					= pnanovdb_grid_get_grid_type(buf, Grid);
+
+	pnanovdb_readaccessor_t acc;
+	pnanovdb_readaccessor_init(acc, Root);
+
+	// ReadValue, https://github.com/eidosmontreal/unreal-vdb/blob/main/Shaders/Private/VdbCommon.ush, adjusted
+	pnanovdb_uint32_t level;
+	pnanovdb_address_t address					= pnanovdb_readaccessor_get_value_address(grid_type, buf, acc, ijk);
+	float value									= pnanovdb_read_float(buf, address);
+
+	output[inDispatchThreadID.xyz]				= value;
 }
 
 float4 LineVS(uint inVertexID : SV_VertexID, out float4 outColor : COLOR) : SV_POSITION

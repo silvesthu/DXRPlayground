@@ -333,6 +333,7 @@ struct Stats
 		float								mCloud = 0;
 		float								mTextureGenerator = 0;
 		float								mBRDFSlice = 0;
+		float								mNVDB = 0;
 		float								mClear = 0;
 		float								mDepths = 0;
 		float								mPrepareLights = 0;
@@ -483,9 +484,12 @@ struct Buffer
 	BUFFER_MEMBER(uint,						ByteCount,		0);
 	BUFFER_MEMBER(std::string,				Name,			"");
 	BUFFER_MEMBER(ViewDescriptorIndex,		CBVIndex,		ViewDescriptorIndex::Invalid);
+	BUFFER_MEMBER(ViewDescriptorIndex,		SRVIndex,		ViewDescriptorIndex::Invalid);
 	BUFFER_MEMBER(ViewDescriptorIndex,		UAVIndex,		ViewDescriptorIndex::Invalid);
+	BUFFER_MEMBER(uint,						Stride,			0);
 	BUFFER_MEMBER(bool,						GPU,			true);
 	BUFFER_MEMBER(bool,						Upload,			false);
+	BUFFER_MEMBER(bool,						UploadOnce,		false);
 	BUFFER_MEMBER(bool,						Readback,		false);
 	
 	void Initialize();

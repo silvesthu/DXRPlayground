@@ -210,13 +210,13 @@
     <LinkIncremental>true</LinkIncremental>
     <CopyFileBeforeTargets>Run</CopyFileBeforeTargets>
     <LibraryPath>$(ProjectDir)Source\Thirdparty\DirectXTex\DirectXTex\Bin\Desktop_2022_Win10\x64\$(Configuration);$(LibraryPath)</LibraryPath>
-    <IncludePath>C:\Data\Projects\DXRPlayground\Source\Thirdparty\imgui;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)Source\Thirdparty\imgui;$(ProjectDir)Source\Thirdparty\openvdb;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <CopyFileBeforeTargets>Run</CopyFileBeforeTargets>
     <LibraryPath>$(ProjectDir)Source\Thirdparty\DirectXTex\DirectXTex\Bin\Desktop_2022_Win10\x64\$(Configuration);$(LibraryPath)</LibraryPath>
-    <IncludePath>C:\Data\Projects\DXRPlayground\Source\Thirdparty\imgui;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)Source\Thirdparty\imgui;$(ProjectDir)Source\Thirdparty\openvdb;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -243,6 +243,8 @@
 copy $(ProjectDir)Source\Thirdparty\nvapi\nvHLSLExtns.h $(ProjectDir)Shader\nvapi
 copy $(ProjectDir)Source\Thirdparty\nvapi\nvHLSLExtnsInternal.h $(ProjectDir)Shader\nvapi
 copy $(ProjectDir)Source\Thirdparty\nvapi\nvShaderExtnEnums.h $(ProjectDir)Shader\nvapi
+mkdir $(ProjectDir)Shader\nanovdb
+copy $(ProjectDir)Source\Thirdparty\openvdb\nanovdb\PNanoVDB.h $(ProjectDir)Shader\nanovdb
 robocopy $(ProjectDir)Shader $(OutputPath)Shader /MIR
 if ErrorLevel 8 (exit /B 1) else (exit /B 0)
 if not exist $(ProjectDir)Asset\ArPragueSkyModelGround\SkyModelDataset.dat powershell Expand-Archive $(ProjectDir)Asset\ArPragueSkyModelGround\SkyModelDataset.zip -DestinationPath $(ProjectDir)Asset\ArPragueSkyModelGround\</Command>
@@ -280,6 +282,8 @@ if not exist $(ProjectDir)Asset\ArPragueSkyModelGround\SkyModelDataset.dat power
 copy $(ProjectDir)Source\Thirdparty\nvapi\nvHLSLExtns.h $(ProjectDir)Shader\nvapi
 copy $(ProjectDir)Source\Thirdparty\nvapi\nvHLSLExtnsInternal.h $(ProjectDir)Shader\nvapi
 copy $(ProjectDir)Source\Thirdparty\nvapi\nvShaderExtnEnums.h $(ProjectDir)Shader\nvapi
+mkdir $(ProjectDir)Shader\nanovdb
+copy $(ProjectDir)Source\Thirdparty\openvdb\nanovdb\PNanoVDB.h $(ProjectDir)Shader\nanovdb
 robocopy $(ProjectDir)Shader $(OutputPath)Shader /MIR
 if ErrorLevel 8 (exit /B 1) else (exit /B 0)
 if not exist $(ProjectDir)Asset\ArPragueSkyModelGround\SkyModelDataset.dat powershell Expand-Archive $(ProjectDir)Asset\ArPragueSkyModelGround\SkyModelDataset.zip -DestinationPath $(ProjectDir)Asset\ArPragueSkyModelGround\</Command>

@@ -61,6 +61,22 @@ void Buffer::Initialize()
 		
 			for (int i = 0; i < kFrameInFlightCount; i++)
 				gDevice->CreateConstantBufferView(&desc, gFrameContexts[i].mViewDescriptorHeap.GetCPUHandle(mCBVIndex));
+
+			gAssert(mStride == 0);
+		}
+
+		if (mSRVIndex != ViewDescriptorIndex::Invalid)
+		{
+			D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
+			desc.Format = DXGI_FORMAT_UNKNOWN;
+			desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+			desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+			desc.Buffer.NumElements = mStride == 0 ? 1 : (mByteCount / mStride);
+			desc.Buffer.StructureByteStride = mStride == 0 ? mByteCount : mStride;
+			desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+
+			for (int i = 0; i < kFrameInFlightCount; i++)
+				gDevice->CreateShaderResourceView(mResource.Get(), &desc, gFrameContexts[i].mViewDescriptorHeap.GetCPUHandle(mSRVIndex));
 		}
 	
 		if (mUAVIndex != ViewDescriptorIndex::Invalid)
@@ -68,8 +84,8 @@ void Buffer::Initialize()
 			D3D12_UNORDERED_ACCESS_VIEW_DESC desc = {};
 			desc.Format = DXGI_FORMAT_UNKNOWN;
 			desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-			desc.Buffer.NumElements = 1;
-			desc.Buffer.StructureByteStride = byte_count;
+			desc.Buffer.NumElements = mStride == 0 ? 1 : (mByteCount / mStride);
+			desc.Buffer.StructureByteStride = mStride == 0 ? mByteCount : mStride;
 			desc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
 
 			for (int i = 0; i < kFrameInFlightCount; i++)
@@ -77,9 +93,9 @@ void Buffer::Initialize()
 		}
 	}
 
-	if (mUpload)
+	if (mUpload || mUploadOnce)
 	{
-		for (int i = 0; i < kFrameInFlightCount; i++)
+		for (int i = 0; i < (mUploadOnce ? 1 : kFrameInFlightCount); i++)
 		{
 			D3D12_RESOURCE_DESC upload_resource_desc = gGetBufferResourceDesc(byte_count);
 			D3D12_HEAP_PROPERTIES upload_props = gGetUploadHeapProperties();
@@ -153,9 +169,9 @@ void Texture::Initialize()
 			D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
 			desc.Format = mSRVFormat != DXGI_FORMAT_UNKNOWN ? mSRVFormat : mFormat;
 			desc.ViewDimension = mDepth == 1 ? D3D12_SRV_DIMENSION_TEXTURE2D : D3D12_SRV_DIMENSION_TEXTURE3D;
+			desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 			desc.Texture2D.MipLevels = (UINT)-1;
 			desc.Texture2D.MostDetailedMip = 0;
-			desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 			gDevice->CreateShaderResourceView(mResource.Get(), &desc, gFrameContexts[i].mViewDescriptorHeap.GetCPUHandle(mSRVIndex));
 		}
 	}
