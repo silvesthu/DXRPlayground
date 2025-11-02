@@ -178,6 +178,7 @@ static void sPrepareImGui()
 			ImGui::InputInt2("Coords", (int*)&gConstants.mPixelDebugCoord);
 			ImGui::SliderInt("Light Index", &gConstants.mPixelDebugLightIndex, 0, (int)gScene.GetSceneContent().mLights.size() - 1);
 			ImGui::InputFloat3("Pixel Value", &gRenderer.mRuntime.mPixelInspectionBuffer.ReadbackAs<PixelInspection>(gGetFrameContextIndex())->mPixelValue.x, "%.8f", ImGuiInputTextFlags_ReadOnly);
+			ImGui::SliderInt("Recursion", &gConstants.mDebugRecursion, 0, gConstants.mRecursionDepthCountMax);
 
 			if (ImGui::TreeNodeEx("Visualize Mode"))
 			{
@@ -201,7 +202,6 @@ static void sPrepareImGui()
 			if (ImGui::TreeNodeEx("Debug Mode"))
 			{
 				ImGui::InputFloat3("Debug Value", &gRenderer.mRuntime.mPixelInspectionBuffer.ReadbackAs<PixelInspection>(gGetFrameContextIndex())->mDebugValue.x, "%.8f", ImGuiInputTextFlags_ReadOnly);
-				ImGui::SliderInt("Recursion (output to ScreenDebug)", &gConstants.mDebugRecursion, 0, 16);
 				
 				for (int i = 0; i < static_cast<int>(DebugMode::Count); i++)
 				{
@@ -290,7 +290,7 @@ static void sPrepareImGui()
 			}
 
 			ImGui::SliderInt("Recursion Depth Max", reinterpret_cast<int*>(&gConstants.mRecursionDepthCountMax), 1, 64);
-			ImGui::SliderInt("Russian Roulette Depth", reinterpret_cast<int*>(&gConstants.mRussianRouletteDepth), 1, 16);
+			ImGui::SliderInt("Russian Roulette Depth", reinterpret_cast<int*>(&gConstants.mRussianRouletteDepth), 1, gConstants.mRecursionDepthCountMax);
 
 			ImGui::TreePop();
 		}

@@ -265,6 +265,7 @@ enum class VisualizeMode : uint
 	GENERATE_NEW_LINE_NAME,
 
 	RecursionDepth,
+	RandomState,
 
 	GENERATE_NEW_LINE_NAME,
 

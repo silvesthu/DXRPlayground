@@ -328,6 +328,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 			case VisualizeMode::Emission: 		path_context.mEmission = hit_context.Emission(); continue_bounce = false; break;
 			case VisualizeMode::RoughnessAlpha: path_context.mEmission = hit_context.RoughnessAlpha(); continue_bounce = false; break;
 			case VisualizeMode::RecursionDepth:	continue_bounce = true; break;
+			case VisualizeMode::RandomState:	continue_bounce = path_context.mRecursionDepth <= mConstants.mDebugRecursion; break;
 			default:							path_context.mEmission = sVisualizeModeValue; continue_bounce = false; break;
 			}
 		}
@@ -418,7 +419,10 @@ void TraceRay(inout PixelContext ioPixelContext)
 			mixed_output						= current_output;
 
 		if (mConstants.mVisualizeMode == VisualizeMode::RecursionDepth)
-			mixed_output						= path_context.mRecursionDepth;
+			mixed_output						= mConstants.mDebugRecursion == 0 ? path_context.mRecursionDepth : (mConstants.mDebugRecursion == path_context.mRecursionDepth);
+
+		if (mConstants.mVisualizeMode == VisualizeMode::RandomState)
+			mixed_output						= path_context.mRecursionDepth < mConstants.mDebugRecursion ? 0 : pow(path_context.mRandomState / 4294967296.0, 2.0);
 
 		ScreenColorUAV[ioPixelContext.mPixelIndex.xy] = float4(mixed_output, 1);
 		
