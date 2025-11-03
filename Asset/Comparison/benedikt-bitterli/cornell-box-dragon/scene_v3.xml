@@ -123,6 +123,21 @@
 
 	</shape> -->
 
+	<bsdf type="dielectric" id="TallBoxBSDF">
+		<float name="int_ior" value="1"/>
+		<float name="ext_ior" value="1"/>
+	</bsdf>
+	<shape type="cube" id="TallBox">
+		<transform name="to_world">
+			<matrix value="0.05 -0.1732050808 0 1.2 0 0 -0.1 0.6 0.08660254038 0.1 0 0.05 0 0 0 1" />
+		</transform>
+		<ref id="TallBoxBSDF" />
+		<medium type="homogeneous" name="interior" id="smoke1.nvdb">
+			<rgb name="albedo" value="1.0, 0.0, 0.0" />
+			<float name="sigma_t" value="2.0" /> <!-- majorant of smoke1.nvdb is around 2.0 while max is around 5.0 -->
+		</medium>
+	</shape>
+
 	<shape type="rectangle" id="Light">
 		<transform name="to_world">
 			<matrix value="1 0 0 0 0 0 -0.01 2.0 0 1.0 0 0 0 0 0 1" />
