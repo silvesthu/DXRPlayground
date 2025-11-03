@@ -38,8 +38,8 @@ static const std::array kScenePresets =
 	ScenePreset().Name("CornellBoxDielectric").Path("Asset/Comparison/benedikt-bitterli/cornell-box-dielectric/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("CornellBoxTeapot").Path("Asset/Comparison/benedikt-bitterli/cornell-box-teapot/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("CornellMonkey").Path("Asset/Comparison/benedikt-bitterli/cornell-box-monkey/scene_v3.xml").EmissionBoost(1E4f),
-	ScenePreset().Name("CornellDragon").Path("Asset/Comparison/benedikt-bitterli/cornell-box-dragon/scene_v3.xml").EmissionBoost(1E4f).CameraAnimationPath("Asset/Comparison/benedikt-bitterli/cornell-box-dragon/camera_animation.gltf"),
-	ScenePreset().Name("CornellVDB").Path("Asset/Comparison/benedikt-bitterli/cornell-box-vdb/scene_v3.xml").EmissionBoost(1E4f),
+	ScenePreset().Name("CornellDragon").Path("Asset/Comparison/benedikt-bitterli/cornell-box-dragon/scene_v3.xml").EmissionBoost(1E4f).DensityBoost(10.0f).CameraAnimationPath("Asset/Comparison/benedikt-bitterli/cornell-box-dragon/camera_animation.gltf"),
+	ScenePreset().Name("CornellVDB").Path("Asset/Comparison/benedikt-bitterli/cornell-box-vdb/scene_v3.xml").EmissionBoost(1E4f).DensityBoost(10.0f),
 
 	// MIS
 	ScenePreset().Name("VeachMIS").Path("Asset/Comparison/benedikt-bitterli/veach-mis/scene_ggx_v3.xml").EmissionBoost(1E4f),
@@ -348,8 +348,6 @@ static void sPrepareImGui()
 				ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mToneMappingMode), i);
 			}
 
-			ImGui::SliderFloat("Emission Boost", &gConstants.mEmissionBoost, 1E-16f, 1E16F);
-
 			ImGui::TreePop();
 		}
 
@@ -360,6 +358,9 @@ static void sPrepareImGui()
 				if (!kScenePresets[i].mName.empty())
 					ImGui::RadioButton(kScenePresets[i].mName.data(), &sCurrentSceneIndex, i);
 			}
+
+			ImGui::SliderFloat("Emission Boost", &gConstants.mEmissionBoost, 1E-16f, 1E16F);
+			ImGui::SliderFloat("Density Boost", &gConstants.mDensityBoost, 1E-16f, 1E16F);
 
 			ImGui::TreePop();
 		}
@@ -1129,6 +1130,7 @@ void sLoadCamera()
 	gConstants.CameraPosition()					= kScenePresets[sCurrentSceneIndex].mCameraPosition;
 	gConstants.CameraFront()					= kScenePresets[sCurrentSceneIndex].mCameraDirection;
 	gConstants.mEmissionBoost					= kScenePresets[sCurrentSceneIndex].mEmissionBoost;
+	gConstants.mDensityBoost					= kScenePresets[sCurrentSceneIndex].mDensityBoost;
 	gCameraSettings.mHorizontalFovDegree		= kScenePresets[sCurrentSceneIndex].mHorizontalFovDegree;
 
 	if (gScene.GetSceneContent().mCameraTransform.has_value())

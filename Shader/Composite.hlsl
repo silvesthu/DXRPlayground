@@ -2,9 +2,7 @@
 #include "Binding.h"
 #include "Common.h"
 #include "BRDFExplorer.h"
-
-#define PNANOVDB_HLSL
-#include "nanovdb/PNanoVDB.h"
+#include "NanoVDB.h"
 
 // https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
 float3 ToneMapping_ACES_Knarkowicz(float3 x)
@@ -296,23 +294,6 @@ void NanoVDBVisualizeCS(
 	if (any(inDispatchThreadID >= instance_data.mMediumNanoVBD.mSize))
 		return;
 
-	StructuredBuffer<uint> buf					= ResourceDescriptorHeap[mRootConstantsNanoVDBVisualize.mBufferSRVIndex];
-	pnanovdb_coord_t ijk						= instance_data.mMediumNanoVBD.mOffset + inDispatchThreadID.xyz;
-
-	// PrepareVdbVolume, https://github.com/eidosmontreal/unreal-vdb/blob/main/Shaders/Private/VdbToVolume.usf
-	pnanovdb_address_t Address;					Address.byte_offset = 0;
-	pnanovdb_grid_handle_t Grid;				Grid.address = Address;
-	pnanovdb_tree_handle_t Tree					= pnanovdb_grid_get_tree(buf, Grid);
-	pnanovdb_root_handle_t Root					= pnanovdb_tree_get_root(buf, Tree);
-	pnanovdb_uint32_t grid_type					= pnanovdb_grid_get_grid_type(buf, Grid);
-
-	pnanovdb_readaccessor_t acc;
-	pnanovdb_readaccessor_init(acc, Root);
-
-	// ReadValue, https://github.com/eidosmontreal/unreal-vdb/blob/main/Shaders/Private/VdbCommon.ush, adjusted
-	pnanovdb_uint32_t level;
-	pnanovdb_address_t address					= pnanovdb_readaccessor_get_value_address(grid_type, buf, acc, ijk);
-	float value									= pnanovdb_read_float(buf, address);
-
-	output[inDispatchThreadID.xyz]				= value;
+	float density								= SampleNanoVDBCoords(inDispatchThreadID.xyz, instance_data.mMediumNanoVBD);
+	output[inDispatchThreadID.xyz]				= density;
 }

@@ -1179,13 +1179,10 @@ void Scene::Render()
 	{
 		gRenderer.Setup(gRenderer.mRuntime.mNanoVDBVisualizeShader);
 
-		Buffer& buffer = mBuffers[buffer_visualization.mBufferIndex];
 		Texture& texture = mTextures[buffer_visualization.mTexutureIndex];
-
 		RootConstantsNanoVDBVisualize constants =
 		{
 			.mInstanceIndex = buffer_visualization.mInstanceIndex,
-			.mBufferSRVIndex = (uint)buffer.mSRVIndex,
 			.mTexutureUAVIndex = (uint)texture.mUAVIndex,
 		};
 		gCommandList->SetComputeRoot32BitConstants((int)RootParameterIndex::ConstantsNanoVDBVisualize, 4, &constants, 0);
@@ -1337,7 +1334,7 @@ void Scene::InitializeBuffers()
 				mTextures.push_back({});
 				Texture& texture = mTextures.back();
 				texture.Width(dim.x()).Height(dim.y()).Depth(dim.z()).
-					Format(DXGI_FORMAT_R8_UNORM).
+					Format(DXGI_FORMAT_R32_FLOAT).
 					UAVIndex(ViewDescriptorIndex((uint)ViewDescriptorIndex::SceneAutoIndex + mNextViewDescriptorIndex++)).
 					SRVIndex(ViewDescriptorIndex((uint)ViewDescriptorIndex::SceneAutoIndex + mNextViewDescriptorIndex++)).
 					Name(buffer.mName);

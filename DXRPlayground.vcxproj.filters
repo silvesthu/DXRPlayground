@@ -381,6 +381,7 @@
     <None Include="Shader\HLSL.h">
       <Filter>Shader</Filter>
     </None>
+    <None Include="Shader\NanoVDB.h" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="Source\Thirdparty\glm\util\glm.natvis">

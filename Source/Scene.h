@@ -164,6 +164,7 @@ struct ScenePreset
 	SCENE_PRESET_MEMBER(glm::vec4, 				CameraDirection, 		glm::vec4(0, 0, -1, 0));
 	SCENE_PRESET_MEMBER(LightSourceMode,		LightSource, 			LightSourceMode::Emitter);
 	SCENE_PRESET_MEMBER(float, 					EmissionBoost, 			1.0f); // As no auto exposure yet
+	SCENE_PRESET_MEMBER(float, 					DensityBoost, 			1.0f);
 	SCENE_PRESET_MEMBER(float, 					HorizontalFovDegree, 	90);
 	SCENE_PRESET_MEMBER(glm::mat4x4, 			Transform, 				glm::mat4x4(1));
 	SCENE_PRESET_MEMBER(float, 					SunAzimuth, 			0);

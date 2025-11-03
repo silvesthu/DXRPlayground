@@ -2,6 +2,7 @@
 
 #include "Shared.h"
 #include "HLSL.h"
+#include "NanoVDB.h"
 
 struct PixelContext
 {
@@ -397,25 +398,40 @@ struct BSDFContext
 	float			mLPDF;						// For light sample
 };
 
-// Assume Homogeneous, for now
 struct MediumContext
 {
-	static void ApplySequence(inout MediumContext ioContext)
+	void ApplyNanoVDB(inout PathContext ioPathContext)
 	{
-		if (mConstants.mSequenceEnabled == 0)
+		if (mInstanceData.mMediumNanoVBD.mBufferIndex == (uint)ViewDescriptorIndex::Invalid)
+			return;
+
+		float density							= SampleNanoVDB(PositionOS(), mInstanceData.mMediumNanoVBD);
+		mInstanceData.mMediumSigmaT				*= density * mConstants.mDensityBoost;
+		mInstanceData.mMediumSigmaT				= min(mInstanceData.mMediumSigmaT, mMajorantSigmaT); // using SigmaT in xml as majorant, clamp with it as max is ignored
+
+		// DebugValue(DebugMode::Manual, ioPathContext.mRecursionDepth, normalized_coords);
+		// DebugValue(DebugMode::Manual, ioPathContext.mRecursionDepth, ijk);
+		// DebugValue(DebugMode::Manual, ioPathContext.mRecursionDepth, density);
+		// DebugValue(DebugMode::Manual, ioPathContext.mRecursionDepth, mMajorantSigmaT);
+		// DebugValue(DebugMode::Manual, ioPathContext.mRecursionDepth, mInstanceData.mMediumSigmaT);
+	}
+
+	void ApplySequence(inout PathContext ioPathContext)
+	{
+		if (mConstants.mSequenceEnabled == 0 || mInstanceData.mMediumNanoVBD.mBufferIndex != (uint)ViewDescriptorIndex::Invalid)
 			return;
 
 		float ratio								= mConstants.mSequenceFrameRatio;
 
 		Texture3D<float> ErosionNoise3D			= ResourceDescriptorHeap[(int)ViewDescriptorIndex::ErosionNoise3DSRV];
 		float3 offset							= float3(0, -mConstants.mSequenceFrameRatio * 5.0, 0);
-		float noise_value						= ErosionNoise3D.SampleLevel(BilinearWrapSampler, (ioContext.PositionWS() + offset) * 1.0, 0);
+		float noise_value						= ErosionNoise3D.SampleLevel(BilinearWrapSampler, (PositionWS() + offset) * 1.0, 0);
 		noise_value								= saturate(pow(noise_value * 1.2, 4.0));
 
-		float y_gradient						= pow(saturate(ioContext.PositionWS().y + 0.1), 0.2);
+		float y_gradient						= pow(saturate(PositionWS().y + 0.1), 0.2);
 		noise_value								= lerp(noise_value, 0.0f, lerp(y_gradient, 0.0, pow(ratio, 16.0)));
 		
-		ioContext.mInstanceData.mMediumSigmaT	*= noise_value;
+		mInstanceData.mMediumSigmaT				*= noise_value;
 	}
 
 	template<RAY_FLAG RayFlags>
@@ -429,16 +445,36 @@ struct MediumContext
 		medium_context.mRayWS.mDirection		= inRayDesc.Direction;
 		medium_context.mRayWS.mTCurrent			= inRayQuery.CommittedRayT();
 
+		medium_context.mRayOS.mOrigin			= inRayQuery.CommittedObjectRayOrigin();
+		medium_context.mRayOS.mDirection		= inRayQuery.CommittedObjectRayDirection();
+		medium_context.mRayOS.mTCurrent			= inRayQuery.CommittedRayT();
+		
+		medium_context.mMajorantSigmaT			= medium_context.SigmaT();
 		medium_context.mScatteringEvent			= false;
 
-		ApplySequence(medium_context);
+		if (medium_context.mInstanceData.mMediumNanoVBD.mBufferIndex != (uint)ViewDescriptorIndex::Invalid)
+			medium_context.mMajorantSigmaT		*= mConstants.mDensityBoost;
 
 		return medium_context;
+	}
+
+	void			ScatterAt(float inT, inout PathContext ioPathContext)
+	{
+		mScatteringEvent						= true;
+		mRayWS.mTCurrent						= inT;
+		mRayOS.mTCurrent						= inT;
+
+		ApplyNanoVDB(ioPathContext);
+		ApplySequence(ioPathContext);
 	}
 
 	float3			PositionWS()				{ return mRayWS.Target(); }
 	float3			DirectionWS()				{ return mRayWS.mDirection; }
 	float3			ViewWS()					{ return -mRayWS.mDirection; }
+
+	float3			PositionOS()				{ return mRayOS.Target(); }
+	float3			DirectionOS()				{ return mRayOS.mDirection; }
+	float3			ViewOS()					{ return -mRayOS.mDirection; }
 
 	float3			Albedo()					{ return mInstanceData.mMediumAlbedo; }
 	float3			SigmaT()					{ return mInstanceData.mMediumSigmaT; }
@@ -451,6 +487,8 @@ struct MediumContext
 	uint			mInstanceID;
 
 	Ray				mRayWS;
+	Ray				mRayOS;
 
+	float3			mMajorantSigmaT;
 	bool			mScatteringEvent;
 };

@@ -112,21 +112,29 @@ void TraceRay(inout PixelContext ioPixelContext)
 			MediumContext medium_context		= MediumContext::Generate(ray, query);
 			if (path_context.mMediumInstanceID != InvalidInstanceID && medium_context.mInstanceID == path_context.mMediumInstanceID)
 			{
-				float free_flight_distance		= -log(1.0 - RandomFloat01(path_context.mRandomState)) / MaxComponent(medium_context.SigmaT());
+				uint channel					= (uint)clamp(RandomFloat01(path_context.mRandomState) * 3.0, 0, 2);
+
+				// [TODO] RGB/Spectrum sampling
+				// Mitsuba3 take a random channel with uniform sampling (?), see VolumetricPathIntegrator::sample
+				float majorant_extinction		= medium_context.mMajorantSigmaT[channel];
+				float free_flight_distance		= -log(1.0 - RandomFloat01(path_context.mRandomState)) / majorant_extinction;
 
 				if (free_flight_distance < hit_context.mRayWS.mTCurrent)
 				{
-					medium_context.mRayWS.mTCurrent = free_flight_distance;
-					medium_context.mScatteringEvent = true;
+					medium_context.ScatterAt(free_flight_distance, path_context);
 
-					path_context.mThroughput	*= medium_context.Albedo();
+					bool null_scattering		= RandomFloat01(path_context.mRandomState) >= medium_context.SigmaT()[channel] / majorant_extinction;
+					if (!null_scattering)
+						path_context.mThroughput*= medium_context.Albedo();
 
 					// Prepare for next bounce
 					ray.Origin					= ray.Origin + ray.Direction * free_flight_distance;
-					ray.Direction				= RandomUnitVector(path_context.mRandomState);
+					if (!null_scattering)
+						ray.Direction			= RandomUnitVector(path_context.mRandomState); // [TODO] Support phase function
 					continue_bounce				= true;
 				}
 
+				DebugValue(DebugMode::MediumExtinction,			path_context.mRecursionDepth, medium_context.SigmaT());
 				DebugValue(DebugMode::MediumFreeFlight,			path_context.mRecursionDepth, float3(free_flight_distance, hit_context.mRayWS.mTCurrent, free_flight_distance < hit_context.mRayWS.mTCurrent ? 1 : 0));
 			}
 			{
@@ -183,12 +191,11 @@ void TraceRay(inout PixelContext ioPixelContext)
 					emission = hit_context.mBarycentrics;
 			}
 			
-			// Ray hit a light / [Mitsuba] Direct emission
-			if (medium_context.mScatteringEvent)
+			if (medium_context.mScatteringEvent) // Ray scatters
 			{
-				// To next bounce, prepared above
+				// To next bounce
 			}
-			else if (hit_context.BSDF() == BSDF::Light)
+			else if (hit_context.BSDF() == BSDF::Light) // Ray hit a light / [Mitsuba] Direct emission
 			{
 				if (path_context.mRecursionDepth == 0 ||					// Camera ray hit the light
 					path_context.mPrevDiracDeltaDistribution || 			// Prev hit is DiracDeltaDistribution -> no light sample
@@ -219,8 +226,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 					DebugValue(DebugMode::MIS_BSDF,				path_context.mRecursionDepth - 1 /* for prev BSDF hit */, float3(path_context.mPrevBSDFSamplePDF, light_mis_pdf, mis_weight));
 				}
 			}
-			// Ray hit a surface
-			else
+			else // Ray hit a surface
 			{
 				// Sample light (NEE) / [Mitsuba] Emitter sampling
 				bool sample_light = mConstants.mSampleMode == SampleMode::SampleLight || mConstants.mSampleMode == SampleMode::MIS;

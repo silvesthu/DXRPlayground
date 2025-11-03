@@ -110,7 +110,7 @@
 		<ref id="TallBoxBSDF" />
 		<medium type="homogeneous" name="interior" id="smoke1.nvdb">
 			<rgb name="albedo" value="0.921, 0.24, 0.064" />
-			<float name="sigma_t" value="0.0" />
+			<float name="sigma_t" value="2.0" /> <!-- majorant of smoke1.nvdb is around 2.0 while max is around 5.0 -->
 		</medium>
 	</shape>
 	<shape type="rectangle" id="Light">

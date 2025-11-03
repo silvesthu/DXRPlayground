@@ -535,7 +535,7 @@ public:
 	void ImGuiShowMenus();
 	void ImGuiShowTextures();
 
-	bool mEnabled = true;
+	bool mEnabled = false;
 };
 
 extern Atmosphere gAtmosphere;

@@ -306,6 +306,7 @@ enum class DebugMode : uint
 	GENERATE_NEW_LINE_NAME,
 	
 	MediumInstanceID,
+	MediumExtinction,
 	MediumFreeFlight,
 
 	GENERATE_NEW_LINE_NAME,
@@ -770,7 +771,7 @@ struct Constants
 	float						mEV100							CONSTANT_DEFAULT(16.0f);
 	ToneMappingMode				mToneMappingMode				CONSTANT_DEFAULT(ToneMappingMode::Knarkowicz);
 	float						mEmissionBoost					CONSTANT_DEFAULT(1);
-	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	float						mDensityBoost					CONSTANT_DEFAULT(1);
 
 	float						mSolarLuminanceScale			CONSTANT_DEFAULT(1.0f);
 	float						mSunAzimuth						CONSTANT_DEFAULT(0);
@@ -855,8 +856,8 @@ struct LocalConstants
 struct RootConstantsNanoVDBVisualize
 {
 	uint						mInstanceIndex					CONSTANT_DEFAULT(0);
-	uint						mBufferSRVIndex					CONSTANT_DEFAULT(0);
 	uint						mTexutureUAVIndex				CONSTANT_DEFAULT(0);
+	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 };
 
