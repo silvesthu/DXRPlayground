@@ -436,8 +436,8 @@ struct MediumContext
 			return;
 
 		float density							= SampleNanoVDB(PositionOS(), mInstanceData.mMediumNanoVBD);
-		mInstanceData.mMediumSigmaT				*= density * mConstants.mDensityBoost;
-		mInstanceData.mMediumSigmaT				= min(mInstanceData.mMediumSigmaT, mMajorantSigmaT); // using SigmaT in xml as majorant, clamp with it as max is ignored
+		mSigmaT									*= density * mConstants.mDensityBoost;
+		mSigmaT									= min(mSigmaT, mMajorantSigmaT); // using SigmaT in xml as majorant, clamp with it as max is ignored
 
 		// DebugValue(DebugMode::Manual, ioPathContext.mRecursionDepth, normalized_coords);
 		// DebugValue(DebugMode::Manual, ioPathContext.mRecursionDepth, ijk);
@@ -455,8 +455,7 @@ struct MediumContext
 
 		if (mInstanceData.mMediumNanoVBD.mBufferIndex != (uint)ViewDescriptorIndex::Invalid)
 		{
-			mMajorantSigmaT						*= (ratio - 0.75) / (1.0 - 0.75);
-			mInstanceData.mMediumSigmaT			*= (ratio - 0.75) / (1.0 - 0.75);
+			mSigmaT								*= (ratio - 0.75) / (1.0 - 0.75);
 			return;
 		}
 
@@ -468,7 +467,21 @@ struct MediumContext
 		float y_gradient						= pow(saturate(PositionWS().y + 0.1), 0.2);
 		noise_value								= lerp(noise_value, 0.0f, lerp(y_gradient, 0.0, pow(ratio, 16.0)));
 		
-		mInstanceData.mMediumSigmaT				*= noise_value;
+		mSigmaT									*= noise_value;
+	}
+
+	void ApplySequenceOnce()
+	{
+		if (mConstants.mSequenceEnabled == 0)
+			return;
+
+		float ratio								= mConstants.mSequenceFrameRatio;
+
+		if (mInstanceData.mMediumNanoVBD.mBufferIndex != (uint)ViewDescriptorIndex::Invalid)
+		{
+			mMajorantSigmaT						*= (ratio - 0.75) / (1.0 - 0.75);
+			return;
+		}
 	}
 
 	template<RAY_FLAG RayFlags>
@@ -486,18 +499,20 @@ struct MediumContext
 		medium_context.mRayOS.mDirection		= inRayQuery.CommittedObjectRayDirection();
 		medium_context.mRayOS.mTCurrent			= inRayQuery.CommittedRayT();
 		
-		medium_context.mMajorantSigmaT			= medium_context.SigmaT();
-		medium_context.mScatteringEvent			= false;
-
+		medium_context.mMajorantSigmaT			= medium_context.mInstanceData.mMediumSigmaT;
 		if (medium_context.mInstanceData.mMediumNanoVBD.mBufferIndex != (uint)ViewDescriptorIndex::Invalid)
 			medium_context.mMajorantSigmaT		*= mConstants.mDensityBoost;
+		medium_context.mSigmaT					= 0;
+
+		medium_context.ApplySequenceOnce();
 
 		return medium_context;
 	}
 
 	void			ScatterAt(float inT, inout PathContext ioPathContext)
 	{
-		mScatteringEvent						= true;
+		mSigmaT									= mInstanceData.mMediumSigmaT;
+
 		mRayWS.mTCurrent						= inT;
 		mRayOS.mTCurrent						= inT;
 
@@ -514,7 +529,7 @@ struct MediumContext
 	float3			ViewOS()					{ return -mRayOS.mDirection; }
 
 	float3			Albedo()					{ return mInstanceData.mMediumAlbedo; }
-	float3			SigmaT()					{ return mInstanceData.mMediumSigmaT; }
+	float3			SigmaT()					{ return mSigmaT; }
 	float			Phase()						{ return mInstanceData.mMediumPhase; }
 
 	float3			Transmittance(float inDistance) { return exp(-SigmaT() * inDistance); }
@@ -527,5 +542,5 @@ struct MediumContext
 	Ray				mRayOS;
 
 	float3			mMajorantSigmaT;
-	bool			mScatteringEvent;
+	float3			mSigmaT;
 };

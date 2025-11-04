@@ -105,6 +105,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 			// Participating media (Medium)
 			// [TODO] Need a medium stack to handle nested medium
 			// [TODO] Skip medium in case ray is offseted to outside, or mesh is not water tight
+			bool ray_scattered					= false;
 			MediumContext medium_context		= MediumContext::Generate(ray, query);
 			if (path_context.mMediumInstanceID != InvalidInstanceID && medium_context.mInstanceID == path_context.mMediumInstanceID)
 			{
@@ -112,26 +113,36 @@ void TraceRay(inout PixelContext ioPixelContext)
 
 				// [TODO] RGB/Spectrum sampling
 				// Mitsuba3 take a random channel with uniform sampling (?), see VolumetricPathIntegrator::sample
-				float majorant_extinction		= medium_context.mMajorantSigmaT[channel];
-				float free_flight_distance		= -log(1.0 - RandomFloat01(path_context.mRandomState)) / majorant_extinction;
+				float majorant_extinction		= max(medium_context.mMajorantSigmaT[channel], 1E-6);
+				float free_flight_distance		= 0;
+				bool null_scattering			= false;
 
-				if (free_flight_distance < query.CommittedRayT())
+				do
 				{
+					free_flight_distance		+= -log(1.0 - RandomFloat01(path_context.mRandomState)) / majorant_extinction;
+					if (free_flight_distance >= query.CommittedRayT())
+						break;
+
 					medium_context.ScatterAt(free_flight_distance, path_context);
 
-					bool null_scattering		= RandomFloat01(path_context.mRandomState) >= medium_context.SigmaT()[channel] / majorant_extinction;
+					null_scattering				= RandomFloat01(path_context.mRandomState) >= medium_context.SigmaT()[channel] / majorant_extinction;
 					if (!null_scattering)
-						path_context.mThroughput*= medium_context.Albedo();
+					{
+						path_context.mThroughput *= medium_context.Albedo();
 
-					// Prepare for next bounce
-					ray.Origin					= ray.Origin + ray.Direction * free_flight_distance;
-					if (!null_scattering)
+						ray.Origin				= ray.Origin + ray.Direction * free_flight_distance;
 						ray.Direction			= RandomUnitVector(path_context.mRandomState); // [TODO] Support phase function
-					continue_bounce				= true;
-				}
+
+						ray_scattered			= true;
+						continue_bounce			= true;
+
+						break;
+					}
+
+				} while (null_scattering);
 
 				DebugValue(DebugMode::MediumExtinction,			path_context.mRecursionDepth, medium_context.SigmaT());
-				DebugValue(DebugMode::MediumFreeFlight,			path_context.mRecursionDepth, float3(free_flight_distance, query.CommittedRayT(), free_flight_distance < query.CommittedRayT() ? 1 : 0));
+				DebugValue(DebugMode::MediumFreeFlight,			path_context.mRecursionDepth, float3(free_flight_distance, query.CommittedRayT(), ray_scattered));
 			}
 			{
 				DebugValue(DebugMode::MediumInstanceID,			path_context.mRecursionDepth, float3(path_context.mMediumInstanceID, 0, 0));
@@ -172,7 +183,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 				VisualizeValue(VisualizeMode::Transmittance, transmittance);
 			}
 			
-			if (medium_context.mScatteringEvent) // Ray scatters
+			if (ray_scattered)
 			{
 				// To next bounce
 			}
