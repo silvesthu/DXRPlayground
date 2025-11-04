@@ -481,8 +481,21 @@ ComPtr<IDxcBlob> gCompileShader(const char* inFilename, const char* inEntryPoint
 	// NVAPI
 	if (gNVAPI.mShaderExecutionReorderingSupported)
 		defines.push_back({ .Name = L"NVAPI_SER", .Value = L"1"});
-	if (gNVAPI.mLinearSweptSpheresSupported)
+	if (gNVAPI.mLinearSweptSpheresSupported && gNVAPI.mWireframeEnabled)
 		defines.push_back({ .Name = L"NVAPI_LSS", .Value = L"1" });
+
+	// Config
+	defines.push_back({ .Name = L"SHADER_DEBUG", .Value = gConfigs.mShaderDebug ? L"1" : L"0"});
+	defines.push_back({ .Name = L"USE_HALF", .Value = gConfigs.mUseHalf ? L"1" : L"0" });
+	defines.push_back({ .Name = L"USE_TEXTURE", .Value = gConfigs.mUseTexture ? L"1" : L"0" });
+	std::vector<std::wstring> bsdf_macros;
+	bsdf_macros.resize((int)BSDF::Count);
+	for (int i = 0; i < (int)BSDF::Count; i++)
+	{
+		BSDF bsdf = (BSDF)i;
+		bsdf_macros[i] = L"USE_BSDF_" + gToWString(nameof::nameof_enum(bsdf));
+		defines.push_back({ .Name = bsdf_macros[i].c_str(), .Value = gConfigs.mSceneBSDFs.find(bsdf) != gConfigs.mSceneBSDFs.end() ? L"1" : L"0"});
+	}
 
 	std::wstring entry_point = gToWString(inEntryPoint);
 	std::wstring entry_point_macro = L"ENTRY_POINT_";
@@ -500,6 +513,7 @@ ComPtr<IDxcBlob> gCompileShader(const char* inFilename, const char* inEntryPoint
 	arguments.push_back(L"-Qembed_debug");							// embeded .pdb
 	arguments.push_back(L"-HV 2021");								// more like c++
 	arguments.push_back(L"-disable-payload-qualifiers");			// -disable-payload-qualifiers, see https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#payload-access-qualifiers
+	arguments.push_back(L"-enable-16bit-types");					// half
 
 	IDxcOperationResult* operation_result;
 	if (FAILED(DxcCompiler->Compile(

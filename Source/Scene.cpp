@@ -225,6 +225,7 @@ bool Scene::LoadDummy(SceneContent& ioSceneContent)
 	instance_data.mVertexOffset = 0;
 	instance_data.mIndexCount = 3;
 	ioSceneContent.mInstanceDatas.push_back(instance_data);
+	ioSceneContent.mBSDFs.insert(instance_data.mBSDF);
 
 	return true;
 }
@@ -242,6 +243,7 @@ bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransfor
 		gTrace(reader.Error().c_str());
 
 	// Fetch indices, attributes
+	bool has_uv = false;
 	uint32_t index = 0;
 	for (auto&& shape : reader.GetShapes())
 	{
@@ -278,6 +280,8 @@ bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransfor
 				}
 				else
 				{
+					has_uv = true;
+
 					ioSceneContent.mUVs.push_back(UVType(
 						reader.GetAttrib().texcoords[2 * idx.texcoord_index + 0],
 						inFlipV ? 1.0f - reader.GetAttrib().texcoords[2 * idx.texcoord_index + 1] : reader.GetAttrib().texcoords[2 * idx.texcoord_index + 1]
@@ -307,7 +311,8 @@ bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransfor
 			default: break;
 			}
 			instance_data.mBSDF = type;
-			instance_data.mTwoSided = false;
+			instance_data.mFlags.mTwoSided = false;
+			instance_data.mFlags.mUV = has_uv;
 			instance_data.mAlbedo = glm::vec3(material.diffuse[0], material.diffuse[1], material.diffuse[2]);
 			instance_data.mOpacity = 1.0f;
 			instance_data.mEmission = glm::vec3(material.emission[0], material.emission[1], material.emission[2]);
@@ -333,6 +338,7 @@ bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransfor
 		instance_data.mIndexOffset = index_offset;
 		instance_data.mIndexCount = index_count;
 		ioSceneContent.mInstanceDatas.push_back(instance_data);
+		ioSceneContent.mBSDFs.insert(instance_data.mBSDF);
 	}
 
 	return true;
@@ -425,7 +431,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 		{
 			if (local_type == "twosided")
 			{
-				bsdf_instance.mInstanceData.mTwoSided = true;
+				bsdf_instance.mInstanceData.mFlags.mTwoSided = true;
 
 				local_bsdf = local_bsdf->FirstChildElement("bsdf");
 				local_type = local_bsdf->Attribute("type");
@@ -762,7 +768,6 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 					gFromString(get_child_value(emitter, "radiance").data(), instance_data.mEmission);
 
 					instance_data.mBSDF = BSDF::Light;
-					instance_data.mTwoSided = false;
 					instance_data.mLightIndex = static_cast<uint>(ioSceneContent.mLights.size());
 
 					Light light;
@@ -792,6 +797,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 			instance_data.mIndexOffset = index_offset;
 			instance_data.mIndexCount = index_count;
 			ioSceneContent.mInstanceDatas.push_back(instance_data);
+			ioSceneContent.mBSDFs.insert(instance_data.mBSDF);
 		}
 
 		shape = shape->NextSiblingElement("shape");
@@ -1040,7 +1046,7 @@ bool Scene::LoadGLTF(const std::string& inFilename, SceneContent& ioSceneContent
 			InstanceData instance_data =
 			{
 				.mBSDF = BSDF::pbrMetallicRoughness,
-				.mTwoSided = material.doubleSided,
+				.mFlags = {.mTwoSided = material.doubleSided, .mUV = true },
 				.mRoughnessAlpha = static_cast<float>(material.pbrMetallicRoughness.roughnessFactor * material.pbrMetallicRoughness.roughnessFactor),
 				.mAlbedo = vec3(material.pbrMetallicRoughness.baseColorFactor[0], material.pbrMetallicRoughness.baseColorFactor[1], material.pbrMetallicRoughness.baseColorFactor[2]),
 				.mReflectance = vec3(static_cast<float>(material.pbrMetallicRoughness.metallicFactor)),
@@ -1065,6 +1071,7 @@ bool Scene::LoadGLTF(const std::string& inFilename, SceneContent& ioSceneContent
 			}
 			
 			ioSceneContent.mInstanceDatas.push_back(instance_data);
+			ioSceneContent.mBSDFs.insert(instance_data.mBSDF);
 
 			if (glm::compMax(instance_data.mEmission) > 0.0f)
 			{
@@ -1141,6 +1148,8 @@ void Scene::Load(const ScenePreset& inPreset)
 	InitializeRuntime();
 	InitializeAccelerationStructures();
 	InitializeViews();
+
+	gConfigs.mSceneBSDFs = mSceneContent.mBSDFs;
 }
 
 void Scene::Unload()

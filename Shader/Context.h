@@ -4,13 +4,24 @@
 #include "HLSL.h"
 #include "NanoVDB.h"
 
+#if USE_HALF
+using half_ = half;
+using half3_ = half3;
+#else
+using half = float;
+using half3 = float3;
+#endif // USE_HALF
+
+half_ ashalf(float inValue) { return (half_)inValue; }
+half3_ ashalf(float3 inValue) { return (half3_)inValue; }
+
 struct PixelContext
 {
 	uint3			mPixelIndex;
 	uint3			mPixelTotal;
 					
-	bool			mOutputDepth;
 	float			mDepth;
+	uint			mOutputDepth : 1;
 };
 
 struct PathContext
@@ -22,14 +33,13 @@ struct PathContext
 	float3			mLightEmission;					// [0, +inf]	Emission from light sample
 					
 	float			mPrevBSDFSamplePDF;
-	bool			mPrevDiracDeltaDistribution;
+	uint			mPrevDiracDeltaDistribution : 1;
 					
 	uint			mRandomState;
 	uint			mRandomStateReSTIR;
 
-	uint			mRecursionDepth;
-
-	uint			mMediumInstanceID;
+	uint			mRecursionDepth : 8;
+	uint			mMediumInstanceID : 16;
 };
 
 // Context information about a point on surface
@@ -54,10 +64,14 @@ struct SurfaceContext
 		mVertexNormalOS					= normal;
 		mVertexNormalWS					= normalize(mul((float3x3) mInstanceData.mInverseTranspose, normal)); // Allow non-uniform scale
 
-		mVertexUVs[0]					= UVs[indices[0]];
-		mVertexUVs[1]					= UVs[indices[1]];
-		mVertexUVs[2]					= UVs[indices[2]];
-		mUV								= mVertexUVs[0] * mBarycentrics.x + mVertexUVs[1] * mBarycentrics.y + mVertexUVs[2] * mBarycentrics.z;
+		mUV								= 0;
+		if (mInstanceData.mFlags.mUV)
+		{
+			mVertexUVs[0]				= UVs[indices[0]];
+			mVertexUVs[1]				= UVs[indices[1]];
+			mVertexUVs[2]				= UVs[indices[2]];
+			mUV							= mVertexUVs[0] * mBarycentrics.x + mVertexUVs[1] * mBarycentrics.y + mVertexUVs[2] * mBarycentrics.z;
+		}
 	}
 	
 	BSDF			BSDF()
@@ -74,7 +88,7 @@ struct SurfaceContext
 
 		return mInstanceData.mBSDF;
 	}
-	uint			TwoSided()					{ return mInstanceData.mTwoSided; }
+	uint			TwoSided()					{ return mInstanceData.mFlags.mTwoSided; }
 	float			Opacity()					{ return mInstanceData.mOpacity; }
 	uint			LightIndex()				{ return mInstanceData.mLightIndex; }
 	float			RoughnessAlpha()
@@ -87,6 +101,7 @@ struct SurfaceContext
 	{
 		if (BSDF() == BSDF::pbrMetallicRoughness) { return AlbedoGLTF(); }
 		
+#if USE_TEXTURE
 		uint texture_index = mInstanceData.mAlbedoTexture.mTextureIndex;
 		uint sampler_index = mInstanceData.mAlbedoTexture.mSamplerIndex;
 		if (texture_index != (uint)ViewDescriptorIndex::Invalid)
@@ -95,12 +110,14 @@ struct SurfaceContext
 			SamplerState sampler = SamplerDescriptorHeap[sampler_index];
 			return texture.SampleLevel(sampler, mUV, 0).rgb * mInstanceData.mAlbedo;
 		}
+#endif // USE_TEXTURE
 		return mInstanceData.mAlbedo; 
 	}
 	float3			SpecularReflectance()
 	{
 		if (BSDF() == BSDF::pbrMetallicRoughness) { return SpecularReflectanceGLTF(); }
 		
+#if USE_TEXTURE
 		uint texture_index = mInstanceData.mReflectanceTexture.mTextureIndex;
 		uint sampler_index = mInstanceData.mReflectanceTexture.mSamplerIndex;
 		if (texture_index != (uint)ViewDescriptorIndex::Invalid)
@@ -109,6 +126,7 @@ struct SurfaceContext
 			SamplerState sampler = SamplerDescriptorHeap[sampler_index];
 			return texture.SampleLevel(sampler, mUV, 0).rgb * mInstanceData.mReflectance;
 		}
+#endif // USE_TEXTURE
 		return mInstanceData.mReflectance;
 	}
 	float3			SpecularTransmittance()		{ return mInstanceData.mSpecularTransmittance; }
@@ -123,6 +141,7 @@ struct SurfaceContext
 
 	float3			Emission()					
 	{
+#if USE_TEXTURE
 		uint texture_index = mInstanceData.mEmissionTexture.mTextureIndex;
 		uint sampler_index = mInstanceData.mEmissionTexture.mSamplerIndex;
 		if (texture_index != (uint)ViewDescriptorIndex::Invalid)
@@ -131,6 +150,7 @@ struct SurfaceContext
 			SamplerState sampler = SamplerDescriptorHeap[sampler_index];
 			return texture.SampleLevel(sampler, mUV, 0).rgb * mInstanceData.mEmission;
 		}
+#endif // USE_TEXTURE
 		return mInstanceData.mEmission; 
 	}
 
@@ -141,6 +161,7 @@ struct SurfaceContext
 	{
 		float3 base_color = mInstanceData.mAlbedo;
 		
+#if USE_TEXTURE
 		uint texture_index = mInstanceData.mAlbedoTexture.mTextureIndex;
 		uint sampler_index = mInstanceData.mAlbedoTexture.mSamplerIndex;
 		if (texture_index != (uint)ViewDescriptorIndex::Invalid)
@@ -149,6 +170,7 @@ struct SurfaceContext
 			SamplerState sampler = SamplerDescriptorHeap[sampler_index];
 			base_color = texture.SampleLevel(sampler, mUV, 0).rgb * mInstanceData.mAlbedo;
 		}
+#endif // USE_TEXTURE
 
 		float metallic = MetallicGLTF();
 		return lerp(base_color, 0.0, metallic);
@@ -157,6 +179,7 @@ struct SurfaceContext
 	{
 		float3 base_color = mInstanceData.mAlbedo;
 		
+#if USE_TEXTURE
 		uint texture_index = mInstanceData.mAlbedoTexture.mTextureIndex;
 		uint sampler_index = mInstanceData.mAlbedoTexture.mSamplerIndex;
 		if (texture_index != (uint)ViewDescriptorIndex::Invalid)
@@ -165,6 +188,7 @@ struct SurfaceContext
 			SamplerState sampler = SamplerDescriptorHeap[sampler_index];
 			base_color = texture.SampleLevel(sampler, mUV, 0).rgb * mInstanceData.mAlbedo;
 		}
+#endif // USE_TEXTURE
 
 		float metallic = MetallicGLTF();
 		return lerp(DielectricReflectanceGLTF(), base_color, metallic);
@@ -172,6 +196,7 @@ struct SurfaceContext
 	float			DielectricReflectanceGLTF() { return 0.04; }
 	float			MetallicGLTF()
 	{
+#if USE_TEXTURE
 		uint texture_index = mInstanceData.mReflectanceTexture.mTextureIndex;
 		uint sampler_index = mInstanceData.mReflectanceTexture.mSamplerIndex;
 		if (texture_index != (uint)ViewDescriptorIndex::Invalid)
@@ -180,10 +205,13 @@ struct SurfaceContext
 			SamplerState sampler = SamplerDescriptorHeap[sampler_index];
 			return texture.SampleLevel(sampler, mUV, 0).b * mInstanceData.mReflectance.x;
 		}
+#endif // USE_TEXTURE
+
 		return mInstanceData.mReflectance.x;
 	}
 	float			RoughnessAlphaGLTF()
 	{
+#if USE_TEXTURE
 		uint texture_index = mInstanceData.mReflectanceTexture.mTextureIndex;
 		uint sampler_index = mInstanceData.mReflectanceTexture.mSamplerIndex;
 		if (texture_index != (uint)ViewDescriptorIndex::Invalid)
@@ -193,6 +221,8 @@ struct SurfaceContext
 			float roughness = texture.SampleLevel(sampler, mUV, 0).g;
 			return (roughness * roughness) * mInstanceData.mRoughnessAlpha;
 		}
+#endif // USE_TEXTURE
+
 		return max(0.01, mInstanceData.mRoughnessAlpha); // Extra clamp
 	}
 
@@ -418,15 +448,22 @@ struct MediumContext
 
 	void ApplySequence(inout PathContext ioPathContext)
 	{
-		if (mConstants.mSequenceEnabled == 0 || mInstanceData.mMediumNanoVBD.mBufferIndex != (uint)ViewDescriptorIndex::Invalid)
+		if (mConstants.mSequenceEnabled == 0)
 			return;
 
 		float ratio								= mConstants.mSequenceFrameRatio;
 
+		if (mInstanceData.mMediumNanoVBD.mBufferIndex != (uint)ViewDescriptorIndex::Invalid)
+		{
+			mMajorantSigmaT						*= (ratio - 0.75) / (1.0 - 0.75);
+			mInstanceData.mMediumSigmaT			*= (ratio - 0.75) / (1.0 - 0.75);
+			return;
+		}
+
 		Texture3D<float> ErosionNoise3D			= ResourceDescriptorHeap[(int)ViewDescriptorIndex::ErosionNoise3DSRV];
-		float3 offset							= float3(0, -mConstants.mSequenceFrameRatio * 5.0, 0);
+		float3 offset							= float3(0, -mConstants.mSequenceFrameRatio * 0.5, 0);
 		float noise_value						= ErosionNoise3D.SampleLevel(BilinearWrapSampler, (PositionWS() + offset) * 1.0, 0);
-		noise_value								= saturate(pow(noise_value * 1.2, 4.0));
+		noise_value								= saturate(pow(noise_value * 1.5, 4.0));
 
 		float y_gradient						= pow(saturate(PositionWS().y + 0.1), 0.2);
 		noise_value								= lerp(noise_value, 0.0f, lerp(y_gradient, 0.0, pow(ratio, 16.0)));

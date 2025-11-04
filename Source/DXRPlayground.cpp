@@ -425,7 +425,8 @@ static void sPrepareImGui()
 				if (ImGui::Button("Reload Scene"))
 					sLoadScene(false);
 
-				ImGui::Checkbox("Enabled", &gNVAPI.mWireframeEnabled);
+				if (ImGui::Checkbox("Enabled", &gNVAPI.mWireframeEnabled))
+					gRenderer.mReloadShader = true;
 
 				bool endcap_chained = gNVAPI.mWireframeEndcapMode == NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_CHAINED;
 				if (ImGui::Checkbox("Endcap Chained (Wireframe)", &endcap_chained))
@@ -479,8 +480,17 @@ static void sPrepareImGui()
 			ImGui::TreePop();
 		}
 
-		if (ImGui::TreeNodeEx("Misc"))
+		if (ImGui::TreeNodeEx("Config", ImGuiTreeNodeFlags_DefaultOpen))
 		{
+			if (ImGui::Checkbox("Shader Debug", &gConfigs.mShaderDebug))
+				gRenderer.mReloadShader = true;
+
+			if (ImGui::Checkbox("Use Half", &gConfigs.mUseHalf))
+				gRenderer.mReloadShader = true;
+
+			if (ImGui::Checkbox("Use Texture", &gConfigs.mUseTexture))
+				gRenderer.mReloadShader = true;
+
 			if (ImGui::Checkbox("Test Lib Shader (ShaderTable)", &gConfigs.mTestHitShader))
 				gRenderer.mAccumulationResetRequested = true;
 
@@ -589,7 +599,7 @@ static void sPrepareImGui()
 						ImGui::Text("%s", instance_info.mMaterial.mMaterialName.c_str());
 
 						ImGui::TableSetColumnIndex(column_index++);
-						ImGui::Text("%s%s", NAMEOF_ENUM(instance_data.mBSDF).data(), instance_data.mTwoSided ? " (TwoSided)" : "");
+						ImGui::Text("%s%s", NAMEOF_ENUM(instance_data.mBSDF).data(), instance_data.mFlags.mTwoSided ? " (TwoSided)" : "");
 
 						ImGui::TableSetColumnIndex(column_index++);
 						std::string albedo = std::format("{:.2f} {:.2f} {:.2f} ", instance_data.mAlbedo.x, instance_data.mAlbedo.y, instance_data.mAlbedo.z);
@@ -935,12 +945,25 @@ static void sUpdate()
 }
 
 // Main code
-int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR /*lpCmdLine*/, int /*nCmdShow*/)
+int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR lpCmdLine, int /*nCmdShow*/)
 {
 	WNDCLASSEX wc = {};
 	HWND hwnd = 0;
 
-	if (!gHeadless)
+	if (lpCmdLine != nullptr && std::string_view(lpCmdLine).starts_with("-headless"))
+		gHeadless = true;
+
+	float app_time = 0.0f;
+	CPUTimingScope app_time_scope(app_time);
+	app_time_scope.mWriteToFile = gHeadless;
+
+	if (gHeadless)
+	{
+		gConfigs.mShaderDebug = false;
+		gConfigs.mUseTexture = false;
+		gDisplaySettings.mVsync = false;
+	}
+	else
 	{
 		// INI
 		int window_x = GetPrivateProfileInt(L"Main", L"Window_X", 100, kINIPathW);
@@ -1215,7 +1238,7 @@ void sRender()
 
 	// Update and Upload Constants
 	{
-		TIMING_SCOPE("Upload", gStats.mTimeMS.mUpload);
+		GPU_TIMING_SCOPE("Upload", gStats.mTimeMS.mUpload);
 
 		// Update
 		{
@@ -1288,35 +1311,35 @@ void sRender()
 
 	// Renderer
 	{
-		TIMING_SCOPE("Renderer", gStats.mTimeMS.mRenderer);
+		GPU_TIMING_SCOPE("Renderer", gStats.mTimeMS.mRenderer);
 
 		gRenderer.Render();
 	}
 
 	// Scene
 	{
-		TIMING_SCOPE("Scene", gStats.mTimeMS.mScene);
+		GPU_TIMING_SCOPE("Scene", gStats.mTimeMS.mScene);
 
 		gScene.Render();
 	}
 
 	// Atmosphere
 	{
-		TIMING_SCOPE("Atmosphere", gStats.mTimeMS.mAtmosphere);
+		GPU_TIMING_SCOPE("Atmosphere", gStats.mTimeMS.mAtmosphere);
 
 		gAtmosphere.Render();
 	}
 
 	// Cloud
 	{
-		TIMING_SCOPE("Cloud", gStats.mTimeMS.mCloud);
+		GPU_TIMING_SCOPE("Cloud", gStats.mTimeMS.mCloud);
 
 		gCloud.Render();
 	}
 
 	// Texture Generator
 	{
-		TIMING_SCOPE("TextureGenerator", gStats.mTimeMS.mTextureGenerator);
+		GPU_TIMING_SCOPE("TextureGenerator", gStats.mTimeMS.mTextureGenerator);
 
 		gRenderer.Setup(gRenderer.mRuntime.mGenerateTextureShader);
 
@@ -1329,7 +1352,7 @@ void sRender()
 	// BRDF Slice
 	if (!gHeadless)
 	{
-		TIMING_SCOPE("BRDFSlice", gStats.mTimeMS.mBRDFSlice);
+		GPU_TIMING_SCOPE("BRDFSlice", gStats.mTimeMS.mBRDFSlice);
 
 		gRenderer.Setup(gRenderer.mRuntime.mBRDFSliceShader);
 
@@ -1339,9 +1362,10 @@ void sRender()
 		gBarrierUAV(gCommandList, nullptr);
 	}
 
-	// Clear
+	// Clear for debug
+	if (!gHeadless)
 	{
-		TIMING_SCOPE("Clear", gStats.mTimeMS.mClear);
+		GPU_TIMING_SCOPE("Clear", gStats.mTimeMS.mClear);
 
 		gRenderer.Setup(gRenderer.mRuntime.mClearShader);
 		gCommandList->Dispatch(gAlignUpDiv(PixelInspection::kArraySize, 64u), 1, 1);
@@ -1353,8 +1377,9 @@ void sRender()
 	}
 	
 	// Depth
+	if (!gHeadless)
 	{
-		TIMING_SCOPE("Depths", gStats.mTimeMS.mDepths);
+		GPU_TIMING_SCOPE("Depths", gStats.mTimeMS.mDepths);
 
 		BarrierScope depth_scope(gCommandList, gRenderer.mRuntime.mScreenDepthTexture.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
@@ -1389,7 +1414,7 @@ void sRender()
 	// PrepareLights
 	if (gScene.GetSceneContent().mEmissiveTriangleCount > 0)
 	{
-		TIMING_SCOPE("PrepareLights", gStats.mTimeMS.mPrepareLights);
+		GPU_TIMING_SCOPE("PrepareLights", gStats.mTimeMS.mPrepareLights);
 
 		gRenderer.Setup(gRenderer.mRuntime.mPrepareLightsShader);
 		uint constants[] = { static_cast<uint>(gScene.GetPrepareLightsTaskCount()) };
@@ -1401,7 +1426,7 @@ void sRender()
 
 	// RayQuery
 	{
-		TIMING_SCOPE("RayQuery", gStats.mTimeMS.mRayQuery);
+		GPU_TIMING_SCOPE("RayQuery", gStats.mTimeMS.mRayQuery);
 
 		gRenderer.Setup(gRenderer.mRuntime.mRayQueryShader);
 		gCommandList->Dispatch(gAlignUpDiv(gRenderer.mScreenWidth, 8u), gAlignUpDiv(gRenderer.mScreenHeight, 8u), 1);
@@ -1445,7 +1470,7 @@ void sRender()
 	if (!gHeadless)
 	{
 		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Composite");
-		TIMING_SCOPE("Composite", gStats.mTimeMS.mComposite);
+		GPU_TIMING_SCOPE("Composite", gStats.mTimeMS.mComposite);
 
 		gBarrierTransition(gCommandList, back_buffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		BarrierScope depth_scope(gCommandList, gRenderer.mRuntime.mScreenDepthTexture.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_DEPTH_READ);
@@ -1935,6 +1960,7 @@ static LRESULT WINAPI sWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam
 			return 0;
 		break;
 	case WM_DESTROY:
+		if (!gHeadless)
 		{
 			// INI
 			auto SetPrivateProfileInt = [](LPCWSTR lpAppName, LPCWSTR lpKeyName, INT nValue, LPCWSTR lpFileName)

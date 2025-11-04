@@ -9,7 +9,7 @@
 #include "AtmosphereIntegration.h"
 #include "CloudIntegration.h"
 
-#ifdef NVAPI_LSS
+#if NVAPI_LSS
 #define IsHit(query) (query.CommittedStatus() == COMMITTED_TRIANGLE_HIT || NvRtCommittedIsLss(query) || NvRtCommittedIsSphere(query))
 #else
 #define IsHit(query) (query.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
@@ -28,7 +28,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 	float2 screen_size							= float2(ioPixelContext.mPixelTotal.xy);
 
 	// [TODO] Need proper reconstruction filter, see https://www.pbr-book.org/4ed/Sampling_and_Reconstruction/Image_Reconstruction
-	switch (mConstants.mOffsetMode)
+	switch (GetOffsetMode())
 	{
 	case OffsetMode::HalfPixel:	screen_coords	+= 0.5; break;
 	case OffsetMode::Random:	screen_coords	+= float2(RandomFloat01(random_state), RandomFloat01(random_state)); break;
@@ -59,9 +59,10 @@ void TraceRay(inout PixelContext ioPixelContext)
 	path_context.mRecursionDepth				= 0;
 	path_context.mMediumInstanceID				= InvalidInstanceID;
 
-	if (mConstants.mDebugFlag & DebugFlag::UpdateRayInspection)
-		if (ioPixelContext.mPixelIndex.x == mConstants.mPixelDebugCoord.x && ioPixelContext.mPixelIndex.y == mConstants.mPixelDebugCoord.y)
-			RayInspectionUAV[0].mPositionWS[0] = float4(ray.Origin + ray.Direction * ray.TMin, 1.0);
+	if (SHADER_DEBUG)
+		if (mConstants.mDebugFlag & DebugFlag::UpdateRayInspection)
+			if (ioPixelContext.mPixelIndex.x == mConstants.mPixelDebugCoord.x && ioPixelContext.mPixelIndex.y == mConstants.mPixelDebugCoord.y)
+				RayInspectionUAV[0].mPositionWS[0] = float4(ray.Origin + ray.Direction * ray.TMin, 1.0);
 
 	for (;;)
 	{
@@ -141,7 +142,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 				DebugValue(DebugMode::MediumInstanceID,			path_context.mRecursionDepth, float3(path_context.mMediumInstanceID, 0, 0));
 			}
 
-			// Debug
+			if (SHADER_DEBUG)
 			{
 				if (mConstants.mDebugFlag & DebugFlag::UpdateRayInspection)
 					if (ioPixelContext.mPixelIndex.x == mConstants.mPixelDebugCoord.x && ioPixelContext.mPixelIndex.y == mConstants.mPixelDebugCoord.y)
@@ -199,7 +200,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 			{
 				if (path_context.mRecursionDepth == 0 ||					// Camera ray hit the light
 					path_context.mPrevDiracDeltaDistribution || 			// Prev hit is DiracDeltaDistribution -> no light sample
-					mConstants.mSampleMode == SampleMode::SampleBSDF ||		// SampleBSDF mode -> no light sample
+					GetSampleMode() == SampleMode::SampleBSDF ||		// SampleBSDF mode -> no light sample
 					false)
 				{
 					// Add light contribution
@@ -209,7 +210,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 					if (path_context.mRecursionDepth == 0)
 						DebugValue(DebugMode::LightIndex, path_context.mRecursionDepth, hit_context.LightIndex() + 0.5); // Add a offset to identify light source in LightIndex debug output
 				}
-				else if (mConstants.mSampleMode == SampleMode::MIS)
+				else if (GetSampleMode() == SampleMode::MIS)
 				{
 					// Add light contribution with MIS
 					
@@ -229,7 +230,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 			else // Ray hit a surface
 			{
 				// Sample light (NEE) / [Mitsuba] Emitter sampling
-				bool sample_light = mConstants.mSampleMode == SampleMode::SampleLight || mConstants.mSampleMode == SampleMode::MIS;
+				bool sample_light = GetSampleMode() == SampleMode::SampleLight || GetSampleMode() == SampleMode::MIS;
 				if (mConstants.mLightCount > 0 &&							// No light -> no light sample
 					!hit_context.DiracDeltaDistribution() &&				// Current hit is DiracDeltaDistribution -> no light sample
 					sample_light &&											// SampleBSDF mode -> no light sample
@@ -282,7 +283,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 							float3 luminance					= light_context.Light().mEmission * (mConstants.mEmissionBoost * kPreExposure);
 							float3 light_emission				= luminance * bsdf_result.mBSDF * abs(bsdf_context.mNdotL) * light_weight;
 
-							if (mConstants.mSampleMode == SampleMode::MIS)
+							if (GetSampleMode() == SampleMode::MIS)
 							{
 								float mis_weight				= max(0.0f, MIS::PowerHeuristic(1, light_uniform_pdf, 1, bsdf_result.mBSDFSamplePDF));
 								light_emission					*= mis_weight;
@@ -302,7 +303,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 					
 					path_context.mEmission						+= path_context.mThroughput * emission; // Emissive BSDF
 					path_context.mThroughput					*= bsdf_result.mBSDFSamplePDF > 0 ? (bsdf_result.mBSDF * abs(bsdf_context.mNdotL) / bsdf_result.mBSDFSamplePDF) : 0;
-					path_context.mEtaScale						*= bsdf_result.mEta;
+					path_context.mEtaScale						*= ashalf(bsdf_result.mEta);
 					path_context.mMediumInstanceID				= bsdf_result.mMediumInstanceID; // [TODO] Need a medium stack to handle nested medium
 					
 					path_context.mPrevBSDFSamplePDF				= bsdf_result.mBSDFSamplePDF;
@@ -322,7 +323,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 			}
 			
 			// DebugMode
-			switch (mConstants.mVisualizeMode)
+			switch (GetVisualizeMode())
 			{
 			case VisualizeMode::None:			break;
 			case VisualizeMode::Barycentrics: 	path_context.mEmission = hit_context.Barycentrics(); continue_bounce = false; break;
@@ -342,7 +343,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 		{
 			// Ray missed (Background)
 
-			// Debug
+			if (SHADER_DEBUG)
 			{
 				if (mConstants.mDebugFlag & DebugFlag::UpdateRayInspection)
 					if (ioPixelContext.mPixelIndex.x == mConstants.mPixelDebugCoord.x && ioPixelContext.mPixelIndex.y == mConstants.mPixelDebugCoord.y)
@@ -421,19 +422,19 @@ void TraceRay(inout PixelContext ioPixelContext)
 		previous_output							= max(0, previous_output); // Eliminate nan
 		float3 mixed_output						= lerp(previous_output, current_output, mConstants.mCurrentFrameWeight);
 
-		if (mConstants.mVisualizeMode != VisualizeMode::None)
+		if (GetVisualizeMode() != VisualizeMode::None)
 			mixed_output						= current_output;
 
-		if (mConstants.mVisualizeMode == VisualizeMode::RecursionDepth)
+		if (GetVisualizeMode() == VisualizeMode::RecursionDepth)
 			mixed_output						= mConstants.mDebugRecursion == 0 ? path_context.mRecursionDepth : (mConstants.mDebugRecursion == path_context.mRecursionDepth);
 
-		if (mConstants.mVisualizeMode == VisualizeMode::RandomState)
+		if (GetVisualizeMode() == VisualizeMode::RandomState)
 			mixed_output						= path_context.mRecursionDepth < mConstants.mDebugRecursion ? 0 : pow(path_context.mRandomState / 4294967296.0, 2.0);
 
 		ScreenColorUAV[ioPixelContext.mPixelIndex.xy] = float4(mixed_output, 1);
 		
 		if (sDebugValueUpdated)
-			ScreenDebugUAV[ioPixelContext.mPixelIndex.xy] = sDebugValue;
+			WriteScreenDebugUAV(ioPixelContext.mPixelIndex.xy, sDebugValue);
 	}
 }
 
@@ -475,5 +476,5 @@ void DepthPS(
 	outDepth									= pixel_context.mDepth;
 	
 	if (sDebugValueUpdated)
-		ScreenDebugUAV[inPosition.xy]			= sDebugValue;
+		WriteScreenDebugUAV(inPosition.xy, sDebugValue);
 }

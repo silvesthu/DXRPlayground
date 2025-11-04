@@ -128,6 +128,8 @@ struct SceneContent
 
 	std::vector<Light>							mLights;
 
+	std::set<BSDF>								mBSDFs;
+
 	std::optional<glm::mat4x4>					mCameraTransform;
 	std::optional<float>						mFov;
 

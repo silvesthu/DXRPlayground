@@ -3,9 +3,9 @@
 #include "packing.hlsli"
 #include "utils.hlsli"
 
-#ifdef NVAPI_LSS
+#if NVAPI_LSS || NVAPI_SER
 #include "nvapi/nvHLSLExtns.h"
-#endif // NVAPI_LSS
+#endif // NVAPI_LSS || NVAPI_SER
 
 template <typename T> T fmadd(T inA, T inB, T inC)              { return inA * inB + inC; }
 template <typename T> T fmsub(T inA, T inB, T inC)              { return inA * inB - inC; }
@@ -320,11 +320,32 @@ float3 F_Conductor_Mitsuba(float3 inEta, float3 inK, float inCosThetaI)
     return 0.5f * (r_s + r_p);
 }
 
+OffsetMode GetOffsetMode()
+{
+    return SHADER_DEBUG ? mConstants.mOffsetMode : OffsetMode::HalfPixel;
+}
+
+SampleMode GetSampleMode()
+{
+    return SHADER_DEBUG ? mConstants.mSampleMode : mConstants.mSampleMode;
+}
+
+VisualizeMode GetVisualizeMode()
+{
+#if SHADER_DEBUG
+    return mConstants.mVisualizeMode;
+#else
+    return VisualizeMode::None;
+#endif // SHADER_DEBUG
+}
+
 static float3       sVisualizeModeValue = 0;
 void VisualizeValue(VisualizeMode inDebugMode, float3 inValue)
 {
+#if SHADER_DEBUG
     if (mConstants.mVisualizeMode == inDebugMode)
         sVisualizeModeValue = inValue;
+#endif // SHADER_DEBUG
 }
 
 static float4       sDebugValue = 0;
@@ -333,13 +354,16 @@ static uint3        sDebugDispatchRaysIndex;
 static uint3        sDebugDispatchRaysDimensions;
 void DebugValueInit()
 {
+#if SHADER_DEBUG
     if (sDebugDispatchRaysIndex.x == mConstants.mPixelDebugCoord.x && sDebugDispatchRaysIndex.y == mConstants.mPixelDebugCoord.y)
         for (int i = 0; i < PixelInspection::kArraySize; i++)
             PixelInspectionUAV[0].mPixelValueArray[i] = 0;
+#endif // SHADER_DEBUG
 }
 
 void DebugValue(DebugMode inDebugMode, uint inRecursionDepth, float3 inValue)
 {
+#if SHADER_DEBUG
     if (mConstants.mDebugMode == inDebugMode)
     {
         if (sDebugDispatchRaysIndex.x == mConstants.mPixelDebugCoord.x && sDebugDispatchRaysIndex.y == mConstants.mPixelDebugCoord.y && inRecursionDepth < PixelInspection::kArraySize)
@@ -354,12 +378,22 @@ void DebugValue(DebugMode inDebugMode, uint inRecursionDepth, float3 inValue)
         if (mConstants.mVisualizeMode == VisualizeMode::DebugValue)
             sVisualizeModeValue = inValue;
     }
+#endif // SHADER_DEBUG
 }
 
 void DebugValue(float3 inValue)
 {
+#if SHADER_DEBUG
     sDebugValue = float4(inValue, 1.0); // fill alpha to show on ImGui
     sDebugValueUpdated = true;
+#endif // SHADER_DEBUG
+}
+
+void WriteScreenDebugUAV(uint2 inCoords, float4 inValue)
+{
+#if SHADER_DEBUG
+    ScreenDebugUAV[inCoords] = inValue;
+#endif // SHADER_DEBUG
 }
 
 // Generate screen space triangle

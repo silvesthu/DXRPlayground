@@ -21,6 +21,7 @@ using Microsoft::WRL::ComPtr;
 #include <filesystem>
 #include <span>
 #include <chrono>
+#include <set>
 
 #include "Thirdparty/glm.h"
 #include "Thirdparty/nameof/include/nameof.hpp"
@@ -301,8 +302,8 @@ inline void gSetName(ComPtr<T>& inObject, std::string_view inPrefix, std::string
 	gSetName(inObject, gToWString(inPrefix), gToWString(inName), gToWString(inSuffix));
 }
 
-constexpr int								kScreenWidth = 1920;
-constexpr int								kScreenHeight = 1080;
+constexpr int								kScreenWidth = 1280;
+constexpr int								kScreenHeight = 720;
 
 constexpr int								kVertexCountPerTriangle = 3;
 
@@ -345,8 +346,14 @@ extern Stats								gStats;
 
 struct Configs
 {
+	bool									mShaderDebug = true;
+	bool									mUseHalf = true;
+	bool									mUseTexture = true;
+
 	bool									mTestHitShader = false;
 	bool									mVisualizeNanoVDB = false;
+
+	std::set<BSDF>							mSceneBSDFs;
 };
 extern Configs								gConfigs;
 

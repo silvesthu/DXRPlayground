@@ -498,21 +498,30 @@ STATITC_ASSERT(sizeof(NanoVDBInfo) == sizeof(float) * 12);
 
 enum : uint
 {
-	InvalidInstanceID							= 0xffffffff,
+	InvalidInstanceID = 0xffff,
 };
+
+struct InstanceFlag
+{
+	uint						mTwoSided : 1					CONSTANT_DEFAULT(0);
+	uint						mUV : 1							CONSTANT_DEFAULT(0);
+	uint						mPad : 30						CONSTANT_DEFAULT(0);
+};
+STATITC_ASSERT(sizeof(InstanceFlag) == sizeof(float) * 1);
 
 struct InstanceData
 {
 	// [TODO] Split material
 
 	BSDF						mBSDF							CONSTANT_DEFAULT(BSDF::Diffuse);
-	uint						mTwoSided						CONSTANT_DEFAULT(0);
+	InstanceFlag				mFlags;
 	float						mOpacity						CONSTANT_DEFAULT(1.0f);
 	uint						mLightIndex						CONSTANT_DEFAULT(0);
 
 	float						mRoughnessAlpha					CONSTANT_DEFAULT(0.0f);
 	TextureInfo					mNormalTexture;
-	float2						GENERATE_PAD_NAME				CONSTANT_DEFAULT(float2(0.0f, 0.0f));
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
     float3						mAlbedo							CONSTANT_DEFAULT(float3(0.0f, 0.0f, 0.0f));
 	TextureInfo					mAlbedoTexture;
@@ -795,7 +804,7 @@ struct Constants
 	int							mDebugInstanceIndex				CONSTANT_DEFAULT(-1);
 	int							mDebugLightIndex				CONSTANT_DEFAULT(-1);
 
-	uint						mRecursionDepthCountMax			CONSTANT_DEFAULT(64);
+	uint						mRecursionDepthCountMax			CONSTANT_DEFAULT(16);
 	uint						mRussianRouletteDepth			CONSTANT_DEFAULT(5);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
@@ -807,7 +816,7 @@ struct Constants
 
 	int							mSequenceEnabled				CONSTANT_DEFAULT(0);
 	int							mSequenceFrameIndex				CONSTANT_DEFAULT(0);
-	int							mSequenceFrameCount				CONSTANT_DEFAULT(4);
+	int							mSequenceFrameCount				CONSTANT_DEFAULT(30);
 	float						mSequenceFrameRatio				CONSTANT_DEFAULT(0.0f);
 
 	int2						mPixelDebugCoord				CONSTANT_DEFAULT(int2(-1, -1));

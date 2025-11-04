@@ -206,7 +206,7 @@ namespace BSDFEvaluation
 	{
 		void PatchThinDielectricBefore(HitContext inHitContext, inout float ioCosTheta, inout float ioEta)
 		{
-			if (inHitContext.BSDF() != BSDF::ThinDielectric)
+			if (!USE_BSDF_ThinDielectric || inHitContext.BSDF() != BSDF::ThinDielectric)
 				return;
 
 			// [NOTE] ThinDielectric essentially mean IOR is same on both side, hence the abs
@@ -215,7 +215,7 @@ namespace BSDFEvaluation
 
 		void PatchThinDielectricAfter(HitContext inHitContext, inout float ioR, inout float ioCosThetaT, inout float ioEtaIT, inout float ioEtaTI)
 		{
-			if (inHitContext.BSDF() != BSDF::ThinDielectric)
+			if (!USE_BSDF_ThinDielectric || inHitContext.BSDF() != BSDF::ThinDielectric)
 				return;
 
 			// Account for internal reflections: r' = r + trt + tr^3t + ..
@@ -512,14 +512,26 @@ namespace BSDFEvaluation
 
 		switch (inHitContext.BSDF())
 		{
-		case BSDF::Unsupported:					bsdf_context = Diffuse::GenerateContext(inHitContext, ioPathContext); break;
-		case BSDF::Diffuse:						bsdf_context = Diffuse::GenerateContext(inHitContext, ioPathContext); break;
+#if USE_BSDF_Conductor
 		case BSDF::Conductor:					bsdf_context = Conductor::GenerateContext(inHitContext, ioPathContext); break;
+#endif // USE_BSDF_Conductor
+#if USE_BSDF_RoughConductor
 		case BSDF::RoughConductor:				bsdf_context = RoughConductor::GenerateContext(inHitContext, ioPathContext); break;
+#endif // USE_BSDF_RoughConductor
+#if USE_BSDF_Dielectric
 		case BSDF::Dielectric:					bsdf_context = Dielectric::GenerateContext(inHitContext, ioPathContext); break;
+#endif // USE_BSDF_Dielectric
+#if USE_BSDF_ThinDielectric
 		case BSDF::ThinDielectric:				bsdf_context = Dielectric::GenerateContext(inHitContext, ioPathContext); break;
+#endif // USE_BSDF_ThinDielectric
+#if USE_BSDF_RoughDielectric
 		case BSDF::RoughDielectric:				bsdf_context = RoughDielectric::GenerateContext(inHitContext, ioPathContext); break;
+#endif // USE_BSDF_RoughDielectric
+#if USE_BSDF_pbrMetallicRoughness
 		case BSDF::pbrMetallicRoughness:		bsdf_context = glTF::GenerateContext(inHitContext, ioPathContext); break;
+#endif // USE_BSDF_pbrMetallicRoughness
+
+		case BSDF::Diffuse:						// [passthrough]
 		default:								bsdf_context = Diffuse::GenerateContext(inHitContext, ioPathContext); break;
 		}
 
@@ -538,14 +550,26 @@ namespace BSDFEvaluation
 		BSDFResult result;
 		switch (inHitContext.BSDF())
 		{
-		case BSDF::Diffuse:						result = Diffuse::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
+#if USE_BSDF_Conductor
 		case BSDF::Conductor:					result = Conductor::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
+#endif // USE_BSDF_Conductor
+#if USE_BSDF_RoughConductor
 		case BSDF::RoughConductor:				result = RoughConductor::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
+#endif // USE_BSDF_RoughConductor
+#if USE_BSDF_Dielectric
 		case BSDF::Dielectric:					result = Dielectric::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
+#endif // USE_BSDF_Dielectric
+#if USE_BSDF_ThinDielectric
 		case BSDF::ThinDielectric:				result = Dielectric::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
+#endif // USE_BSDF_ThinDielectric
+#if USE_BSDF_RoughDielectric
 		case BSDF::RoughDielectric:				result = RoughDielectric::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
+#endif // USE_BSDF_RoughDielectric
+#if USE_BSDF_pbrMetallicRoughness
 		case BSDF::pbrMetallicRoughness:		result = glTF::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
-		case BSDF::Unsupported:					result = Diffuse::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
+#endif // USE_BSDF_pbrMetallicRoughness
+
+		case BSDF::Diffuse:						// [passthrough]
 		default:								result = Diffuse::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
 		}
 

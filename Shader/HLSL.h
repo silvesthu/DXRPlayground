@@ -64,4 +64,8 @@ struct RayQuery
 
 };
 
+#define SHADER_DEBUG 1
+#define USE_HALF 1
+#define USE_TEXTURE 1
+
 #endif // __INTELLISENSE__
