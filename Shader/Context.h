@@ -260,12 +260,12 @@ struct SurfaceContext
 
 struct Ray
 {
-	static Ray Generate(RayDesc inRayDesc)
+	static Ray Generate(RayDesc inRayDesc, float inTCurrent)
 	{
 		Ray ray;
 		ray.mOrigin								= inRayDesc.Origin;
 		ray.mDirection							= inRayDesc.Direction;
-		ray.mTCurrent							= inf();
+		ray.mTCurrent							= inTCurrent;
 		return ray;
 	}
 	

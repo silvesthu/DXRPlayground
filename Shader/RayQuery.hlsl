@@ -102,11 +102,6 @@ void TraceRay(inout PixelContext ioPixelContext)
 		
 		if (IsHit(query))
 		{
-			// Ray hit something
-
-			// HitContext
-			HitContext hit_context				= HitContext::Generate(ray, query);
-
 			// Participating media (Medium)
 			// [TODO] Need a medium stack to handle nested medium
 			// [TODO] Skip medium in case ray is offseted to outside, or mesh is not water tight
@@ -120,7 +115,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 				float majorant_extinction		= medium_context.mMajorantSigmaT[channel];
 				float free_flight_distance		= -log(1.0 - RandomFloat01(path_context.mRandomState)) / majorant_extinction;
 
-				if (free_flight_distance < hit_context.mRayWS.mTCurrent)
+				if (free_flight_distance < query.CommittedRayT())
 				{
 					medium_context.ScatterAt(free_flight_distance, path_context);
 
@@ -136,7 +131,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 				}
 
 				DebugValue(DebugMode::MediumExtinction,			path_context.mRecursionDepth, medium_context.SigmaT());
-				DebugValue(DebugMode::MediumFreeFlight,			path_context.mRecursionDepth, float3(free_flight_distance, hit_context.mRayWS.mTCurrent, free_flight_distance < hit_context.mRayWS.mTCurrent ? 1 : 0));
+				DebugValue(DebugMode::MediumFreeFlight,			path_context.mRecursionDepth, float3(free_flight_distance, query.CommittedRayT(), free_flight_distance < query.CommittedRayT() ? 1 : 0));
 			}
 			{
 				DebugValue(DebugMode::MediumInstanceID,			path_context.mRecursionDepth, float3(path_context.mMediumInstanceID, 0, 0));
@@ -168,7 +163,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 				float3 in_scattering			= 0;
 				float3 transmittance			= 1;
 
-				GetSkyLuminanceToPoint(hit_context.mRayWS, in_scattering, transmittance);
+				GetSkyLuminanceToPoint(Ray::Generate(ray, query.CommittedRayT()), in_scattering, transmittance);
 
 				path_context.mEmission			+= in_scattering;
 				path_context.mThroughput		*= transmittance;
@@ -176,167 +171,173 @@ void TraceRay(inout PixelContext ioPixelContext)
 				VisualizeValue(VisualizeMode::InScattering, in_scattering);
 				VisualizeValue(VisualizeMode::Transmittance, transmittance);
 			}
-
-			// Emission
-			float3 emission = hit_context.Emission() * (mConstants.mEmissionBoost * kPreExposure);
-			{
-				if (dot(hit_context.mVertexNormalWS, hit_context.ViewWS()) < 0 && !hit_context.TwoSided())
-					emission = 0;
-
-				// IES
-				//float angle = acos(dot(-hit_context.mRayDirectionWS, float3(0,-1,0))) / MATH_PI;
-				//float ies = IESSRV.SampleLevel(BilinearClampSampler, float2(angle, 0), 0).x;
-				//hit_context.mEmission *= ies;
-
-				if (mConstants.mDebugInstanceIndex == hit_context.mInstanceID && mConstants.mDebugInstanceMode == DebugInstanceMode::Barycentrics)
-					emission = hit_context.mBarycentrics;
-			}
 			
 			if (medium_context.mScatteringEvent) // Ray scatters
 			{
 				// To next bounce
 			}
-			else if (hit_context.BSDF() == BSDF::Light) // Ray hit a light / [Mitsuba] Direct emission
+			else 
 			{
-				if (path_context.mRecursionDepth == 0 ||					// Camera ray hit the light
-					path_context.mPrevDiracDeltaDistribution || 			// Prev hit is DiracDeltaDistribution -> no light sample
-					GetSampleMode() == SampleMode::SampleBSDF ||		// SampleBSDF mode -> no light sample
-					false)
-				{
-					// Add light contribution
-					
-					path_context.mEmission						+= path_context.mThroughput * emission;
-					
-					if (path_context.mRecursionDepth == 0)
-						DebugValue(DebugMode::LightIndex, path_context.mRecursionDepth, hit_context.LightIndex() + 0.5); // Add a offset to identify light source in LightIndex debug output
-				}
-				else if (GetSampleMode() == SampleMode::MIS)
-				{
-					// Add light contribution with MIS
-					
-					// Select light
-					uint light_index							= hit_context.LightIndex();
-					Light light									= Lights[light_index];
+				// HitContext
+				HitContext hit_context			= HitContext::Generate(ray, query);
 
-					LightContext light_context					= LightEvaluation::GenerateContext(LightEvaluation::ContextType::Input, ray.Direction, light_index, ray.Origin, path_context);
-					float light_mis_pdf							= light_context.mSolidAnglePDF * light_context.UniformSelectionPDF();
-					
-					float mis_weight							= max(0.0f, MIS::PowerHeuristic(1, path_context.mPrevBSDFSamplePDF, 1, light_mis_pdf));
-					path_context.mEmission						+= path_context.mThroughput * emission * mis_weight;
-					
-					DebugValue(DebugMode::MIS_BSDF,				path_context.mRecursionDepth - 1 /* for prev BSDF hit */, float3(path_context.mPrevBSDFSamplePDF, light_mis_pdf, mis_weight));
-				}
-			}
-			else // Ray hit a surface
-			{
-				// Sample light (NEE) / [Mitsuba] Emitter sampling
-				bool sample_light = GetSampleMode() == SampleMode::SampleLight || GetSampleMode() == SampleMode::MIS;
-				if (mConstants.mLightCount > 0 &&							// No light -> no light sample
-					!hit_context.DiracDeltaDistribution() &&				// Current hit is DiracDeltaDistribution -> no light sample
-					sample_light &&											// SampleBSDF mode -> no light sample
-					true)
+				// Emission
+				float3 emission = hit_context.Emission() * (mConstants.mEmissionBoost * kPreExposure);
 				{
-					// Select light
-					LightContext light_context					= LightEvaluation::SelectLight(hit_context.PositionWS(), path_context);
-					DebugValue(DebugMode::LightIndex, path_context.mRecursionDepth, light_context.LightIndex());
-					
-					float light_uniform_pdf						= light_context.mSolidAnglePDF * light_context.UniformSelectionPDF(); // [TODO] Unify MIS (with BRDF sample) to use same mis weight
-					float light_weight							= light_context.mSolidAnglePDF <= 0.0 ? 0.0 : (light_context.SelectionWeight() / light_context.mSolidAnglePDF);
-					// light_weight								= 1.0 / light_uniform_pdf; // for uniform sample debugging
+					if (dot(hit_context.mVertexNormalWS, hit_context.ViewWS()) < 0 && !hit_context.TwoSided())
+						emission = 0;
 
-					DebugValue(DebugMode::RIS_SAMPLE,	path_context.mRecursionDepth, float3(light_context.mReservoir.mTargetPDF, 0.0, 0.0));
-					DebugValue(DebugMode::RIS_SUM,		path_context.mRecursionDepth, float3(light_context.mReservoir.mWeightSum, light_context.mReservoir.mCountSum, 0.0));
-					
-					if (light_context.IsValid() && light_weight > 0)
+					// IES
+					//float angle = acos(dot(-hit_context.mRayDirectionWS, float3(0,-1,0))) / MATH_PI;
+					//float ies = IESSRV.SampleLevel(BilinearClampSampler, float2(angle, 0), 0).x;
+					//hit_context.mEmission *= ies;
+
+					if (mConstants.mDebugInstanceIndex == hit_context.mInstanceID && mConstants.mDebugInstanceMode == DebugInstanceMode::Barycentrics)
+						emission = hit_context.mBarycentrics;
+				}
+
+				if (hit_context.BSDF() == BSDF::Light) // Ray hit a light / [Mitsuba] Direct emission
+				{
+					if (path_context.mRecursionDepth == 0 ||					// Camera ray hit the light
+						path_context.mPrevDiracDeltaDistribution || 			// Prev hit is DiracDeltaDistribution -> no light sample
+						GetSampleMode() == SampleMode::SampleBSDF ||		// SampleBSDF mode -> no light sample
+						false)
 					{
-						// Cast shadow ray
-						RayDesc shadow_ray;
-						shadow_ray.Origin						= hit_context.PositionWS();
-						shadow_ray.Direction					= light_context.mL;
-						shadow_ray.TMin							= 0.001;
-						shadow_ray.TMax							= 100000;
+						// Add light contribution
+					
+						path_context.mEmission						+= path_context.mThroughput * emission;
+					
+						if (path_context.mRecursionDepth == 0)
+							DebugValue(DebugMode::LightIndex, path_context.mRecursionDepth, hit_context.LightIndex() + 0.5); // Add a offset to identify light source in LightIndex debug output
+					}
+					else if (GetSampleMode() == SampleMode::MIS)
+					{
+						// Add light contribution with MIS
+					
+						// Select light
+						uint light_index							= hit_context.LightIndex();
+						Light light									= Lights[light_index];
 
-						RayQuery<RAY_FLAG_FORCE_OPAQUE> shadow_query;
-						uint shadow_additional_ray_flags		= 0;
-						uint shadow_ray_instance_mask			= 0xffffffff;
-						shadow_query.TraceRayInline(RaytracingScene, shadow_additional_ray_flags, shadow_ray_instance_mask, shadow_ray);
-						shadow_query.Proceed();
-						
-						// Shadow ray hit the light
-						if (IsHit(shadow_query) && shadow_query.CommittedInstanceID() == light_context.Light().mInstanceID)
+						LightContext light_context					= LightEvaluation::GenerateContext(LightEvaluation::ContextType::Input, ray.Direction, light_index, ray.Origin, path_context);
+						float light_mis_pdf							= light_context.mSolidAnglePDF * light_context.UniformSelectionPDF();
+					
+						float mis_weight							= max(0.0f, MIS::PowerHeuristic(1, path_context.mPrevBSDFSamplePDF, 1, light_mis_pdf));
+						path_context.mEmission						+= path_context.mThroughput * emission * mis_weight;
+					
+						DebugValue(DebugMode::MIS_BSDF,				path_context.mRecursionDepth - 1 /* for prev BSDF hit */, float3(path_context.mPrevBSDFSamplePDF, light_mis_pdf, mis_weight));
+					}
+				}
+				else // Ray hit a surface
+				{
+					// Sample light (NEE) / [Mitsuba] Emitter sampling
+					bool sample_light = GetSampleMode() == SampleMode::SampleLight || GetSampleMode() == SampleMode::MIS;
+					if (mConstants.mLightCount > 0 &&							// No light -> no light sample
+						!hit_context.DiracDeltaDistribution() &&				// Current hit is DiracDeltaDistribution -> no light sample
+						sample_light &&											// SampleBSDF mode -> no light sample
+						true)
+					{
+						// Select light
+						LightContext light_context					= LightEvaluation::SelectLight(hit_context.PositionWS(), path_context);
+						DebugValue(DebugMode::LightIndex, path_context.mRecursionDepth, light_context.LightIndex());
+					
+						float light_uniform_pdf						= light_context.mSolidAnglePDF * light_context.UniformSelectionPDF(); // [TODO] Unify MIS (with BRDF sample) to use same mis weight
+						float light_weight							= light_context.mSolidAnglePDF <= 0.0 ? 0.0 : (light_context.SelectionWeight() / light_context.mSolidAnglePDF);
+						// light_weight								= 1.0 / light_uniform_pdf; // for uniform sample debugging
+
+						DebugValue(DebugMode::RIS_SAMPLE,	path_context.mRecursionDepth, float3(light_context.mReservoir.mTargetPDF, 0.0, 0.0));
+						DebugValue(DebugMode::RIS_SUM,		path_context.mRecursionDepth, float3(light_context.mReservoir.mWeightSum, light_context.mReservoir.mCountSum, 0.0));
+					
+						if (light_context.IsValid() && light_weight > 0)
 						{
-							if (mConstants.mDebugFlag& DebugFlag::UpdateRayInspection)
-								if (ioPixelContext.mPixelIndex.x == mConstants.mPixelDebugCoord.x && ioPixelContext.mPixelIndex.y == mConstants.mPixelDebugCoord.y)
-									RayInspectionUAV[0].mLightPositionWS[path_context.mRecursionDepth + 1] = float4(shadow_ray.Origin + shadow_ray.Direction * shadow_query.CommittedRayT(), 1.0);
-							
-							BSDFContext bsdf_context			= BSDFContext::Generate(BSDFContext::Mode::Light, light_context.mL, hit_context);
-							BSDFResult bsdf_result				= BSDFEvaluation::Evaluate(bsdf_context, hit_context, path_context);
-							
-							DebugValue(DebugMode::Light_L, 		path_context.mRecursionDepth, float3(bsdf_context.mL));
-							DebugValue(DebugMode::Light_V, 		path_context.mRecursionDepth, float3(bsdf_context.mV));
-							DebugValue(DebugMode::Light_N, 		path_context.mRecursionDepth, float3(bsdf_context.mN));
-							DebugValue(DebugMode::Light_H, 		path_context.mRecursionDepth, float3(bsdf_context.mH));
+							// Cast shadow ray
+							RayDesc shadow_ray;
+							shadow_ray.Origin						= hit_context.PositionWS();
+							shadow_ray.Direction					= light_context.mL;
+							shadow_ray.TMin							= 0.001;
+							shadow_ray.TMax							= 100000;
 
-							DebugValue(DebugMode::Light_BSDF,	path_context.mRecursionDepth, float3(bsdf_result.mBSDF));
-							DebugValue(DebugMode::Light_PDF,	path_context.mRecursionDepth, float3(1.0 / light_weight, 0, 0));
-
-							float3 luminance					= light_context.Light().mEmission * (mConstants.mEmissionBoost * kPreExposure);
-							float3 light_emission				= luminance * bsdf_result.mBSDF * abs(bsdf_context.mNdotL) * light_weight;
-
-							if (GetSampleMode() == SampleMode::MIS)
+							RayQuery<RAY_FLAG_FORCE_OPAQUE> shadow_query;
+							uint shadow_additional_ray_flags		= 0;
+							uint shadow_ray_instance_mask			= 0xffffffff;
+							shadow_query.TraceRayInline(RaytracingScene, shadow_additional_ray_flags, shadow_ray_instance_mask, shadow_ray);
+							shadow_query.Proceed();
+						
+							// Shadow ray hit the light
+							if (IsHit(shadow_query) && shadow_query.CommittedInstanceID() == light_context.Light().mInstanceID)
 							{
-								float mis_weight				= max(0.0f, MIS::PowerHeuristic(1, light_uniform_pdf, 1, bsdf_result.mBSDFSamplePDF));
-								light_emission					*= mis_weight;
-								
-								DebugValue(DebugMode::MIS_LIGHT, path_context.mRecursionDepth, float3(bsdf_result.mBSDFSamplePDF, light_uniform_pdf, mis_weight));
-							}
+								if (mConstants.mDebugFlag& DebugFlag::UpdateRayInspection)
+									if (ioPixelContext.mPixelIndex.x == mConstants.mPixelDebugCoord.x && ioPixelContext.mPixelIndex.y == mConstants.mPixelDebugCoord.y)
+										RayInspectionUAV[0].mLightPositionWS[path_context.mRecursionDepth + 1] = float4(shadow_ray.Origin + shadow_ray.Direction * shadow_query.CommittedRayT(), 1.0);
+							
+								BSDFContext bsdf_context			= BSDFContext::Generate(BSDFContext::Mode::Light, light_context.mL, hit_context);
+								BSDFResult bsdf_result				= BSDFEvaluation::Evaluate(bsdf_context, hit_context, path_context);
+							
+								DebugValue(DebugMode::Light_L, 		path_context.mRecursionDepth, float3(bsdf_context.mL));
+								DebugValue(DebugMode::Light_V, 		path_context.mRecursionDepth, float3(bsdf_context.mV));
+								DebugValue(DebugMode::Light_N, 		path_context.mRecursionDepth, float3(bsdf_context.mN));
+								DebugValue(DebugMode::Light_H, 		path_context.mRecursionDepth, float3(bsdf_context.mH));
 
-							path_context.mLightEmission			= path_context.mThroughput * light_emission;
+								DebugValue(DebugMode::Light_BSDF,	path_context.mRecursionDepth, float3(bsdf_result.mBSDF));
+								DebugValue(DebugMode::Light_PDF,	path_context.mRecursionDepth, float3(1.0 / light_weight, 0, 0));
+
+								float3 luminance					= light_context.Light().mEmission * (mConstants.mEmissionBoost * kPreExposure);
+								float3 light_emission				= luminance * bsdf_result.mBSDF * abs(bsdf_context.mNdotL) * light_weight;
+
+								if (GetSampleMode() == SampleMode::MIS)
+								{
+									float mis_weight				= max(0.0f, MIS::PowerHeuristic(1, light_uniform_pdf, 1, bsdf_result.mBSDFSamplePDF));
+									light_emission					*= mis_weight;
+								
+									DebugValue(DebugMode::MIS_LIGHT, path_context.mRecursionDepth, float3(bsdf_result.mBSDFSamplePDF, light_uniform_pdf, mis_weight));
+								}
+
+								path_context.mLightEmission			= path_context.mThroughput * light_emission;
+							}
 						}
+					}
+
+					// Sample BSDF / [Mitsuba] BSDF sampling
+					{
+						BSDFContext bsdf_context					= BSDFEvaluation::GenerateContext(hit_context, path_context);
+						BSDFResult bsdf_result						= BSDFEvaluation::Evaluate(bsdf_context, hit_context, path_context);
+					
+						path_context.mEmission						+= path_context.mThroughput * emission; // Emissive BSDF
+						path_context.mThroughput					*= bsdf_result.mBSDFSamplePDF > 0 ? (bsdf_result.mBSDF * abs(bsdf_context.mNdotL) / bsdf_result.mBSDFSamplePDF) : 0;
+						path_context.mEtaScale						*= ashalf(bsdf_result.mEta);
+						path_context.mMediumInstanceID				= bsdf_result.mMediumInstanceID; // [TODO] Need a medium stack to handle nested medium
+					
+						path_context.mPrevBSDFSamplePDF				= bsdf_result.mBSDFSamplePDF;
+						path_context.mPrevDiracDeltaDistribution	= hit_context.DiracDeltaDistribution();
+
+						DebugValue(DebugMode::BSDF__BSDF,			path_context.mRecursionDepth, float3(bsdf_result.mBSDF));
+						DebugValue(DebugMode::BSDF__PDF,			path_context.mRecursionDepth, float3(bsdf_result.mBSDFSamplePDF, 0, 0));
+
+						DebugValue(DebugMode::DiracDelta,			path_context.mRecursionDepth, float3(hit_context.DiracDeltaDistribution(), 0, 0));
+						DebugValue(DebugMode::LobeIndex,			path_context.mRecursionDepth, float3(bsdf_result.mLobeIndex, 0, 0));
+
+						// Prepare for next bounce
+						ray.Origin									= hit_context.PositionWS();
+						ray.Direction								= bsdf_context.mL;
+						continue_bounce								= true;
 					}
 				}
 
-				// Sample BSDF / [Mitsuba] BSDF sampling
+				// DebugMode
+				switch (GetVisualizeMode())
 				{
-					BSDFContext bsdf_context					= BSDFEvaluation::GenerateContext(hit_context, path_context);
-					BSDFResult bsdf_result						= BSDFEvaluation::Evaluate(bsdf_context, hit_context, path_context);
-					
-					path_context.mEmission						+= path_context.mThroughput * emission; // Emissive BSDF
-					path_context.mThroughput					*= bsdf_result.mBSDFSamplePDF > 0 ? (bsdf_result.mBSDF * abs(bsdf_context.mNdotL) / bsdf_result.mBSDFSamplePDF) : 0;
-					path_context.mEtaScale						*= ashalf(bsdf_result.mEta);
-					path_context.mMediumInstanceID				= bsdf_result.mMediumInstanceID; // [TODO] Need a medium stack to handle nested medium
-					
-					path_context.mPrevBSDFSamplePDF				= bsdf_result.mBSDFSamplePDF;
-					path_context.mPrevDiracDeltaDistribution	= hit_context.DiracDeltaDistribution();
-
-					DebugValue(DebugMode::BSDF__BSDF,			path_context.mRecursionDepth, float3(bsdf_result.mBSDF));
-					DebugValue(DebugMode::BSDF__PDF,			path_context.mRecursionDepth, float3(bsdf_result.mBSDFSamplePDF, 0, 0));
-
-					DebugValue(DebugMode::DiracDelta,			path_context.mRecursionDepth, float3(hit_context.DiracDeltaDistribution(), 0, 0));
-					DebugValue(DebugMode::LobeIndex,			path_context.mRecursionDepth, float3(bsdf_result.mLobeIndex, 0, 0));
-
-					// Prepare for next bounce
-					ray.Origin									= hit_context.PositionWS();
-					ray.Direction								= bsdf_context.mL;
-					continue_bounce								= true;
+				case VisualizeMode::None:							break;
+				case VisualizeMode::Barycentrics: 					path_context.mEmission = hit_context.Barycentrics(); continue_bounce = false; break;
+				case VisualizeMode::Position: 						path_context.mEmission = hit_context.PositionWS(); continue_bounce = false; break;
+				case VisualizeMode::Normal: 						path_context.mEmission = hit_context.NormalWS(); continue_bounce = false; break;
+				case VisualizeMode::UV:								path_context.mEmission = float3(hit_context.UV(), 0.0); continue_bounce = false; break;
+				case VisualizeMode::Albedo: 						path_context.mEmission = hit_context.Albedo(); continue_bounce = false; break;
+				case VisualizeMode::Reflectance: 					path_context.mEmission = hit_context.SpecularReflectance(); continue_bounce = false; break;
+				case VisualizeMode::Emission: 						path_context.mEmission = hit_context.Emission(); continue_bounce = false; break;
+				case VisualizeMode::RoughnessAlpha:					path_context.mEmission = hit_context.RoughnessAlpha(); continue_bounce = false; break;
+				case VisualizeMode::RecursionDepth:					continue_bounce = true; break;
+				case VisualizeMode::RandomState:					continue_bounce = path_context.mRecursionDepth <= mConstants.mDebugRecursion; break;
+				default:											path_context.mEmission = sVisualizeModeValue; continue_bounce = false; break;
 				}
-			}
-			
-			// DebugMode
-			switch (GetVisualizeMode())
-			{
-			case VisualizeMode::None:			break;
-			case VisualizeMode::Barycentrics: 	path_context.mEmission = hit_context.Barycentrics(); continue_bounce = false; break;
-			case VisualizeMode::Position: 		path_context.mEmission = hit_context.PositionWS(); continue_bounce = false; break;
-			case VisualizeMode::Normal: 		path_context.mEmission = hit_context.NormalWS(); continue_bounce = false; break;
-			case VisualizeMode::UV:				path_context.mEmission = float3(hit_context.UV(), 0.0); continue_bounce = false; break;
-			case VisualizeMode::Albedo: 		path_context.mEmission = hit_context.Albedo(); continue_bounce = false; break;
-			case VisualizeMode::Reflectance: 	path_context.mEmission = hit_context.SpecularReflectance(); continue_bounce = false; break;
-			case VisualizeMode::Emission: 		path_context.mEmission = hit_context.Emission(); continue_bounce = false; break;
-			case VisualizeMode::RoughnessAlpha: path_context.mEmission = hit_context.RoughnessAlpha(); continue_bounce = false; break;
-			case VisualizeMode::RecursionDepth:	continue_bounce = true; break;
-			case VisualizeMode::RandomState:	continue_bounce = path_context.mRecursionDepth <= mConstants.mDebugRecursion; break;
-			default:							path_context.mEmission = sVisualizeModeValue; continue_bounce = false; break;
 			}
 		}
 		else
@@ -358,11 +359,11 @@ void TraceRay(inout PixelContext ioPixelContext)
 				DebugValue(DebugMode::InstanceID, path_context.mRecursionDepth, float3(-1.0, 0.0, 0.0));
 			}
 
-			float3 sky_luminance				= GetSkyLuminance(Ray::Generate(ray));
+			float3 sky_luminance				= GetSkyLuminance(Ray::Generate(ray, 0.0f));
 
 			float3 cloud_transmittance			= 1;
 			float3 cloud_luminance				= 0;
-		 	RaymarchCloud(Ray::Generate(ray), cloud_transmittance, cloud_luminance);
+		 	RaymarchCloud(Ray::Generate(ray, 0.0f), cloud_transmittance, cloud_luminance);
 
 			float3 emission						= lerp(sky_luminance, cloud_luminance, 1.0 - cloud_transmittance);
 			path_context.mEmission				+= path_context.mThroughput * emission;
