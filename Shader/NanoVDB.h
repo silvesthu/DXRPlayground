@@ -23,7 +23,6 @@ struct NanoVDBContext
 		pnanovdb_grid_handle_t Grid;			Grid.address = Address;
 		pnanovdb_tree_handle_t Tree				= pnanovdb_grid_get_tree(buf, Grid);
 		pnanovdb_root_handle_t Root				= pnanovdb_tree_get_root(buf, Tree);
-		grid_type								= pnanovdb_grid_get_grid_type(buf, Grid);
 
 		pnanovdb_readaccessor_init(acc, Root);
 	}
@@ -35,7 +34,7 @@ struct NanoVDBContext
 		pnanovdb_coord_t ijk					= mInfo.mOffset + inCoords;
 
 		// ReadValue, https://github.com/eidosmontreal/unreal-vdb/blob/main/Shaders/Private/VdbCommon.ush, adjusted
-		pnanovdb_uint32_t level;
+		pnanovdb_uint32_t grid_type				= 1; // float
 		pnanovdb_address_t address				= pnanovdb_readaccessor_get_value_address(grid_type, buf, acc, ijk);
 		float density							= pnanovdb_read_float(buf, address);
 		return									density;
@@ -57,7 +56,6 @@ struct NanoVDBContext
 		return SampleCoords(uint_coords);
 	}
 
-	pnanovdb_uint32_t grid_type;
 	pnanovdb_readaccessor_t acc;
 	NanoVDBInfo mInfo;
 	bool mValid;
