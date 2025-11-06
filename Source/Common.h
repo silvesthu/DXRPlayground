@@ -351,7 +351,9 @@ struct Configs
 	bool									mUseTexture = true;
 
 	bool									mTestHitShader = false;
-	bool									mVisualizeNanoVDB = false;
+
+	bool									mNanoVDBGenerateTexture = false;
+	bool									mNanoVDBUseTexture = false;
 
 	std::set<BSDF>							mSceneBSDFs;
 };

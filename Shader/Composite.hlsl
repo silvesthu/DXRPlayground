@@ -294,6 +294,8 @@ void NanoVDBVisualizeCS(
 	if (any(inDispatchThreadID >= instance_data.mMediumNanoVBD.mSize))
 		return;
 
-	float density								= SampleNanoVDBCoords(inDispatchThreadID.xyz, instance_data.mMediumNanoVBD);
+	NanoVDBContext context;
+	context.Initialize(instance_data.mMediumNanoVBD);
+	float density								= context.SampleCoords(inDispatchThreadID.xyz);
 	output[inDispatchThreadID.xyz]				= density;
 }

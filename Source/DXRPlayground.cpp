@@ -494,8 +494,11 @@ static void sPrepareImGui()
 			if (ImGui::Checkbox("Test Lib Shader (ShaderTable)", &gConfigs.mTestHitShader))
 				gRenderer.mAccumulationResetRequested = true;
 
-			if (ImGui::Checkbox("Visualize NanoVDB in Scene Textures", &gConfigs.mVisualizeNanoVDB))
+			if (ImGui::Checkbox("NanoVDB Generate Texture (in Scene Textures)", &gConfigs.mNanoVDBGenerateTexture))
 				sLoadScene(false);
+
+			if (ImGui::Checkbox("NanoVDB Use Texture (Require Generate)", &gConfigs.mNanoVDBUseTexture))
+				gRenderer.mReloadShader = true;
 
 			ImGui::TreePop();
 		}

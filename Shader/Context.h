@@ -432,10 +432,10 @@ struct MediumContext
 {
 	void ApplyNanoVDB(inout PathContext ioPathContext)
 	{
-		if (mInstanceData.mMediumNanoVBD.mBufferIndex == (uint)ViewDescriptorIndex::Invalid)
+		if (!mNanoVDBContext.mValid)
 			return;
 
-		float density							= SampleNanoVDB(PositionOS(), mInstanceData.mMediumNanoVBD);
+		float density							= mNanoVDBContext.Sample(PositionOS());
 		mSigmaT									*= density * mConstants.mDensityBoost;
 		mSigmaT									= min(mSigmaT, mMajorantSigmaT); // using SigmaT in xml as majorant, clamp with it as max is ignored
 
@@ -504,6 +504,8 @@ struct MediumContext
 			medium_context.mMajorantSigmaT		*= mConstants.mDensityBoost;
 		medium_context.mSigmaT					= 0;
 
+		medium_context.mNanoVDBContext.Initialize(medium_context.mInstanceData.mMediumNanoVBD);
+
 		medium_context.ApplySequenceOnce();
 
 		return medium_context;
@@ -543,4 +545,6 @@ struct MediumContext
 
 	float3			mMajorantSigmaT;
 	float3			mSigmaT;
+
+	NanoVDBContext	mNanoVDBContext;
 };

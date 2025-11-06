@@ -115,7 +115,6 @@ void TraceRay(inout PixelContext ioPixelContext)
 				// Mitsuba3 take a random channel with uniform sampling (?), see VolumetricPathIntegrator::sample
 				float majorant_extinction		= max(medium_context.mMajorantSigmaT[channel], 1E-6);
 				float free_flight_distance		= 0;
-				bool null_scattering			= false;
 
 				do
 				{
@@ -125,7 +124,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 
 					medium_context.ScatterAt(free_flight_distance, path_context);
 
-					null_scattering				= RandomFloat01(path_context.mRandomState) >= medium_context.SigmaT()[channel] / majorant_extinction;
+					bool null_scattering		= RandomFloat01(path_context.mRandomState) >= medium_context.SigmaT()[channel] / majorant_extinction;
 					if (!null_scattering)
 					{
 						path_context.mThroughput *= medium_context.Albedo();
@@ -139,7 +138,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 						break;
 					}
 
-				} while (null_scattering);
+				} while (true);
 
 				DebugValue(DebugMode::MediumExtinction,			path_context.mRecursionDepth, medium_context.SigmaT());
 				DebugValue(DebugMode::MediumFreeFlight,			path_context.mRecursionDepth, float3(free_flight_distance, query.CommittedRayT(), ray_scattered));

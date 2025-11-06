@@ -1338,7 +1338,7 @@ void Scene::InitializeBuffers()
 				.mMaximum = grid_max,
 			};
 
-			if (gConfigs.mVisualizeNanoVDB)
+			if (gConfigs.mNanoVDBGenerateTexture)
 			{
 				mTextures.push_back({});
 				Texture& texture = mTextures.back();
@@ -1357,6 +1357,8 @@ void Scene::InitializeBuffers()
 					.mBufferIndex = uint(&buffer - mBuffers.data()),
 					.mTexutureIndex = uint(&texture - mTextures.data()),
 				};
+
+				instance_data.mMediumNanoVBD.mTextureIndex = (uint)texture.mSRVIndex;
 			}
 		}
 	}

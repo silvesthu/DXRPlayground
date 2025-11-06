@@ -488,6 +488,7 @@ ComPtr<IDxcBlob> gCompileShader(const char* inFilename, const char* inEntryPoint
 	defines.push_back({ .Name = L"SHADER_DEBUG", .Value = gConfigs.mShaderDebug ? L"1" : L"0"});
 	defines.push_back({ .Name = L"USE_HALF", .Value = gConfigs.mUseHalf ? L"1" : L"0" });
 	defines.push_back({ .Name = L"USE_TEXTURE", .Value = gConfigs.mUseTexture ? L"1" : L"0" });
+	defines.push_back({ .Name = L"NANOVDB_USE_TEXTURE", .Value = gConfigs.mNanoVDBUseTexture ? L"1" : L"0" });
 	std::vector<std::wstring> bsdf_macros;
 	bsdf_macros.resize((int)BSDF::Count);
 	for (int i = 0; i < (int)BSDF::Count; i++)

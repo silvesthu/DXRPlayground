@@ -486,7 +486,8 @@ STATITC_ASSERT(sizeof(TextureInfo) == sizeof(float) * 1);
 struct NanoVDBInfo
 {
 	uint						mBufferIndex					CONSTANT_DEFAULT((uint)ViewDescriptorIndex::Invalid);
-	uint3						mPad							CONSTANT_DEFAULT(uint3(0, 0, 0));
+	uint						mTextureIndex					CONSTANT_DEFAULT((uint)ViewDescriptorIndex::Invalid);
+	uint2						mPad							CONSTANT_DEFAULT(uint2(0, 0));
 	
 	uint3						mOffset							CONSTANT_DEFAULT(uint3(0, 0, 0));
 	float						mMinimum						CONSTANT_DEFAULT(0);
