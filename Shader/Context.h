@@ -26,20 +26,20 @@ struct PixelContext
 
 struct PathContext
 {
+	uint			mRandomState;
+	uint			mRandomStateReSTIR;
+
 	float3			mThroughput;					// [0, 1]		Accumulated throughput, [PBRT3] call it beta https://github.com/mmp/pbrt-v3/blob/master/src/integrators/path.cpp#L68
 	float3			mEmission;						// [0, +inf]	Accumulated emission
 	float			mEtaScale;
 					
 	float3			mLightEmission;					// [0, +inf]	Emission from light sample
-					
+	
 	float			mPrevBSDFSamplePDF;
-	uint			mPrevDiracDeltaDistribution : 1;
-					
-	uint			mRandomState;
-	uint			mRandomStateReSTIR;
+	bool			mPrevDiracDeltaDistribution;
 
-	uint			mRecursionDepth : 8;
-	uint			mMediumInstanceID : 16;
+	uint			mRecursionDepth;
+	uint			mMediumInstanceID;
 };
 
 // Context information about a point on surface
@@ -276,6 +276,29 @@ struct Ray
 	float			mTCurrent;
 };
 
+
+namespace InstanceDataCache
+{
+	const static int CacheSize = 64;
+	groupshared InstanceData CacheDatas[CacheSize];
+
+	void Initialize(uint inGroupIndex)
+	{
+		if (inGroupIndex >= CacheSize)
+			return;
+
+		CacheDatas[inGroupIndex] = InstanceDatas[inGroupIndex];
+	}
+
+	InstanceData Load(uint inInstanceID)
+	{
+		// if (inInstanceID >= CacheSize)
+			return InstanceDatas[inInstanceID];
+		
+		// return CacheDatas[inInstanceID];
+	}
+};
+
 struct HitContext : SurfaceContext
 {
 	template<RAY_FLAG RayFlags>
@@ -286,7 +309,7 @@ struct HitContext : SurfaceContext
 		float2 bary2							= inRayQuery.CommittedTriangleBarycentrics();
 		
 		HitContext hit_context					= (HitContext)0;
-		hit_context.mInstanceData				= InstanceDatas[inRayQuery.CommittedInstanceID()];
+		hit_context.mInstanceData				= InstanceDataCache::Load(inRayQuery.CommittedInstanceID());
 		hit_context.mInstanceID					= inRayQuery.CommittedInstanceID();
 		hit_context.mPrimitiveIndex				= inRayQuery.CommittedPrimitiveIndex();
 		hit_context.mBarycentrics				= float3(1.0 - bary2.x - bary2.y, bary2.x, bary2.y);
@@ -459,10 +482,9 @@ struct MediumContext
 			return;
 		}
 
-		Texture3D<float> ErosionNoise3D			= ResourceDescriptorHeap[(int)ViewDescriptorIndex::ErosionNoise3DSRV];
-		float3 offset							= float3(0, -mConstants.mSequenceFrameRatio * 0.5, 0);
+		float3 offset							= float3(0, -mConstants.mSequenceFrameRatio * 2.0, 0);
 		float noise_value						= ErosionNoise3D.SampleLevel(BilinearWrapSampler, (PositionWS() + offset) * 1.0, 0);
-		noise_value								= saturate(pow(noise_value * 1.5, 4.0));
+		noise_value								= saturate(pow(noise_value * 1.2, 8.0));
 
 		float y_gradient						= pow(saturate(PositionWS().y + 0.1), 0.2);
 		noise_value								= lerp(noise_value, 0.0f, lerp(y_gradient, 0.0, pow(ratio, 16.0)));
@@ -488,7 +510,7 @@ struct MediumContext
 	static MediumContext Generate(RayDesc inRayDesc, RayQuery<RayFlags> inRayQuery)
 	{
 		MediumContext medium_context;
-		medium_context.mInstanceData			= InstanceDatas[inRayQuery.CommittedInstanceID()];
+		medium_context.mInstanceData			= InstanceDataCache::Load(inRayQuery.CommittedInstanceID());
 		medium_context.mInstanceID				= inRayQuery.CommittedInstanceID();
 
 		medium_context.mRayWS.mOrigin			= inRayDesc.Origin;

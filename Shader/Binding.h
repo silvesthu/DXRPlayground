@@ -73,6 +73,7 @@ static RWStructuredBuffer<PixelInspection> PixelInspectionUAV = ResourceDescript
 static RWStructuredBuffer<RayInspection> RayInspectionUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::RayInspectionUAV];
 
 static Texture2D<float4> UVCheckerMap = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::UVCheckerSRV];
+static Texture3D<float> ErosionNoise3D = ResourceDescriptorHeap[(int)ViewDescriptorIndex::ErosionNoise3DSRV];
 static Texture2D<float4> IESSRV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::IESSRV];
 
 static Texture2D<float4> TransmittanceSRV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Bruneton17TransmittanceSRV];

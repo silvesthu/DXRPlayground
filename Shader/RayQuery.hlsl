@@ -15,6 +15,24 @@
 #define IsHit(query) (query.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
 #endif // NVAPI_LSS
 
+template<typename T>
+void TracePrimaryRay(inout T ioQuery, inout RayDesc ioRay)
+{
+	uint additional_ray_flags = 0;
+	uint ray_instance_mask = 0xffffffff;
+	ioQuery.TraceRayInline(RaytracingScene, additional_ray_flags, ray_instance_mask, ioRay);
+	ioQuery.Proceed();
+}
+
+template<typename T>
+void TraceShadowRay(inout T ioQuery, inout RayDesc ioRay)
+{
+	uint additional_ray_flags = 0;
+	uint ray_instance_mask = 0xffffffff;
+	ioQuery.TraceRayInline(RaytracingScene, additional_ray_flags, ray_instance_mask, ioRay);
+	ioQuery.Proceed();
+}
+
 void TraceRay(inout PixelContext ioPixelContext)
 {
 	DebugValueInit();
@@ -47,7 +65,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 	ray.Origin									= mConstants.CameraPosition().xyz;
 	ray.Direction								= ray_direction_ws;
 	ray.TMin									= 1E-4;
-	ray.TMax									= 100000;
+	ray.TMax									= 10000;
 
 	PathContext path_context					= (PathContext)0;
 	path_context.mThroughput					= 1.0;
@@ -60,7 +78,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 	path_context.mMediumInstanceID				= InvalidInstanceID;
 
 	if (SHADER_DEBUG)
-		if (mConstants.mDebugFlag & DebugFlag::UpdateRayInspection)
+		if (GetDebugFlag() & DebugFlag::UpdateRayInspection)
 			if (ioPixelContext.mPixelIndex.x == mConstants.mPixelDebugCoord.x && ioPixelContext.mPixelIndex.y == mConstants.mPixelDebugCoord.y)
 				RayInspectionUAV[0].mPositionWS[0] = float4(ray.Origin + ray.Direction * ray.TMin, 1.0);
 
@@ -71,10 +89,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 		// Note RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH will give first hit but not necessary the closest one, commonly used for shadow ray
 		// https://docs.microsoft.com/en-us/windows/win32/direct3d12/ray_flag
 		RayQuery<RAY_FLAG_FORCE_OPAQUE> query;
-		uint additional_ray_flags				= 0;
-		uint ray_instance_mask					= 0xffffffff;
-		query.TraceRayInline(RaytracingScene, additional_ray_flags, ray_instance_mask, ray);
-		query.Proceed();
+		TracePrimaryRay(query, ray);
 		
 		if (ioPixelContext.mOutputDepth)
 		{
@@ -113,18 +128,20 @@ void TraceRay(inout PixelContext ioPixelContext)
 
 				// [TODO] RGB/Spectrum sampling
 				// Mitsuba3 take a random channel with uniform sampling (?), see VolumetricPathIntegrator::sample
-				float majorant_extinction		= max(medium_context.mMajorantSigmaT[channel], 1E-6);
+				float inv_majorant_extinction	= 1.0 / max(medium_context.mMajorantSigmaT[channel], 1E-6);
 				float free_flight_distance		= 0;
+
+				const bool loop_until_event		= true;
 
 				do
 				{
-					free_flight_distance		+= -log(1.0 - RandomFloat01(path_context.mRandomState)) / majorant_extinction;
+					free_flight_distance		+= -log(1.0 - RandomFloat01(path_context.mRandomState)) * inv_majorant_extinction;
 					if (free_flight_distance >= query.CommittedRayT())
 						break;
 
 					medium_context.ScatterAt(free_flight_distance, path_context);
 
-					bool null_scattering		= RandomFloat01(path_context.mRandomState) >= medium_context.SigmaT()[channel] / majorant_extinction;
+					bool null_scattering		= RandomFloat01(path_context.mRandomState) >= medium_context.SigmaT()[channel] * inv_majorant_extinction;
 					if (!null_scattering)
 					{
 						path_context.mThroughput *= medium_context.Albedo();
@@ -137,8 +154,14 @@ void TraceRay(inout PixelContext ioPixelContext)
 
 						break;
 					}
+					else if (!loop_until_event)
+					{
+						ray.Origin				= ray.Origin + ray.Direction * free_flight_distance;
+						ray_scattered			= true;
+						continue_bounce			= true;
+					}
 
-				} while (true);
+				} while (loop_until_event);
 
 				DebugValue(DebugMode::MediumExtinction,			path_context.mRecursionDepth, medium_context.SigmaT());
 				DebugValue(DebugMode::MediumFreeFlight,			path_context.mRecursionDepth, float3(free_flight_distance, query.CommittedRayT(), ray_scattered));
@@ -149,7 +172,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 
 			if (SHADER_DEBUG)
 			{
-				if (mConstants.mDebugFlag & DebugFlag::UpdateRayInspection)
+				if (GetDebugFlag() & DebugFlag::UpdateRayInspection)
 					if (ioPixelContext.mPixelIndex.x == mConstants.mPixelDebugCoord.x && ioPixelContext.mPixelIndex.y == mConstants.mPixelDebugCoord.y)
 						RayInspectionUAV[0].mPositionWS[path_context.mRecursionDepth + 1] = float4(medium_context.PositionWS(), 1.0);
 
@@ -202,7 +225,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 					//float ies = IESSRV.SampleLevel(BilinearClampSampler, float2(angle, 0), 0).x;
 					//hit_context.mEmission *= ies;
 
-					if (mConstants.mDebugInstanceIndex == hit_context.mInstanceID && mConstants.mDebugInstanceMode == DebugInstanceMode::Barycentrics)
+					if (GetDebugInstanceMode() == DebugInstanceMode::Barycentrics && GetDebugInstanceIndex() == hit_context.mInstanceID)
 						emission = hit_context.mBarycentrics;
 				}
 
@@ -210,7 +233,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 				{
 					if (path_context.mRecursionDepth == 0 ||					// Camera ray hit the light
 						path_context.mPrevDiracDeltaDistribution || 			// Prev hit is DiracDeltaDistribution -> no light sample
-						GetSampleMode() == SampleMode::SampleBSDF ||		// SampleBSDF mode -> no light sample
+						GetSampleMode() == SampleMode::SampleBSDF ||			// SampleBSDF mode -> no light sample
 						false)
 					{
 						// Add light contribution
@@ -264,18 +287,15 @@ void TraceRay(inout PixelContext ioPixelContext)
 							shadow_ray.Origin						= hit_context.PositionWS();
 							shadow_ray.Direction					= light_context.mL;
 							shadow_ray.TMin							= 0.001;
-							shadow_ray.TMax							= 100000;
+							shadow_ray.TMax							= 10000;
 
-							RayQuery<RAY_FLAG_FORCE_OPAQUE> shadow_query;
-							uint shadow_additional_ray_flags		= 0;
-							uint shadow_ray_instance_mask			= 0xffffffff;
-							shadow_query.TraceRayInline(RaytracingScene, shadow_additional_ray_flags, shadow_ray_instance_mask, shadow_ray);
-							shadow_query.Proceed();
+							RayQuery<RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH> shadow_query;
+							TraceShadowRay(shadow_query, shadow_ray);
 						
 							// Shadow ray hit the light
 							if (IsHit(shadow_query) && shadow_query.CommittedInstanceID() == light_context.Light().mInstanceID)
 							{
-								if (mConstants.mDebugFlag& DebugFlag::UpdateRayInspection)
+								if (GetDebugFlag() & DebugFlag::UpdateRayInspection)
 									if (ioPixelContext.mPixelIndex.x == mConstants.mPixelDebugCoord.x && ioPixelContext.mPixelIndex.y == mConstants.mPixelDebugCoord.y)
 										RayInspectionUAV[0].mLightPositionWS[path_context.mRecursionDepth + 1] = float4(shadow_ray.Origin + shadow_ray.Direction * shadow_query.CommittedRayT(), 1.0);
 							
@@ -345,7 +365,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 				case VisualizeMode::Emission: 						path_context.mEmission = hit_context.Emission(); continue_bounce = false; break;
 				case VisualizeMode::RoughnessAlpha:					path_context.mEmission = hit_context.RoughnessAlpha(); continue_bounce = false; break;
 				case VisualizeMode::RecursionDepth:					continue_bounce = true; break;
-				case VisualizeMode::RandomState:					continue_bounce = path_context.mRecursionDepth <= mConstants.mDebugRecursion; break;
+				case VisualizeMode::RandomState:					continue_bounce = path_context.mRecursionDepth <= GetDebugRecursion(); break;
 				default:											path_context.mEmission = sVisualizeModeValue; continue_bounce = false; break;
 				}
 			}
@@ -356,7 +376,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 
 			if (SHADER_DEBUG)
 			{
-				if (mConstants.mDebugFlag & DebugFlag::UpdateRayInspection)
+				if (GetDebugFlag() & DebugFlag::UpdateRayInspection)
 					if (ioPixelContext.mPixelIndex.x == mConstants.mPixelDebugCoord.x && ioPixelContext.mPixelIndex.y == mConstants.mPixelDebugCoord.y)
 						RayInspectionUAV[0].mPositionWS[path_context.mRecursionDepth + 1] = float4(ray.Origin + ray.Direction * 64.0, 0.0);
 
@@ -437,10 +457,10 @@ void TraceRay(inout PixelContext ioPixelContext)
 			mixed_output						= current_output;
 
 		if (GetVisualizeMode() == VisualizeMode::RecursionDepth)
-			mixed_output						= mConstants.mDebugRecursion == 0 ? path_context.mRecursionDepth : (mConstants.mDebugRecursion == path_context.mRecursionDepth);
+			mixed_output						= GetDebugRecursion() == 0 ? path_context.mRecursionDepth : (GetDebugRecursion() == path_context.mRecursionDepth);
 
 		if (GetVisualizeMode() == VisualizeMode::RandomState)
-			mixed_output						= path_context.mRecursionDepth < mConstants.mDebugRecursion ? 0 : pow(path_context.mRandomState / 4294967296.0, 2.0);
+			mixed_output						= path_context.mRecursionDepth < GetDebugRecursion() ? 0 : pow(path_context.mRandomState / 4294967296.0, 2.0);
 
 		ScreenColorUAV[ioPixelContext.mPixelIndex.xy] = float4(mixed_output, 1);
 		
@@ -457,6 +477,9 @@ void RayQueryCS(
 	uint3 inDispatchThreadID : SV_DispatchThreadID,
 	uint inGroupIndex : SV_GroupIndex)
 {
+	InstanceDataCache::Initialize(inGroupIndex);
+	GroupMemoryBarrierWithGroupSync();
+
 	uint2 output_dimensions;
 	ScreenColorUAV.GetDimensions(output_dimensions.x, output_dimensions.y);
 

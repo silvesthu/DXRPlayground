@@ -87,7 +87,7 @@ namespace BSDFEvaluation
 			if (inBSDFContext.mNdotL < 0 || inBSDFContext.mNdotV < 0 || inBSDFContext.mHdotL < 0 || inBSDFContext.mHdotV < 0)
 				result.mBSDF					= 0;
 
-			if (mConstants.mDebugInstanceIndex == inHitContext.mInstanceID && mConstants.mDebugInstanceMode == DebugInstanceMode::Barycentrics)
+			if (GetDebugInstanceMode() == DebugInstanceMode::Barycentrics && GetDebugInstanceIndex() == inHitContext.mInstanceID)
 				result.mBSDF					= 0.0;
 
 			return result;
@@ -130,7 +130,7 @@ namespace BSDFEvaluation
 			if (inBSDFContext.mNdotL < 0 || inBSDFContext.mNdotV < 0 || inBSDFContext.mHdotL < 0 || inBSDFContext.mHdotV < 0)
 				result.mBSDF					= 0;
 
-			if (mConstants.mDebugInstanceIndex == inHitContext.mInstanceID && mConstants.mDebugInstanceMode == DebugInstanceMode::Reflection)
+			if (GetDebugInstanceMode() == DebugInstanceMode::Reflection && GetDebugInstanceIndex() == inHitContext.mInstanceID)
 				result.mBSDF					= 1.0;
 
 			return result;

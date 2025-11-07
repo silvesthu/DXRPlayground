@@ -339,6 +339,60 @@ VisualizeMode GetVisualizeMode()
 #endif // SHADER_DEBUG
 }
 
+DebugInstanceMode GetDebugInstanceMode()
+{
+#if SHADER_DEBUG
+    return mConstants.mDebugInstanceMode;
+#else
+    return DebugInstanceMode::None;
+#endif // SHADER_DEBUG
+}
+
+int GetDebugInstanceIndex()
+{
+#if SHADER_DEBUG
+    return mConstants.mDebugInstanceIndex;
+#else
+    return -1;
+#endif // SHADER_DEBUG
+}
+
+int GetDebugLightIndex()
+{
+#if SHADER_DEBUG
+    return mConstants.mDebugLightIndex;
+#else
+    return -1;
+#endif // SHADER_DEBUG
+}
+
+DebugMode GetDebugMode()
+{
+#if SHADER_DEBUG
+    return mConstants.mDebugMode;
+#else
+    return DebugMode::Manual;
+#endif // SHADER_DEBUG
+}
+
+int GetDebugRecursion()
+{
+#if SHADER_DEBUG
+    return mConstants.mDebugRecursion;
+#else
+    return -1;
+#endif // SHADER_DEBUG
+}
+
+DebugFlag GetDebugFlag()
+{
+#if SHADER_DEBUG
+    return mConstants.mDebugFlag;
+#else
+    return DebugFlag::None;
+#endif // SHADER_DEBUG
+}
+
 static float3       sVisualizeModeValue = 0;
 void VisualizeValue(VisualizeMode inDebugMode, float3 inValue)
 {
@@ -364,12 +418,12 @@ void DebugValueInit()
 void DebugValue(DebugMode inDebugMode, uint inRecursionDepth, float3 inValue)
 {
 #if SHADER_DEBUG
-    if (mConstants.mDebugMode == inDebugMode)
+    if (GetDebugMode() == inDebugMode)
     {
         if (sDebugDispatchRaysIndex.x == mConstants.mPixelDebugCoord.x && sDebugDispatchRaysIndex.y == mConstants.mPixelDebugCoord.y && inRecursionDepth < PixelInspection::kArraySize)
             PixelInspectionUAV[0].mPixelValueArray[inRecursionDepth] = float4(inValue, 1.0); // 1.0 indicate value is written
 
-        if (mConstants.mDebugRecursion == inRecursionDepth)
+        if (GetDebugRecursion() == inRecursionDepth)
         {
             sDebugValue = float4(inValue, 1.0); // fill alpha to show on ImGui
             sDebugValueUpdated = true;

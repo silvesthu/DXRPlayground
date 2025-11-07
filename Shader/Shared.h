@@ -817,7 +817,7 @@ struct Constants
 
 	int							mSequenceEnabled				CONSTANT_DEFAULT(0);
 	int							mSequenceFrameIndex				CONSTANT_DEFAULT(0);
-	int							mSequenceFrameCount				CONSTANT_DEFAULT(30);
+	int							mSequenceFrameCount				CONSTANT_DEFAULT(192);
 	float						mSequenceFrameRatio				CONSTANT_DEFAULT(0.0f);
 
 	int2						mPixelDebugCoord				CONSTANT_DEFAULT(int2(-1, -1));

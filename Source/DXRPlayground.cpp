@@ -437,6 +437,21 @@ static void sPrepareImGui()
 				ImGui::TreePop();
 			}
 
+			if (ImGui::TreeNodeEx("Caps"))
+			{
+				ImGui::BeginDisabled();
+
+				ImGui::Checkbox("Micromap", &gNVAPI.mMicromapSupported);
+				ImGui::Checkbox("Clusters", &gNVAPI.mClustersSupported);
+				ImGui::Checkbox("LinearSweptSpheres", &gNVAPI.mLinearSweptSpheresSupported);
+				ImGui::Checkbox("Spheres", &gNVAPI.mSpheresSupported);
+				ImGui::Checkbox("ShaderExecutionReordering", &gNVAPI.mShaderExecutionReorderingSupported);
+
+				ImGui::EndDisabled();
+
+				ImGui::TreePop();
+			}
+
 			ImGui::TreePop();
 		}
 
@@ -767,6 +782,20 @@ static void sPrepareImGui()
 					ImGui::InputFloat("PrepareLights", &gStats.mTimeMS.mPrepareLights, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
 					ImGui::InputFloat("RayQuery", &gStats.mTimeMS.mRayQuery, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
 
+					static ImGui::ScrollingBuffer sRayQueryBuffer;
+					sRayQueryBuffer.AddPoint(gConstants.mTime, gStats.mTimeMS.mRayQuery);
+
+					float time = gConstants.mTime;
+					if (ImPlot::BeginPlot("Time", ImVec2(-1, 400)))
+					{
+						ImPlot::SetupAxisLimits(ImAxis_X1, time - 10.0f, time, ImGuiCond_Always);
+						ImPlot::SetupAxisLimits(ImAxis_Y1, 0, 5.0f);
+
+						ImPlot::PlotLine("RayQuery", &sRayQueryBuffer.Data[0].x, &sRayQueryBuffer.Data[0].y, sRayQueryBuffer.Data.size(), 0, sRayQueryBuffer.Offset, 2 * sizeof(float));
+
+						ImPlot::EndPlot();
+					}
+
 					ImGui::TreePop();
 				}
 			}
@@ -965,6 +994,8 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR lpCmdLine
 		gConfigs.mShaderDebug = false;
 		gConfigs.mUseTexture = false;
 		gDisplaySettings.mVsync = false;
+		gConstants.mOffsetMode = OffsetMode::Random;
+		gRenderer.mRuntime.mScreenColorTexture.mFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 	}
 	else
 	{

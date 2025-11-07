@@ -138,7 +138,7 @@ struct Renderer
 
 	bool										mAccumulationFrameUnlimited = false;
 	bool										mAccumulationPaused = false;
-	int											mAccumulationFrameCount = 64;
+	int											mAccumulationFrameCount = 384;
 	bool										mAccumulationResetRequested = false;
 
 	bool										mSequenceCameraEnabled = true;

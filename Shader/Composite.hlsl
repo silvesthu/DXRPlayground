@@ -104,7 +104,7 @@ float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 	case VisualizeMode::RoughnessAlpha: 		break;
 	case VisualizeMode::Transmittance:			break;
 	case VisualizeMode::InScattering:			break;
-	case VisualizeMode::RecursionDepth:			color.xyz = mConstants.mDebugRecursion == 0 ? hsv2rgb(float3(color.x / 8.0, 1, 1)) : color.xxx; break;
+	case VisualizeMode::RecursionDepth:			color.xyz = GetDebugRecursion() == 0 ? hsv2rgb(float3(color.x / 8.0, 1, 1)) : color.xxx; break;
 	default:									break;
 	}
 	
@@ -142,7 +142,7 @@ void ClearCS(
 		PixelInspectionUAV[0].mPixelValueArray[inDispatchThreadID.x] = 0;
 	}
 
-	if (mConstants.mDebugFlag & DebugFlag::UpdateRayInspection)
+	if (GetDebugFlag() & DebugFlag::UpdateRayInspection)
 		if (inDispatchThreadID.x < RayInspection::kArraySize)
 		{
 			// Initialize position as NaN to kill vertices those are not updated
