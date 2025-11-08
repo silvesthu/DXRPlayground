@@ -217,7 +217,10 @@ void TraceRay(inout PixelContext ioPixelContext)
 				// Emission
 				float3 emission = hit_context.Emission() * (mConstants.mEmissionBoost * kPreExposure);
 				{
-					if (dot(hit_context.mVertexNormalWS, hit_context.ViewWS()) < 0 && !hit_context.TwoSided())
+					bool back_face				= dot(hit_context.mVertexNormalWS, hit_context.ViewWS()) < 0;
+					// bool two_sided				= hit_context.TwoSided();
+					bool two_sided				= false; // Mitsuba3's emitter does not become twosided even specified on bsdf
+					if (back_face && !two_sided)
 						emission = 0;
 
 					// IES

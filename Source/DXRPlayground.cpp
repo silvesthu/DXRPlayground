@@ -40,6 +40,7 @@ static const std::array kScenePresets =
 	ScenePreset().Name("CornellMonkey").Path("Asset/Comparison/benedikt-bitterli/cornell-box-monkey/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("CornellDragon").Path("Asset/Comparison/benedikt-bitterli/cornell-box-dragon/scene_v3.xml").EmissionBoost(1E4f).DensityBoost(10.0f).CameraAnimationPath("Asset/Comparison/benedikt-bitterli/cornell-box-dragon/camera_animation.gltf"),
 	ScenePreset().Name("CornellVDB").Path("Asset/Comparison/benedikt-bitterli/cornell-box-vdb/scene_v3.xml").EmissionBoost(1E4f).DensityBoost(10.0f),
+	ScenePreset().Name("CornellLSS").Path("Asset/Comparison/benedikt-bitterli/cornell-box-lss/scene_v3.xml").EmissionBoost(1E4f),
 
 	// MIS
 	ScenePreset().Name("VeachMIS").Path("Asset/Comparison/benedikt-bitterli/veach-mis/scene_ggx_v3.xml").EmissionBoost(1E4f),
@@ -75,7 +76,7 @@ int sFindScenePresetIndex(const std::string_view inName)
 {
 	return static_cast<int>(&sFindScenePreset(inName) - &kScenePresets.front());
 }
-static int sCurrentSceneIndex = sFindScenePresetIndex("CornellDragon");
+static int sCurrentSceneIndex = sFindScenePresetIndex("CornellLSS");
 static int sPreviousSceneIndex = sCurrentSceneIndex;
 
 struct CameraSettings
