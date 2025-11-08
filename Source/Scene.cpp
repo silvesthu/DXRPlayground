@@ -625,6 +625,11 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 			primitive = &mPrimitives.mSphere;
 			id = id.empty() ? "sphere" : id;
 		}
+		else if (type == "cylinder")
+		{
+			primitive = &mPrimitives.mCylinder;
+			id = id.empty() ? "cylinder" : id;
+		}
 		else if (type == "obj")
 		{
 			std::filesystem::path path = inFilename;
@@ -1107,6 +1112,7 @@ void Scene::Load(const ScenePreset& inPreset)
 	LoadObj("Asset/primitives/cube.obj", glm::mat4x4(1.0f), false, mPrimitives.mCube);
 	LoadObj("Asset/primitives/rectangle.obj", glm::mat4x4(1.0f), false, mPrimitives.mRectangle);
 	LoadObj("Asset/primitives/sphere.obj", glm::mat4x4(1.0f), false, mPrimitives.mSphere);
+	LoadObj("Asset/primitives/cylinder.obj", glm::mat4x4(1.0f), false, mPrimitives.mCylinder);
 
 	mSceneContent = {}; // Reset
 

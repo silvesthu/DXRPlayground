@@ -5,11 +5,15 @@
 enum class GeometryType
 {
 	Triangles = 0,
+
 	AABB,
+
 	OMM,
 	DMM,
+
 	Sphere,
 	LSS,
+
 	TriangleAsLSS,
 };
 
@@ -219,6 +223,7 @@ private:
 		SceneContent						mCube;
 		SceneContent						mRectangle;
 		SceneContent						mSphere;
+		SceneContent						mCylinder;
 	};
 	Primitives								mPrimitives;
 
