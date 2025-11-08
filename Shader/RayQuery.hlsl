@@ -289,7 +289,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 							RayDesc shadow_ray;
 							shadow_ray.Origin						= hit_context.PositionWS();
 							shadow_ray.Direction					= light_context.mL;
-							shadow_ray.TMin							= 0.001;
+							shadow_ray.TMin							= 1E-4;
 							shadow_ray.TMax							= 10000;
 
 							RayQuery<RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH> shadow_query;
