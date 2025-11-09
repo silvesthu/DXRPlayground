@@ -697,8 +697,9 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 
 			bool is_shapegroup_lss = id.starts_with("[LSS]");
 			bool is_shapegroup_sphere = id.starts_with("[Sphere]");
+			bool is_shapegroup_sphere_surface = id.starts_with("[SphereSurface]");
 
-			if (!is_shapegroup_lss && !is_shapegroup_sphere)
+			if (!is_shapegroup_lss && !is_shapegroup_sphere && !is_shapegroup_sphere_surface)
 				continue;
 
 			int lss_vertex_offset = (int)ioSceneContent.mLSSVertices.size();
@@ -714,43 +715,98 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 			};
 
 			int lss_vertex_index = 0;
-			for (tinyxml2::XMLElement* lss_vertex = shape->FirstChildElement("shape"); lss_vertex != nullptr; lss_vertex = lss_vertex->NextSiblingElement("shape"))
+			if (is_shapegroup_sphere_surface)
 			{
-				tinyxml2::XMLElement* center_element = lss_vertex->FirstChildElement("point");
-				gAssert(center_element != nullptr);
-				gAssert(std::string_view(center_element->Attribute("name")) == "center");
-				glm::vec3 center = glm::vec3(0.0f);
-				gFromString(center_element->Attribute("x"), center[0]);
-				gFromString(center_element->Attribute("y"), center[1]);
-				gFromString(center_element->Attribute("z"), center[2]);
-				
-				tinyxml2::XMLElement* radius_element = lss_vertex->FirstChildElement("float");
-				gAssert(radius_element != nullptr);
-				gAssert(std::string_view(radius_element->Attribute("name")) == "radius");
-				float radius = 0.0f;
-				gFromString(radius_element->Attribute("value"), radius);
+				tinyxml2::XMLElement* sphere_surface = shape->FirstChildElement("shape");
+				gAssert(std::string_view(sphere_surface->Attribute("type")) == "rectangle");
 
-				ioSceneContent.mLSSVertices.push_back(center);
-				ioSceneContent.mLSSRadii.push_back(radius);
-				if (lss_vertex_index == 0)
+				// For first vertex (shape), get material
+				tinyxml2::XMLElement* ref = sphere_surface->FirstChildElement("ref");
+				std::string_view bsdf_id = ref->Attribute("id");
+				shapegroup_instance.mBSDFID = bsdf_id;
+
+				int fill_count_x = std::max(2, gNVAPI.mSphereSurfaceFillCountX);
+				int fill_count = fill_count_x * fill_count_x;
+
+				float radius = gNVAPI.mSphereSurfaceFillRadius;
+				if (radius < 0.0f)
+					radius = 1.0f / (fill_count_x - 1);
+
+				ioSceneContent.mLSSVertices.resize(lss_vertex_offset + fill_count);
+				ioSceneContent.mLSSIndices.resize(lss_index_offset + fill_count);
+				ioSceneContent.mLSSRadii.resize(lss_radius_offset + fill_count, radius);
+
+				bool random = gNVAPI.mSphereSurfaceRandom;
+				std::random_device device;
+				std::mt19937 engine(device());
+				std::uniform_real_distribution<float> distribution(-1.0f, 1.0f);
+
+				for (int i = 0; i < fill_count; i++)
 				{
-					// For first vertex (shape), get material
-					tinyxml2::XMLElement* ref = lss_vertex->FirstChildElement("ref");
-					std::string_view bsdf_id = ref->Attribute("id");
-					shapegroup_instance.mBSDFID = bsdf_id;
-				}
-				else if (is_shapegroup_lss)
-				{
-					// For following vertex, add indices (segments)
-					ioSceneContent.mLSSIndices.push_back(static_cast<IndexType>(lss_vertex_index - 1));
-					ioSceneContent.mLSSIndices.push_back(static_cast<IndexType>(lss_vertex_index));
-				}
-				if (is_shapegroup_sphere)
-				{
-					ioSceneContent.mLSSIndices.push_back(static_cast<IndexType>(lss_vertex_index));
+					int row = i % fill_count_x;
+					int col = i / fill_count_x;
+
+					float u = 0; 
+					float v = 0; 
+
+					if (random)
+					{
+						u = distribution(engine);
+						v = distribution(engine);
+					}
+					else
+					{
+						// Grid
+						u = (row * 2.0f) / (fill_count_x - 1) - 1.0f;
+						v = (col * 2.0f) / (fill_count_x - 1) - 1.0f;
+					}
+
+					ioSceneContent.mLSSVertices[lss_vertex_offset + i] = glm::vec3(u, v, 0.0f);
+					ioSceneContent.mLSSIndices[lss_index_offset + i] = i;
 				}
 
-				lss_vertex_index++;
+				lss_vertex_index = fill_count;
+			}
+			else
+			{
+				for (tinyxml2::XMLElement* lss_vertex = shape->FirstChildElement("shape"); lss_vertex != nullptr; lss_vertex = lss_vertex->NextSiblingElement("shape"))
+				{
+					tinyxml2::XMLElement* center_element = lss_vertex->FirstChildElement("point");
+					gAssert(center_element != nullptr);
+					gAssert(std::string_view(center_element->Attribute("name")) == "center");
+					glm::vec3 center = glm::vec3(0.0f);
+					gFromString(center_element->Attribute("x"), center[0]);
+					gFromString(center_element->Attribute("y"), center[1]);
+					gFromString(center_element->Attribute("z"), center[2]);
+
+					tinyxml2::XMLElement* radius_element = lss_vertex->FirstChildElement("float");
+					gAssert(radius_element != nullptr);
+					gAssert(std::string_view(radius_element->Attribute("name")) == "radius");
+					float radius = 0.0f;
+					gFromString(radius_element->Attribute("value"), radius);
+
+					ioSceneContent.mLSSVertices.push_back(center);
+					ioSceneContent.mLSSRadii.push_back(radius);
+					if (lss_vertex_index == 0)
+					{
+						// For first vertex (shape), get material
+						tinyxml2::XMLElement* ref = lss_vertex->FirstChildElement("ref");
+						std::string_view bsdf_id = ref->Attribute("id");
+						shapegroup_instance.mBSDFID = bsdf_id;
+					}
+					else if (is_shapegroup_lss)
+					{
+						// For following vertex, add indices (segments)
+						ioSceneContent.mLSSIndices.push_back(static_cast<IndexType>(lss_vertex_index - 1));
+						ioSceneContent.mLSSIndices.push_back(static_cast<IndexType>(lss_vertex_index));
+					}
+					if (is_shapegroup_sphere)
+					{
+						ioSceneContent.mLSSIndices.push_back(static_cast<IndexType>(lss_vertex_index));
+					}
+
+					lss_vertex_index++;
+				}
 			}
 
 			gAssert(!is_shapegroup_lss || lss_vertex_index >= 2); // At least 2 vertices to form a lss segment

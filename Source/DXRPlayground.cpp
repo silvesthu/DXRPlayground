@@ -41,6 +41,7 @@ static const std::array kScenePresets =
 	ScenePreset().Name("CornellBoxDragon").Path("Asset/Comparison/benedikt-bitterli/cornell-box-dragon/scene_v3.xml").EmissionBoost(1E4f).DensityBoost(10.0f).CameraAnimationPath("Asset/Comparison/benedikt-bitterli/cornell-box-dragon/camera_animation.gltf"),
 	ScenePreset().Name("CornellBoxVDB").Path("Asset/Comparison/benedikt-bitterli/cornell-box-vdb/scene_v3.xml").EmissionBoost(1E4f).DensityBoost(10.0f),
 	ScenePreset().Name("CornellBoxLSS").Path("Asset/Comparison/benedikt-bitterli/cornell-box-lss/scene_v3.xml").EmissionBoost(1E4f),
+	ScenePreset().Name("CornellBoxSphereSurface").Path("Asset/Comparison/benedikt-bitterli/cornell-box-spheresurface/scene_v3.xml").EmissionBoost(1E4f),
 
 	// MIS
 	ScenePreset().Name("VeachMIS").Path("Asset/Comparison/benedikt-bitterli/veach-mis/scene_ggx_v3.xml").EmissionBoost(1E4f),
@@ -76,33 +77,33 @@ int sFindScenePresetIndex(const std::string_view inName)
 {
 	return static_cast<int>(&sFindScenePreset(inName) - &kScenePresets.front());
 }
-static int sCurrentSceneIndex = sFindScenePresetIndex("CornellBoxLSS");
+static int sCurrentSceneIndex = sFindScenePresetIndex("CornellBoxSphereSurface");
 static int sPreviousSceneIndex = sCurrentSceneIndex;
 
 struct CameraSettings
 {
-	float			mMoveSpeed = 0.1f;
-	float			mRotateSpeed = 0.01f;
-	float			mHorizontalFovDegree = 90.0f;
+	float			mMoveSpeed				= 0.1f;
+	float			mRotateSpeed			= 0.002f;
+	float			mHorizontalFovDegree	= 90.0f;
 
 	struct ExposureControl
 	{
 		// Sunny 16 rule
-		float		mAperture = 16.0;						// N, f-stops
-		float		mInvShutterSpeed = 100.0;				// t, seconds
-		float		mSensitivity = 100.0f;					// S, ISO
+		float		mAperture				= 16.0;		// N, f-stops
+		float		mInvShutterSpeed		= 100.0;	// t, seconds
+		float		mSensitivity			= 100.0f;	// S, ISO
 	};
 	ExposureControl mExposureControl;
-	void			ResetExposure()		{ mExposureControl = ExposureControl(); }
+	void			ResetExposure()			{ mExposureControl = ExposureControl(); }
 };
-CameraSettings		gCameraSettings = {};
+CameraSettings		gCameraSettings			= {};
 
 struct DisplaySettings
 {
-	glm::ivec2		mWindowSize	= glm::ivec2(0, 0);
-	bool			mVsync				= true;
+	glm::ivec2		mWindowSize				= glm::ivec2(0, 0);
+	bool			mVsync					= true;
 };
-DisplaySettings		gDisplaySettings	= {};
+DisplaySettings		gDisplaySettings		= {};
 
 // Forward declarations of helper functions
 static bool sCreateDeviceD3D(HWND hWnd);
@@ -431,6 +432,15 @@ static void sPrepareImGui()
 					gNVAPI.mEndcapMode = endcap_chained ? NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_CHAINED : NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_NONE;
 					gRenderer.mReloadScene = true;
 				}
+
+				ImGui::TreePop();
+			}
+
+			if (ImGui::TreeNodeEx("Sphere Surface", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				ImGui::InputInt("Fill Count X", &gNVAPI.mSphereSurfaceFillCountX);
+				ImGui::InputFloat("Radius", &gNVAPI.mSphereSurfaceFillRadius);
+				ImGui::Checkbox("Random", &gNVAPI.mSphereSurfaceRandom);
 
 				ImGui::TreePop();
 			}
@@ -1101,7 +1111,7 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR lpCmdLine
 		[](const std::string& inPath, const filewatch::Event inChangeType)
 		{
 			(void)inChangeType;
-			std::regex pattern(".*\\.(hlsl|hlsli|h|inl)");
+			std::regex pattern(".*\\.(hlsl|hlsli|hpp|h|inl)");
 			if (std::regex_match(inPath, pattern) && inChangeType == filewatch::Event::modified)
 			{
 				std::string msg = "Reload triggered by " + inPath + "\n";

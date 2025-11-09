@@ -10,7 +10,7 @@
 	<sensor type="perspective">
 		<float name="fov" value="45" />
 		<transform name="to_world">
-			<matrix value="-1 0 0 0 0 1 0 1 0 0 -1 6.8 0 0 0 1" />
+			<matrix value="-0.8358419 -0.09983823 -0.5398154 0.18547131 0 0.9833236 -0.18186456 1.0691096 0.5489703 -0.15201001 -0.8219031 0.26568982 0 0 0 1" />
 		</transform>
 		<sampler type="independent">
 			<integer name="sample_count" value="$spp" />
@@ -90,79 +90,52 @@
 		</bsdf>
 	</bsdf>
 
-	<shape type="shapegroup" id="[LSS] 0">
-		<shape type="sphere">
-			<point name="center" x="0" y="0" z="0"/>
-			<float name="radius" value="0.1"/>
-			<ref id="DiffuseBSDF" />
-		</shape>
-		<shape type="sphere">
-			<point name="center" x="0.5" y="0" z="0"/>
-			<float name="radius" value="0.2"/>
-			<ref id="DiffuseBSDF" />
+<!--  	<bsdf type="twosided" id="TopBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="1, 0, 0" />
+		</bsdf>
+	</bsdf>
+ -->
+
+ 	<bsdf type="twosided" id="BottomBSDF">
+		<bsdf type="roughconductor">
+			<float name="alpha" value="0.5" />
+			<string name="distribution" value="ggx" />
+			<float name="extEta" value="1" />
+			<rgb name="specularReflectance" value="0.49144, 0.491304, 0.4913"/>
+			<rgb name="eta" value="-0.0485226, 4.14275, 4.66977"/>
+			<rgb name="k" value="-0.0363742, 0.0937665, 1.30074"/>
+		</bsdf>
+	</bsdf>
+
+	<shape type="shapegroup" id="[SphereSurface]">
+		<shape type="rectangle">
+			<ref id="TopBSDF" />
 		</shape>
 	</shape>
-	<shape type="instance" id="LSS 0">
-		<ref id="[LSS] 0"/>
+	<shape type="instance" id="SphereSurface">
+		<ref id="[SphereSurface]"/>
 		<transform name="to_world">
-			<matrix value="1 0 0 0  0 1 0 1.0  0 0 1 0  0 0 0 1" />
+			<matrix value="0.1 0 0 0  0 0 -0.1 1.0  0 0.1 0 0.0  0 0 0 1" />
 		</transform>
 	</shape>
 
-	<shape type="rectangle" id="Clip 0 0">
-		<transform name="to_world">
-			<matrix value="0 0 0.1 0  0 0.1 0 1.0  -0.1 0 0 0  0 0 0 1" />
-		</transform>
-		<ref id="DiffuseBSDF" />
-	</shape>
-	<shape type="rectangle" id="Clip 0 1">
-		<transform name="to_world">
-			<matrix value="0 0 0.2 0.5  0 0.2 0 1.0  -0.2 0 0 0  0 0 0 1" />
-		</transform>
-		<ref id="DiffuseBSDF" />
-	</shape>
+	<bsdf type="twosided" id="TopBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0, 1, 0" />
+		</bsdf>
+	</bsdf>
 
-	<shape type="shapegroup" id="[LSS] 1">
-		<shape type="sphere">
-			<point name="center" x="-0.5" y="0" z="0"/>
-			<float name="radius" value="0.2"/>
-			<ref id="DiffuseBSDF" />
-		</shape>
-		<shape type="sphere">
-			<point name="center" x="0" y="0" z="0"/>
-			<float name="radius" value="0.1"/>
-			<ref id="DiffuseBSDF" />
-		</shape>
-		<shape type="sphere">
-			<point name="center" x="+0.5" y="0" z="0"/>
-			<float name="radius" value="0.2"/>
-			<ref id="DiffuseBSDF" />
-		</shape>
-	</shape>
-	<shape type="instance" id="LSS 1">
-		<ref id="[LSS] 1"/>
+	<shape type="rectangle">
+		<ref id="BottomBSDF" />
 		<transform name="to_world">
-			<matrix value="1 0 0 0  0 1 0 0.3  0 0 1 -0.5  0 0 0 1" />
-		</transform>
-	</shape>
-
-	<shape type="shapegroup" id="[Sphere]">
-		<shape type="sphere">
-			<point name="center" x="0" y="0" z="0"/>
-			<float name="radius" value="0.2"/>
-			<ref id="DiffuseBSDF" />
-		</shape>
-	</shape>
-	<shape type="instance" id="Sphere">
-		<ref id="[Sphere]"/>
-		<transform name="to_world">
-			<matrix value="1 0 0 -0.5  0 1 0 1.0  0 0 1 0  0 0 0 1" />
+			<matrix value="0.1 0 0 0  0 0 -0.1 1.0  0 0.1 0 0.0  0 0 0 1" />
 		</transform>
 	</shape>
 
 	<shape type="rectangle" id="Light">
 		<transform name="to_world">
-			<matrix value="0.235 0 0 -0.005 0 0 -0.0893 1.98 0 0.19 0 -0.03 0 0 0 1" />
+			<matrix value="0.05 0 0 -0.005  0 0.05 0 1.05  0 0 0.05 -0.2  0 0 0 1" />
 		</transform>
 		<ref id="LightBSDF" />
 		<emitter type="area">

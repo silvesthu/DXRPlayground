@@ -22,6 +22,8 @@ using Microsoft::WRL::ComPtr;
 #include <span>
 #include <chrono>
 #include <set>
+#include <ranges>
+#include <random>
 
 #include "Thirdparty/glm.h"
 #include "Thirdparty/nameof/include/nameof.hpp"
@@ -381,6 +383,10 @@ struct NVAPI
 	bool									mLSSWireframeEnabled = false;
 	NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE  mLSSWireframeEndcapMode = NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_CHAINED;
 	float									mLSSWireframeRadius = 0.01f;
+
+	int										mSphereSurfaceFillCountX = 100;
+	float									mSphereSurfaceFillRadius = -1.0f;
+	bool									mSphereSurfaceRandom = false;
 };
 extern NVAPI								gNVAPI;
 
