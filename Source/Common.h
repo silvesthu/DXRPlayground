@@ -376,11 +376,11 @@ struct NVAPI
 	bool									mShaderExecutionReorderingSupported = false;
 	bool									mFakeUAVEnabled = false;
 
-	NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE  mEndcapMode = NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_NONE;
+	NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE  mEndcapMode = NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_CHAINED;
 
-	bool									mWireframeEnabled = false;
-	NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE  mWireframeEndcapMode = NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_CHAINED;
-	float									mWireframeRadius = 0.01f;
+	bool									mLSSWireframeEnabled = false;
+	NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE  mLSSWireframeEndcapMode = NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_CHAINED;
+	float									mLSSWireframeRadius = 0.01f;
 };
 extern NVAPI								gNVAPI;
 

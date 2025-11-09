@@ -317,26 +317,28 @@ struct HitContext : SurfaceContext
 		hit_context.mRayWS.mDirection			= inRayDesc.Direction;
 		hit_context.mRayWS.mTCurrent			= inRayQuery.CommittedRayT();
 
-		hit_context.LoadSurface();
-
 #ifdef NVAPI_LSS
 		if (NvRtCommittedIsLss(inRayQuery))
 		{
 			// Transform from object space to handle non-uniform scale properly
 			// See also getGeometryFromHit in RTXCR
 			// [NOTE] Somehow the object space coordinates here might flip sign. Avoid get position from it
+			// [NOTE] Somehow accessing CommittedPrimitiveIndex() when LSS presents cause crash
 			float2x4 lss_data					= NvRtCommittedLssObjectPositionsAndRadii(inRayQuery);
 			float3 lss_center_OS				= lerp(lss_data[0].xyz, lss_data[1].xyz, bary2.x); // bary2.x = NvRtCommittedLssHitParameter(inRayQuery)
 			float3 lss_position_OS				= inRayQuery.CommittedObjectRayOrigin() + inRayQuery.CommittedRayT() * inRayQuery.CommittedObjectRayDirection();
 			float3 lss_normal_OS				= lss_position_OS - lss_center_OS;
+			
+			hit_context.mVertexPositionOS		= lss_position_OS;
+			hit_context.mVertexNormalOS			= normalize(lss_normal_OS);
 			hit_context.mVertexNormalWS			= normalize(mul((float3x3)hit_context.mInstanceData.mInverseTranspose, lss_normal_OS)); // Allow non-uniform scale
-
-			// Clear data those are not available
-			hit_context.mUV						= 0;
-			hit_context.mVertexPositionOS		= 0;
-			hit_context.mVertexNormalOS			= 0;
+			hit_context.mUV						= float2(0.0, bary2.x);
 		}
+		else
 #endif // NVAPI_LSS
+		{
+			hit_context.LoadSurface();
+		}
 		
 		return hit_context;
 	}

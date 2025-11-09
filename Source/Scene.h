@@ -69,6 +69,7 @@ public:
 		D3D12_GPU_VIRTUAL_ADDRESS mVerticesBaseAddress;
 		D3D12_GPU_VIRTUAL_ADDRESS mIndicesBaseAddress;
 
+		D3D12_GPU_VIRTUAL_ADDRESS mLSSVerticesBaseAddress;
 		D3D12_GPU_VIRTUAL_ADDRESS mLSSIndicesBaseAddress;
 		D3D12_GPU_VIRTUAL_ADDRESS mLSSRadiiBaseAddress;
 	};
@@ -106,6 +107,10 @@ struct SceneContent
 	std::vector<NormalType>						mNormals;
 	std::vector<UVType>							mUVs;
 
+	std::vector<VertexType>						mLSSVertices;
+	std::vector<IndexType>						mLSSIndices;
+	std::vector<float>							mLSSRadii;
+
 	std::vector<InstanceInfo>					mInstanceInfos;
 	std::vector<InstanceData>					mInstanceDatas;
 
@@ -138,8 +143,6 @@ struct SceneContent
 	std::optional<float>						mFov;
 
 	std::optional<AtmosphereMode>				mAtmosphereMode;
-
-	bool										mLSSAllowed = false;
 };
 
 class TLAS final
@@ -211,7 +214,9 @@ private:
 
 	void FillDummyMaterial(InstanceInfo& ioInstanceInfo, InstanceData& ioInstanceData);
 	
+	void GenerateLSSFromInstance();
 	void GenerateLSSFromTriangle();
+
 	void InitializeTextures();
 	void InitializeBuffers();
 	void InitializeRuntime();
@@ -248,6 +253,7 @@ private:
 		ComPtr<ID3D12Resource>				mLightDataBuffer;
 
 		// LSS
+		ComPtr<ID3D12Resource>				mLSSVertices;
 		ComPtr<ID3D12Resource>				mLSSIndices;
 		ComPtr<ID3D12Resource>				mLSSRadii;
 	};

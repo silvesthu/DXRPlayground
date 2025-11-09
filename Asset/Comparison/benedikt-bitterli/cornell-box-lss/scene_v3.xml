@@ -84,23 +84,84 @@
 		<ref id="LeftWallBSDF" />
 	</shape>
 
-	<bsdf type="diffuse" id="DiffuseBSDF">
-		<rgb name="reflectance" value="0.5, 0.5, 0.5" />
+	<bsdf type="twosided" id="DiffuseBSDF">
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0.5, 0.5, 0.5" />
+		</bsdf>
 	</bsdf>
 
-	<shape type="cylinder" id="1.0 0.5">
-		<transform name="to_world">
-			<matrix value="0 0 0.5 -0.75  0 0.2 0 1.0  -0.2 0 0 0  0 0 0 1" />
-		</transform>
-		<float name="radius" value="1.0"/>
-		<ref id="DiffuseBSDF" />
-	</shape>	
+	<shape type="shapegroup" id="[LSS] 0">
+		<shape type="sphere">
+			<point name="center" x="0" y="0" z="0"/>
+			<float name="radius" value="0.1"/>
+			<ref id="DiffuseBSDF" />
+		</shape>
+		<shape type="sphere">
+			<point name="center" x="0.5" y="0" z="0"/>
+			<float name="radius" value="0.2"/>
+			<ref id="DiffuseBSDF" />
+		</shape>
+	</shape>
 
-	<shape type="sphere">
+	<shape type="instance" id="LSS 0">
+		<ref id="[LSS] 0"/>
 		<transform name="to_world">
-			<matrix value="0.2 0 0 0.5  0 0.2 0 1.0  0 0 0.2 0  0 0 0 1" />
+			<matrix value="1 0 0 0  0 1 0 1.0  0 0 1 0  0 0 0 1" />
+		</transform>
+	</shape>
+
+	<shape type="rectangle" id="Clip 0 0">
+		<transform name="to_world">
+			<matrix value="0 0 0.1 0  0 0.1 0 1.0  -0.1 0 0 0  0 0 0 1" />
 		</transform>
 		<ref id="DiffuseBSDF" />
+	</shape>
+
+	<shape type="rectangle" id="Clip 0 1">
+		<transform name="to_world">
+			<matrix value="0 0 0.2 0.5  0 0.2 0 1.0  -0.2 0 0 0  0 0 0 1" />
+		</transform>
+		<ref id="DiffuseBSDF" />
+	</shape>
+
+	<shape type="shapegroup" id="[LSS] 1">
+		<shape type="sphere">
+			<point name="center" x="-0.5" y="0" z="0"/>
+			<float name="radius" value="0.2"/>
+			<ref id="DiffuseBSDF" />
+		</shape>
+		<shape type="sphere">
+			<point name="center" x="0" y="0" z="0"/>
+			<float name="radius" value="0.1"/>
+			<ref id="DiffuseBSDF" />
+		</shape>
+		<shape type="sphere">
+			<point name="center" x="+0.5" y="0" z="0"/>
+			<float name="radius" value="0.2"/>
+			<ref id="DiffuseBSDF" />
+		</shape>
+	</shape>
+
+	<shape type="instance" id="LSS 1">
+		<ref id="[LSS] 1"/>
+		<transform name="to_world">
+			<matrix value="1 0 0 0  0 1 0 0.3  0 0 1 -0.5  0 0 0 1" />
+		</transform>
+	</shape>
+
+	<shape type="shapegroup" id="[Sphere]">
+		<shape type="sphere">
+			<point name="center" x="0" y="0" z="0"/>
+			<float name="radius" value="0.2"/>
+			<ref id="DiffuseBSDF" />
+		</shape>
+	</shape>
+
+	<shape type="instance" id="Sphere">
+		<ref id="[Sphere]"/>
+		<transform name="to_world">
+			<matrix value="1 0 0 +0.5  0 1 0 1.0  0 0 1 0  0 0 0 1" />
+		</transform>
 	</shape>
 
 	<shape type="rectangle" id="Light">

@@ -134,6 +134,7 @@ struct Renderer
 	}
 
 	bool										mReloadShader = false;
+	bool										mReloadScene = false;
 	bool										mDumpRayQuery = false;
 
 	bool										mAccumulationFrameUnlimited = false;

@@ -506,7 +506,10 @@ struct InstanceFlag
 {
 	uint						mTwoSided : 1					CONSTANT_DEFAULT(0);
 	uint						mUV : 1							CONSTANT_DEFAULT(0);
-	uint						mPad : 30						CONSTANT_DEFAULT(0);
+
+	uint						mInstanceMask : 8				CONSTANT_DEFAULT(0xff);
+
+	uint						mPad : 22						CONSTANT_DEFAULT(0);
 };
 STATITC_ASSERT(sizeof(InstanceFlag) == sizeof(float) * 1);
 
@@ -558,10 +561,14 @@ struct InstanceData
 	uint						mIndexOffset					CONSTANT_DEFAULT(0);
 	uint						mIndexCount						CONSTANT_DEFAULT(0);
 
+	uint						mLSSVertexOffset				CONSTANT_DEFAULT(0);
+	uint						mLSSVertexCount					CONSTANT_DEFAULT(0);
 	uint						mLSSIndexOffset					CONSTANT_DEFAULT(0);
 	uint						mLSSIndexCount					CONSTANT_DEFAULT(0);
 	uint						mLSSRadiusOffset				CONSTANT_DEFAULT(0);
 	uint						mLSSRadiusCount					CONSTANT_DEFAULT(0);
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 };
 STATITC_ASSERT(sizeof(InstanceData) % sizeof(glm::vec4) == 0);
 
