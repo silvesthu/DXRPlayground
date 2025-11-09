@@ -332,9 +332,23 @@ struct HitContext : SurfaceContext
 			hit_context.mVertexPositionOS		= lss_position_OS;
 			hit_context.mVertexNormalOS			= normalize(lss_normal_OS);
 			hit_context.mVertexNormalWS			= normalize(mul((float3x3)hit_context.mInstanceData.mInverseTranspose, lss_normal_OS)); // Allow non-uniform scale
-			hit_context.mUV						= float2(0.0, bary2.x);
+			hit_context.mUV						= float2(bary2.x, 0.0);
+			if (bary2.x == 0.0 || bary2.x == 1.0)
+				hit_context.mUV = 1.0; // To visualize caps
 		}
-		else
+		else if (NvRtCommittedIsSphere(inRayQuery))
+		{
+			float4 sphere_data					= NvRtCommittedSphereObjectPositionAndRadius(inRayQuery);
+			float3 sphere_center_OS				= sphere_data.xyz;
+			float3 sphere_position_OS			= inRayQuery.CommittedObjectRayOrigin() + inRayQuery.CommittedRayT() * inRayQuery.CommittedObjectRayDirection();
+			float3 sphere_normal_OS				= sphere_position_OS - sphere_center_OS;
+			
+			hit_context.mVertexPositionOS		= sphere_position_OS;
+			hit_context.mVertexNormalOS			= normalize(sphere_normal_OS);
+			hit_context.mVertexNormalWS			= normalize(mul((float3x3)hit_context.mInstanceData.mInverseTranspose, sphere_normal_OS)); // Allow non-uniform scale
+			hit_context.mUV						= float2(0.0, 0.0);
+		}
+		else 
 #endif // NVAPI_LSS
 		{
 			hit_context.LoadSurface();

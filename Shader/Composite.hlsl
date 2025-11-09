@@ -49,9 +49,9 @@ float3 LuminanceToColor(float3 inLuminance, Constants inConstants)
 		switch (inConstants.mToneMappingMode)
 		{
 			case ToneMappingMode::Knarkowicz:	tone_mapped_color = ToneMapping_ACES_Knarkowicz(normalized_luminance); break;
-            case ToneMappingMode::Passthrough:	// fallthrough
+			case ToneMappingMode::Passthrough:	// fallthrough
 			default:							tone_mapped_color = normalized_luminance; break;
-        }
+		}
 
 		// [Reference]
 		// https://github.com/ampas/aces-dev
@@ -64,15 +64,15 @@ float3 LuminanceToColor(float3 inLuminance, Constants inConstants)
 // https://github.com/microsoft/DirectX-Graphics-Samples/blob/master/MiniEngine/Core/Shaders/ColorSpaceUtility.hlsli
 float3 ApplySRGBCurve( float3 x )
 {
-    // Approximately pow(x, 1.0 / 2.2)
-    return select(x < 0.0031308, 12.92 * x, 1.055 * pow(x, 1.0 / 2.4) - 0.055);
+	// Approximately pow(x, 1.0 / 2.2)
+	return select(x < 0.0031308, 12.92 * x, 1.055 * pow(x, 1.0 / 2.4) - 0.055);
 }
 
 // https://github.com/microsoft/DirectX-Graphics-Samples/blob/master/MiniEngine/Core/Shaders/ColorSpaceUtility.hlsli
 float3 RemoveSRGBCurve( float3 x )
 {
-    // Approximately pow(x, 2.2)
-    return select(x < 0.04045, x / 12.92, pow( (x + 0.055) / 1.055, 2.4 ));
+	// Approximately pow(x, 2.2)
+	return select(x < 0.04045, x / 12.92, pow( (x + 0.055) / 1.055, 2.4 ));
 }
 
 [RootSignature(ROOT_SIGNATURE_COMMON)]
@@ -224,8 +224,8 @@ float4 LineVS(uint inVertexID : SV_VertexID, out float4 outColor : COLOR) : SV_P
 
 		if (group == 0)
 			outColor = float4(1.0, 1.0, 1.0, distance_along_ray); // Camera Ray in White
-		else if (group == 1)
-			outColor = float4(1.0, 0.0, 0.0, distance_along_ray); // First Bounce in Red
+		// else if (group == 1)
+		//	outColor = float4(1.0, 0.0, 0.0, distance_along_ray); // First Bounce in Red
 		else
 			outColor = index == 0 ? float4(0.0, 1.0, 0.0, distance_along_ray) : float4(1.0, 1.0, 0.0, distance_along_ray); // Secondary Bounce in Green -> Yellow
 

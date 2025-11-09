@@ -160,7 +160,7 @@
 	<shape type="instance" id="Sphere">
 		<ref id="[Sphere]"/>
 		<transform name="to_world">
-			<matrix value="1 0 0 +0.5  0 1 0 1.0  0 0 1 0  0 0 0 1" />
+			<matrix value="1 0 0 -0.5  0 1 0 1.0  0 0 1 0  0 0 0 1" />
 		</transform>
 	</shape>
 

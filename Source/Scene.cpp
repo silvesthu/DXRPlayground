@@ -12,8 +12,8 @@
 #include "Thirdparty/tiny_gltf.h"
 #include "Thirdparty/tinyexr.h"
 
-#pragma warning(disable: 4244)
-#pragma warning(disable: 4324)
+#pragma warning(disable: 4244) // possible loss of data
+#pragma warning(disable: 4324) // structure was padded due to alignment specifier
 #include "Thirdparty/openvdb/nanovdb/NanoVDB.h"
 #pragma warning(default: 4244)
 #pragma warning(default: 4324)
@@ -58,33 +58,50 @@ void BLAS::Initialize(const Initializer& inInitializer)
 		}
 		else if (instance_info.mGeometryType == GeometryType::Sphere)
 		{
-			mDescEx.type = NVAPI_D3D12_RAYTRACING_GEOMETRY_TYPE_SPHERES_EX; // see fillD3dSpheresDesc
+			mDescEx.type = NVAPI_D3D12_RAYTRACING_GEOMETRY_TYPE_SPHERES_EX;
 			mDescEx.flags = mDesc.Flags;
 
-			// [TODO]
+			mDescEx.spheres.vertexCount = instance_data.mLSSVertexCount;
+			mDescEx.spheres.indexCount = instance_data.mLSSIndexCount;
+
+			mDescEx.spheres.vertexPositionBuffer.StartAddress = inInitializer.mLSSVerticesBaseAddress + instance_data.mLSSVertexOffset * sizeof(VertexType);
+			mDescEx.spheres.vertexPositionBuffer.StrideInBytes = sizeof(VertexType);
+			mDescEx.spheres.vertexPositionFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+
+			mDescEx.spheres.vertexRadiusBuffer.StartAddress = inInitializer.mLSSRadiiBaseAddress + instance_data.mLSSRadiusOffset * sizeof(RadiusType);
+			mDescEx.spheres.vertexRadiusBuffer.StrideInBytes = sizeof(RadiusType);
+			mDescEx.spheres.vertexRadiusFormat = DXGI_FORMAT_R32_FLOAT;
+
+			// The API comment says "May be set to NULL", but show nothing if no index buffer...
+			mDescEx.spheres.indexBuffer.StartAddress = inInitializer.mLSSIndicesBaseAddress + instance_data.mLSSIndexOffset * sizeof(IndexType);
+			mDescEx.spheres.indexBuffer.StrideInBytes = sizeof(IndexType);
+			mDescEx.spheres.indexFormat = DXGI_FORMAT_R32_UINT;
 		}
 		else if (instance_info.mGeometryType == GeometryType::LSS || instance_info.mGeometryType == GeometryType::TriangleAsLSS)
 		{
 			mDescEx.type = NVAPI_D3D12_RAYTRACING_GEOMETRY_TYPE_LSS_EX; // see fillD3dLssDesc
 			mDescEx.flags = mDesc.Flags;
+
 			mDescEx.lss.vertexCount = instance_data.mLSSVertexCount;
+			mDescEx.lss.indexCount = instance_data.mLSSIndexCount;
 			mDescEx.lss.primitiveCount = instance_data.mLSSIndexCount / 2; // NVAPI_D3D12_RAYTRACING_LSS_PRIMITIVE_FORMAT_LIST
+
 			mDescEx.lss.vertexPositionBuffer.StartAddress = inInitializer.mLSSVerticesBaseAddress + instance_data.mLSSVertexOffset * sizeof(VertexType);
 			mDescEx.lss.vertexPositionBuffer.StrideInBytes = sizeof(VertexType);
 			mDescEx.lss.vertexPositionFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+
 			mDescEx.lss.vertexRadiusBuffer.StartAddress = inInitializer.mLSSRadiiBaseAddress + instance_data.mLSSRadiusOffset * sizeof(RadiusType);
 			mDescEx.lss.vertexRadiusBuffer.StrideInBytes = sizeof(RadiusType);
 			mDescEx.lss.vertexRadiusFormat = DXGI_FORMAT_R32_FLOAT;
+
+			mDescEx.lss.indexBuffer.StartAddress = inInitializer.mLSSIndicesBaseAddress + instance_data.mLSSIndexOffset * sizeof(IndexType);
+			mDescEx.lss.indexBuffer.StrideInBytes = sizeof(IndexType);
+			mDescEx.lss.indexFormat = DXGI_FORMAT_R32_UINT;
 
 			mDescEx.lss.endcapMode = instance_info.mGeometryType == GeometryType::TriangleAsLSS ? gNVAPI.mLSSWireframeEndcapMode : gNVAPI.mEndcapMode;
 			// mDescEx.lss.endcapMode = NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_CHAINED;
 			mDescEx.lss.primitiveFormat = NVAPI_D3D12_RAYTRACING_LSS_PRIMITIVE_FORMAT_LIST;
 			// mDescEx.lss.primitiveFormat = NVAPI_D3D12_RAYTRACING_LSS_PRIMITIVE_FORMAT_SUCCESSIVE_IMPLICIT;
-
-			mDescEx.lss.indexBuffer.StartAddress = inInitializer.mLSSIndicesBaseAddress + instance_data.mLSSIndexOffset * sizeof(IndexType);
-			mDescEx.lss.indexBuffer.StrideInBytes = sizeof(IndexType);
-			mDescEx.lss.indexCount = instance_data.mLSSIndexCount;
-			mDescEx.lss.indexFormat = DXGI_FORMAT_R32_UINT;
 		}
 		
 		// D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS -> NVAPI_D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS_EX
@@ -444,6 +461,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 		int mLSSRadiusOffset = 0;
 
 		std::string_view mBSDFID;
+		GeometryType mGeometryType = GeometryType::LSS;
 	};
 
 	std::unordered_map<std::string_view, BSDFInstance> bsdf_id_to_instance;
@@ -640,7 +658,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 
 		SceneContent* primitive = nullptr;
 		SceneContent loaded_primitive;
-		bool is_lss = false;
+		bool is_instance_lss = false;
 		if (type == "cube")
 		{
 			primitive = &mPrimitives.mCube;
@@ -677,7 +695,10 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 			if (!gNVAPI.mLinearSweptSpheresSupported)
 				continue;
 
-			if (!id.starts_with("[LSS]"))
+			bool is_shapegroup_lss = id.starts_with("[LSS]");
+			bool is_shapegroup_sphere = id.starts_with("[Sphere]");
+
+			if (!is_shapegroup_lss && !is_shapegroup_sphere)
 				continue;
 
 			int lss_vertex_offset = (int)ioSceneContent.mLSSVertices.size();
@@ -689,6 +710,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 				.mLSSVertexOffset = lss_vertex_offset,
 				.mLSSIndexOffset = lss_index_offset,
 				.mLSSRadiusOffset = lss_radius_offset,
+				.mGeometryType = is_shapegroup_lss ? GeometryType::LSS : GeometryType::Sphere
 			};
 
 			int lss_vertex_index = 0;
@@ -717,20 +739,24 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 					std::string_view bsdf_id = ref->Attribute("id");
 					shapegroup_instance.mBSDFID = bsdf_id;
 				}
-				else
+				else if (is_shapegroup_lss)
 				{
 					// For following vertex, add indices (segments)
 					ioSceneContent.mLSSIndices.push_back(static_cast<IndexType>(lss_vertex_index - 1));
+					ioSceneContent.mLSSIndices.push_back(static_cast<IndexType>(lss_vertex_index));
+				}
+				if (is_shapegroup_sphere)
+				{
 					ioSceneContent.mLSSIndices.push_back(static_cast<IndexType>(lss_vertex_index));
 				}
 
 				lss_vertex_index++;
 			}
 
-			gAssert(lss_vertex_index >= 2); // At least 2 vertices to form a segment
+			gAssert(!is_shapegroup_lss || lss_vertex_index >= 2); // At least 2 vertices to form a lss segment
 
 			shapegroup_instance.mLSSVertexCount = lss_vertex_index;
-			shapegroup_instance.mLSSIndexCount = (lss_vertex_index - 1) * 2;
+			shapegroup_instance.mLSSIndexCount = is_shapegroup_lss ? (lss_vertex_index - 1) * 2 : lss_vertex_index;
 			shapegroup_instance.mLSSRadiusCount = lss_vertex_index;
 
 			shapegroup_id_to_instance[id] = shapegroup_instance;
@@ -742,7 +768,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 			if (!gNVAPI.mLinearSweptSpheresSupported)
 				continue;
 
-			is_lss = true;
+			is_instance_lss = true;
 		}
 		else
 		{
@@ -775,7 +801,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 			gAssert(!primitive->mInstanceDatas.empty());
 			has_uv = primitive->mInstanceDatas.front().mFlags.mUV;
 		}
-		else if (is_lss)
+		else if (is_instance_lss)
 		{
 			auto ref = shape->FirstChildElement("ref");
 			auto shapegroup_id = ref->Attribute("id");
@@ -931,7 +957,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 		// LSS
 		if (shapegroup_instance != nullptr)
 		{
-			instance_info.mGeometryType = GeometryType::LSS;
+			instance_info.mGeometryType = shapegroup_instance->mGeometryType;
 
 			instance_data.mLSSVertexOffset = shapegroup_instance->mLSSVertexOffset;
 			instance_data.mLSSVertexCount = shapegroup_instance->mLSSVertexCount;
