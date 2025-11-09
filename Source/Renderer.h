@@ -9,28 +9,28 @@ struct Renderer
 {
 	struct Runtime : RuntimeBase<Runtime>
 	{
-		Shader									mRayQueryShader				= Shader().FileName("Shader/RayQuery.hlsl").CSName("RayQueryCS");
-		Shader									mDepthShader				= Shader().FileName("Shader/RayQuery.hlsl").VSName("ScreenspaceTriangleVS").PSName("DepthPS").DepthWrite(true).DSVFormat(DXGI_FORMAT_D32_FLOAT);
-		Shader									mPrepareLightsShader		= Shader().FileName("Shader/PrepareLights.hlsl").CSName("PrepareLightsCS");
-		Shader									mClearShader				= Shader().FileName("Shader/Composite.hlsl").CSName("ClearCS");
-		Shader									mGenerateTextureShader		= Shader().FileName("Shader/Composite.hlsl").CSName("GeneratTextureCS");
-		Shader									mBRDFSliceShader			= Shader().FileName("Shader/Composite.hlsl").CSName("BRDFSliceCS");
-		Shader									mReadbackShader				= Shader().FileName("Shader/Composite.hlsl").CSName("ReadbackCS");
-		Shader									mNanoVDBVisualizeShader		= Shader().FileName("Shader/Composite.hlsl").CSName("NanoVDBVisualizeCS");
-		Shader									mDiffTexture2DShader		= Shader().FileName("Shader/DiffTexture.hlsl").CSName("DiffTexture2DShader");
-		Shader									mDiffTexture3DShader		= Shader().FileName("Shader/DiffTexture.hlsl").CSName("DiffTexture3DShader");
-		Shader									mLineShader					= Shader().FileName("Shader/Composite.hlsl").VSName("LineVS").PSName("LinePS").Topology(D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE).DepthFunc(D3D12_COMPARISON_FUNC_LESS).RTVFormat(kBackBufferFormat).DSVFormat(DXGI_FORMAT_D32_FLOAT);
-		Shader									mLineHiddenShader			= Shader().FileName("Shader/Composite.hlsl").VSName("LineVS").PSName("LineHiddenPS").Topology(D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE).DepthFunc(D3D12_COMPARISON_FUNC_GREATER).RTVFormat(kBackBufferFormat).DSVFormat(DXGI_FORMAT_D32_FLOAT);
-		Shader									mCompositeShader			= Shader().FileName("Shader/Composite.hlsl").VSName("ScreenspaceTriangleVS").PSName("CompositePS").RTVFormat(kBackBufferFormat).DSVFormat(DXGI_FORMAT_D32_FLOAT);
+		Shader									mRayQueryShader				= Shader().FileName("Shader/RayQuery.hpp").CSName("RayQueryCS");
+		Shader									mDepthShader				= Shader().FileName("Shader/RayQuery.hpp").VSName("ScreenspaceTriangleVS").PSName("DepthPS").DepthWrite(true).DSVFormat(DXGI_FORMAT_D32_FLOAT);
+		Shader									mPrepareLightsShader		= Shader().FileName("Shader/PrepareLights.hpp").CSName("PrepareLightsCS");
+		Shader									mClearShader				= Shader().FileName("Shader/Composite.hpp").CSName("ClearCS");
+		Shader									mGenerateTextureShader		= Shader().FileName("Shader/Composite.hpp").CSName("GeneratTextureCS");
+		Shader									mBRDFSliceShader			= Shader().FileName("Shader/Composite.hpp").CSName("BRDFSliceCS");
+		Shader									mReadbackShader				= Shader().FileName("Shader/Composite.hpp").CSName("ReadbackCS");
+		Shader									mNanoVDBVisualizeShader		= Shader().FileName("Shader/Composite.hpp").CSName("NanoVDBVisualizeCS");
+		Shader									mDiffTexture2DShader		= Shader().FileName("Shader/DiffTexture.hpp").CSName("DiffTexture2DShader");
+		Shader									mDiffTexture3DShader		= Shader().FileName("Shader/DiffTexture.hpp").CSName("DiffTexture3DShader");
+		Shader									mLineShader					= Shader().FileName("Shader/Composite.hpp").VSName("LineVS").PSName("LinePS").Topology(D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE).DepthFunc(D3D12_COMPARISON_FUNC_LESS).RTVFormat(kBackBufferFormat).DSVFormat(DXGI_FORMAT_D32_FLOAT);
+		Shader									mLineHiddenShader			= Shader().FileName("Shader/Composite.hpp").VSName("LineVS").PSName("LineHiddenPS").Topology(D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE).DepthFunc(D3D12_COMPARISON_FUNC_GREATER).RTVFormat(kBackBufferFormat).DSVFormat(DXGI_FORMAT_D32_FLOAT);
+		Shader									mCompositeShader			= Shader().FileName("Shader/Composite.hpp").VSName("ScreenspaceTriangleVS").PSName("CompositePS").RTVFormat(kBackBufferFormat).DSVFormat(DXGI_FORMAT_D32_FLOAT);
 		Shader									mSentinelShader				= Shader();
 		std::span<Shader>						mShaders					= std::span<Shader>(&mRayQueryShader, &mSentinelShader);
 
-		Shader									mRayGenerationShader		= Shader().FileName("Shader/RayGeneration.hlsl").RayGenerationName(L"RayGeneration").RootSignatureReference(&mRayQueryShader);
-		Shader									mMissShader					= Shader().FileName("Shader/Miss.hlsl").MissName(L"Miss").RootSignatureReference(&mRayQueryShader);
-		Shader									mAnyHitShader				= Shader().FileName("Shader/AnyHit.hlsl").AnyHitName(L"AnyHit").RootSignatureReference(&mRayQueryShader);														// AnyHit MUST comes before HitGroup referencing it when being AddToStateObject, otherwise DXGI_ERROR_DRIVER_INTERNAL_ERROR
-		Shader									mClosestHit100Shader		= Shader().FileName("Shader/ClosestHit100.hlsl").ClosestHitName(L"ClosestHit100").RootSignatureReference(&mRayQueryShader);										// ClosestHit without AnyHit
-		Shader									mClosestHit010Shader		= Shader().FileName("Shader/ClosestHit010.hlsl").ClosestHitName(L"ClosestHit010").AnyHitReference(&mAnyHitShader).RootSignatureReference(&mRayQueryShader);		// ClosestHit with AnyHit in different library
-		Shader									mClosestHit001Shader		= Shader().FileName("Shader/ClosestHit001.hlsl").ClosestHitName(L"ClosestHit001").AnyHitName(L"AnyHit001").RootSignatureReference(&mRayQueryShader);			// ClosestHit with AnyHit in same library
+		Shader									mRayGenerationShader		= Shader().FileName("Shader/RayGeneration.hpp").RayGenerationName(L"RayGeneration").RootSignatureReference(&mRayQueryShader);
+		Shader									mMissShader					= Shader().FileName("Shader/Miss.hpp").MissName(L"Miss").RootSignatureReference(&mRayQueryShader);
+		Shader									mAnyHitShader				= Shader().FileName("Shader/AnyHit.hpp").AnyHitName(L"AnyHit").RootSignatureReference(&mRayQueryShader);														// AnyHit MUST comes before HitGroup referencing it when being AddToStateObject, otherwise DXGI_ERROR_DRIVER_INTERNAL_ERROR
+		Shader									mClosestHit100Shader		= Shader().FileName("Shader/ClosestHit100.hpp").ClosestHitName(L"ClosestHit100").RootSignatureReference(&mRayQueryShader);										// ClosestHit without AnyHit
+		Shader									mClosestHit010Shader		= Shader().FileName("Shader/ClosestHit010.hpp").ClosestHitName(L"ClosestHit010").AnyHitReference(&mAnyHitShader).RootSignatureReference(&mRayQueryShader);		// ClosestHit with AnyHit in different library
+		Shader									mClosestHit001Shader		= Shader().FileName("Shader/ClosestHit001.hpp").ClosestHitName(L"ClosestHit001").AnyHitName(L"AnyHit001").RootSignatureReference(&mRayQueryShader);			// ClosestHit with AnyHit in same library
 		Shader									mCollectionSentinelShader	= Shader();
 		std::span<Shader>						mCollectionShaders			= std::span<Shader>(&mMissShader,			&mCollectionSentinelShader);
 		std::span<Shader>						mHitGroupShaders			= std::span<Shader>(&mClosestHit100Shader,	&mCollectionSentinelShader);

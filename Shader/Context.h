@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Shared.h"
-#include "HLSL.h"
+#include "Binding.h"
 #include "NanoVDB.h"
 
 #if USE_HALF

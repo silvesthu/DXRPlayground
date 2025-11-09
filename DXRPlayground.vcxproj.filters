@@ -285,13 +285,13 @@
     <None Include="Shader\utils.hlsli">
       <Filter>Shader</Filter>
     </None>
-    <None Include="Shader\AnyHit.hlsl">
+    <None Include="Shader\AnyHit.hpp">
       <Filter>Shader</Filter>
     </None>
-    <None Include="Shader\EnumHelper.inl">
+    <None Include="Shader\EnumHelper.h">
       <Filter>Shader</Filter>
     </None>
-    <None Include="Shader\Atmosphere.hlsl">
+    <None Include="Shader\Atmosphere.hpp">
       <Filter>Shader</Filter>
     </None>
     <None Include="Shader\AtmosphereIntegration.Bruneton17.h">
@@ -318,16 +318,16 @@
     <None Include="Shader\ClosestHit.h">
       <Filter>Shader</Filter>
     </None>
-    <None Include="Shader\ClosestHit001.hlsl">
+    <None Include="Shader\ClosestHit001.hpp">
       <Filter>Shader</Filter>
     </None>
-    <None Include="Shader\ClosestHit010.hlsl">
+    <None Include="Shader\ClosestHit010.hpp">
       <Filter>Shader</Filter>
     </None>
-    <None Include="Shader\ClosestHit100.hlsl">
+    <None Include="Shader\ClosestHit100.hpp">
       <Filter>Shader</Filter>
     </None>
-    <None Include="Shader\Cloud.hlsl">
+    <None Include="Shader\Cloud.hpp">
       <Filter>Shader</Filter>
     </None>
     <None Include="Shader\CloudIntegration.h">
@@ -336,31 +336,28 @@
     <None Include="Shader\Common.h">
       <Filter>Shader</Filter>
     </None>
-    <None Include="Shader\Composite.hlsl">
+    <None Include="Shader\Composite.hpp">
       <Filter>Shader</Filter>
     </None>
     <None Include="Shader\Context.h">
       <Filter>Shader</Filter>
     </None>
-    <None Include="Shader\DiffTexture.hlsl">
+    <None Include="Shader\DiffTexture.hpp">
       <Filter>Shader</Filter>
     </None>
     <None Include="Shader\Light.h">
       <Filter>Shader</Filter>
     </None>
-    <None Include="Shader\Miss.hlsl">
+    <None Include="Shader\Miss.hpp">
       <Filter>Shader</Filter>
     </None>
     <None Include="Shader\Planet.h">
       <Filter>Shader</Filter>
     </None>
-    <None Include="Shader\PrepareLights.hlsl">
+    <None Include="Shader\PrepareLights.hpp">
       <Filter>Shader</Filter>
     </None>
-    <None Include="Shader\RayGeneration.hlsl">
-      <Filter>Shader</Filter>
-    </None>
-    <None Include="Shader\RayQuery.hlsl">
+    <None Include="Shader\RayGeneration.hpp">
       <Filter>Shader</Filter>
     </None>
     <None Include="Shader\Reservoir.h">
@@ -378,10 +375,13 @@
     <None Include="Source\Thirdparty\nvapi\nvShaderExtnEnums.h">
       <Filter>Source\Thirdparty\nvapi</Filter>
     </None>
-    <None Include="Shader\HLSL.h">
+    <None Include="Shader\HLSLHelper.h">
       <Filter>Shader</Filter>
     </None>
     <None Include="Shader\NanoVDB.h" />
+    <None Include="Shader\RayQuery.hpp">
+      <Filter>Shader</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="Source\Thirdparty\glm\util\glm.natvis">

@@ -1,6 +1,4 @@
 
-#include "HLSL.h"
-
 // Sample at center of each segment
 // #define HILLAIRE20_ADJUST_INTEGRATION
 

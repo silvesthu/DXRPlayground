@@ -22,11 +22,23 @@ uint SamplerDescriptorHeap[];
 
 template <typename T> T normalize(T a) { return a; }
 template <typename T> T abs(T a) { return a; }
+template <typename T> T log(T a) { return a; }
+template <typename T> T exp(T a) { return a; }
 template <typename T1, typename T2> T1 mul(T1 a, T2 b) { return a; }
 template <typename T1, typename T2> T1 min(T1 a, T2 b) { return a; }
 template <typename T1, typename T2> T1 max(T1 a, T2 b) { return a; }
 template <typename T1, typename T2> T1 dot(T1 a, T2 b) { return a; }
 template <typename T1, typename T2, typename T3> T1 lerp(T1 a, T2 b, T3 c) { return a; }
+template <typename T1, typename T2, typename T3> T1 clamp(T1 a, T2 b, T3 c) { return a; }
+
+struct RaytracingAccelerationStructure {};
+struct RayDesc
+{
+    float3 Origin;
+    float  TMin;
+    float3 Direction;
+    float  TMax;
+};
 
 enum RAY_FLAG : uint
 {
@@ -50,22 +62,22 @@ enum COMMITTED_STATUS : uint
     COMMITTED_PROCEDURAL_PRIMITIVE_HIT
 };
 
-struct RaytracingAccelerationStructure {};
-struct RayDesc
+template <RAY_FLAG RayFlags>
+struct RayQuery 
 {
-    float3 Origin;
-    float  TMin;
-    float3 Direction;
-    float  TMax;
-};
-template <uint RayFlags>
-struct RayQuery
-{
-
+	RAY_FLAG RayFlags() { return RAY_FLAG_NONE; }
+	COMMITTED_STATUS CommittedStatus() { return COMMITTED_NOTHING; }
+	uint CommittedInstanceID() { return 0; }
+	float CommittedRayT() { return 0.0f; }
 };
 
 #define SHADER_DEBUG 1
 #define USE_HALF 1
 #define USE_TEXTURE 1
+#define NVAPI_LSS 1
+#define NVAPI_SER 1
+
+#define __SHADER_TARGET_MAJOR 6
+#define __SHADER_TARGET_MINOR 7
 
 #endif // __INTELLISENSE__

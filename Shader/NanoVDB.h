@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Shared.h"
-#include "HLSL.h"
 
 #define PNANOVDB_HLSL
 #include "nanovdb/PNanoVDB.h"

@@ -58,8 +58,8 @@ public:
 	struct Runtime : RuntimeBase<Runtime>
 	{
 		// Shaders
-		Shader mShapeNoiseShader				= Shader().FileName("Shader/Cloud.hlsl").CSName("CloudShapeNoiseCS");
-		Shader mErosionNoiseShader				= Shader().FileName("Shader/Cloud.hlsl").CSName("CloudErosionNoiseCS");
+		Shader mShapeNoiseShader				= Shader().FileName("Shader/Cloud.hpp").CSName("CloudShapeNoiseCS");
+		Shader mErosionNoiseShader				= Shader().FileName("Shader/Cloud.hpp").CSName("CloudErosionNoiseCS");
 		// Gather shaders
 		Shader mSentinelShader					= Shader();
 		std::span<Shader> mShaders				= std::span<Shader>(&mShapeNoiseShader, &mSentinelShader);
