@@ -52,9 +52,18 @@ struct SurfaceContext
 		uint base_index					= mPrimitiveIndex * kIndexCountPerTriangle + mInstanceData.mIndexOffset;
 		uint3 indices					= uint3(Indices[base_index], Indices[base_index + 1], Indices[base_index + 2]) + mInstanceData.mVertexOffset;
 
-		mVertexPositions[0]				= Vertices[indices[0]];
-		mVertexPositions[1]				= Vertices[indices[1]];
-		mVertexPositions[2]				= Vertices[indices[2]];
+		if (VERTEX_TYPE_HALF)
+		{
+			mVertexPositions[0]			= VerticesHalf[indices[0]].xyz;
+			mVertexPositions[1]			= VerticesHalf[indices[1]].xyz;
+			mVertexPositions[2]			= VerticesHalf[indices[2]].xyz;
+		}
+		else
+		{
+			mVertexPositions[0]			= Vertices[indices[0]].xyz;
+			mVertexPositions[1]			= Vertices[indices[1]].xyz;
+			mVertexPositions[2]			= Vertices[indices[2]].xyz;
+		}
 		mVertexPositionOS				= mVertexPositions[0] * mBarycentrics.x + mVertexPositions[1] * mBarycentrics.y + mVertexPositions[2] * mBarycentrics.z;
 
 		mVertexNormalOS					= 0;

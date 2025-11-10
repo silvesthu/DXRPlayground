@@ -45,6 +45,8 @@ using float4x4 = glm::mat4x4;
 #define GENERATE_PAD_NAME CONCAT(mPad_, __LINE__)
 #define GENERATE_NEW_LINE_NAME CONCAT(_Newline_, __LINE__)
 
+#define VERTEX_TYPE_HALF						0
+
 #include "HLSLHelper.h"
 #include "EnumHelper.h"
 

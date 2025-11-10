@@ -94,7 +94,41 @@ private:
 using BLASRef = std::shared_ptr<BLAS>;
 
 using IndexType = uint32_t;
+
+#if VERTEX_TYPE_HALF
+struct VertexType
+{
+	VertexType() = default;
+	VertexType(float inX, float inY, float inZ)
+		: x(glm::detail::toFloat16(inX))
+		, y(glm::detail::toFloat16(inY))
+		, z(glm::detail::toFloat16(inZ))
+		, w(0)
+	{
+	}
+	VertexType(const glm::vec3& inVec3)
+		: x(glm::detail::toFloat16(inVec3.x))
+		, y(glm::detail::toFloat16(inVec3.y))
+		, z(glm::detail::toFloat16(inVec3.z))
+		, w(0)
+	{
+	}
+
+	short x = 0;
+	short y = 0;
+	short z = 0;
+	short w = 0;
+
+	constexpr static DXGI_FORMAT DXGIFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+};
+#else
 using VertexType = glm::vec3;
+#endif // VERTEX_TYPE_HALF
+
+template <typename T> inline DXGI_FORMAT gGetDXGIFormat();
+template <typename T> inline DXGI_FORMAT gGetDXGIFormat<T>() { return T::DXGIFormat; }
+template <> inline  DXGI_FORMAT gGetDXGIFormat<glm::vec3>() { return DXGI_FORMAT_R32G32B32_FLOAT; }
+
 using NormalType = glm::vec3;
 using UVType = glm::vec2;
 

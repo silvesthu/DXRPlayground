@@ -30,7 +30,7 @@ void BLAS::Initialize(const Initializer& inInitializer)
 	mDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
 	mDesc.Triangles.VertexBuffer.StartAddress = inInitializer.mVerticesBaseAddress + instance_data.mVertexOffset * sizeof(VertexType);
 	mDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(VertexType);
-	mDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+	mDesc.Triangles.VertexFormat = gGetDXGIFormat<VertexType>();
 	mDesc.Triangles.VertexCount = instance_data.mVertexCount;
 	if (instance_data.mIndexCount > 0)
 	{
@@ -66,7 +66,7 @@ void BLAS::Initialize(const Initializer& inInitializer)
 
 			mDescEx.spheres.vertexPositionBuffer.StartAddress = inInitializer.mLSSVerticesBaseAddress + instance_data.mLSSVertexOffset * sizeof(VertexType);
 			mDescEx.spheres.vertexPositionBuffer.StrideInBytes = sizeof(VertexType);
-			mDescEx.spheres.vertexPositionFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+			mDescEx.spheres.vertexPositionFormat = gGetDXGIFormat<VertexType>();
 
 			mDescEx.spheres.vertexRadiusBuffer.StartAddress = inInitializer.mLSSRadiiBaseAddress + instance_data.mLSSRadiusOffset * sizeof(RadiusType);
 			mDescEx.spheres.vertexRadiusBuffer.StrideInBytes = sizeof(RadiusType);
@@ -88,7 +88,7 @@ void BLAS::Initialize(const Initializer& inInitializer)
 
 			mDescEx.lss.vertexPositionBuffer.StartAddress = inInitializer.mLSSVerticesBaseAddress + instance_data.mLSSVertexOffset * sizeof(VertexType);
 			mDescEx.lss.vertexPositionBuffer.StrideInBytes = sizeof(VertexType);
-			mDescEx.lss.vertexPositionFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+			mDescEx.lss.vertexPositionFormat = gGetDXGIFormat<VertexType>();
 
 			mDescEx.lss.vertexRadiusBuffer.StartAddress = inInitializer.mLSSRadiiBaseAddress + instance_data.mLSSRadiusOffset * sizeof(RadiusType);
 			mDescEx.lss.vertexRadiusBuffer.StrideInBytes = sizeof(RadiusType);
@@ -895,6 +895,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 		uint32_t index_offset = 0;
 		const ShapegroupInstance* shapegroup_instance = nullptr;
 		bool has_uv = false;
+		bool has_normal = false;
 		if (primitive != nullptr)
 		{
 			vertex_offset = static_cast<uint32_t>(ioSceneContent.mVertices.size());
@@ -913,6 +914,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 			std::copy(primitive->mUVs.begin(), primitive->mUVs.end(), std::back_inserter(ioSceneContent.mUVs));
 
 			gAssert(!primitive->mInstanceDatas.empty());
+			has_normal = primitive->mInstanceDatas.front().mFlags.mNormal;
 			has_uv = primitive->mInstanceDatas.front().mFlags.mUV;
 		}
 		else if (is_instance_lss)
@@ -1083,6 +1085,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 
 		ioSceneContent.mInstanceInfos.push_back(instance_info);
 
+		instance_data.mFlags.mNormal = has_normal;
 		instance_data.mFlags.mUV = has_uv;
 		instance_data.mTransform = matrix;
 		instance_data.mInverseTranspose = glm::transpose(glm::inverse(matrix));
@@ -1337,7 +1340,7 @@ bool Scene::LoadGLTF(const std::string& inFilename, SceneContent& ioSceneContent
 			InstanceData instance_data =
 			{
 				.mBSDF = BSDF::pbrMetallicRoughness,
-				.mFlags = {.mTwoSided = material.doubleSided, .mUV = true },
+				.mFlags = { .mTwoSided = material.doubleSided, .mNormal = true, .mUV = true },
 				.mRoughnessAlpha = static_cast<float>(material.pbrMetallicRoughness.roughnessFactor * material.pbrMetallicRoughness.roughnessFactor),
 				.mAlbedo = vec3(material.pbrMetallicRoughness.baseColorFactor[0], material.pbrMetallicRoughness.baseColorFactor[1], material.pbrMetallicRoughness.baseColorFactor[2]),
 				.mReflectance = vec3(static_cast<float>(material.pbrMetallicRoughness.metallicFactor)),
