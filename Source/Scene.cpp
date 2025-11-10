@@ -260,51 +260,106 @@ bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransfor
 		gTrace(reader.Error().c_str());
 
 	// Fetch indices, attributes
+	gAssert(reader.GetShapes().size() == 1);
+	bool has_normal = false;
 	bool has_uv = false;
 	uint32_t index = 0;
 	for (auto&& shape : reader.GetShapes())
 	{
-		uint32_t vertex_offset = static_cast<uint32_t>(ioSceneContent.mVertices.size());
+		has_normal = reader.GetAttrib().normals.size() > 0;
+		has_uv = reader.GetAttrib().texcoords.size() > 0;
+
+		bool vertex_only = !has_normal && !has_uv;
+
 		uint32_t index_offset = static_cast<uint32_t>(ioSceneContent.mIndices.size());
+		uint32_t vertex_offset = static_cast<uint32_t>(ioSceneContent.mVertices.size());
 		
-		// Currently add new vertex for each index
-		// [TODO] Add proper support for index
-		uint32_t vertex_count = static_cast<uint32_t>(shape.mesh.num_face_vertices.size()) * kVertexCountPerTriangle;
 		uint32_t index_count = static_cast<uint32_t>(shape.mesh.num_face_vertices.size()) * kVertexCountPerTriangle;
+		ioSceneContent.mIndices.reserve(ioSceneContent.mIndices.size() + index_count);
 
-		for (size_t face_index = 0; face_index < shape.mesh.num_face_vertices.size(); face_index++)
+		// [NOTE] Not trivial to de-duplication. Need to use vertex_index/normal_index/texcoord_index as key
+		// Only try to reduce vertex_count if vertex_only
+		uint32_t vertex_count = 0;
+		if (!vertex_only)
 		{
-			assert(shape.mesh.num_face_vertices[face_index] == kVertexCountPerTriangle);
-			for (size_t vertex_index = 0; vertex_index < kVertexCountPerTriangle; vertex_index++)
+			// Add new vertex for each index
+			vertex_count = index_count;
+			ioSceneContent.mVertices.reserve(ioSceneContent.mVertices.size() + vertex_count);
+			ioSceneContent.mNormals.reserve(ioSceneContent.mNormals.size() + vertex_count);
+			ioSceneContent.mUVs.reserve(ioSceneContent.mUVs.size() + vertex_count);
+
+			for (size_t face_index = 0; face_index < shape.mesh.num_face_vertices.size(); face_index++)
 			{
-				tinyobj::index_t idx = shape.mesh.indices[face_index * kVertexCountPerTriangle + vertex_index];
-				ioSceneContent.mIndices.push_back(static_cast<IndexType>(index++));
-
-				ioSceneContent.mVertices.push_back(VertexType(
-					reader.GetAttrib().vertices[3 * idx.vertex_index + 0],
-					reader.GetAttrib().vertices[3 * idx.vertex_index + 1],
-					reader.GetAttrib().vertices[3 * idx.vertex_index + 2]
-				));
-
-				ioSceneContent.mNormals.push_back(NormalType(
-					reader.GetAttrib().normals[3 * idx.normal_index + 0],
-					reader.GetAttrib().normals[3 * idx.normal_index + 1],
-					reader.GetAttrib().normals[3 * idx.normal_index + 2]
-				));
-
-				if (idx.texcoord_index == -1)
+				assert(shape.mesh.num_face_vertices[face_index] == kVertexCountPerTriangle);
+				for (size_t face_vertex_index = 0; face_vertex_index < kVertexCountPerTriangle; face_vertex_index++)
 				{
-					// Dummy uv if not available
-					ioSceneContent.mUVs.push_back(UVType(0, 0));
-				}
-				else
-				{
-					has_uv = true;
+					tinyobj::index_t idx = shape.mesh.indices[face_index * kVertexCountPerTriangle + face_vertex_index];
+					ioSceneContent.mIndices.push_back(static_cast<IndexType>(index++));
 
-					ioSceneContent.mUVs.push_back(UVType(
-						reader.GetAttrib().texcoords[2 * idx.texcoord_index + 0],
-						inFlipV ? 1.0f - reader.GetAttrib().texcoords[2 * idx.texcoord_index + 1] : reader.GetAttrib().texcoords[2 * idx.texcoord_index + 1]
+					ioSceneContent.mVertices.push_back(VertexType(
+						reader.GetAttrib().vertices[3 * idx.vertex_index + 0],
+						reader.GetAttrib().vertices[3 * idx.vertex_index + 1],
+						reader.GetAttrib().vertices[3 * idx.vertex_index + 2]
 					));
+
+					if (idx.normal_index == -1)
+					{
+						// Dummy normal if not available
+						gAssert(!has_normal);
+						ioSceneContent.mNormals.push_back(NormalType(0, 0, 0));
+					}
+					else
+					{
+						ioSceneContent.mNormals.push_back(NormalType(
+							reader.GetAttrib().normals[3 * idx.normal_index + 0],
+							reader.GetAttrib().normals[3 * idx.normal_index + 1],
+							reader.GetAttrib().normals[3 * idx.normal_index + 2]
+						));
+					}
+
+					if (idx.texcoord_index == -1)
+					{
+						// Dummy uv if not available
+						gAssert(!has_uv);
+						ioSceneContent.mUVs.push_back(UVType(0, 0));
+					}
+					else
+					{
+						ioSceneContent.mUVs.push_back(UVType(
+							reader.GetAttrib().texcoords[2 * idx.texcoord_index + 0],
+							inFlipV ? 1.0f - reader.GetAttrib().texcoords[2 * idx.texcoord_index + 1] : reader.GetAttrib().texcoords[2 * idx.texcoord_index + 1]
+						));
+					}
+				}
+			}
+		}
+		else
+		{
+			// Only vertex (position) is available, no need to duplicate vertex
+			vertex_count = static_cast<uint32_t>(reader.GetAttrib().vertices.size() / 3); // 3 as xyz
+			ioSceneContent.mVertices.reserve(ioSceneContent.mVertices.size() + vertex_count);
+			ioSceneContent.mNormals.reserve(ioSceneContent.mNormals.size() + vertex_count);
+			ioSceneContent.mUVs.reserve(ioSceneContent.mUVs.size() + vertex_count);
+
+			for (size_t vertex_index = 0; vertex_index < vertex_count; vertex_index++)
+			{
+				ioSceneContent.mVertices.push_back(VertexType(
+					reader.GetAttrib().vertices[3 * vertex_index + 0],
+					reader.GetAttrib().vertices[3 * vertex_index + 1],
+					reader.GetAttrib().vertices[3 * vertex_index + 2]
+				));
+
+				ioSceneContent.mNormals.push_back({});
+				ioSceneContent.mUVs.push_back({});
+			}
+
+			for (size_t face_index = 0; face_index < shape.mesh.num_face_vertices.size(); face_index++)
+			{
+				assert(shape.mesh.num_face_vertices[face_index] == kVertexCountPerTriangle);
+				for (size_t face_vertex_index = 0; face_vertex_index < kVertexCountPerTriangle; face_vertex_index++)
+				{
+					tinyobj::index_t idx = shape.mesh.indices[face_index * kVertexCountPerTriangle + face_vertex_index];
+					ioSceneContent.mIndices.push_back(static_cast<IndexType>(idx.vertex_index));
 				}
 			}
 		}
@@ -339,6 +394,7 @@ bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransfor
 		}
 		{
 			instance_data.mFlags.mTwoSided = false;
+			instance_data.mFlags.mNormal = has_normal;
 			instance_data.mFlags.mUV = has_uv;
 		}
 
@@ -842,7 +898,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 		if (primitive != nullptr)
 		{
 			vertex_offset = static_cast<uint32_t>(ioSceneContent.mVertices.size());
-			vertex_count = static_cast<uint32_t>(primitive->mIndices.size()); // [TODO] Add proper support for index in LoadObj first
+			vertex_count = static_cast<uint32_t>(primitive->mVertices.size());
 
 			index_offset = static_cast<uint32_t>(ioSceneContent.mIndices.size());
 			index_count = static_cast<uint32_t>(primitive->mIndices.size());
@@ -850,6 +906,8 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 			for (uint32_t i = 0; i < index_count; i++)
 				ioSceneContent.mIndices.push_back(primitive->mIndices[i]);
 
+			gAssert(primitive->mVertices.size() == primitive->mNormals.size());
+			gAssert(primitive->mVertices.size() == primitive->mUVs.size());
 			std::copy(primitive->mVertices.begin(), primitive->mVertices.end(), std::back_inserter(ioSceneContent.mVertices));
 			std::copy(primitive->mNormals.begin(), primitive->mNormals.end(), std::back_inserter(ioSceneContent.mNormals));
 			std::copy(primitive->mUVs.begin(), primitive->mUVs.end(), std::back_inserter(ioSceneContent.mUVs));
@@ -1029,7 +1087,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 		instance_data.mTransform = matrix;
 		instance_data.mInverseTranspose = glm::transpose(glm::inverse(matrix));
 		instance_data.mVertexOffset = vertex_offset;
-		instance_data.mVertexCount = index_count;
+		instance_data.mVertexCount = vertex_count;
 		instance_data.mIndexOffset = index_offset;
 		instance_data.mIndexCount = index_count;
 		ioSceneContent.mInstanceDatas.push_back(instance_data);

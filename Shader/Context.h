@@ -57,12 +57,20 @@ struct SurfaceContext
 		mVertexPositions[2]				= Vertices[indices[2]];
 		mVertexPositionOS				= mVertexPositions[0] * mBarycentrics.x + mVertexPositions[1] * mBarycentrics.y + mVertexPositions[2] * mBarycentrics.z;
 
-		mVertexNormals[0]				= Normals[indices[0]];
-		mVertexNormals[1]				= Normals[indices[1]];
-		mVertexNormals[2]				= Normals[indices[2]];
-		float3 normal					= normalize(mVertexNormals[0] * mBarycentrics.x + mVertexNormals[1] * mBarycentrics.y + mVertexNormals[2] * mBarycentrics.z);
-		mVertexNormalOS					= normal;
-		mVertexNormalWS					= normalize(mul((float3x3) mInstanceData.mInverseTranspose, normal)); // Allow non-uniform scale
+		mVertexNormalOS					= 0;
+		if (mInstanceData.mFlags.mNormal)
+		{
+			mVertexNormals[0]			= Normals[indices[0]];
+			mVertexNormals[1]			= Normals[indices[1]];
+			mVertexNormals[2]			= Normals[indices[2]];
+			float3 normal				= normalize(mVertexNormals[0] * mBarycentrics.x + mVertexNormals[1] * mBarycentrics.y + mVertexNormals[2] * mBarycentrics.z);
+			mVertexNormalOS				= normal;	
+		}
+		else
+		{
+			mVertexNormalOS				= normalize(cross(mVertexPositions[0] - mVertexPositions[1], mVertexPositions[0] - mVertexPositions[2]));
+		}
+		mVertexNormalWS					= normalize(mul((float3x3) mInstanceData.mInverseTranspose, mVertexNormalOS)); // Allow non-uniform scale
 
 		mUV								= 0;
 		if (mInstanceData.mFlags.mUV)

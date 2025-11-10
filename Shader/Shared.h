@@ -506,11 +506,12 @@ enum : uint
 struct InstanceFlag
 {
 	uint						mTwoSided : 1					CONSTANT_DEFAULT(0);
+	uint						mNormal : 1						CONSTANT_DEFAULT(0);
 	uint						mUV : 1							CONSTANT_DEFAULT(0);
 
 	uint						mInstanceMask : 8				CONSTANT_DEFAULT(0xff);
 
-	uint						mPad : 22						CONSTANT_DEFAULT(0);
+	uint						mPad : 21						CONSTANT_DEFAULT(0);
 };
 STATITC_ASSERT(sizeof(InstanceFlag) == sizeof(float) * 1);
 
