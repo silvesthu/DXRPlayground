@@ -502,17 +502,18 @@ struct MediumContext
 
 		if (mInstanceData.mMediumNanoVBD.mBufferIndex != (uint)ViewDescriptorIndex::Invalid)
 		{
-			mSigmaT								*= (ratio - 0.75) / (1.0 - 0.75);
+			mSigmaT								*= (ratio - 0.5) / (1.0 - 0.5);
 			return;
 		}
 
-		float3 offset							= float3(0, -mConstants.mSequenceFrameRatio * 2.0, 0);
+		float3 offset							= float3(0, -ratio * 2.0, 0);
 		float noise_value						= ErosionNoise3D.SampleLevel(BilinearWrapSampler, (PositionWS() + offset) * 1.0, 0);
-		noise_value								= saturate(pow(noise_value * 1.2, 8.0));
+		noise_value								= saturate(pow(noise_value, 8.0));
 
-		float y_gradient						= pow(saturate(PositionWS().y + 0.1), 0.2);
-		noise_value								= lerp(noise_value, 0.0f, lerp(y_gradient, 0.0, pow(ratio, 16.0)));
-		
+		float y_animation_ratio					= pow(saturate(1.0 - ratio - 0.1), 0.5f);
+		float y_animation						= saturate(remap(PositionWS().y, 1.0f - y_animation_ratio, 1.0f + lerp(0.0f, 0.2f, ratio) - y_animation_ratio, 0.0f, 1.0f));
+		noise_value								= lerp(1.0f, noise_value, y_animation);
+
 		mSigmaT									*= noise_value;
 	}
 
@@ -525,7 +526,7 @@ struct MediumContext
 
 		if (mInstanceData.mMediumNanoVBD.mBufferIndex != (uint)ViewDescriptorIndex::Invalid)
 		{
-			mMajorantSigmaT						*= (ratio - 0.75) / (1.0 - 0.75);
+			mMajorantSigmaT						*= (ratio - 0.5) / (1.0 - 0.5);
 			return;
 		}
 	}
