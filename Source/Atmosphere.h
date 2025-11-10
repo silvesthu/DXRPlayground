@@ -354,12 +354,12 @@ public:
 		// Textures
 		struct Bruneton17
 		{
-			Shader mComputeTransmittanceShader					= Shader().FileName("Shader/Atmosphere.hlsl").CSName("ComputeTransmittanceCS");
-			Shader mComputeDirectIrradianceShader				= Shader().FileName("Shader/Atmosphere.hlsl").CSName("ComputeDirectIrradianceCS");
-			Shader mComputeSingleScatteringShader				= Shader().FileName("Shader/Atmosphere.hlsl").CSName("ComputeSingleScatteringCS");
-			Shader mComputeScatteringDensityShader				= Shader().FileName("Shader/Atmosphere.hlsl").CSName("ComputeScatteringDensityCS");
-			Shader mComputeIndirectIrradianceShader				= Shader().FileName("Shader/Atmosphere.hlsl").CSName("ComputeIndirectIrradianceCS");
-			Shader mComputeMultipleScatteringShader				= Shader().FileName("Shader/Atmosphere.hlsl").CSName("ComputeMultipleScatteringCS");
+			Shader mComputeTransmittanceShader					= Shader().FileName("Shader/Atmosphere.hpp").CSName("ComputeTransmittanceCS");
+			Shader mComputeDirectIrradianceShader				= Shader().FileName("Shader/Atmosphere.hpp").CSName("ComputeDirectIrradianceCS");
+			Shader mComputeSingleScatteringShader				= Shader().FileName("Shader/Atmosphere.hpp").CSName("ComputeSingleScatteringCS");
+			Shader mComputeScatteringDensityShader				= Shader().FileName("Shader/Atmosphere.hpp").CSName("ComputeScatteringDensityCS");
+			Shader mComputeIndirectIrradianceShader				= Shader().FileName("Shader/Atmosphere.hpp").CSName("ComputeIndirectIrradianceCS");
+			Shader mComputeMultipleScatteringShader				= Shader().FileName("Shader/Atmosphere.hpp").CSName("ComputeMultipleScatteringCS");
 
 			Shader mSentinelShader								= Shader();
 			std::span<Shader> mShaders							= std::span<Shader>(&mComputeTransmittanceShader, &mSentinelShader);

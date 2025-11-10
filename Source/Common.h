@@ -22,6 +22,8 @@ using Microsoft::WRL::ComPtr;
 #include <span>
 #include <chrono>
 #include <set>
+#include <ranges>
+#include <random>
 
 #include "Thirdparty/glm.h"
 #include "Thirdparty/nameof/include/nameof.hpp"
@@ -302,8 +304,8 @@ inline void gSetName(ComPtr<T>& inObject, std::string_view inPrefix, std::string
 	gSetName(inObject, gToWString(inPrefix), gToWString(inName), gToWString(inSuffix));
 }
 
-constexpr int								kScreenWidth = 1280;
-constexpr int								kScreenHeight = 720;
+constexpr int								kScreenWidth = 1920;
+constexpr int								kScreenHeight = 1080;
 
 constexpr int								kVertexCountPerTriangle = 3;
 
@@ -376,11 +378,15 @@ struct NVAPI
 	bool									mShaderExecutionReorderingSupported = false;
 	bool									mFakeUAVEnabled = false;
 
-	NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE  mEndcapMode = NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_NONE;
+	NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE  mEndcapMode = NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_CHAINED;
 
-	bool									mWireframeEnabled = false;
-	NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE  mWireframeEndcapMode = NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_CHAINED;
-	float									mWireframeRadius = 0.01f;
+	bool									mLSSWireframeEnabled = false;
+	NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE  mLSSWireframeEndcapMode = NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_CHAINED;
+	float									mLSSWireframeRadius = 0.01f;
+
+	int										mSphereSurfaceFillCountX = 100;
+	float									mSphereSurfaceFillRadius = -1.0f;
+	bool									mSphereSurfaceRandom = false;
 };
 extern NVAPI								gNVAPI;
 

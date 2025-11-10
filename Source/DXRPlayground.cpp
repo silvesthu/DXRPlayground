@@ -37,9 +37,11 @@ static const std::array kScenePresets =
 	ScenePreset().Name("CornellBox").Path("Asset/Comparison/benedikt-bitterli/cornell-box/scene_v3.xml").EmissionBoost(1E4f).TriangleAsLSSAllowed(true),
 	ScenePreset().Name("CornellBoxDielectric").Path("Asset/Comparison/benedikt-bitterli/cornell-box-dielectric/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("CornellBoxTeapot").Path("Asset/Comparison/benedikt-bitterli/cornell-box-teapot/scene_v3.xml").EmissionBoost(1E4f),
-	ScenePreset().Name("CornellMonkey").Path("Asset/Comparison/benedikt-bitterli/cornell-box-monkey/scene_v3.xml").EmissionBoost(1E4f),
-	ScenePreset().Name("CornellDragon").Path("Asset/Comparison/benedikt-bitterli/cornell-box-dragon/scene_v3.xml").EmissionBoost(1E4f).DensityBoost(10.0f).CameraAnimationPath("Asset/Comparison/benedikt-bitterli/cornell-box-dragon/camera_animation.gltf"),
-	ScenePreset().Name("CornellVDB").Path("Asset/Comparison/benedikt-bitterli/cornell-box-vdb/scene_v3.xml").EmissionBoost(1E4f).DensityBoost(10.0f),
+	ScenePreset().Name("CornellBoxMonkey").Path("Asset/Comparison/benedikt-bitterli/cornell-box-monkey/scene_v3.xml").EmissionBoost(1E4f),
+	ScenePreset().Name("CornellBoxDragon").Path("Asset/Comparison/benedikt-bitterli/cornell-box-dragon/scene_v3.xml").EmissionBoost(1E4f).DensityBoost(10.0f).CameraAnimationPath("Asset/Comparison/benedikt-bitterli/cornell-box-dragon/camera_animation.gltf"),
+	ScenePreset().Name("CornellBoxVDB").Path("Asset/Comparison/benedikt-bitterli/cornell-box-vdb/scene_v3.xml").EmissionBoost(1E4f).DensityBoost(10.0f),
+	ScenePreset().Name("CornellBoxLSS").Path("Asset/Comparison/benedikt-bitterli/cornell-box-lss/scene_v3.xml").EmissionBoost(1E4f),
+	ScenePreset().Name("CornellBoxSphereSurface").Path("Asset/Comparison/benedikt-bitterli/cornell-box-spheresurface/scene_v3.xml").EmissionBoost(1E4f),
 
 	// MIS
 	ScenePreset().Name("VeachMIS").Path("Asset/Comparison/benedikt-bitterli/veach-mis/scene_ggx_v3.xml").EmissionBoost(1E4f),
@@ -75,40 +77,39 @@ int sFindScenePresetIndex(const std::string_view inName)
 {
 	return static_cast<int>(&sFindScenePreset(inName) - &kScenePresets.front());
 }
-static int sCurrentSceneIndex = sFindScenePresetIndex("CornellDragon");
+static int sCurrentSceneIndex = sFindScenePresetIndex("CornellBoxSphereSurface");
 static int sPreviousSceneIndex = sCurrentSceneIndex;
 
 struct CameraSettings
 {
-	float			mMoveSpeed = 0.1f;
-	float			mRotateSpeed = 0.01f;
-	float			mHorizontalFovDegree = 90.0f;
+	float			mMoveSpeed				= 0.1f;
+	float			mRotateSpeed			= 0.002f;
+	float			mHorizontalFovDegree	= 90.0f;
 
 	struct ExposureControl
 	{
 		// Sunny 16 rule
-		float		mAperture = 16.0;						// N, f-stops
-		float		mInvShutterSpeed = 100.0;				// t, seconds
-		float		mSensitivity = 100.0f;					// S, ISO
+		float		mAperture				= 16.0;		// N, f-stops
+		float		mInvShutterSpeed		= 100.0;	// t, seconds
+		float		mSensitivity			= 100.0f;	// S, ISO
 	};
 	ExposureControl mExposureControl;
-	void			ResetExposure()		{ mExposureControl = ExposureControl(); }
+	void			ResetExposure()			{ mExposureControl = ExposureControl(); }
 };
-CameraSettings		gCameraSettings = {};
+CameraSettings		gCameraSettings			= {};
 
 struct DisplaySettings
 {
-	glm::ivec2		mWindowSize	= glm::ivec2(0, 0);
-	bool			mVsync				= true;
+	glm::ivec2		mWindowSize				= glm::ivec2(0, 0);
+	bool			mVsync					= true;
 };
-DisplaySettings		gDisplaySettings	= {};
+DisplaySettings		gDisplaySettings		= {};
 
 // Forward declarations of helper functions
 static bool sCreateDeviceD3D(HWND hWnd);
 static void sCleanupDeviceD3D();
 static void sWaitForGPU();
 static void sUpdate();
-static void sLoadShader() { gRenderer.mReloadShader = true; }
 static void sLoadCamera();
 static void sLoadScene(bool inLoadCamera);
 static void sDumpLuminance()
@@ -134,7 +135,7 @@ static void sPrepareImGui()
 	{
 		{
 			if (ImGui::Button("Reload Shader (F5)"))
-				sLoadShader();
+				gRenderer.mReloadShader = true;
 
 			ImGui::SameLine();
 
@@ -150,8 +151,8 @@ static void sPrepareImGui()
 			}
 		}
 		{
-			if (ImGui::Button("Reload Scene"))
-				sLoadScene(false);
+			if (ImGui::Button("Reload Scene (F4)"))
+				gRenderer.mReloadScene = true;
 
 			ImGui::SameLine();
 
@@ -418,21 +419,45 @@ static void sPrepareImGui()
 			ImGui::TreePop();
 		}
 
-		if (ImGui::TreeNodeEx("NVAPI", ImGuiTreeNodeFlags_None /*ImGuiTreeNodeFlags_DefaultOpen*/))
+		if (ImGui::TreeNodeEx("NVAPI", ImGuiTreeNodeFlags_DefaultOpen))
 		{
+			if (ImGui::Button("Reload Scene"))
+				gRenderer.mReloadScene = true;
+
+			if (ImGui::TreeNodeEx("LSS", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				bool endcap_chained = gNVAPI.mEndcapMode == NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_CHAINED;
+				if (ImGui::Checkbox("Endcap Chained", &endcap_chained))
+				{
+					gNVAPI.mEndcapMode = endcap_chained ? NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_CHAINED : NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_NONE;
+					gRenderer.mReloadScene = true;
+				}
+
+				ImGui::TreePop();
+			}
+
+			if (ImGui::TreeNodeEx("Sphere Surface", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				ImGui::InputInt("Fill Count X", &gNVAPI.mSphereSurfaceFillCountX);
+				ImGui::InputFloat("Radius", &gNVAPI.mSphereSurfaceFillRadius);
+				ImGui::Checkbox("Random", &gNVAPI.mSphereSurfaceRandom);
+
+				ImGui::TreePop();
+			}
+
 			if (ImGui::TreeNodeEx("LSS (Wireframe)", ImGuiTreeNodeFlags_DefaultOpen))
 			{
-				if (ImGui::Button("Reload Scene"))
-					sLoadScene(false);
+				if (ImGui::Checkbox("Enabled", &gNVAPI.mLSSWireframeEnabled))
+					gRenderer.mReloadScene = true;
 
-				if (ImGui::Checkbox("Enabled", &gNVAPI.mWireframeEnabled))
-					gRenderer.mReloadShader = true;
+				bool endcap_chained = gNVAPI.mLSSWireframeEndcapMode == NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_CHAINED;
+				if (ImGui::Checkbox("Endcap Chained", &endcap_chained))
+				{
+					gNVAPI.mLSSWireframeEndcapMode = endcap_chained ? NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_CHAINED : NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_NONE;
+					gRenderer.mReloadScene = true;
+				}
 
-				bool endcap_chained = gNVAPI.mWireframeEndcapMode == NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_CHAINED;
-				if (ImGui::Checkbox("Endcap Chained (Wireframe)", &endcap_chained))
-					gNVAPI.mWireframeEndcapMode = endcap_chained ? NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_CHAINED : NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_NONE;
-
-				ImGui::SliderFloat("Radius (Wireframe)", &gNVAPI.mWireframeRadius, 0.001f, 0.1f);
+				ImGui::SliderFloat("Radius", &gNVAPI.mLSSWireframeRadius, 0.001f, 0.1f);
 
 				ImGui::TreePop();
 			}
@@ -510,7 +535,7 @@ static void sPrepareImGui()
 				gRenderer.mAccumulationResetRequested = true;
 
 			if (ImGui::Checkbox("NanoVDB Generate Texture (in Scene Textures)", &gConfigs.mNanoVDBGenerateTexture))
-				sLoadScene(false);
+				gRenderer.mReloadScene = true;
 
 			if (ImGui::Checkbox("NanoVDB Use Texture (Require Generate)", &gConfigs.mNanoVDBUseTexture))
 				gRenderer.mReloadShader = true;
@@ -894,8 +919,11 @@ static void sUpdate()
 		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_E))
 			gConstants.CameraPosition() -= up * move_speed;
 
+		if (ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_F4))
+			gRenderer.mReloadScene = true;
+
 		if (ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_F5))
-			sLoadShader();
+			gRenderer.mReloadShader = true;
 
 		if (ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_F6))
 			sLoadCamera();
@@ -1083,7 +1111,7 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR lpCmdLine
 		[](const std::string& inPath, const filewatch::Event inChangeType)
 		{
 			(void)inChangeType;
-			std::regex pattern(".*\\.(hlsl|hlsli|h|inl)");
+			std::regex pattern(".*\\.(hlsl|hlsli|hpp|h|inl)");
 			if (std::regex_match(inPath, pattern) && inChangeType == filewatch::Event::modified)
 			{
 				std::string msg = "Reload triggered by " + inPath + "\n";
@@ -1267,6 +1295,11 @@ void sRender()
 		{
 			sPreviousSceneIndex = sCurrentSceneIndex;
 			sLoadScene(true);
+		}
+		else if (gRenderer.mReloadScene)
+		{
+			gRenderer.mReloadScene = false;
+			sLoadScene(false);
 		}
 	}
 

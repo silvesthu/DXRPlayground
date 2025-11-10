@@ -61,6 +61,7 @@ static RaytracingAccelerationStructure RaytracingScene = ResourceDescriptorHeap[
 static StructuredBuffer<InstanceData> InstanceDatas = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::RaytraceInstanceDataSRV];
 static StructuredBuffer<uint> Indices = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::RaytraceIndicesSRV];
 static StructuredBuffer<float3> Vertices = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::RaytraceVerticesSRV];
+static StructuredBuffer<half4> VerticesHalf = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::RaytraceVerticesSRV];
 static StructuredBuffer<float3> Normals = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::RaytraceNormalsSRV];
 static StructuredBuffer<float2> UVs = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::RaytraceUVsSRV];
 static StructuredBuffer<Light> Lights = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::RaytraceLightsSRV];

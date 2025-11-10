@@ -5,11 +5,15 @@
 enum class GeometryType
 {
 	Triangles = 0,
+
 	AABB,
+
 	OMM,
 	DMM,
+
 	Sphere,
 	LSS,
+
 	TriangleAsLSS,
 };
 
@@ -65,6 +69,7 @@ public:
 		D3D12_GPU_VIRTUAL_ADDRESS mVerticesBaseAddress;
 		D3D12_GPU_VIRTUAL_ADDRESS mIndicesBaseAddress;
 
+		D3D12_GPU_VIRTUAL_ADDRESS mLSSVerticesBaseAddress;
 		D3D12_GPU_VIRTUAL_ADDRESS mLSSIndicesBaseAddress;
 		D3D12_GPU_VIRTUAL_ADDRESS mLSSRadiiBaseAddress;
 	};
@@ -89,14 +94,41 @@ private:
 using BLASRef = std::shared_ptr<BLAS>;
 
 using IndexType = uint32_t;
-// using VertexType = glm::vec3;
+
+#if VERTEX_TYPE_HALF
 struct VertexType
 {
+	VertexType() = default;
+	VertexType(float inX, float inY, float inZ)
+		: x(glm::detail::toFloat16(inX))
+		, y(glm::detail::toFloat16(inY))
+		, z(glm::detail::toFloat16(inZ))
+		, w(0)
+	{
+	}
+	VertexType(const glm::vec3& inVec3)
+		: x(glm::detail::toFloat16(inVec3.x))
+		, y(glm::detail::toFloat16(inVec3.y))
+		, z(glm::detail::toFloat16(inVec3.z))
+		, w(0)
+	{
+	}
+
 	short x = 0;
 	short y = 0;
 	short z = 0;
 	short w = 0;
+
+	constexpr static DXGI_FORMAT DXGIFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 };
+#else
+using VertexType = glm::vec3;
+#endif // VERTEX_TYPE_HALF
+
+template <typename T> inline DXGI_FORMAT gGetDXGIFormat();
+template <typename T> inline DXGI_FORMAT gGetDXGIFormat<T>() { return T::DXGIFormat; }
+template <> inline  DXGI_FORMAT gGetDXGIFormat<glm::vec3>() { return DXGI_FORMAT_R32G32B32_FLOAT; }
+
 using NormalType = glm::vec3;
 using UVType = glm::vec2;
 
@@ -108,6 +140,10 @@ struct SceneContent
 	std::vector<VertexType>						mVertices;
 	std::vector<NormalType>						mNormals;
 	std::vector<UVType>							mUVs;
+
+	std::vector<VertexType>						mLSSVertices;
+	std::vector<IndexType>						mLSSIndices;
+	std::vector<float>							mLSSRadii;
 
 	std::vector<InstanceInfo>					mInstanceInfos;
 	std::vector<InstanceData>					mInstanceDatas;
@@ -141,8 +177,6 @@ struct SceneContent
 	std::optional<float>						mFov;
 
 	std::optional<AtmosphereMode>				mAtmosphereMode;
-
-	bool										mLSSAllowed = false;
 };
 
 class TLAS final
@@ -214,7 +248,9 @@ private:
 
 	void FillDummyMaterial(InstanceInfo& ioInstanceInfo, InstanceData& ioInstanceData);
 	
+	void GenerateLSSFromInstance();
 	void GenerateLSSFromTriangle();
+
 	void InitializeTextures();
 	void InitializeBuffers();
 	void InitializeRuntime();
@@ -226,6 +262,7 @@ private:
 		SceneContent						mCube;
 		SceneContent						mRectangle;
 		SceneContent						mSphere;
+		SceneContent						mCylinder;
 	};
 	Primitives								mPrimitives;
 
@@ -250,6 +287,7 @@ private:
 		ComPtr<ID3D12Resource>				mLightDataBuffer;
 
 		// LSS
+		ComPtr<ID3D12Resource>				mLSSVertices;
 		ComPtr<ID3D12Resource>				mLSSIndices;
 		ComPtr<ID3D12Resource>				mLSSRadii;
 	};

@@ -12,8 +12,8 @@
 #include "Thirdparty/tiny_gltf.h"
 #include "Thirdparty/tinyexr.h"
 
-#pragma warning(disable: 4244)
-#pragma warning(disable: 4324)
+#pragma warning(disable: 4244) // possible loss of data
+#pragma warning(disable: 4324) // structure was padded due to alignment specifier
 #include "Thirdparty/openvdb/nanovdb/NanoVDB.h"
 #pragma warning(default: 4244)
 #pragma warning(default: 4324)
@@ -27,10 +27,10 @@ void BLAS::Initialize(const Initializer& inInitializer)
 
 	mDesc = {};
 	mDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-	mDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
+	mDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
 	mDesc.Triangles.VertexBuffer.StartAddress = inInitializer.mVerticesBaseAddress + instance_data.mVertexOffset * sizeof(VertexType);
 	mDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(VertexType);
-	mDesc.Triangles.VertexFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+	mDesc.Triangles.VertexFormat = gGetDXGIFormat<VertexType>();
 	mDesc.Triangles.VertexCount = instance_data.mVertexCount;
 	if (instance_data.mIndexCount > 0)
 	{
@@ -58,33 +58,50 @@ void BLAS::Initialize(const Initializer& inInitializer)
 		}
 		else if (instance_info.mGeometryType == GeometryType::Sphere)
 		{
-			mDescEx.type = NVAPI_D3D12_RAYTRACING_GEOMETRY_TYPE_SPHERES_EX; // see fillD3dSpheresDesc
+			mDescEx.type = NVAPI_D3D12_RAYTRACING_GEOMETRY_TYPE_SPHERES_EX;
 			mDescEx.flags = mDesc.Flags;
 
-			// [TODO]
+			mDescEx.spheres.vertexCount = instance_data.mLSSVertexCount;
+			mDescEx.spheres.indexCount = instance_data.mLSSIndexCount;
+
+			mDescEx.spheres.vertexPositionBuffer.StartAddress = inInitializer.mLSSVerticesBaseAddress + instance_data.mLSSVertexOffset * sizeof(VertexType);
+			mDescEx.spheres.vertexPositionBuffer.StrideInBytes = sizeof(VertexType);
+			mDescEx.spheres.vertexPositionFormat = gGetDXGIFormat<VertexType>();
+
+			mDescEx.spheres.vertexRadiusBuffer.StartAddress = inInitializer.mLSSRadiiBaseAddress + instance_data.mLSSRadiusOffset * sizeof(RadiusType);
+			mDescEx.spheres.vertexRadiusBuffer.StrideInBytes = sizeof(RadiusType);
+			mDescEx.spheres.vertexRadiusFormat = DXGI_FORMAT_R32_FLOAT;
+
+			// The API comment says "May be set to NULL", but show nothing if no index buffer...
+			mDescEx.spheres.indexBuffer.StartAddress = inInitializer.mLSSIndicesBaseAddress + instance_data.mLSSIndexOffset * sizeof(IndexType);
+			mDescEx.spheres.indexBuffer.StrideInBytes = sizeof(IndexType);
+			mDescEx.spheres.indexFormat = DXGI_FORMAT_R32_UINT;
 		}
 		else if (instance_info.mGeometryType == GeometryType::LSS || instance_info.mGeometryType == GeometryType::TriangleAsLSS)
 		{
 			mDescEx.type = NVAPI_D3D12_RAYTRACING_GEOMETRY_TYPE_LSS_EX; // see fillD3dLssDesc
 			mDescEx.flags = mDesc.Flags;
-			mDescEx.lss.vertexCount = instance_data.mVertexCount;
-			mDescEx.lss.primitiveCount = instance_data.mLSSIndexCount / 2; // List
-			mDescEx.lss.vertexPositionBuffer.StartAddress = inInitializer.mVerticesBaseAddress + instance_data.mVertexOffset * sizeof(VertexType);
+
+			mDescEx.lss.vertexCount = instance_data.mLSSVertexCount;
+			mDescEx.lss.indexCount = instance_data.mLSSIndexCount;
+			mDescEx.lss.primitiveCount = instance_data.mLSSIndexCount / 2; // NVAPI_D3D12_RAYTRACING_LSS_PRIMITIVE_FORMAT_LIST
+
+			mDescEx.lss.vertexPositionBuffer.StartAddress = inInitializer.mLSSVerticesBaseAddress + instance_data.mLSSVertexOffset * sizeof(VertexType);
 			mDescEx.lss.vertexPositionBuffer.StrideInBytes = sizeof(VertexType);
-			mDescEx.lss.vertexPositionFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+			mDescEx.lss.vertexPositionFormat = gGetDXGIFormat<VertexType>();
+
 			mDescEx.lss.vertexRadiusBuffer.StartAddress = inInitializer.mLSSRadiiBaseAddress + instance_data.mLSSRadiusOffset * sizeof(RadiusType);
 			mDescEx.lss.vertexRadiusBuffer.StrideInBytes = sizeof(RadiusType);
 			mDescEx.lss.vertexRadiusFormat = DXGI_FORMAT_R32_FLOAT;
 
-			mDescEx.lss.endcapMode = instance_info.mGeometryType == GeometryType::TriangleAsLSS ? gNVAPI.mWireframeEndcapMode : gNVAPI.mEndcapMode;
+			mDescEx.lss.indexBuffer.StartAddress = inInitializer.mLSSIndicesBaseAddress + instance_data.mLSSIndexOffset * sizeof(IndexType);
+			mDescEx.lss.indexBuffer.StrideInBytes = sizeof(IndexType);
+			mDescEx.lss.indexFormat = DXGI_FORMAT_R32_UINT;
+
+			mDescEx.lss.endcapMode = instance_info.mGeometryType == GeometryType::TriangleAsLSS ? gNVAPI.mLSSWireframeEndcapMode : gNVAPI.mEndcapMode;
 			// mDescEx.lss.endcapMode = NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_CHAINED;
 			mDescEx.lss.primitiveFormat = NVAPI_D3D12_RAYTRACING_LSS_PRIMITIVE_FORMAT_LIST;
 			// mDescEx.lss.primitiveFormat = NVAPI_D3D12_RAYTRACING_LSS_PRIMITIVE_FORMAT_SUCCESSIVE_IMPLICIT;
-
-			mDescEx.lss.indexBuffer.StartAddress = inInitializer.mLSSIndicesBaseAddress + instance_data.mLSSIndexOffset * sizeof(IndexType);
-			mDescEx.lss.indexBuffer.StrideInBytes = sizeof(IndexType);
-			mDescEx.lss.indexCount = instance_data.mLSSIndexCount;
-			mDescEx.lss.indexFormat = DXGI_FORMAT_R32_UINT;
 		}
 		
 		// D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS -> NVAPI_D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS_EX
@@ -243,49 +260,106 @@ bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransfor
 		gTrace(reader.Error().c_str());
 
 	// Fetch indices, attributes
+	gAssert(reader.GetShapes().size() == 1);
+	bool has_normal = false;
 	bool has_uv = false;
 	uint32_t index = 0;
 	for (auto&& shape : reader.GetShapes())
 	{
-		uint32_t vertex_offset = static_cast<uint32_t>(ioSceneContent.mVertices.size());
+		has_normal = reader.GetAttrib().normals.size() > 0;
+		has_uv = reader.GetAttrib().texcoords.size() > 0;
+
+		bool vertex_only = !has_normal && !has_uv;
+
 		uint32_t index_offset = static_cast<uint32_t>(ioSceneContent.mIndices.size());
+		uint32_t vertex_offset = static_cast<uint32_t>(ioSceneContent.mVertices.size());
 		
-		uint32_t vertex_count = static_cast<uint32_t>(shape.mesh.num_face_vertices.size()) * kVertexCountPerTriangle;
 		uint32_t index_count = static_cast<uint32_t>(shape.mesh.num_face_vertices.size()) * kVertexCountPerTriangle;
+		ioSceneContent.mIndices.reserve(ioSceneContent.mIndices.size() + index_count);
 
-		for (size_t face_index = 0; face_index < shape.mesh.num_face_vertices.size(); face_index++)
+		// [NOTE] Not trivial to de-duplication. Need to use vertex_index/normal_index/texcoord_index as key
+		// Only try to reduce vertex_count if vertex_only
+		uint32_t vertex_count = 0;
+		if (!vertex_only)
 		{
-			assert(shape.mesh.num_face_vertices[face_index] == kVertexCountPerTriangle);
-			for (size_t vertex_index = 0; vertex_index < kVertexCountPerTriangle; vertex_index++)
+			// Add new vertex for each index
+			vertex_count = index_count;
+			ioSceneContent.mVertices.reserve(ioSceneContent.mVertices.size() + vertex_count);
+			ioSceneContent.mNormals.reserve(ioSceneContent.mNormals.size() + vertex_count);
+			ioSceneContent.mUVs.reserve(ioSceneContent.mUVs.size() + vertex_count);
+
+			for (size_t face_index = 0; face_index < shape.mesh.num_face_vertices.size(); face_index++)
 			{
-				tinyobj::index_t idx = shape.mesh.indices[face_index * kVertexCountPerTriangle + vertex_index];
-				ioSceneContent.mIndices.push_back(static_cast<IndexType>(index++));
+				assert(shape.mesh.num_face_vertices[face_index] == kVertexCountPerTriangle);
+				for (size_t face_vertex_index = 0; face_vertex_index < kVertexCountPerTriangle; face_vertex_index++)
+				{
+					tinyobj::index_t idx = shape.mesh.indices[face_index * kVertexCountPerTriangle + face_vertex_index];
+					ioSceneContent.mIndices.push_back(static_cast<IndexType>(index++));
 
-				ioSceneContent.mVertices.push_back({
-					.x = glm::detail::toFloat16(reader.GetAttrib().vertices[3 * idx.vertex_index + 0]),
-					.y = glm::detail::toFloat16(reader.GetAttrib().vertices[3 * idx.vertex_index + 1]),
-					.z = glm::detail::toFloat16(reader.GetAttrib().vertices[3 * idx.vertex_index + 2])
-				});
+					ioSceneContent.mVertices.push_back(VertexType(
+						reader.GetAttrib().vertices[3 * idx.vertex_index + 0],
+						reader.GetAttrib().vertices[3 * idx.vertex_index + 1],
+						reader.GetAttrib().vertices[3 * idx.vertex_index + 2]
+					));
 
-				ioSceneContent.mNormals.push_back(NormalType(
-					reader.GetAttrib().normals[3 * idx.normal_index + 0],
-					reader.GetAttrib().normals[3 * idx.normal_index + 1],
-					reader.GetAttrib().normals[3 * idx.normal_index + 2]
+					if (idx.normal_index == -1)
+					{
+						// Dummy normal if not available
+						gAssert(!has_normal);
+						ioSceneContent.mNormals.push_back(NormalType(0, 0, 0));
+					}
+					else
+					{
+						ioSceneContent.mNormals.push_back(NormalType(
+							reader.GetAttrib().normals[3 * idx.normal_index + 0],
+							reader.GetAttrib().normals[3 * idx.normal_index + 1],
+							reader.GetAttrib().normals[3 * idx.normal_index + 2]
+						));
+					}
+
+					if (idx.texcoord_index == -1)
+					{
+						// Dummy uv if not available
+						gAssert(!has_uv);
+						ioSceneContent.mUVs.push_back(UVType(0, 0));
+					}
+					else
+					{
+						ioSceneContent.mUVs.push_back(UVType(
+							reader.GetAttrib().texcoords[2 * idx.texcoord_index + 0],
+							inFlipV ? 1.0f - reader.GetAttrib().texcoords[2 * idx.texcoord_index + 1] : reader.GetAttrib().texcoords[2 * idx.texcoord_index + 1]
+						));
+					}
+				}
+			}
+		}
+		else
+		{
+			// Only vertex (position) is available, no need to duplicate vertex
+			vertex_count = static_cast<uint32_t>(reader.GetAttrib().vertices.size() / 3); // 3 as xyz
+			ioSceneContent.mVertices.reserve(ioSceneContent.mVertices.size() + vertex_count);
+			ioSceneContent.mNormals.reserve(ioSceneContent.mNormals.size() + vertex_count);
+			ioSceneContent.mUVs.reserve(ioSceneContent.mUVs.size() + vertex_count);
+
+			for (size_t vertex_index = 0; vertex_index < vertex_count; vertex_index++)
+			{
+				ioSceneContent.mVertices.push_back(VertexType(
+					reader.GetAttrib().vertices[3 * vertex_index + 0],
+					reader.GetAttrib().vertices[3 * vertex_index + 1],
+					reader.GetAttrib().vertices[3 * vertex_index + 2]
 				));
 
-				if (idx.texcoord_index == -1)
-				{
-					// Dummy uv if not available
-					ioSceneContent.mUVs.push_back(UVType(0, 0));
-				}
-				else
-				{
-					has_uv = true;
+				ioSceneContent.mNormals.push_back({});
+				ioSceneContent.mUVs.push_back({});
+			}
 
-					ioSceneContent.mUVs.push_back(UVType(
-						reader.GetAttrib().texcoords[2 * idx.texcoord_index + 0],
-						inFlipV ? 1.0f - reader.GetAttrib().texcoords[2 * idx.texcoord_index + 1] : reader.GetAttrib().texcoords[2 * idx.texcoord_index + 1]
-					));
+			for (size_t face_index = 0; face_index < shape.mesh.num_face_vertices.size(); face_index++)
+			{
+				assert(shape.mesh.num_face_vertices[face_index] == kVertexCountPerTriangle);
+				for (size_t face_vertex_index = 0; face_vertex_index < kVertexCountPerTriangle; face_vertex_index++)
+				{
+					tinyobj::index_t idx = shape.mesh.indices[face_index * kVertexCountPerTriangle + face_vertex_index];
+					ioSceneContent.mIndices.push_back(static_cast<IndexType>(idx.vertex_index));
 				}
 			}
 		}
@@ -311,14 +385,17 @@ bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransfor
 			default: break;
 			}
 			instance_data.mBSDF = type;
-			instance_data.mFlags.mTwoSided = false;
-			instance_data.mFlags.mUV = has_uv;
 			instance_data.mAlbedo = glm::vec3(material.diffuse[0], material.diffuse[1], material.diffuse[2]);
 			instance_data.mOpacity = 1.0f;
 			instance_data.mEmission = glm::vec3(material.emission[0], material.emission[1], material.emission[2]);
 			instance_data.mRoughnessAlpha = material.roughness; // To match Mitsuba2 and PBRT (remaproughness = false)
 			instance_data.mReflectance = glm::vec3(material.specular[0], material.specular[1], material.specular[2]);
 			instance_data.mSpecularTransmittance = glm::vec3(material.transmittance[0], material.transmittance[1], material.transmittance[2]);
+		}
+		{
+			instance_data.mFlags.mTwoSided = false;
+			instance_data.mFlags.mNormal = has_normal;
+			instance_data.mFlags.mUV = has_uv;
 		}
 
 		glm::vec3 translation;
@@ -346,13 +423,25 @@ bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransfor
 
 bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneContent)
 {
-	static auto get_first_child_element_by_name = [](tinyxml2::XMLElement* inElement, const char* inName)
+	static auto get_first_child_element_by_lambda = [](tinyxml2::XMLElement* inElement, const char* inName, const auto&& inLambda)
+		{
+			tinyxml2::XMLElement* child = inElement->FirstChildElement(inName);
+			while (child != nullptr)
+			{
+				if (inLambda(child))
+					return child;
+				child = child->NextSiblingElement(inName);
+			}
+			return (tinyxml2::XMLElement*)nullptr;
+		};
+
+	static auto get_first_child_element_by_name_attribute = [](tinyxml2::XMLElement* inElement, const char* inNameAttribute)
 		{
 			tinyxml2::XMLElement* child = inElement->FirstChildElement();
 			while (child != nullptr)
 			{
 				std::string_view name = child->Attribute("name");
-				if (name == inName)
+				if (name == inNameAttribute)
 					return child;
 
 				child = child->NextSiblingElement();
@@ -363,7 +452,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 
 	static auto get_child_type = [](tinyxml2::XMLElement* inElement, const char* inName)
 		{
-			tinyxml2::XMLElement* child = get_first_child_element_by_name(inElement, inName);
+			tinyxml2::XMLElement* child = get_first_child_element_by_name_attribute(inElement, inName);
 			if (child == nullptr)
 				return std::string_view(); // Treat no found the same as attribute with empty string to simplify parsing
 
@@ -372,7 +461,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 
 	static auto get_child_value = [](tinyxml2::XMLElement* inElement, const char* inName)
 		{
-			tinyxml2::XMLElement* child = get_first_child_element_by_name(inElement, inName);
+			tinyxml2::XMLElement* child = get_first_child_element_by_name_attribute(inElement, inName);
 			if (child == nullptr)
 				return std::string_view(); // Treat no found the same as attribute with empty string to simplify parsing
 
@@ -381,7 +470,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 
 	static auto get_child_texture = [](tinyxml2::XMLElement* inElement, const char* inName)
 		{
-			tinyxml2::XMLElement* child = get_first_child_element_by_name(inElement, inName);
+			tinyxml2::XMLElement* child = get_first_child_element_by_name_attribute(inElement, inName);
 			if (child == nullptr)
 				return std::string_view();
 
@@ -390,7 +479,7 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 
 	static auto get_child_sampler = [](tinyxml2::XMLElement* inElement, const char* inName)
 		{
-			tinyxml2::XMLElement* child = get_first_child_element_by_name(inElement, inName);
+			tinyxml2::XMLElement* child = get_first_child_element_by_name_attribute(inElement, inName);
 			if (child == nullptr)
 				return std::string_view();
 
@@ -416,7 +505,23 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 		InstanceData mInstanceData;
 	};
 
-	std::unordered_map<std::string_view, BSDFInstance> bsdf_instance_by_id;
+	struct ShapegroupInstance
+	{
+		int mLSSVertexCount = 0;
+		int mLSSVertexOffset = 0;
+
+		int mLSSIndexCount = 0;
+		int mLSSIndexOffset = 0;
+
+		int mLSSRadiusCount = 0;
+		int mLSSRadiusOffset = 0;
+
+		std::string_view mBSDFID;
+		GeometryType mGeometryType = GeometryType::LSS;
+	};
+
+	std::unordered_map<std::string_view, BSDFInstance> bsdf_id_to_instance;
+	std::unordered_map<std::string_view, ShapegroupInstance> shapegroup_id_to_instance;
 	tinyxml2::XMLElement* bsdf = scene->FirstChildElement("bsdf");
 	while (bsdf != nullptr) // loop to handle nested bsdf
 	{
@@ -597,19 +702,19 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 
 		gAssert(id != nullptr);
 		bsdf_instance.mMaterial.mMaterialName = id;
-		bsdf_instance_by_id[id] = bsdf_instance;
+		bsdf_id_to_instance[id] = bsdf_instance;
 
 		bsdf = bsdf->NextSiblingElement("bsdf");
 	}
 
-	tinyxml2::XMLElement* shape = scene->FirstChildElement("shape");
-	while (shape != nullptr)
+	for (tinyxml2::XMLElement* shape = scene->FirstChildElement("shape"); shape != nullptr; shape = shape->NextSiblingElement("shape"))
 	{
 		std::string_view type = null_to_empty(shape->Attribute("type"));
 		std::string_view id = null_to_empty(shape->Attribute("id"));
 
 		SceneContent* primitive = nullptr;
 		SceneContent loaded_primitive;
+		bool is_instance_lss = false;
 		if (type == "cube")
 		{
 			primitive = &mPrimitives.mCube;
@@ -625,6 +730,11 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 			primitive = &mPrimitives.mSphere;
 			id = id.empty() ? "sphere" : id;
 		}
+		else if (type == "cylinder")
+		{
+			primitive = &mPrimitives.mCylinder;
+			id = id.empty() ? "cylinder" : id;
+		}
 		else if (type == "obj")
 		{
 			std::filesystem::path path = inFilename;
@@ -635,178 +745,362 @@ bool Scene::LoadMitsuba(const std::string& inFilename, SceneContent& ioSceneCont
 			primitive = &loaded_primitive;
 			id = id.empty() ? "obj" : id;
 		}
-
-		if (primitive != nullptr)
+		else if (type == "shapegroup")
 		{
-			uint32_t index_count = static_cast<uint32_t>(primitive->mIndices.size());
-			uint32_t vertex_offset = static_cast<uint32_t>(ioSceneContent.mVertices.size());
-			uint32_t index_offset = static_cast<uint32_t>(ioSceneContent.mIndices.size());
-			for (uint32_t i = 0; i < index_count; i++)
-				ioSceneContent.mIndices.push_back(primitive->mIndices[i]);
+			// Only support shapegroup for LSS
+			if (!gNVAPI.mLinearSweptSpheresSupported)
+				continue;
 
-			std::copy(primitive->mVertices.begin(), primitive->mVertices.end(), std::back_inserter(ioSceneContent.mVertices));
-			std::copy(primitive->mNormals.begin(), primitive->mNormals.end(), std::back_inserter(ioSceneContent.mNormals));
-			std::copy(primitive->mUVs.begin(), primitive->mUVs.end(), std::back_inserter(ioSceneContent.mUVs));
+			bool is_shapegroup_lss = id.starts_with("[LSS]");
+			bool is_shapegroup_sphere = id.starts_with("[Sphere]");
+			bool is_shapegroup_sphere_surface = id.starts_with("[SphereSurface]");
 
-			// Transform
-			glm::mat4x4 matrix = glm::mat4x4(1.0f);
+			if (!is_shapegroup_lss && !is_shapegroup_sphere && !is_shapegroup_sphere_surface)
+				continue;
+
+			int lss_vertex_offset = (int)ioSceneContent.mLSSVertices.size();
+			int lss_index_offset = (int)ioSceneContent.mLSSIndices.size();
+			int lss_radius_offset = (int)ioSceneContent.mLSSRadii.size();
+
+			ShapegroupInstance shapegroup_instance =
 			{
-				if (tinyxml2::XMLElement* transform = shape->FirstChildElement("transform"))
-				{
-					std::string_view transform_name = transform->Attribute("name");
-					gAssert(transform_name == "to_world");
+				.mLSSVertexOffset = lss_vertex_offset,
+				.mLSSIndexOffset = lss_index_offset,
+				.mLSSRadiusOffset = lss_radius_offset,
+				.mGeometryType = is_shapegroup_lss ? GeometryType::LSS : GeometryType::Sphere
+			};
 
-					std::string_view matrix_value = transform->FirstChildElement("matrix")->Attribute("value");
-					gFromString(matrix_value.data(), matrix);
+			int lss_vertex_index = 0;
+			if (is_shapegroup_sphere_surface)
+			{
+				tinyxml2::XMLElement* sphere_surface = shape->FirstChildElement("shape");
+				gAssert(std::string_view(sphere_surface->Attribute("type")) == "rectangle");
+
+				// For first vertex (shape), get material
+				tinyxml2::XMLElement* ref = sphere_surface->FirstChildElement("ref");
+				std::string_view bsdf_id = ref->Attribute("id");
+				shapegroup_instance.mBSDFID = bsdf_id;
+
+				int fill_count_x = std::max(2, gNVAPI.mSphereSurfaceFillCountX);
+				int fill_count = fill_count_x * fill_count_x;
+
+				float radius = gNVAPI.mSphereSurfaceFillRadius;
+				if (radius < 0.0f)
+					radius = 1.0f / (fill_count_x - 1);
+
+				ioSceneContent.mLSSVertices.resize(lss_vertex_offset + fill_count);
+				ioSceneContent.mLSSIndices.resize(lss_index_offset + fill_count);
+				ioSceneContent.mLSSRadii.resize(lss_radius_offset + fill_count, radius);
+
+				bool random = gNVAPI.mSphereSurfaceRandom;
+				std::random_device device;
+				std::mt19937 engine(device());
+				std::uniform_real_distribution<float> distribution(-1.0f, 1.0f);
+
+				for (int i = 0; i < fill_count; i++)
+				{
+					int row = i % fill_count_x;
+					int col = i / fill_count_x;
+
+					float u = 0; 
+					float v = 0; 
+
+					if (random)
+					{
+						u = distribution(engine);
+						v = distribution(engine);
+					}
+					else
+					{
+						// Grid
+						u = (row * 2.0f) / (fill_count_x - 1) - 1.0f;
+						v = (col * 2.0f) / (fill_count_x - 1) - 1.0f;
+					}
+
+					ioSceneContent.mLSSVertices[lss_vertex_offset + i] = glm::vec3(u, v, 0.0f);
+					ioSceneContent.mLSSIndices[lss_index_offset + i] = i;
 				}
-				else if (tinyxml2::XMLElement* center_element = shape->FirstChildElement("point"))
-				{
-					tinyxml2::XMLElement* radius_element = shape->FirstChildElement("float");
-					gAssert(std::string_view(radius_element->Attribute("name")) == "radius");
-					float radius = 0.0f;
-					gFromString(radius_element->Attribute("value"), radius);
 
+				lss_vertex_index = fill_count;
+			}
+			else
+			{
+				for (tinyxml2::XMLElement* lss_vertex = shape->FirstChildElement("shape"); lss_vertex != nullptr; lss_vertex = lss_vertex->NextSiblingElement("shape"))
+				{
+					tinyxml2::XMLElement* center_element = lss_vertex->FirstChildElement("point");
+					gAssert(center_element != nullptr);
 					gAssert(std::string_view(center_element->Attribute("name")) == "center");
 					glm::vec3 center = glm::vec3(0.0f);
 					gFromString(center_element->Attribute("x"), center[0]);
 					gFromString(center_element->Attribute("y"), center[1]);
 					gFromString(center_element->Attribute("z"), center[2]);
 
-					matrix = glm::translate(matrix, center);
-					matrix = glm::scale(matrix, glm::vec3(radius));
+					tinyxml2::XMLElement* radius_element = lss_vertex->FirstChildElement("float");
+					gAssert(radius_element != nullptr);
+					gAssert(std::string_view(radius_element->Attribute("name")) == "radius");
+					float radius = 0.0f;
+					gFromString(radius_element->Attribute("value"), radius);
+
+					ioSceneContent.mLSSVertices.push_back(center);
+					ioSceneContent.mLSSRadii.push_back(radius);
+					if (lss_vertex_index == 0)
+					{
+						// For first vertex (shape), get material
+						tinyxml2::XMLElement* ref = lss_vertex->FirstChildElement("ref");
+						std::string_view bsdf_id = ref->Attribute("id");
+						shapegroup_instance.mBSDFID = bsdf_id;
+					}
+					else if (is_shapegroup_lss)
+					{
+						// For following vertex, add indices (segments)
+						ioSceneContent.mLSSIndices.push_back(static_cast<IndexType>(lss_vertex_index - 1));
+						ioSceneContent.mLSSIndices.push_back(static_cast<IndexType>(lss_vertex_index));
+					}
+					if (is_shapegroup_sphere)
+					{
+						ioSceneContent.mLSSIndices.push_back(static_cast<IndexType>(lss_vertex_index));
+					}
+
+					lss_vertex_index++;
 				}
 			}
 
-			InstanceInfo instance_info = {};
-			InstanceData instance_data = {};
+			gAssert(!is_shapegroup_lss || lss_vertex_index >= 2); // At least 2 vertices to form a lss segment
 
-			instance_info.mName = id;
+			shapegroup_instance.mLSSVertexCount = lss_vertex_index;
+			shapegroup_instance.mLSSIndexCount = is_shapegroup_lss ? (lss_vertex_index - 1) * 2 : lss_vertex_index;
+			shapegroup_instance.mLSSRadiusCount = lss_vertex_index;
 
-			glm::vec3 translation;
-			glm::vec3 skew;
-			glm::vec4 perspective;
-			glm::quat rotation;
-			glm::vec3 scale;
-			glm::decompose(matrix, scale, rotation, translation, skew, perspective);
-			instance_info.mDecomposedScale = scale;
+			shapegroup_id_to_instance[id] = shapegroup_instance;
+			continue; // shapegroup does not add instance
+		}
+		else if (type == "instance")
+		{
+			// Only support instance for LSS
+			if (!gNVAPI.mLinearSweptSpheresSupported)
+				continue;
 
-			// Material
-			{
-				bool found_material = false;
-				tinyxml2::XMLElement* ref = shape->FirstChildElement("ref");
-				if (ref != nullptr)
-				{
-					std::string_view material_id = ref->Attribute("id");
-					auto iter = bsdf_instance_by_id.find(material_id);
-					if (iter != bsdf_instance_by_id.end())
-					{
-						instance_info.mMaterial = iter->second.mMaterial;
-						instance_data = iter->second.mInstanceData;
-						found_material = true;
-					}
-				}
-				if (!found_material)
-					FillDummyMaterial(instance_info, instance_data);
-			}
-
-			// Medium
-			{
-				tinyxml2::XMLElement* medium = shape->FirstChildElement("medium");
-				if (medium != nullptr)
-				{
-					std::string_view medium_type = medium->Attribute("type");
-					gAssert(medium_type == "homogeneous"); // heterogeneous not supported
-
-					instance_data.mMedium = 1;
-
-					if (get_child_type(medium, "albedo") == "float")
-					{
-						float value = 0;
-						gFromString(get_child_value(medium, "albedo").data(), value);
-						instance_data.mMediumAlbedo = float3(value);
-					}
-					else
-						gFromString(get_child_value(medium, "albedo").data(), instance_data.mMediumAlbedo);
-					if (get_child_type(medium, "sigma_t") == "float")
-					{
-						float value = 0;
-						gFromString(get_child_value(medium, "sigma_t").data(), value);
-						instance_data.mMediumSigmaT = float3(value);
-					}
-					else
-						gFromString(get_child_value(medium, "sigma_t").data(), instance_data.mMediumSigmaT);
-
-					tinyxml2::XMLElement* phase = medium->FirstChildElement("phase");
-					if (phase != nullptr)
-					{
-						gAssert(false); // Not supported yet
-
-						gFromString(get_child_value(medium, "g").data(), instance_data.mMediumPhase);
-					}
-
-					if (const char* medium_id_raw = medium->Attribute("id"))
-					{
-						std::string_view medium_id = medium_id_raw;
-						if (medium_id.ends_with(".nvdb"))
-						{
-							std::filesystem::path path = inFilename;
-							path.replace_filename(std::filesystem::path(medium_id));
-							instance_info.mMaterial.mNanoVDB = { .mPath = path };
-						}
-					}
-				}
-			}
-
-			// Light
-			{
-				tinyxml2::XMLElement* emitter = shape->FirstChildElement("emitter");
-				if (emitter != nullptr)
-				{
-					std::string_view emitter_type = emitter->Attribute("type");
-					gAssert(emitter_type == "area");
-
-					gFromString(get_child_value(emitter, "radiance").data(), instance_data.mEmission);
-
-					instance_data.mBSDF = BSDF::Light;
-					instance_data.mLightIndex = static_cast<uint>(ioSceneContent.mLights.size());
-
-					Light light;
-					light.mType = LightType::Count;
-					if (primitive == &mPrimitives.mSphere)
-						light.mType = LightType::Sphere;
-					if (primitive == &mPrimitives.mRectangle)
-						light.mType = LightType::Rectangle;
-
-					light.mHalfExtends = glm::vec2(scale.x, scale.y);
-					light.mInstanceID = static_cast<uint>(ioSceneContent.mInstanceDatas.size());
-					light.mPosition = matrix[3];
-					light.mTangent = normalize(matrix[0]);
-					light.mBitangent = normalize(matrix[1]);
-					light.mNormal = normalize(matrix[2]);
-					light.mEmission = instance_data.mEmission;
-					ioSceneContent.mLights.push_back(light);
-				}
-			}
-
-			ioSceneContent.mInstanceInfos.push_back(instance_info);
-
-			instance_data.mTransform = matrix;
-			instance_data.mInverseTranspose = glm::transpose(glm::inverse(matrix));
-			instance_data.mVertexOffset = vertex_offset;
-			instance_data.mVertexCount = index_count;
-			instance_data.mIndexOffset = index_offset;
-			instance_data.mIndexCount = index_count;
-			ioSceneContent.mInstanceDatas.push_back(instance_data);
-			ioSceneContent.mBSDFs.insert(instance_data.mBSDF);
+			is_instance_lss = true;
+		}
+		else
+		{
+			// other types of shape are not supported
+			gAssert(false);
+			continue;
 		}
 
-		shape = shape->NextSiblingElement("shape");
+		uint32_t vertex_offset = 0;
+		uint32_t vertex_count = 0;
+		uint32_t index_count = 0;
+		uint32_t index_offset = 0;
+		const ShapegroupInstance* shapegroup_instance = nullptr;
+		bool has_uv = false;
+		bool has_normal = false;
+		if (primitive != nullptr)
+		{
+			vertex_offset = static_cast<uint32_t>(ioSceneContent.mVertices.size());
+			vertex_count = static_cast<uint32_t>(primitive->mVertices.size());
+
+			index_offset = static_cast<uint32_t>(ioSceneContent.mIndices.size());
+			index_count = static_cast<uint32_t>(primitive->mIndices.size());
+
+			for (uint32_t i = 0; i < index_count; i++)
+				ioSceneContent.mIndices.push_back(primitive->mIndices[i]);
+
+			gAssert(primitive->mVertices.size() == primitive->mNormals.size());
+			gAssert(primitive->mVertices.size() == primitive->mUVs.size());
+			std::copy(primitive->mVertices.begin(), primitive->mVertices.end(), std::back_inserter(ioSceneContent.mVertices));
+			std::copy(primitive->mNormals.begin(), primitive->mNormals.end(), std::back_inserter(ioSceneContent.mNormals));
+			std::copy(primitive->mUVs.begin(), primitive->mUVs.end(), std::back_inserter(ioSceneContent.mUVs));
+
+			gAssert(!primitive->mInstanceDatas.empty());
+			has_normal = primitive->mInstanceDatas.front().mFlags.mNormal;
+			has_uv = primitive->mInstanceDatas.front().mFlags.mUV;
+		}
+		else if (is_instance_lss)
+		{
+			auto ref = shape->FirstChildElement("ref");
+			auto shapegroup_id = ref->Attribute("id");
+			shapegroup_instance = &shapegroup_id_to_instance[shapegroup_id];
+			gAssert(shapegroup_instance != nullptr);
+		}
+		else
+		{
+			gAssert(false);
+			continue;
+		}
+
+		// Transform
+		glm::mat4x4 matrix = glm::mat4x4(1.0f);
+		{
+			if (tinyxml2::XMLElement* transform = shape->FirstChildElement("transform"))
+			{
+				std::string_view transform_name = transform->Attribute("name");
+				gAssert(transform_name == "to_world");
+
+				std::string_view matrix_value = transform->FirstChildElement("matrix")->Attribute("value");
+				gFromString(matrix_value.data(), matrix);
+			}
+			else if (tinyxml2::XMLElement* center_element = shape->FirstChildElement("point"))
+			{
+				tinyxml2::XMLElement* radius_element = shape->FirstChildElement("float");
+				gAssert(std::string_view(radius_element->Attribute("name")) == "radius");
+				float radius = 0.0f;
+				gFromString(radius_element->Attribute("value"), radius);
+
+				gAssert(std::string_view(center_element->Attribute("name")) == "center");
+				glm::vec3 center = glm::vec3(0.0f);
+				gFromString(center_element->Attribute("x"), center[0]);
+				gFromString(center_element->Attribute("y"), center[1]);
+				gFromString(center_element->Attribute("z"), center[2]);
+
+				matrix = glm::translate(matrix, center);
+				matrix = glm::scale(matrix, glm::vec3(radius));
+			}
+		}
+
+		InstanceInfo instance_info = {};
+		instance_info.mName = id;
+
+		glm::vec3 translation;
+		glm::vec3 skew;
+		glm::vec4 perspective;
+		glm::quat rotation;
+		glm::vec3 scale;
+		glm::decompose(matrix, scale, rotation, translation, skew, perspective);
+		instance_info.mDecomposedScale = scale;
+
+		// Material
+		InstanceData instance_data = {};
+		{
+			std::string_view bsdf_id;
+			if (shapegroup_instance != nullptr)
+				bsdf_id = shapegroup_instance->mBSDFID;
+
+			if (bsdf_id.empty())
+			{
+				tinyxml2::XMLElement* ref = shape->FirstChildElement("ref");
+				if (ref != nullptr)
+					bsdf_id = ref->Attribute("id");
+			}
+
+			auto iter = bsdf_id_to_instance.find(bsdf_id);
+			if (iter != bsdf_id_to_instance.end())
+			{
+				instance_info.mMaterial = iter->second.mMaterial;
+				instance_data = iter->second.mInstanceData;
+			}
+			else
+				FillDummyMaterial(instance_info, instance_data);
+		}
+
+		// Medium
+		if (tinyxml2::XMLElement* medium = shape->FirstChildElement("medium"))
+		{
+			std::string_view medium_type = medium->Attribute("type");
+			gAssert(medium_type == "homogeneous"); // heterogeneous not supported
+
+			instance_data.mMedium = 1;
+
+			if (get_child_type(medium, "albedo") == "float")
+			{
+				float value = 0;
+				gFromString(get_child_value(medium, "albedo").data(), value);
+				instance_data.mMediumAlbedo = float3(value);
+			}
+			else
+				gFromString(get_child_value(medium, "albedo").data(), instance_data.mMediumAlbedo);
+			if (get_child_type(medium, "sigma_t") == "float")
+			{
+				float value = 0;
+				gFromString(get_child_value(medium, "sigma_t").data(), value);
+				instance_data.mMediumSigmaT = float3(value);
+			}
+			else
+				gFromString(get_child_value(medium, "sigma_t").data(), instance_data.mMediumSigmaT);
+
+			tinyxml2::XMLElement* phase = medium->FirstChildElement("phase");
+			if (phase != nullptr)
+			{
+				gAssert(false); // Not supported yet
+
+				gFromString(get_child_value(medium, "g").data(), instance_data.mMediumPhase);
+			}
+
+			if (const char* medium_id_raw = medium->Attribute("id"))
+			{
+				std::string_view medium_id = medium_id_raw;
+				if (medium_id.ends_with(".nvdb"))
+				{
+					std::filesystem::path path = inFilename;
+					path.replace_filename(std::filesystem::path(medium_id));
+					instance_info.mMaterial.mNanoVDB = { .mPath = path };
+				}
+			}
+		}
+
+		// Light
+		{
+			tinyxml2::XMLElement* emitter = shape->FirstChildElement("emitter");
+			if (emitter != nullptr)
+			{
+				std::string_view emitter_type = emitter->Attribute("type");
+				gAssert(emitter_type == "area");
+
+				gFromString(get_child_value(emitter, "radiance").data(), instance_data.mEmission);
+
+				instance_data.mBSDF = BSDF::Light;
+				instance_data.mLightIndex = static_cast<uint>(ioSceneContent.mLights.size());
+
+				Light light;
+				light.mType = LightType::Count;
+				if (primitive == &mPrimitives.mSphere)
+					light.mType = LightType::Sphere;
+				if (primitive == &mPrimitives.mRectangle)
+					light.mType = LightType::Rectangle;
+
+				light.mHalfExtends = glm::vec2(scale.x, scale.y);
+				light.mInstanceID = static_cast<uint>(ioSceneContent.mInstanceDatas.size());
+				light.mPosition = matrix[3];
+				light.mTangent = normalize(matrix[0]);
+				light.mBitangent = normalize(matrix[1]);
+				light.mNormal = normalize(matrix[2]);
+				light.mEmission = instance_data.mEmission;
+				ioSceneContent.mLights.push_back(light);
+			}
+		}
+
+		// LSS
+		if (shapegroup_instance != nullptr)
+		{
+			instance_info.mGeometryType = shapegroup_instance->mGeometryType;
+
+			instance_data.mLSSVertexOffset = shapegroup_instance->mLSSVertexOffset;
+			instance_data.mLSSVertexCount = shapegroup_instance->mLSSVertexCount;
+			instance_data.mLSSIndexOffset = shapegroup_instance->mLSSIndexOffset;
+			instance_data.mLSSIndexCount = shapegroup_instance->mLSSIndexCount;
+			instance_data.mLSSRadiusOffset = shapegroup_instance->mLSSRadiusOffset;
+			instance_data.mLSSRadiusCount = shapegroup_instance->mLSSRadiusCount;
+		}
+
+		ioSceneContent.mInstanceInfos.push_back(instance_info);
+
+		instance_data.mFlags.mNormal = has_normal;
+		instance_data.mFlags.mUV = has_uv;
+		instance_data.mTransform = matrix;
+		instance_data.mInverseTranspose = glm::transpose(glm::inverse(matrix));
+		instance_data.mVertexOffset = vertex_offset;
+		instance_data.mVertexCount = vertex_count;
+		instance_data.mIndexOffset = index_offset;
+		instance_data.mIndexCount = index_count;
+		ioSceneContent.mInstanceDatas.push_back(instance_data);
+		ioSceneContent.mBSDFs.insert(instance_data.mBSDF);
 	}
 
 	tinyxml2::XMLElement* sensor = scene->FirstChildElement("sensor");
 	if (sensor != nullptr)
 	{
-		tinyxml2::XMLElement* transform = get_first_child_element_by_name(sensor, "to_world");
+		tinyxml2::XMLElement* transform = get_first_child_element_by_name_attribute(sensor, "to_world");
 		glm::mat4x4 matrix = glm::mat4x4(1.0f);
 		gFromString(transform->FirstChildElement("matrix")->Attribute("value"), matrix);
 		ioSceneContent.mCameraTransform = matrix;
@@ -1046,7 +1340,7 @@ bool Scene::LoadGLTF(const std::string& inFilename, SceneContent& ioSceneContent
 			InstanceData instance_data =
 			{
 				.mBSDF = BSDF::pbrMetallicRoughness,
-				.mFlags = {.mTwoSided = material.doubleSided, .mUV = true },
+				.mFlags = { .mTwoSided = material.doubleSided, .mNormal = true, .mUV = true },
 				.mRoughnessAlpha = static_cast<float>(material.pbrMetallicRoughness.roughnessFactor * material.pbrMetallicRoughness.roughnessFactor),
 				.mAlbedo = vec3(material.pbrMetallicRoughness.baseColorFactor[0], material.pbrMetallicRoughness.baseColorFactor[1], material.pbrMetallicRoughness.baseColorFactor[2]),
 				.mReflectance = vec3(static_cast<float>(material.pbrMetallicRoughness.metallicFactor)),
@@ -1107,6 +1401,7 @@ void Scene::Load(const ScenePreset& inPreset)
 	LoadObj("Asset/primitives/cube.obj", glm::mat4x4(1.0f), false, mPrimitives.mCube);
 	LoadObj("Asset/primitives/rectangle.obj", glm::mat4x4(1.0f), false, mPrimitives.mRectangle);
 	LoadObj("Asset/primitives/sphere.obj", glm::mat4x4(1.0f), false, mPrimitives.mSphere);
+	LoadObj("Asset/primitives/cylinder.obj", glm::mat4x4(1.0f), false, mPrimitives.mCylinder);
 
 	mSceneContent = {}; // Reset
 
@@ -1140,7 +1435,7 @@ void Scene::Load(const ScenePreset& inPreset)
 	if (mSceneContent.mInstanceDatas.empty())
 		LoadDummy(mSceneContent);
 
-	if (gNVAPI.mLinearSweptSpheresSupported && gNVAPI.mWireframeEnabled && inPreset.mTriangleAsLSSAllowed)
+	if (gNVAPI.mLinearSweptSpheresSupported && gNVAPI.mLSSWireframeEnabled && inPreset.mTriangleAsLSSAllowed)
 		GenerateLSSFromTriangle();
 
 	InitializeTextures();
@@ -1395,6 +1690,7 @@ void Scene::InitializeRuntime()
 		mRuntime.mVertices->Unmap(0, nullptr);
 	}
 
+	gAssert(mSceneContent.mNormals.size() == mSceneContent.mVertices.size());
 	{
 		desc_upload.Width = sizeof(NormalType) * mSceneContent.mNormals.size();
 		gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mRuntime.mNormals)));
@@ -1406,6 +1702,7 @@ void Scene::InitializeRuntime()
 		mRuntime.mNormals->Unmap(0, nullptr);
 	}
 
+	gAssert(mSceneContent.mUVs.size() == mSceneContent.mVertices.size());
 	{
 		desc_upload.Width = sizeof(UVType) * mSceneContent.mUVs.size();
 		gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mRuntime.mUVs)));
@@ -1415,6 +1712,45 @@ void Scene::InitializeRuntime()
 		mRuntime.mUVs->Map(0, nullptr, reinterpret_cast<void**>(&pData));
 		memcpy(pData, mSceneContent.mUVs.data(), desc_upload.Width);
 		mRuntime.mUVs->Unmap(0, nullptr);
+	}
+
+	// LSS
+	{
+		if (!mSceneContent.mLSSVertices.empty())
+		{
+			desc_upload.Width = sizeof(VertexType) * mSceneContent.mLSSVertices.size();
+			gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mRuntime.mLSSVertices)));
+			gSetName(mRuntime.mLSSVertices, "Scene.", "mBuffers.mLSSVertices", "");
+
+			uint8_t* pData = nullptr;
+			mRuntime.mLSSVertices->Map(0, nullptr, reinterpret_cast<void**>(&pData));
+			memcpy(pData, mSceneContent.mLSSVertices.data(), desc_upload.Width);
+			mRuntime.mLSSVertices->Unmap(0, nullptr);
+		}
+
+		if (!mSceneContent.mLSSIndices.empty())
+		{
+			desc_upload.Width = sizeof(IndexType) * mSceneContent.mLSSIndices.size();
+			gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mRuntime.mLSSIndices)));
+			gSetName(mRuntime.mLSSIndices, "Scene.", "mBuffers.mLSSIndices", "");
+
+			uint8_t* pData = nullptr;
+			mRuntime.mLSSIndices->Map(0, nullptr, reinterpret_cast<void**>(&pData));
+			memcpy(pData, mSceneContent.mLSSIndices.data(), desc_upload.Width);
+			mRuntime.mLSSIndices->Unmap(0, nullptr);
+		}
+
+		if (!mSceneContent.mLSSRadii.empty())
+		{
+			desc_upload.Width = sizeof(RadiusType) * mSceneContent.mLSSRadii.size();
+			gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mRuntime.mLSSRadii)));
+			gSetName(mRuntime.mLSSRadii, "Scene.", "mBuffers.mLSSRadii", "");
+
+			uint8_t* pData = nullptr;
+			mRuntime.mLSSRadii->Map(0, nullptr, reinterpret_cast<void**>(&pData));
+			memcpy(pData, mSceneContent.mLSSRadii.data(), desc_upload.Width);
+			mRuntime.mLSSRadii->Unmap(0, nullptr);
+		}
 	}
 
 	{
@@ -1489,6 +1825,8 @@ void Scene::InitializeRuntime()
 
 void Scene::GenerateLSSFromTriangle()
 {
+	gAssert(mSceneContent.mLSSVertices.empty()); // Mixing LSS and TriangleAsLSS is not supported
+
 	D3D12_RESOURCE_DESC desc_upload = gGetBufferResourceDesc(0);
 	D3D12_HEAP_PROPERTIES props_upload = gGetUploadHeapProperties();
 
@@ -1505,11 +1843,18 @@ void Scene::GenerateLSSFromTriangle()
 		if (gMaxComponent(instance_data.mEmission) > 0.0f)
 			continue; // Leave light source as triangles
 
-		instance_data.mLSSIndexCount = instance_data.mIndexCount * 2;
-		instance_data.mLSSIndexOffset = instance_data.mIndexOffset * 2;
+		// Vertex count is same as triangle list, use existing buffer
+		// Index count doubles, create new buffer
+		// Radius count is same as vertex count, create new buffer
 
-		instance_data.mLSSRadiusCount = instance_data.mVertexCount;
-		instance_data.mLSSRadiusOffset = instance_data.mVertexOffset;
+		instance_data.mLSSVertexOffset = instance_data.mVertexOffset;
+		instance_data.mLSSVertexCount = instance_data.mVertexCount;
+
+		instance_data.mLSSIndexOffset = instance_data.mIndexOffset * 2;
+		instance_data.mLSSIndexCount = instance_data.mIndexCount * 2;
+
+		instance_data.mLSSRadiusOffset = instance_data.mLSSVertexOffset;
+		instance_data.mLSSRadiusCount = instance_data.mLSSVertexCount;
 
 		InstanceInfo& instance_info = mSceneContent.mInstanceInfos[instance_index];
 
@@ -1520,8 +1865,8 @@ void Scene::GenerateLSSFromTriangle()
 		{
 			size_t triangle_count = mSceneContent.mIndices.size() / indices_per_triangle;
 
-			std::vector<IndexType> LSSIndices;
-			LSSIndices.resize(triangle_count * lss_indices_per_lss_triangle);
+			gAssert(mSceneContent.mLSSIndices.empty());
+			mSceneContent.mLSSIndices.resize(triangle_count * lss_indices_per_lss_triangle);
 			for (uint triangle_index = 0; triangle_index < triangle_count; triangle_index++)
 			{
 				uint triangle_index_offset = triangle_index * indices_per_triangle;
@@ -1530,45 +1875,27 @@ void Scene::GenerateLSSFromTriangle()
 				IndexType v2 = mSceneContent.mIndices[triangle_index_offset + 2];
 
 				uint lss_triangle_index_offset = triangle_index * lss_indices_per_lss_triangle;
-				LSSIndices[lss_triangle_index_offset + 0] = v0;
-				LSSIndices[lss_triangle_index_offset + 1] = v1;
-				LSSIndices[lss_triangle_index_offset + 2] = v1;
-				LSSIndices[lss_triangle_index_offset + 3] = v2;
-				LSSIndices[lss_triangle_index_offset + 4] = v2;
-				LSSIndices[lss_triangle_index_offset + 5] = v0;
+				mSceneContent.mLSSIndices[lss_triangle_index_offset + 0] = v0;
+				mSceneContent.mLSSIndices[lss_triangle_index_offset + 1] = v1;
+				mSceneContent.mLSSIndices[lss_triangle_index_offset + 2] = v1;
+				mSceneContent.mLSSIndices[lss_triangle_index_offset + 3] = v2;
+				mSceneContent.mLSSIndices[lss_triangle_index_offset + 4] = v2;
+				mSceneContent.mLSSIndices[lss_triangle_index_offset + 5] = v0;
 			}
-
-			desc_upload.Width = sizeof(IndexType) * LSSIndices.size();
-			gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mRuntime.mLSSIndices)));
-			gSetName(mRuntime.mLSSIndices, "Scene.", "mBuffers.mLSSIndices", "");
-
-			uint8_t* pData = nullptr;
-			mRuntime.mLSSIndices->Map(0, nullptr, reinterpret_cast<void**>(&pData));
-			memcpy(pData, LSSIndices.data(), desc_upload.Width);
-			mRuntime.mLSSIndices->Unmap(0, nullptr);
 		}
 
 		{
 			// [NOTE] Radius can also be uniform by use stride = 0, see NVAPI_D3D12_RAYTRACING_GEOMETRY_LSS_DESC
-			std::vector<float> LSSRadii;
-			LSSRadii.resize(mSceneContent.mVertices.size());
-			// std::fill(LSSRadii.begin(), LSSRadii.end(), gNVAPI.mWireframeRadius);
+			gAssert(mSceneContent.mLSSRadii.empty());
+			mSceneContent.mLSSRadii.resize(mSceneContent.mVertices.size());
+			// std::fill(mSceneContent.mLSSRadii.begin(), mSceneContent.mLSSRadii.end(), gNVAPI.mWireframeRadius);
 			for (uint instance_index = 0; instance_index < instance_count; instance_index++)
 			{
 				// Assume vertex is not shared between instances
-				float wireframe_radius = gNVAPI.mWireframeRadius * 1.0f / gMinComponent(mSceneContent.mInstanceInfos[instance_index].mDecomposedScale);
+				float wireframe_radius = gNVAPI.mLSSWireframeRadius * 1.0f / gMinComponent(mSceneContent.mInstanceInfos[instance_index].mDecomposedScale);
 				for (uint vertex_index = 0; vertex_index < mSceneContent.mInstanceDatas[instance_index].mVertexCount; vertex_index++)
-					LSSRadii[mSceneContent.mInstanceDatas[instance_index].mVertexOffset + vertex_index] = wireframe_radius;
+					mSceneContent.mLSSRadii[mSceneContent.mInstanceDatas[instance_index].mVertexOffset + vertex_index] = wireframe_radius;
 			}
-
-			desc_upload.Width = sizeof(RadiusType) * LSSRadii.size();
-			gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mRuntime.mLSSRadii)));
-			gSetName(mRuntime.mLSSRadii, "Scene.", "mBuffers.mLSSRadii", "");
-
-			uint8_t* pData = nullptr;
-			mRuntime.mLSSRadii->Map(0, nullptr, reinterpret_cast<void**>(&pData));
-			memcpy(pData, LSSRadii.data(), desc_upload.Width);
-			mRuntime.mLSSRadii->Unmap(0, nullptr);
 		}
 	}
 }
@@ -1589,6 +1916,7 @@ void Scene::InitializeAccelerationStructures()
 			.mInstanceData = instance_data,
 			.mVerticesBaseAddress = mRuntime.mVertices->GetGPUVirtualAddress(),
 			.mIndicesBaseAddress = mRuntime.mIndices->GetGPUVirtualAddress(),
+			.mLSSVerticesBaseAddress = mRuntime.mLSSVertices != nullptr ? mRuntime.mLSSVertices->GetGPUVirtualAddress() : mRuntime.mVertices->GetGPUVirtualAddress(),
 			.mLSSIndicesBaseAddress = mRuntime.mLSSIndices != nullptr ? mRuntime.mLSSIndices->GetGPUVirtualAddress() : 0,
 			.mLSSRadiiBaseAddress = mRuntime.mLSSRadii != nullptr ? mRuntime.mLSSRadii->GetGPUVirtualAddress() : 0,
 		});
@@ -1597,7 +1925,7 @@ void Scene::InitializeAccelerationStructures()
 		glm::mat4x4 transform = glm::transpose(instance_data.mTransform); // column-major -> row-major
 		memcpy(instance_descs[instance_index].Transform, &transform, sizeof(instance_descs[instance_index].Transform));
 		instance_descs[instance_index].InstanceID = instance_index; // This value will be exposed to the shader via InstanceID()
-		instance_descs[instance_index].InstanceMask = 0xFF;
+		instance_descs[instance_index].InstanceMask = instance_data.mFlags.mInstanceMask;
 		instance_descs[instance_index].InstanceContributionToHitGroupIndex = instance_index % 3;
 		instance_descs[instance_index].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
 		instance_descs[instance_index].AccelerationStructure = blas->GetGPUVirtualAddress();

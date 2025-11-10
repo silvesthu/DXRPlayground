@@ -481,7 +481,7 @@ ComPtr<IDxcBlob> gCompileShader(const char* inFilename, const char* inEntryPoint
 	// NVAPI
 	if (gNVAPI.mShaderExecutionReorderingSupported)
 		defines.push_back({ .Name = L"NVAPI_SER", .Value = L"1"});
-	if (gNVAPI.mLinearSweptSpheresSupported && gNVAPI.mWireframeEnabled)
+	if (gNVAPI.mLinearSweptSpheresSupported)
 		defines.push_back({ .Name = L"NVAPI_LSS", .Value = L"1" });
 
 	// Config

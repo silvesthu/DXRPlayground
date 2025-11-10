@@ -45,7 +45,10 @@ using float4x4 = glm::mat4x4;
 #define GENERATE_PAD_NAME CONCAT(mPad_, __LINE__)
 #define GENERATE_NEW_LINE_NAME CONCAT(_Newline_, __LINE__)
 
-#include "EnumHelper.inl"
+#define VERTEX_TYPE_HALF						0
+
+#include "HLSLHelper.h"
+#include "EnumHelper.h"
 
 static const uint kIndexCountPerTriangle		= 3;
 
@@ -505,8 +508,12 @@ enum : uint
 struct InstanceFlag
 {
 	uint						mTwoSided : 1					CONSTANT_DEFAULT(0);
+	uint						mNormal : 1						CONSTANT_DEFAULT(0);
 	uint						mUV : 1							CONSTANT_DEFAULT(0);
-	uint						mPad : 30						CONSTANT_DEFAULT(0);
+
+	uint						mInstanceMask : 8				CONSTANT_DEFAULT(0xff);
+
+	uint						mPad : 21						CONSTANT_DEFAULT(0);
 };
 STATITC_ASSERT(sizeof(InstanceFlag) == sizeof(float) * 1);
 
@@ -558,10 +565,14 @@ struct InstanceData
 	uint						mIndexOffset					CONSTANT_DEFAULT(0);
 	uint						mIndexCount						CONSTANT_DEFAULT(0);
 
+	uint						mLSSVertexOffset				CONSTANT_DEFAULT(0);
+	uint						mLSSVertexCount					CONSTANT_DEFAULT(0);
 	uint						mLSSIndexOffset					CONSTANT_DEFAULT(0);
 	uint						mLSSIndexCount					CONSTANT_DEFAULT(0);
 	uint						mLSSRadiusOffset				CONSTANT_DEFAULT(0);
 	uint						mLSSRadiusCount					CONSTANT_DEFAULT(0);
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 };
 STATITC_ASSERT(sizeof(InstanceData) % sizeof(glm::vec4) == 0);
 

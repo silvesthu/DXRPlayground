@@ -32,13 +32,13 @@
     <None Include="Shader\CloudIntegration.h" />
     <None Include="Shader\Common.h" />
     <None Include="Shader\Context.h" />
-    <None Include="Shader\EnumHelper.inl" />
+    <None Include="Shader\EnumHelper.h" />
     <None Include="Shader\Light.h" />
     <None Include="Shader\Planet.h" />
     <None Include="Shader\Reservoir.h" />
     <None Include="Shader\Shared.h" />
     <ClInclude Include="Shader\BRDFExplorer.h" />
-    <None Include="Shader\HLSL.h" />
+    <None Include="Shader\HLSLHelper.h" />
     <None Include="Shader\NanoVDB.h" />
     <ClInclude Include="Source\Thirdparty\glm.h" />
     <ClInclude Include="Source\Thirdparty\imgui_config.h" />
@@ -137,40 +137,40 @@
     <Manifest Include="dpi.manifest" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Shader\AnyHit.hlsl">
+    <None Include="Shader\AnyHit.hpp">
       <FileType>Document</FileType>
     </None>
-    <None Include="Shader\Atmosphere.hlsl">
+    <None Include="Shader\Atmosphere.hpp">
       <FileType>Document</FileType>
     </None>
-    <None Include="Shader\ClosestHit001.hlsl">
+    <None Include="Shader\ClosestHit001.hpp">
       <FileType>Document</FileType>
     </None>
-    <None Include="Shader\ClosestHit010.hlsl">
+    <None Include="Shader\ClosestHit010.hpp">
       <FileType>Document</FileType>
     </None>
-    <None Include="Shader\ClosestHit100.hlsl">
+    <None Include="Shader\ClosestHit100.hpp">
       <FileType>Document</FileType>
     </None>
-    <None Include="Shader\Cloud.hlsl">
+    <None Include="Shader\Cloud.hpp">
       <FileType>Document</FileType>
     </None>
-    <None Include="Shader\Composite.hlsl">
+    <None Include="Shader\Composite.hpp">
       <FileType>Document</FileType>
     </None>
-    <None Include="Shader\DiffTexture.hlsl">
+    <None Include="Shader\DiffTexture.hpp">
       <FileType>Document</FileType>
     </None>
-    <None Include="Shader\Miss.hlsl">
+    <None Include="Shader\Miss.hpp">
       <FileType>Document</FileType>
     </None>
-    <None Include="Shader\PrepareLights.hlsl">
+    <None Include="Shader\PrepareLights.hpp">
       <FileType>Document</FileType>
     </None>
-    <None Include="Shader\RayGeneration.hlsl">
+    <None Include="Shader\RayGeneration.hpp">
       <FileType>Document</FileType>
     </None>
-    <None Include="Shader\RayQuery.hlsl">
+    <None Include="Shader\RayQuery.hpp">
       <FileType>Document</FileType>
     </None>
   </ItemGroup>

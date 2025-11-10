@@ -1,6 +1,5 @@
 
 #include "Shared.h"
-#include "HLSL.h"
 #include "Binding.h"
 #include "Common.h"
 #include "Context.h"
@@ -217,7 +216,10 @@ void TraceRay(inout PixelContext ioPixelContext)
 				// Emission
 				float3 emission = hit_context.Emission() * (mConstants.mEmissionBoost * kPreExposure);
 				{
-					if (dot(hit_context.mVertexNormalWS, hit_context.ViewWS()) < 0 && !hit_context.TwoSided())
+					bool back_face				= dot(hit_context.mVertexNormalWS, hit_context.ViewWS()) < 0;
+					// bool two_sided				= hit_context.TwoSided();
+					bool two_sided				= false; // Mitsuba3's emitter does not become twosided even specified on bsdf
+					if (back_face && !two_sided)
 						emission = 0;
 
 					// IES
@@ -286,7 +288,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 							RayDesc shadow_ray;
 							shadow_ray.Origin						= hit_context.PositionWS();
 							shadow_ray.Direction					= light_context.mL;
-							shadow_ray.TMin							= 0.001;
+							shadow_ray.TMin							= 1E-4;
 							shadow_ray.TMax							= 10000;
 
 							RayQuery<RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH> shadow_query;

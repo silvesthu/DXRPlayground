@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Shared.h"
-#include "HLSL.h"
+#include "Binding.h"
 #include "NanoVDB.h"
 
 #if USE_HALF
@@ -52,17 +52,34 @@ struct SurfaceContext
 		uint base_index					= mPrimitiveIndex * kIndexCountPerTriangle + mInstanceData.mIndexOffset;
 		uint3 indices					= uint3(Indices[base_index], Indices[base_index + 1], Indices[base_index + 2]) + mInstanceData.mVertexOffset;
 
-		mVertexPositions[0]				= Vertices[indices[0]];
-		mVertexPositions[1]				= Vertices[indices[1]];
-		mVertexPositions[2]				= Vertices[indices[2]];
+		if (VERTEX_TYPE_HALF)
+		{
+			mVertexPositions[0]			= VerticesHalf[indices[0]].xyz;
+			mVertexPositions[1]			= VerticesHalf[indices[1]].xyz;
+			mVertexPositions[2]			= VerticesHalf[indices[2]].xyz;
+		}
+		else
+		{
+			mVertexPositions[0]			= Vertices[indices[0]].xyz;
+			mVertexPositions[1]			= Vertices[indices[1]].xyz;
+			mVertexPositions[2]			= Vertices[indices[2]].xyz;
+		}
 		mVertexPositionOS				= mVertexPositions[0] * mBarycentrics.x + mVertexPositions[1] * mBarycentrics.y + mVertexPositions[2] * mBarycentrics.z;
 
-		mVertexNormals[0]				= Normals[indices[0]];
-		mVertexNormals[1]				= Normals[indices[1]];
-		mVertexNormals[2]				= Normals[indices[2]];
-		float3 normal					= normalize(mVertexNormals[0] * mBarycentrics.x + mVertexNormals[1] * mBarycentrics.y + mVertexNormals[2] * mBarycentrics.z);
-		mVertexNormalOS					= normal;
-		mVertexNormalWS					= normalize(mul((float3x3) mInstanceData.mInverseTranspose, normal)); // Allow non-uniform scale
+		mVertexNormalOS					= 0;
+		if (mInstanceData.mFlags.mNormal)
+		{
+			mVertexNormals[0]			= Normals[indices[0]];
+			mVertexNormals[1]			= Normals[indices[1]];
+			mVertexNormals[2]			= Normals[indices[2]];
+			float3 normal				= normalize(mVertexNormals[0] * mBarycentrics.x + mVertexNormals[1] * mBarycentrics.y + mVertexNormals[2] * mBarycentrics.z);
+			mVertexNormalOS				= normal;	
+		}
+		else
+		{
+			mVertexNormalOS				= normalize(cross(mVertexPositions[0] - mVertexPositions[1], mVertexPositions[0] - mVertexPositions[2]));
+		}
+		mVertexNormalWS					= normalize(mul((float3x3) mInstanceData.mInverseTranspose, mVertexNormalOS)); // Allow non-uniform scale
 
 		mUV								= 0;
 		if (mInstanceData.mFlags.mUV)
@@ -317,26 +334,42 @@ struct HitContext : SurfaceContext
 		hit_context.mRayWS.mDirection			= inRayDesc.Direction;
 		hit_context.mRayWS.mTCurrent			= inRayQuery.CommittedRayT();
 
-		hit_context.LoadSurface();
-
 #ifdef NVAPI_LSS
 		if (NvRtCommittedIsLss(inRayQuery))
 		{
 			// Transform from object space to handle non-uniform scale properly
 			// See also getGeometryFromHit in RTXCR
 			// [NOTE] Somehow the object space coordinates here might flip sign. Avoid get position from it
+			// [NOTE] Somehow accessing CommittedPrimitiveIndex() when LSS presents cause crash
 			float2x4 lss_data					= NvRtCommittedLssObjectPositionsAndRadii(inRayQuery);
 			float3 lss_center_OS				= lerp(lss_data[0].xyz, lss_data[1].xyz, bary2.x); // bary2.x = NvRtCommittedLssHitParameter(inRayQuery)
 			float3 lss_position_OS				= inRayQuery.CommittedObjectRayOrigin() + inRayQuery.CommittedRayT() * inRayQuery.CommittedObjectRayDirection();
 			float3 lss_normal_OS				= lss_position_OS - lss_center_OS;
+			
+			hit_context.mVertexPositionOS		= lss_position_OS;
+			hit_context.mVertexNormalOS			= normalize(lss_normal_OS);
 			hit_context.mVertexNormalWS			= normalize(mul((float3x3)hit_context.mInstanceData.mInverseTranspose, lss_normal_OS)); // Allow non-uniform scale
-
-			// Clear data those are not available
-			hit_context.mUV						= 0;
-			hit_context.mVertexPositionOS		= 0;
-			hit_context.mVertexNormalOS			= 0;
+			hit_context.mUV						= float2(bary2.x, 0.0);
+			if (bary2.x == 0.0 || bary2.x == 1.0)
+				hit_context.mUV = 1.0; // To visualize caps
 		}
+		else if (NvRtCommittedIsSphere(inRayQuery))
+		{
+			float4 sphere_data					= NvRtCommittedSphereObjectPositionAndRadius(inRayQuery);
+			float3 sphere_center_OS				= sphere_data.xyz;
+			float3 sphere_position_OS			= inRayQuery.CommittedObjectRayOrigin() + inRayQuery.CommittedRayT() * inRayQuery.CommittedObjectRayDirection();
+			float3 sphere_normal_OS				= sphere_position_OS - sphere_center_OS;
+			
+			hit_context.mVertexPositionOS		= sphere_position_OS;
+			hit_context.mVertexNormalOS			= normalize(sphere_normal_OS);
+			hit_context.mVertexNormalWS			= normalize(mul((float3x3)hit_context.mInstanceData.mInverseTranspose, sphere_normal_OS)); // Allow non-uniform scale
+			hit_context.mUV						= float2(0.0, 0.0);
+		}
+		else 
 #endif // NVAPI_LSS
+		{
+			hit_context.LoadSurface();
+		}
 		
 		return hit_context;
 	}
@@ -478,17 +511,18 @@ struct MediumContext
 
 		if (mInstanceData.mMediumNanoVBD.mBufferIndex != (uint)ViewDescriptorIndex::Invalid)
 		{
-			mSigmaT								*= (ratio - 0.75) / (1.0 - 0.75);
+			mSigmaT								*= (ratio - 0.5) / (1.0 - 0.5);
 			return;
 		}
 
-		float3 offset							= float3(0, -mConstants.mSequenceFrameRatio * 2.0, 0);
+		float3 offset							= float3(0, -ratio * 2.0, 0);
 		float noise_value						= ErosionNoise3D.SampleLevel(BilinearWrapSampler, (PositionWS() + offset) * 1.0, 0);
-		noise_value								= saturate(pow(noise_value * 1.2, 8.0));
+		noise_value								= saturate(pow(noise_value, 8.0));
 
-		float y_gradient						= pow(saturate(PositionWS().y + 0.1), 0.2);
-		noise_value								= lerp(noise_value, 0.0f, lerp(y_gradient, 0.0, pow(ratio, 16.0)));
-		
+		float y_animation_ratio					= pow(saturate(1.0 - ratio - 0.1), 0.5f);
+		float y_animation						= saturate(remap(PositionWS().y, 1.0f - y_animation_ratio, 1.0f + lerp(0.0f, 0.2f, ratio) - y_animation_ratio, 0.0f, 1.0f));
+		noise_value								= lerp(1.0f, noise_value, y_animation);
+
 		mSigmaT									*= noise_value;
 	}
 
@@ -501,7 +535,7 @@ struct MediumContext
 
 		if (mInstanceData.mMediumNanoVBD.mBufferIndex != (uint)ViewDescriptorIndex::Invalid)
 		{
-			mMajorantSigmaT						*= (ratio - 0.75) / (1.0 - 0.75);
+			mMajorantSigmaT						*= (ratio - 0.5) / (1.0 - 0.5);
 			return;
 		}
 	}
