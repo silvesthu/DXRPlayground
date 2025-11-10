@@ -30,7 +30,7 @@ void BLAS::Initialize(const Initializer& inInitializer)
 	mDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
 	mDesc.Triangles.VertexBuffer.StartAddress = inInitializer.mVerticesBaseAddress + instance_data.mVertexOffset * sizeof(VertexType);
 	mDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(VertexType);
-	mDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+	mDesc.Triangles.VertexFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 	mDesc.Triangles.VertexCount = instance_data.mVertexCount;
 	if (instance_data.mIndexCount > 0)
 	{
@@ -71,7 +71,7 @@ void BLAS::Initialize(const Initializer& inInitializer)
 			mDescEx.lss.primitiveCount = instance_data.mLSSIndexCount / 2; // List
 			mDescEx.lss.vertexPositionBuffer.StartAddress = inInitializer.mVerticesBaseAddress + instance_data.mVertexOffset * sizeof(VertexType);
 			mDescEx.lss.vertexPositionBuffer.StrideInBytes = sizeof(VertexType);
-			mDescEx.lss.vertexPositionFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+			mDescEx.lss.vertexPositionFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 			mDescEx.lss.vertexRadiusBuffer.StartAddress = inInitializer.mLSSRadiiBaseAddress + instance_data.mLSSRadiusOffset * sizeof(RadiusType);
 			mDescEx.lss.vertexRadiusBuffer.StrideInBytes = sizeof(RadiusType);
 			mDescEx.lss.vertexRadiusFormat = DXGI_FORMAT_R32_FLOAT;
@@ -261,11 +261,11 @@ bool Scene::LoadObj(const std::string& inFilename, const glm::mat4x4& inTransfor
 				tinyobj::index_t idx = shape.mesh.indices[face_index * kVertexCountPerTriangle + vertex_index];
 				ioSceneContent.mIndices.push_back(static_cast<IndexType>(index++));
 
-				ioSceneContent.mVertices.push_back(VertexType(
-					reader.GetAttrib().vertices[3 * idx.vertex_index + 0],
-					reader.GetAttrib().vertices[3 * idx.vertex_index + 1],
-					reader.GetAttrib().vertices[3 * idx.vertex_index + 2]
-				));
+				ioSceneContent.mVertices.push_back({
+					.x = glm::detail::toFloat16(reader.GetAttrib().vertices[3 * idx.vertex_index + 0]),
+					.y = glm::detail::toFloat16(reader.GetAttrib().vertices[3 * idx.vertex_index + 1]),
+					.z = glm::detail::toFloat16(reader.GetAttrib().vertices[3 * idx.vertex_index + 2])
+				});
 
 				ioSceneContent.mNormals.push_back(NormalType(
 					reader.GetAttrib().normals[3 * idx.normal_index + 0],

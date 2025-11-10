@@ -89,7 +89,14 @@ private:
 using BLASRef = std::shared_ptr<BLAS>;
 
 using IndexType = uint32_t;
-using VertexType = glm::vec3;
+// using VertexType = glm::vec3;
+struct VertexType
+{
+	short x = 0;
+	short y = 0;
+	short z = 0;
+	short w = 0;
+};
 using NormalType = glm::vec3;
 using UVType = glm::vec2;
 
