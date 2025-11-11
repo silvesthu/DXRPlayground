@@ -482,6 +482,21 @@ static void sPrepareImGui()
 
 		if (ImGui::TreeNodeEx("Sequence", ImGuiTreeNodeFlags_DefaultOpen))
 		{
+			ImGui::Checkbox("Enabled", (bool*)&gConstants.mSequenceEnabled);
+			ImGui::SameLine();
+			ImGui::Checkbox("Camera", &gRenderer.mSequenceCameraEnabled);
+			ImGui::SameLine();
+			ImGui::Checkbox("Vsync", &gDisplaySettings.mVsync);
+
+			if (ImGui::Button("Dump PNG"))
+				gRenderer.mSequenceDumpPNG = true;
+
+			ImGui::SliderInt("Sequence Frame Count", &gConstants.mSequenceFrameCount, 1, 600);
+			ImGui::SliderInt("Sequence Frame Index", &gConstants.mSequenceFrameIndex, 0, gConstants.mSequenceFrameCount - 1);
+			ImGui::BeginDisabled();
+			ImGui::SliderInt("Accumulation Frame Index", &gConstants.mCurrentFrameIndex, 0, gRenderer.mAccumulationFrameCount - 1);
+			ImGui::EndDisabled();
+
 			if (ImGui::Button("Record"))
 			{
 				gConstants.mSequenceEnabled = 1;
@@ -490,16 +505,6 @@ static void sPrepareImGui()
 
 				gRenderer.mSequenceFrameRecording = 0;
 			}
-
-			ImGui::Checkbox("Enabled", (bool*)&gConstants.mSequenceEnabled);
-			ImGui::SameLine();
-			ImGui::Checkbox("Camera", &gRenderer.mSequenceCameraEnabled);			
-
-			ImGui::SliderInt("Sequence Frame Count", &gConstants.mSequenceFrameCount, 1, 600);
-			ImGui::SliderInt("Sequence Frame Index", &gConstants.mSequenceFrameIndex, 0, gConstants.mSequenceFrameCount - 1);
-			ImGui::BeginDisabled();
-			ImGui::SliderInt("Accumulation Frame Index", &gConstants.mCurrentFrameIndex, 0, gRenderer.mAccumulationFrameCount - 1);
-			ImGui::EndDisabled();
 
 			ImGui::TreePop();
 		}
@@ -1580,10 +1585,11 @@ void sRender()
 	}
 
 	// Readback Sequence
-	bool record_frame = gRenderer.mSequenceFrameRecording >= 0 && gConstants.mCurrentFrameIndex + 1 == gRenderer.mAccumulationFrameCount;
-	if (record_frame)
+	bool sequence_recording = gRenderer.mSequenceFrameRecording >= 0 && gConstants.mCurrentFrameIndex + 1 == gRenderer.mAccumulationFrameCount;
+	bool sequence_dump_png = gRenderer.mSequenceDumpPNG; // [NOTE] This flag is updated by UI (sPrepareImGui) below, state from last frame
+	if (sequence_recording || sequence_dump_png)
 	{
-		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Readback Sequence");
+		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Readback SceneColor with postprocess for Sequence");
 
 		gRenderer.Setup(gRenderer.mRuntime.mReadbackShader);
 		gCommandList->Dispatch(gAlignUpDiv(gRenderer.mScreenWidth, 8u), gAlignUpDiv(gRenderer.mScreenHeight, 8u), 1);
@@ -1643,7 +1649,8 @@ void sRender()
 	}
 
 	// Dump Texture for Sequence
-	if (record_frame)
+	// [NOTE] Don't use global state here, those are updated by UI above. Otherwise readback is not done for current frame due to execution order
+	if (sequence_recording || sequence_dump_png)
 	{
 		DirectX::ScratchImage image;
 		DirectX::CaptureTexture(gCommandQueue, gRenderer.mRuntime.mScreenReadbackTexture.mResource.Get(), false, image, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COMMON);
@@ -1652,20 +1659,23 @@ void sRender()
 		swprintf_s(filename, L"%03u.png", gRenderer.mSequenceFrameRecording);
 		DirectX::SaveToWICFile(image.GetImages(), image.GetImageCount(), DirectX::WIC_FLAGS_NONE, GUID_ContainerFormatPng, filename);
 
-		gConstants.mSequenceFrameIndex++;
-		gRenderer.mSequenceFrameRecording++;
-
-		std::string text = std::format("Sequence {}/{}\n", gRenderer.mSequenceFrameRecording, gConstants.mSequenceFrameCount);
-		gTrace(text.c_str());
-
-		if (gRenderer.mSequenceFrameRecording == gConstants.mSequenceFrameCount)
+		if (sequence_recording)
 		{
-			gConstants.mSequenceEnabled = 0;
-			gConstants.mSequenceFrameIndex = 0;
-			gRenderer.mSequenceFrameRecording = -1;
-			if (gHeadless)
-				gHeadlessDone = true;
+			gConstants.mSequenceFrameIndex++;
+			gRenderer.mSequenceFrameRecording++;
+
+			if (gRenderer.mSequenceFrameRecording == gConstants.mSequenceFrameCount)
+			{
+				gConstants.mSequenceEnabled = 0;
+				gConstants.mSequenceFrameIndex = 0;
+				gRenderer.mSequenceFrameRecording = -1;
+				if (gHeadless)
+					gHeadlessDone = true;
+			}
 		}
+
+		if (sequence_dump_png)
+			gRenderer.mSequenceDumpPNG = false;
 	}
 
 	// Present
