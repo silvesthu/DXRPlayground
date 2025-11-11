@@ -142,6 +142,7 @@ struct Renderer
 	int											mAccumulationFrameCount = 384;
 	bool										mAccumulationResetRequested = false;
 
+	bool										mSequenceDumpPNG = false;
 	bool										mSequenceCameraEnabled = true;
 	int											mSequenceFrameRecording = -1;
 
