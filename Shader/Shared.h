@@ -799,7 +799,7 @@ struct Constants
 	float						mSunZenith						CONSTANT_DEFAULT(MATH_PI / 4.0f);
 	float						mTime							CONSTANT_DEFAULT(0);
 
-	OffsetMode					mOffsetMode						CONSTANT_DEFAULT(OffsetMode::HalfPixel);
+	OffsetMode					mOffsetMode						CONSTANT_DEFAULT(OffsetMode::Random);
 	SampleMode					mSampleMode						CONSTANT_DEFAULT(SampleMode::MIS);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
