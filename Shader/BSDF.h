@@ -499,7 +499,7 @@ namespace BSDFEvaluation
 
 		float ratio								= mConstants.mSequenceFrameRatio;
 
-		float y_animation_ratio					= pow(saturate(1.0 - ratio), 0.5f);
+		float y_animation_ratio					= pow(saturate(1.0 - ratio), 0.3f);
 		float y_animation						= saturate(remap(ioContext.PositionWS().y, 1.0f - y_animation_ratio, 1.0f + lerp(0.0f, 0.2f, ratio) - y_animation_ratio, 0.0f, 1.0f));
 		ioContext.mInstanceData.mEta			= lerp(ioContext.mInstanceData.mEta, 1.0f, y_animation);
 	}

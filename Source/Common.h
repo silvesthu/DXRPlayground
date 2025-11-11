@@ -304,8 +304,8 @@ inline void gSetName(ComPtr<T>& inObject, std::string_view inPrefix, std::string
 	gSetName(inObject, gToWString(inPrefix), gToWString(inName), gToWString(inSuffix));
 }
 
-constexpr int								kScreenWidth = 1920;
-constexpr int								kScreenHeight = 1080;
+constexpr int								kScreenWidth = 1280;
+constexpr int								kScreenHeight = 720;
 
 constexpr int								kVertexCountPerTriangle = 3;
 
