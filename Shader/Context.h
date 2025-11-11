@@ -515,12 +515,13 @@ struct MediumContext
 			return;
 		}
 
-		float3 offset							= float3(0, -ratio * 2.0, 0);
-		float noise_value						= ErosionNoise3D.SampleLevel(BilinearWrapSampler, (PositionWS() + offset) * 1.0, 0);
-		noise_value								= saturate(pow(noise_value, 8.0));
+		float3 offset							= float3(0, ratio * 8.0, 0);
+		float noise_value_raw					= ErosionNoise3D.SampleLevel(BilinearWrapSampler, (PositionWS() + offset) * 2.0, 0);
+		float noise_value						= saturate(pow(noise_value_raw, 16.0));
 
-		float y_animation_ratio					= pow(saturate(1.0 - ratio - 0.1), 0.5f);
-		float y_animation						= saturate(remap(PositionWS().y, 1.0f - y_animation_ratio, 1.0f + lerp(0.0f, 0.2f, ratio) - y_animation_ratio, 0.0f, 1.0f));
+		float y_animation_ratio					= saturate(pow(ratio, 0.6f));
+		float distort							= -noise_value_raw * 0.2 + 0.1;
+		float y_animation						= saturate(remap(PositionWS().y + distort, y_animation_ratio, y_animation_ratio + lerp(0.0f, 0.2f, ratio), 0.0f, 1.0f));
 		noise_value								= lerp(1.0f, noise_value, y_animation);
 
 		mSigmaT									*= noise_value;
