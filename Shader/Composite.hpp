@@ -201,7 +201,14 @@ void ReadbackCS(
 	Texture2D<float4> Input = ResourceDescriptorHeap[(int)ViewDescriptorIndex::ScreenColorSRV];
 	RWTexture2D<float4> Output = ResourceDescriptorHeap[(int)ViewDescriptorIndex::ScreenReadbackUAV];
 
-	Output[inDispatchThreadID.xy] = Input[inDispatchThreadID.xy];
+	float3 luminance = Input[inDispatchThreadID.xy].xyz;
+	float3 color = luminance;
+	if (true)
+	{
+		color = LuminanceToColor(luminance, mConstants);
+		color = ApplySRGBCurve(color);
+	}
+	Output[inDispatchThreadID.xy] = float4(color, 1.0);
 }
 
 float4 LineVS(uint inVertexID : SV_VertexID, out float4 outColor : COLOR) : SV_POSITION
