@@ -322,7 +322,7 @@ float3 F_Conductor_Mitsuba(float3 inEta, float3 inK, float inCosThetaI)
 
 OffsetMode GetOffsetMode()
 {
-    return SHADER_DEBUG ? mConstants.mOffsetMode : OffsetMode::HalfPixel;
+    return SHADER_DEBUG ? mConstants.mOffsetMode : OffsetMode::Random;
 }
 
 SampleMode GetSampleMode()
