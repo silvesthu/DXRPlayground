@@ -519,7 +519,7 @@ struct MediumContext
 		float noise_value_raw					= ErosionNoise3D.SampleLevel(BilinearWrapSampler, (PositionWS() + offset) * 2.0, 0);
 		float noise_value						= saturate(pow(noise_value_raw, 16.0));
 
-		float y_animation_ratio					= saturate(pow(ratio, 0.5f));
+		float y_animation_ratio					= saturate(pow(ratio, 0.6f));
 		float distort							= -noise_value_raw * 0.2 + 0.1;
 		float y_animation						= saturate(remap(PositionWS().y + distort, y_animation_ratio, y_animation_ratio + lerp(0.0f, 0.2f, ratio), 0.0f, 1.0f));
 		noise_value								= lerp(1.0f, noise_value, y_animation);

@@ -38,7 +38,7 @@ static const std::array kScenePresets =
 	ScenePreset().Name("CornellBoxDielectric").Path("Asset/Comparison/benedikt-bitterli/cornell-box-dielectric/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("CornellBoxTeapot").Path("Asset/Comparison/benedikt-bitterli/cornell-box-teapot/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("CornellBoxMonkey").Path("Asset/Comparison/benedikt-bitterli/cornell-box-monkey/scene_v3.xml").EmissionBoost(1E4f),
-	ScenePreset().Name("CornellBoxDragon").Path("Asset/Comparison/benedikt-bitterli/cornell-box-dragon/scene_v3.xml").EmissionBoost(1E4f).DensityBoost(200.0f).CameraAnimationPath("Asset/Comparison/benedikt-bitterli/cornell-box-dragon/camera_animation.gltf"),
+	ScenePreset().Name("CornellBoxDragon").Path("Asset/Comparison/benedikt-bitterli/cornell-box-dragon/scene_v3.xml").EmissionBoost(1E4f).DensityBoost(150.0f).CameraAnimationPath("Asset/Comparison/benedikt-bitterli/cornell-box-dragon/camera_animation.gltf"),
 	ScenePreset().Name("CornellBoxVDB").Path("Asset/Comparison/benedikt-bitterli/cornell-box-vdb/scene_v3.xml").EmissionBoost(1E4f).DensityBoost(10.0f),
 	ScenePreset().Name("CornellBoxLSS").Path("Asset/Comparison/benedikt-bitterli/cornell-box-lss/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("CornellBoxSphereSurface").Path("Asset/Comparison/benedikt-bitterli/cornell-box-spheresurface/scene_v3.xml").EmissionBoost(1E4f),
