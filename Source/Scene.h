@@ -56,6 +56,13 @@ struct InstanceInfo
 	GeometryType mGeometryType = GeometryType::Triangles;
 
 	float3 mDecomposedScale = float3(1.0f);
+
+	struct Stats
+	{
+		mutable uint64_t mScratchDataSizeInBytes = 0;
+		mutable uint64_t mBVHDataSizeInBytes = 0;
+	};
+	mutable Stats mStats;
 };
 
 class BLAS final

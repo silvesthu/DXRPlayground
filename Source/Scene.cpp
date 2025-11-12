@@ -133,6 +133,9 @@ void BLAS::Initialize(const Initializer& inInitializer)
 	desc = gGetUAVResourceDesc(info.ResultDataMaxSizeInBytes);
 	gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, nullptr, IID_PPV_ARGS(&mDest)));
 	gSetName(mDest, "Scene.", instance_info.mName, ".[BLAS].Dest");
+
+	instance_info.mStats.mScratchDataSizeInBytes = info.ScratchDataSizeInBytes;
+	instance_info.mStats.mBVHDataSizeInBytes = info.ResultDataMaxSizeInBytes;
 }
 
 void BLAS::Build(ID3D12GraphicsCommandList4* inCommandList)

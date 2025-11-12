@@ -77,7 +77,7 @@ int sFindScenePresetIndex(const std::string_view inName)
 {
 	return static_cast<int>(&sFindScenePreset(inName) - &kScenePresets.front());
 }
-static int sCurrentSceneIndex = sFindScenePresetIndex("CornellBoxSphereSurface");
+static int sCurrentSceneIndex = sFindScenePresetIndex("CornellBoxDragon");
 static int sPreviousSceneIndex = sCurrentSceneIndex;
 
 struct CameraSettings
@@ -594,6 +594,8 @@ static void sPrepareImGui()
 					"Opacity",
 					"VertexCount",
 					"PrimitiveCount",
+					"ScratchMB",
+					"ResultMB",
 				};
 				int column_count = (int)std::size(columns);
 
@@ -717,6 +719,14 @@ static void sPrepareImGui()
 						ImGui::TableSetColumnIndex(column_index++);
 						std::string index_count = std::format("{} ", instance_data.mIndexCount / kIndexCountPerTriangle);
 						ImGui::Text(index_count.c_str());
+
+						ImGui::TableSetColumnIndex(column_index++);
+						std::string scratch_data_size_in_mb = std::format("{} ", instance_info.mStats.mScratchDataSizeInBytes / 1024.0f / 1024.0f);
+						ImGui::Text(scratch_data_size_in_mb.c_str());
+
+						ImGui::TableSetColumnIndex(column_index++);
+						std::string bvh_data_size_in_mb = std::format("{} ", instance_info.mStats.mBVHDataSizeInBytes / 1024.0f / 1024.0f);
+						ImGui::Text(bvh_data_size_in_mb.c_str());
 
 						ImGui::PopID();
 						gAssert(column_index == column_count);
@@ -1777,7 +1787,8 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		return false;
 
 	// NVAPI, based on RTXDI, RTXCR. NvAPI_Unload is not used.
-	gNVAPI.mInitialized = NvAPI_Initialize() == NVAPI_OK;
+	if (gConfigs.mUseNVAPI)
+		gNVAPI.mInitialized = NvAPI_Initialize() == NVAPI_OK;
 	if (gNVAPI.mInitialized)
 	{
 		NVAPI_D3D12_RAYTRACING_OPACITY_MICROMAP_CAPS caps = NVAPI_D3D12_RAYTRACING_OPACITY_MICROMAP_CAP_NONE;
