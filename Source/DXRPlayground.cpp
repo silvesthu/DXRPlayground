@@ -21,8 +21,8 @@
 extern "C" { __declspec(dllexport) extern const UINT			D3D12SDKVersion = 614; }
 extern "C" { __declspec(dllexport) extern const char8_t*		D3D12SDKPath = u8".\\D3D12\\"; }
 
-#define DX12_ENABLE_DEBUG_LAYER			(0)
-#define DX12_ENABLE_INFO_QUEUE_CALLBACK (0)
+#define DX12_ENABLE_DEBUG_LAYER			(1)
+#define DX12_ENABLE_INFO_QUEUE_CALLBACK (1)
 #define DX12_ENABLE_GBV					(0)
 
 static const wchar_t*											kApplicationTitleW = L"DXR Playground";
@@ -77,7 +77,7 @@ int sFindScenePresetIndex(const std::string_view inName)
 {
 	return static_cast<int>(&sFindScenePreset(inName) - &kScenePresets.front());
 }
-static int sCurrentSceneIndex = sFindScenePresetIndex("CornellBoxDragon");
+static int sCurrentSceneIndex = sFindScenePresetIndex("CornellBoxLSS");
 static int sPreviousSceneIndex = sCurrentSceneIndex;
 
 struct CameraSettings
@@ -858,22 +858,6 @@ static void sUpdate()
 		gRenderer.mResizeHeight = 0;
 	}
 
-	// Reload
-	if (gRenderer.mReloadShader)
-	{
-		gRenderer.mReloadShader = false;
-
-		sWaitForGPU();
-
-		gRenderer.FinalizeShaders();
-		gRenderer.InitializeShaders();
-
-		gRenderer.mAccumulationResetRequested = true;
-
-		gAtmosphere.mRuntime.mBruneton17.mRecomputeRequested = true;
-		gCloud.mRecomputeRequested = true;
-	}
-
 	// Rotate Camera
 	if (!gHeadless)
 	{
@@ -1304,7 +1288,7 @@ void sRender()
 		gCommandList->Reset(frame_context.mCommandAllocator.Get(), nullptr);
 	}
 
-	// Update Scene
+	// Reload Scene
 	{
 		if (sPreviousSceneIndex != sCurrentSceneIndex)
 		{
@@ -1316,6 +1300,22 @@ void sRender()
 			gRenderer.mReloadScene = false;
 			sLoadScene(false);
 		}
+	}
+
+	// Reload Shader
+	if (gRenderer.mReloadShader)
+	{
+		gRenderer.mReloadShader = false;
+
+		sWaitForGPU();
+
+		gRenderer.FinalizeShaders();
+		gRenderer.InitializeShaders();
+
+		gRenderer.mAccumulationResetRequested = true;
+
+		gAtmosphere.mRuntime.mBruneton17.mRecomputeRequested = true;
+		gCloud.mRecomputeRequested = true;
 	}
 
 	// Update and Upload Constants

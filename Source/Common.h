@@ -348,7 +348,7 @@ extern Stats								gStats;
 
 struct Configs
 {
-	bool									mUseNVAPI = false;
+	bool									mUseNVAPI = true;
 	bool									mShaderDebug = true;
 	bool									mUseHalf = true;
 	bool									mUseTexture = true;
