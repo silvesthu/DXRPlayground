@@ -1,1 +1,0 @@
-Cornell Box + LSS

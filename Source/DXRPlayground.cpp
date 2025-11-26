@@ -21,8 +21,8 @@
 extern "C" { __declspec(dllexport) extern const UINT			D3D12SDKVersion = 618; }
 extern "C" { __declspec(dllexport) extern const char8_t*		D3D12SDKPath = u8".\\D3D12\\"; }
 
-#define DX12_ENABLE_DEBUG_LAYER			(1)
-#define DX12_ENABLE_INFO_QUEUE_CALLBACK (1)
+#define DX12_ENABLE_DEBUG_LAYER			(0)
+#define DX12_ENABLE_INFO_QUEUE_CALLBACK (0)
 #define DX12_ENABLE_GBV					(0)
 
 static const wchar_t*											kApplicationTitleW = L"DXR Playground";
@@ -54,6 +54,7 @@ static const std::array kScenePresets =
 	ScenePreset().Name("LivingRoom2").Path("Asset/Comparison/benedikt-bitterli/living-room-2/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("VeachAjar").Path("Asset/Comparison/benedikt-bitterli/veach-ajar/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("VeachBidir").Path("Asset/Comparison/benedikt-bitterli/veach-bidir/scene_v3.xml").EmissionBoost(1E4f),
+	ScenePreset().Name("Sponza").Path("Asset/glTF-Sample-Assets/Sponza/glTF/Sponza.gltf").CameraPosition(glm::vec4(5.401f, 3.615f, -1.425f, 0.0f)).CameraDirection(glm::vec4(-0.969f, 0.033f, 0.246f, 0.0f)).EmissionBoost(1E6f).ConstantColor(glm::vec4(1.0f)),
 	ScenePreset().Name("PicaPica").Path("Asset/Sketchfab/pica-pica-mini-diorama-01/scene.gltf").CameraPosition(glm::vec4(-20.588f, 2.453f, 13.020f, 0.0f)).CameraDirection(glm::vec4(0.983f, -0.168f, 0.071f, 0.0f)).EmissionBoost(1E6f).ConstantColor(glm::vec4(0.1f)).TriangleAsLSSAllowed(true),
 	ScenePreset().Name("Bistro").Path("Asset/Comparison/RTXDI-Assets/bistro/bistro.gltf").CameraPosition(glm::vec4(-20.588f, 2.453f, 13.020f, 0.0f)).CameraDirection(glm::vec4(0.983f, -0.168f, 0.071f, 0.0f)).EmissionBoost(1E6f),
 
@@ -77,7 +78,7 @@ int sFindScenePresetIndex(const std::string_view inName)
 {
 	return static_cast<int>(&sFindScenePreset(inName) - &kScenePresets.front());
 }
-static int sCurrentSceneIndex = sFindScenePresetIndex("CornellBoxLSS");
+static int sCurrentSceneIndex = sFindScenePresetIndex("Sponza");
 static int sPreviousSceneIndex = sCurrentSceneIndex;
 
 struct CameraSettings
