@@ -492,23 +492,8 @@ namespace BSDFEvaluation
 		}
 	};
 
-	static void ApplySequence(inout HitContext ioContext)
-	{
-		if (mConstants.mSequenceEnabled == 0)
-			return;
-
-		float ratio								= mConstants.mSequenceFrameRatio;
-
-		float eta_ratio							= saturate((ratio - 0.5) / (1.0 - 0.5));
-		float y_animation_ratio					= pow(eta_ratio, 0.8);
-		float y_animation						= saturate(remap(ioContext.PositionWS().y, y_animation_ratio, y_animation_ratio + lerp(0.0f, 0.2f, eta_ratio), 0.0f, 1.0f));
-		ioContext.mInstanceData.mEta			= lerp(ioContext.mInstanceData.mEta, 1.0f, y_animation);
-	}
-
 	BSDFContext GenerateContext(HitContext inHitContext, inout PathContext ioPathContext)
 	{
-		ApplySequence(inHitContext);
-
 		BSDFContext bsdf_context;
 
 		switch (inHitContext.BSDF())
@@ -546,8 +531,6 @@ namespace BSDFEvaluation
 
 	BSDFResult Evaluate(inout BSDFContext inBSDFContext, HitContext inHitContext, inout PathContext ioPathContext)
 	{
-		ApplySequence(inHitContext);
-
 		BSDFResult result;
 		switch (inHitContext.BSDF())
 		{

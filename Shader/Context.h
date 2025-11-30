@@ -486,7 +486,7 @@ struct BSDFContext
 
 struct MediumContext
 {
-	void ApplyNanoVDB(inout PathContext ioPathContext)
+	void SampleNanoVDB(inout PathContext ioPathContext)
 	{
 		if (!mNanoVDBContext.mValid)
 			return;
@@ -500,45 +500,6 @@ struct MediumContext
 		// DebugValue(DebugMode::Manual, ioPathContext.mRecursionDepth, density);
 		// DebugValue(DebugMode::Manual, ioPathContext.mRecursionDepth, mMajorantSigmaT);
 		// DebugValue(DebugMode::Manual, ioPathContext.mRecursionDepth, mInstanceData.mMediumSigmaT);
-	}
-
-	void ApplySequence(inout PathContext ioPathContext)
-	{
-		if (mConstants.mSequenceEnabled == 0)
-			return;
-
-		float ratio								= mConstants.mSequenceFrameRatio;
-
-		if (mInstanceData.mMediumNanoVBD.mBufferIndex != (uint)ViewDescriptorIndex::Invalid)
-		{
-			mSigmaT								*= (ratio - 0.5) / (1.0 - 0.5);
-			return;
-		}
-
-		float3 offset							= float3(0, ratio * 8.0, 0);
-		float noise_value_raw					= ErosionNoise3D.SampleLevel(BilinearWrapSampler, (PositionWS() + offset) * 2.0, 0);
-		float noise_value						= saturate(pow(noise_value_raw, 16.0));
-
-		float y_animation_ratio					= saturate(pow(ratio, 0.6f));
-		float distort							= -noise_value_raw * 0.2 + 0.1;
-		float y_animation						= saturate(remap(PositionWS().y + distort, y_animation_ratio, y_animation_ratio + lerp(0.0f, 0.2f, ratio), 0.0f, 1.0f));
-		noise_value								= lerp(1.0f, noise_value, y_animation);
-
-		mSigmaT									*= noise_value;
-	}
-
-	void ApplySequenceOnce()
-	{
-		if (mConstants.mSequenceEnabled == 0)
-			return;
-
-		float ratio								= mConstants.mSequenceFrameRatio;
-
-		if (mInstanceData.mMediumNanoVBD.mBufferIndex != (uint)ViewDescriptorIndex::Invalid)
-		{
-			mMajorantSigmaT						*= (ratio - 0.5) / (1.0 - 0.5);
-			return;
-		}
 	}
 
 	template<RAY_FLAG RayFlags>
@@ -563,8 +524,6 @@ struct MediumContext
 
 		medium_context.mNanoVDBContext.Initialize(medium_context.mInstanceData.mMediumNanoVBD);
 
-		medium_context.ApplySequenceOnce();
-
 		return medium_context;
 	}
 
@@ -575,8 +534,7 @@ struct MediumContext
 		mRayWS.mTCurrent						= inT;
 		mRayOS.mTCurrent						= inT;
 
-		ApplyNanoVDB(ioPathContext);
-		ApplySequence(ioPathContext);
+		SampleNanoVDB(ioPathContext);
 	}
 
 	float3			PositionWS()				{ return mRayWS.Target(); }
