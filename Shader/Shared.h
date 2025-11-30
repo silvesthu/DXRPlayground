@@ -242,6 +242,7 @@ enum class RootParameterIndex : uint
 enum class VisualizeMode : uint
 {
 	None = 0,
+	PrimitiveIndex,
 
 	GENERATE_NEW_LINE_NAME,
 

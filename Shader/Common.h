@@ -27,17 +27,6 @@ float MaxComponent(float2 inValue)                              { return max(inV
 float MaxComponent(float3 inValue)                              { return max(MaxComponent(inValue.xy), inValue.z); }
 float MaxComponent(float4 inValue)                              { return max(MaxComponent(inValue.xyz), inValue.z); }
 
-// Hash.ush, originally from MurmurHash, thus the name
-uint MurmurMix(uint Hash)
-{
-    Hash ^= Hash >> 16;
-    Hash *= 0x85ebca6b;
-    Hash ^= Hash >> 13;
-    Hash *= 0xc2b2ae35;
-    Hash ^= Hash >> 16;
-    return Hash;
-}
-
 // From https://www.shadertoy.com/view/tsBBWW
 uint wang_hash(inout uint seed)
 {
@@ -94,7 +83,7 @@ float RGBToLuminance(float3 inColor)
 }
 
 // From https://www.shadertoy.com/view/lsdGzN
-float3 hsv2rgb( in float3 c )
+float3 HSVToRGB( in float3 c )
 {
     float3 rgb = clamp( abs(fmod(c.x*6.0+float3(0.0,4.0,2.0),6.0)-3.0)-1.0, 0.0, 1.0 );
 
@@ -103,6 +92,16 @@ float3 hsv2rgb( in float3 c )
     return c.z * lerp(1.0, rgb, c.y);
 }
 
+// Hash.ush, originally from MurmurHash, thus the name
+uint MurmurMix(uint Hash)
+{
+    Hash ^= Hash >> 16;
+    Hash *= 0x85ebca6b;
+    Hash ^= Hash >> 13;
+    Hash *= 0xc2b2ae35;
+    Hash ^= Hash >> 16;
+    return Hash;
+}
 // Visualization.ush
 float3 IntToColor(uint Index)
 {

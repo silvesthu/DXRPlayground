@@ -104,7 +104,7 @@ float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 	case VisualizeMode::RoughnessAlpha: 		break;
 	case VisualizeMode::Transmittance:			break;
 	case VisualizeMode::InScattering:			break;
-	case VisualizeMode::RecursionDepth:			color.xyz = GetDebugRecursion() == 0 ? hsv2rgb(float3(color.x / 8.0, 1, 1)) : color.xxx; break;
+	case VisualizeMode::RecursionDepth:			color.xyz = GetDebugRecursion() == 0 ? HSVToRGB(float3(color.x / 8.0, 1, 1)) : color.xxx; break;
 	default:									break;
 	}
 	

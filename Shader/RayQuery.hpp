@@ -358,6 +358,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 				switch (GetVisualizeMode())
 				{
 				case VisualizeMode::None:							break;
+				case VisualizeMode::PrimitiveIndex:					path_context.mEmission = IntToColor((hit_context.mInstanceID << 16) + hit_context.mPrimitiveIndex + 1 /* skip 0 = black */); continue_bounce = false; break;
 				case VisualizeMode::Barycentrics: 					path_context.mEmission = hit_context.Barycentrics(); continue_bounce = false; break;
 				case VisualizeMode::Position: 						path_context.mEmission = hit_context.PositionWS(); continue_bounce = false; break;
 				case VisualizeMode::Normal: 						path_context.mEmission = hit_context.NormalWS(); continue_bounce = false; break;
