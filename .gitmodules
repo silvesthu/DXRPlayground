@@ -44,3 +44,6 @@
 [submodule "Source/Thirdparty/implot"]
 	path = Source/Thirdparty/implot
 	url = https://github.com/epezent/implot.git
+[submodule "Source/Thirdparty/meshoptimizer"]
+	path = Source/Thirdparty/meshoptimizer
+	url = https://github.com/zeux/meshoptimizer.git
