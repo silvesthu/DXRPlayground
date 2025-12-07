@@ -33,8 +33,11 @@ static const std::array kScenePresets =
 {
 	ScenePreset().Name("None"),
 
-	// Basics
-	ScenePreset().Name("CornellBox").Path("Asset/Comparison/benedikt-bitterli/cornell-box/scene_v3.xml").EmissionBoost(1E4f).TriangleAsLSSAllowed(true),
+	// Basic
+	ScenePreset().Name("Basic").Path("Asset/Basic/basic/scene_v3.xml").EmissionBoost(1E4f),
+
+	// CornellBox
+	ScenePreset().Name("CornellBox").Path("Asset/Comparison/benedikt-bitterli/cornell-box/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("CornellBoxDielectric").Path("Asset/Comparison/benedikt-bitterli/cornell-box-dielectric/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("CornellBoxTeapot").Path("Asset/Comparison/benedikt-bitterli/cornell-box-teapot/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("CornellBoxMonkey").Path("Asset/Comparison/benedikt-bitterli/cornell-box-monkey/scene_v3.xml").EmissionBoost(1E4f),
@@ -55,7 +58,7 @@ static const std::array kScenePresets =
 	ScenePreset().Name("VeachAjar").Path("Asset/Comparison/benedikt-bitterli/veach-ajar/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("VeachBidir").Path("Asset/Comparison/benedikt-bitterli/veach-bidir/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("Sponza").Path("Asset/glTF-Sample-Assets/Sponza/glTF/Sponza.gltf").CameraPosition(glm::vec4(5.401f, 3.615f, -1.425f, 0.0f)).CameraDirection(glm::vec4(-0.969f, 0.033f, 0.246f, 0.0f)).EmissionBoost(1E6f).ConstantColor(glm::vec4(1.0f)),
-	ScenePreset().Name("PicaPica").Path("Asset/Sketchfab/pica-pica-mini-diorama-01/scene.gltf").CameraPosition(glm::vec4(-20.588f, 2.453f, 13.020f, 0.0f)).CameraDirection(glm::vec4(0.983f, -0.168f, 0.071f, 0.0f)).EmissionBoost(1E6f).ConstantColor(glm::vec4(0.1f)).TriangleAsLSSAllowed(true),
+	ScenePreset().Name("PicaPica").Path("Asset/Sketchfab/pica-pica-mini-diorama-01/scene.gltf").CameraPosition(glm::vec4(-20.588f, 2.453f, 13.020f, 0.0f)).CameraDirection(glm::vec4(0.983f, -0.168f, 0.071f, 0.0f)).EmissionBoost(1E6f).ConstantColor(glm::vec4(0.1f)),
 	ScenePreset().Name("Bistro").Path("Asset/Comparison/RTXDI-Assets/bistro/bistro.gltf").CameraPosition(glm::vec4(-20.588f, 2.453f, 13.020f, 0.0f)).CameraDirection(glm::vec4(0.983f, -0.168f, 0.071f, 0.0f)).EmissionBoost(1E6f),
 
 	// Atmosphere
@@ -78,7 +81,7 @@ int sFindScenePresetIndex(const std::string_view inName)
 {
 	return static_cast<int>(&sFindScenePreset(inName) - &kScenePresets.front());
 }
-static int sCurrentSceneIndex = sFindScenePresetIndex("Sponza");
+static int sCurrentSceneIndex = sFindScenePresetIndex("Basic");
 static int sPreviousSceneIndex = sCurrentSceneIndex;
 
 struct CameraSettings
@@ -425,7 +428,7 @@ static void sPrepareImGui()
 			if (ImGui::Button("Reload Scene"))
 				gRenderer.mReloadScene = true;
 
-			if (ImGui::TreeNodeEx("LSS", ImGuiTreeNodeFlags_DefaultOpen))
+			if (ImGui::TreeNodeEx("LSS", ImGuiTreeNodeFlags_None))
 			{
 				bool endcap_chained = gNVAPI.mEndcapMode == NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_CHAINED;
 				if (ImGui::Checkbox("Endcap Chained", &endcap_chained))
@@ -437,7 +440,7 @@ static void sPrepareImGui()
 				ImGui::TreePop();
 			}
 
-			if (ImGui::TreeNodeEx("Sphere Surface", ImGuiTreeNodeFlags_DefaultOpen))
+			if (ImGui::TreeNodeEx("Sphere Surface", ImGuiTreeNodeFlags_None))
 			{
 				ImGui::InputInt("Fill Count X", &gNVAPI.mSphereSurfaceFillCountX);
 				ImGui::InputFloat("Radius", &gNVAPI.mSphereSurfaceFillRadius);
@@ -446,7 +449,7 @@ static void sPrepareImGui()
 				ImGui::TreePop();
 			}
 
-			if (ImGui::TreeNodeEx("LSS (Wireframe)", ImGuiTreeNodeFlags_DefaultOpen))
+			if (ImGui::TreeNodeEx("LSS (Wireframe)", ImGuiTreeNodeFlags_None))
 			{
 				if (ImGui::Checkbox("Enabled", &gNVAPI.mLSSWireframeEnabled))
 					gRenderer.mReloadScene = true;
@@ -463,12 +466,20 @@ static void sPrepareImGui()
 				ImGui::TreePop();
 			}
 
-			if (ImGui::TreeNodeEx("Caps"))
+			if (ImGui::TreeNodeEx("Cluster", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				if (ImGui::Checkbox("Enabled", &gNVAPI.mClusterEnabled))
+					gRenderer.mReloadScene = true;
+
+				ImGui::TreePop();
+			}
+
+			if (ImGui::TreeNodeEx("Caps", ImGuiTreeNodeFlags_None))
 			{
 				ImGui::BeginDisabled();
 
 				ImGui::Checkbox("Micromap", &gNVAPI.mMicromapSupported);
-				ImGui::Checkbox("Clusters", &gNVAPI.mClustersSupported);
+				ImGui::Checkbox("Clusters", &gNVAPI.mClusterSupported);
 				ImGui::Checkbox("LinearSweptSpheres", &gNVAPI.mLinearSweptSpheresSupported);
 				ImGui::Checkbox("Spheres", &gNVAPI.mSpheresSupported);
 				ImGui::Checkbox("ShaderExecutionReordering", &gNVAPI.mShaderExecutionReorderingSupported);
@@ -481,7 +492,7 @@ static void sPrepareImGui()
 			ImGui::TreePop();
 		}
 
-		if (ImGui::TreeNodeEx("Sequence", ImGuiTreeNodeFlags_DefaultOpen))
+		if (ImGui::TreeNodeEx("Sequence", ImGuiTreeNodeFlags_None))
 		{
 			ImGui::Checkbox("Enabled", (bool*)&gConstants.mSequenceEnabled);
 			ImGui::SameLine();
@@ -722,11 +733,11 @@ static void sPrepareImGui()
 						ImGui::Text(index_count.c_str());
 
 						ImGui::TableSetColumnIndex(column_index++);
-						std::string scratch_data_size_in_mb = std::format("{} ", instance_info.mStats.mScratchDataSizeInBytes / 1024.0f / 1024.0f);
+						std::string scratch_data_size_in_mb = std::format("{:.2f} ", instance_info.mStats.mScratchDataSizeInBytes / 1024.0f / 1024.0f);
 						ImGui::Text(scratch_data_size_in_mb.c_str());
 
 						ImGui::TableSetColumnIndex(column_index++);
-						std::string bvh_data_size_in_mb = std::format("{} ", instance_info.mStats.mBVHDataSizeInBytes / 1024.0f / 1024.0f);
+						std::string bvh_data_size_in_mb = std::format("{:.2f} ", instance_info.mStats.mResultDataSizeInBytes / 1024.0f / 1024.0f);
 						ImGui::Text(bvh_data_size_in_mb.c_str());
 
 						ImGui::PopID();
@@ -1798,7 +1809,7 @@ static bool sCreateDeviceD3D(HWND hWnd)
 
 		NVAPI_D3D12_RAYTRACING_CLUSTER_OPERATIONS_CAPS clusterCaps = NVAPI_D3D12_RAYTRACING_CLUSTER_OPERATIONS_CAP_NONE;
 		gVerify(NvAPI_D3D12_GetRaytracingCaps(gDevice, NVAPI_D3D12_RAYTRACING_CAPS_TYPE_CLUSTER_OPERATIONS, &clusterCaps, sizeof(clusterCaps)) == NVAPI_OK);
-		gNVAPI.mClustersSupported = clusterCaps == NVAPI_D3D12_RAYTRACING_CLUSTER_OPERATIONS_CAP_STANDARD;
+		gNVAPI.mClusterSupported = clusterCaps == NVAPI_D3D12_RAYTRACING_CLUSTER_OPERATIONS_CAP_STANDARD;
 		
 		NVAPI_D3D12_RAYTRACING_LINEAR_SWEPT_SPHERES_CAPS lss_caps = NVAPI_D3D12_RAYTRACING_LINEAR_SWEPT_SPHERES_CAP_NONE;
 		gVerify(NvAPI_D3D12_GetRaytracingCaps(gDevice, NVAPI_D3D12_RAYTRACING_CAPS_TYPE_LINEAR_SWEPT_SPHERES, &lss_caps, sizeof(NVAPI_D3D12_RAYTRACING_LINEAR_SWEPT_SPHERES_CAPS)) == NVAPI_OK);
@@ -1811,13 +1822,13 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		// Assume both LSS and sphere or neither. Will only check for LSS after this line
 		gVerify(gNVAPI.mLinearSweptSpheresSupported == gNVAPI.mSpheresSupported);
 
-		if (gNVAPI.mMicromapSupported || gNVAPI.mClustersSupported || gNVAPI.mLinearSweptSpheresSupported || gNVAPI.mSpheresSupported)
+		if (gNVAPI.mMicromapSupported || gNVAPI.mClusterSupported || gNVAPI.mLinearSweptSpheresSupported || gNVAPI.mSpheresSupported)
 		{
 			NVAPI_D3D12_SET_CREATE_PIPELINE_STATE_OPTIONS_PARAMS params = {};
 			params.version = NVAPI_D3D12_SET_CREATE_PIPELINE_STATE_OPTIONS_PARAMS_VER;
 			params.flags = 0;
 			params.flags |= (gNVAPI.mMicromapSupported ? NVAPI_D3D12_PIPELINE_CREATION_STATE_FLAGS_ENABLE_OMM_SUPPORT : 0);
-			params.flags |= (gNVAPI.mClustersSupported ? NVAPI_D3D12_PIPELINE_CREATION_STATE_FLAGS_ENABLE_CLUSTER_SUPPORT : 0);
+			params.flags |= (gNVAPI.mClusterSupported ? NVAPI_D3D12_PIPELINE_CREATION_STATE_FLAGS_ENABLE_CLUSTER_SUPPORT : 0);
 			params.flags |= (gNVAPI.mLinearSweptSpheresSupported ? NVAPI_D3D12_PIPELINE_CREATION_STATE_FLAGS_ENABLE_LSS_SUPPORT : 0);
 			params.flags |= (gNVAPI.mSpheresSupported ? NVAPI_D3D12_PIPELINE_CREATION_STATE_FLAGS_ENABLE_SPHERE_SUPPORT : 0);
 			gVerify(NvAPI_D3D12_SetCreatePipelineStateOptions(gDevice, &params) == NVAPI_OK);

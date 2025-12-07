@@ -42,6 +42,17 @@ struct PathContext
 	uint			mMediumInstanceID;
 };
 
+struct meshopt_Meshlet
+{
+	/* offsets within meshlet_vertices and meshlet_triangles arrays with meshlet data */
+	unsigned int vertex_offset;
+	unsigned int triangle_offset;
+
+	/* number of vertices and triangles used in the meshlet; data is stored in consecutive range defined by offset and count */
+	unsigned int vertex_count;
+	unsigned int triangle_count;
+};
+
 // Context information about a point on surface
 struct SurfaceContext
 {	
@@ -49,8 +60,17 @@ struct SurfaceContext
 	{
 		// Only support 32bit index for simplicity
 		// see https://github.com/microsoft/DirectX-Graphics-Samples/blob/master/Samples/Desktop/D3D12Raytracing/src/D3D12RaytracingSimpleLighting/Raytracing.hlsl for reference
+#ifdef NVAPI_CLUSTERS
+		StructuredBuffer<meshopt_Meshlet> MeshletBuffer = ResourceDescriptorHeap[mInstanceData.mClusterMeshletBufferIndex];
+		StructuredBuffer<uint> IndexBuffer = ResourceDescriptorHeap[mInstanceData.mClusterIndexBufferIndex];
+
+		meshopt_Meshlet meshlet			= MeshletBuffer[mClusterID];
+		uint base_index					= mPrimitiveIndex * kIndexCountPerTriangle + meshlet.triangle_offset;
+		uint3 indices					= uint3(IndexBuffer[base_index], IndexBuffer[base_index + 1], IndexBuffer[base_index + 2]) + mInstanceData.mVertexOffset;
+#else
 		uint base_index					= mPrimitiveIndex * kIndexCountPerTriangle + mInstanceData.mIndexOffset;
 		uint3 indices					= uint3(Indices[base_index], Indices[base_index + 1], Indices[base_index + 2]) + mInstanceData.mVertexOffset;
+#endif // NVAPI_CLUSTERS
 
 		if (VERTEX_TYPE_HALF)
 		{
@@ -261,6 +281,7 @@ struct SurfaceContext
 
 	uint			mInstanceID;
 	uint			mPrimitiveIndex;
+	uint			mClusterID;
 	float3			mBarycentrics;
 
 	// Vertex Attributes
@@ -329,6 +350,11 @@ struct HitContext : SurfaceContext
 		hit_context.mInstanceData				= InstanceDataCache::Load(inRayQuery.CommittedInstanceID());
 		hit_context.mInstanceID					= inRayQuery.CommittedInstanceID();
 		hit_context.mPrimitiveIndex				= inRayQuery.CommittedPrimitiveIndex();
+#ifdef NVAPI_CLUSTERS
+		hit_context.mClusterID					= NvRtGetCommittedClusterID(inRayQuery);
+#else
+		hit_context.mClusterID					= 0xFFFFFFFF;
+#endif // NVAPI_CLUSTERS
 		hit_context.mBarycentrics				= float3(1.0 - bary2.x - bary2.y, bary2.x, bary2.y);
 		hit_context.mRayWS.mOrigin				= inRayDesc.Origin;
 		hit_context.mRayWS.mDirection			= inRayDesc.Direction;

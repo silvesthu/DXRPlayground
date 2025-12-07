@@ -483,6 +483,8 @@ ComPtr<IDxcBlob> gCompileShader(const char* inFilename, const char* inEntryPoint
 		defines.push_back({ .Name = L"NVAPI_SER", .Value = L"1"});
 	if (gNVAPI.mLinearSweptSpheresSupported)
 		defines.push_back({ .Name = L"NVAPI_LSS", .Value = L"1" });
+	if (gNVAPI.mClusterSupported && gNVAPI.mClusterEnabled)
+		defines.push_back({ .Name = L"NVAPI_CLUSTERS", .Value = L"1" });
 
 	// Config
 	defines.push_back({ .Name = L"SHADER_DEBUG", .Value = gConfigs.mShaderDebug ? L"1" : L"0"});

@@ -23,6 +23,7 @@ using Microsoft::WRL::ComPtr;
 #include <chrono>
 #include <set>
 #include <ranges>
+#include <execution>
 #include <random>
 
 #include "Thirdparty/glm.h"
@@ -33,6 +34,8 @@ using Microsoft::WRL::ComPtr;
 #include "ImGui/imgui_impl_helper.h"
 #include "ImGui/imgui_impl_dx12.h"
 #include "Thirdparty/implot/implot.h"
+
+#include "Thirdparty/meshoptimizer/src/meshoptimizer.h"
 
 #include "../Shader/Shared.h"
 
@@ -309,6 +312,19 @@ constexpr int								kScreenHeight = 1080;
 
 constexpr int								kVertexCountPerTriangle = 3;
 
+constexpr size_t							kClusterCLASCountMax = 128 * 256;							// See MaxCLASPerFrame
+constexpr size_t							kClusterTriangleCountMin = 16;
+constexpr size_t							kClusterTriangleCountMax = 128;								// See NANITE_MAX_CLUSTER_TRIANGLES
+constexpr size_t							kClusterVertexCountMax = 256;								// See NANITE_MAX_CLUSTER_VERTICES
+constexpr float								kClusterFillWeight = 0.5f;
+constexpr int								kClusterGeometryIndexMax = 15;								// See NANITE_RAYTRACING_CLAS_MAX_GEOMETRY_INDEX
+constexpr int								kClusterUniqueGeometriesMax = 10;							// See NANITE_RAYTRACING_CLAS_MAX_UNIQUE_GEOMETRIES
+constexpr int								kClusterMinPostTruncateBitCount = 0;						// See NANITE_RAYTRACING_CLAS_MIN_POS_TRUNCATE_BIT_COUNT
+
+constexpr size_t							kClusterBLASCountMax = 1;									// See GNaniteRayTracingBLASMaxToBuild
+constexpr size_t							kClusterBLASCLASAddressCountMax = 8 * 1024 * 1024;			// See GNaniteRayTracingBLASMaxCLASAddresses
+constexpr size_t							kClusterBLASCLASCountMax = kClusterCLASCountMax;			// See MaxBLASCLASCount, no reference value found
+
 extern bool									gHeadless;
 extern bool									gHeadlessDone;
 
@@ -373,7 +389,7 @@ struct NVAPI
 {
 	bool									mInitialized = false;
 	bool									mMicromapSupported = false;
-	bool									mClustersSupported = false;
+	bool									mClusterSupported = false;
 	bool									mLinearSweptSpheresSupported = false;
 	bool									mSpheresSupported = false;
 	bool									mShaderExecutionReorderingSupported = false;
@@ -388,6 +404,8 @@ struct NVAPI
 	int										mSphereSurfaceFillCountX = 100;
 	float									mSphereSurfaceFillRadius = -1.0f;
 	bool									mSphereSurfaceRandom = false;
+
+	bool									mClusterEnabled = true;
 };
 extern NVAPI								gNVAPI;
 

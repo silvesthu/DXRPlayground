@@ -212,6 +212,10 @@
     </ClInclude>
     <ClInclude Include="Source\Thirdparty\implot\implot.h" />
     <ClInclude Include="Source\Thirdparty\implot\implot_internal.h" />
+    <ClInclude Include="Source\Thirdparty\nvapi\nvapi.h" />
+    <ClInclude Include="Source\Thirdparty\nvapi\nvapi_interface.h" />
+    <ClInclude Include="Source\Thirdparty\nvapi\nvapi_lite_common.h" />
+    <ClInclude Include="Source\Thirdparty\nvapi\nvapi_lite_d3dext.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\DXRPlayground.cpp">

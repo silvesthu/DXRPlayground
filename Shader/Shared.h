@@ -243,6 +243,7 @@ enum class VisualizeMode : uint
 {
 	None = 0,
 	PrimitiveIndex,
+	ClusterID,
 
 	GENERATE_NEW_LINE_NAME,
 
@@ -572,8 +573,8 @@ struct InstanceData
 	uint						mLSSIndexCount					CONSTANT_DEFAULT(0);
 	uint						mLSSRadiusOffset				CONSTANT_DEFAULT(0);
 	uint						mLSSRadiusCount					CONSTANT_DEFAULT(0);
-	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
-	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	uint						mClusterMeshletBufferIndex		CONSTANT_DEFAULT(0);
+	uint						mClusterIndexBufferIndex		CONSTANT_DEFAULT(0);
 };
 STATITC_ASSERT(sizeof(InstanceData) % sizeof(glm::vec4) == 0);
 

@@ -19,6 +19,8 @@ enum class GeometryType
 
 struct InstanceInfo
 {
+	std::string mName;
+
 	struct Material
 	{
 		std::string mMaterialName;
@@ -48,10 +50,20 @@ struct InstanceInfo
 
 		NanoVDB mNanoVDB;
 	};
-
-	std::string mName;
-
 	Material mMaterial;
+
+	struct Cluster
+	{
+		std::vector<meshopt_Meshlet> mMeshlets;
+		std::vector<uint32_t> mVertices;
+		std::vector<uint8_t> mTriangles;
+
+		std::vector<uint32_t> mIndices;
+
+		Buffer mMeshletBuffer;
+		Buffer mIndexBuffer;
+	};
+	mutable Cluster mCluster; // Generated at BLAS build time
 
 	GeometryType mGeometryType = GeometryType::Triangles;
 
@@ -60,11 +72,23 @@ struct InstanceInfo
 	struct Stats
 	{
 		mutable uint64_t mScratchDataSizeInBytes = 0;
-		mutable uint64_t mBVHDataSizeInBytes = 0;
+		mutable uint64_t mResultDataSizeInBytes = 0;
+
+		struct Cluster
+		{
+			mutable uint64_t mScratchSizeInBytes = 0;
+			mutable uint64_t mBuildSizeInBytes = 0;
+			mutable uint64_t mAddressSizeInBytes = 0;
+			mutable uint64_t mSizeSizeInBytes = 0;
+			mutable uint64_t mIndirectArgArraySizeInBytes = 0;
+		};
+		Cluster mClusterCLAS;
+		Cluster mClusterBLAS;
 	};
 	mutable Stats mStats;
 };
 
+struct SceneContent;
 class BLAS final
 {
 public:
@@ -82,9 +106,18 @@ public:
 	};
 
 	void Initialize(const Initializer& inInitializer);
+	void InitializeCLAS(const Initializer& inInitializer);
 	void Build(ID3D12GraphicsCommandList4* inCommandList);
 
-	D3D12_GPU_VIRTUAL_ADDRESS GetGPUVirtualAddress() const { return mDest->GetGPUVirtualAddress(); }
+	D3D12_GPU_VIRTUAL_ADDRESS GetGPUVirtualAddress() const 
+	{
+		if (mClusterBLAS.mBuild != nullptr)
+		{
+			return mClusterBLAS.mBuild->GetGPUVirtualAddress();
+		}
+
+		return mDest->GetGPUVirtualAddress(); 
+	}
 
 private:
 	D3D12_RAYTRACING_GEOMETRY_DESC mDesc{};
@@ -96,12 +129,28 @@ private:
 	ComPtr<ID3D12Resource> mScratch = nullptr;
 	ComPtr<ID3D12Resource> mDest = nullptr;
 
+	struct Cluster
+	{
+		NVAPI_D3D12_RAYTRACING_MULTI_INDIRECT_CLUSTER_OPERATION_DESC mBuildDesc{};
+
+		ComPtr<ID3D12Resource> mScratch = nullptr;
+		ComPtr<ID3D12Resource> mBuild = nullptr;
+		ComPtr<ID3D12Resource> mAddress = nullptr;
+		ComPtr<ID3D12Resource> mSize = nullptr;
+		ComPtr<ID3D12Resource> mIndirectArgArray = nullptr;
+	};
+	Cluster mClusterCLAS;
+	Cluster mClusterBLAS;
+
 	bool mBuilt = false;
 };
 using BLASRef = std::shared_ptr<BLAS>;
 
-using IndexType = uint32_t;
+template <typename T> inline DXGI_FORMAT gGetDXGIFormat();
+template <typename T> inline DXGI_FORMAT gGetDXGIFormat<T>() { return T::DXGIFormat; }
+template <> inline  DXGI_FORMAT gGetDXGIFormat<glm::vec3>() { return DXGI_FORMAT_R32G32B32_FLOAT; }
 
+using IndexType = uint32_t;
 #if VERTEX_TYPE_HALF
 struct VertexType
 {
@@ -131,14 +180,8 @@ struct VertexType
 #else
 using VertexType = glm::vec3;
 #endif // VERTEX_TYPE_HALF
-
-template <typename T> inline DXGI_FORMAT gGetDXGIFormat();
-template <typename T> inline DXGI_FORMAT gGetDXGIFormat<T>() { return T::DXGIFormat; }
-template <> inline  DXGI_FORMAT gGetDXGIFormat<glm::vec3>() { return DXGI_FORMAT_R32G32B32_FLOAT; }
-
 using NormalType = glm::vec3;
 using UVType = glm::vec2;
-
 using RadiusType = float;
 
 struct SceneContent
@@ -221,7 +264,6 @@ struct ScenePreset
 	SCENE_PRESET_MEMBER(float, 					SunZenith, 				glm::pi<float>() / 4.0f);
 	SCENE_PRESET_MEMBER(AtmosphereMode,			Atmosphere,				AtmosphereMode::ConstantColor);
 	SCENE_PRESET_MEMBER(glm::vec4,				ConstantColor,			glm::vec4(0, 0, 0, 0));
-	SCENE_PRESET_MEMBER(bool,					TriangleAsLSSAllowed,	false);
 	SCENE_PRESET_MEMBER(std::string_view, 		CameraAnimationPath,	"");
 };
 
@@ -239,6 +281,8 @@ public:
 	int GetInstanceCount() const								{ return static_cast<int>(mSceneContent.mInstanceInfos.size()); }
 	const InstanceInfo& GetInstanceInfo(int inIndex) const		{ return mSceneContent.mInstanceInfos[inIndex]; }
 	const InstanceData& GetInstanceData(int inIndex) const		{ return mSceneContent.mInstanceDatas[inIndex]; }
+	InstanceInfo& GetInstanceInfo(int inIndex)					{ return mSceneContent.mInstanceInfos[inIndex]; }
+	InstanceData& GetInstanceData(int inIndex)					{ return mSceneContent.mInstanceDatas[inIndex]; }
 
 	int GetLightCount() const									{ return static_cast<int>(mSceneContent.mLights.size()); }
 	const Light& GetLight(int inIndex) const					{ return mSceneContent.mLights[inIndex]; }
@@ -255,8 +299,8 @@ private:
 
 	void FillDummyMaterial(InstanceInfo& ioInstanceInfo, InstanceData& ioInstanceData);
 	
-	void GenerateLSSFromInstance();
 	void GenerateLSSFromTriangle();
+	void GenerateMeshlets();
 
 	void InitializeTextures();
 	void InitializeBuffers();

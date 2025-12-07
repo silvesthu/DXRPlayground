@@ -22,8 +22,14 @@ Scene gScene;
 
 void BLAS::Initialize(const Initializer& inInitializer)
 {
-	const InstanceInfo& instance_info = inInitializer.mInstanceInfo;
-	const InstanceData& instance_data = inInitializer.mInstanceData;
+	const InstanceInfo& instance_info				= inInitializer.mInstanceInfo;
+	const InstanceData& instance_data				= inInitializer.mInstanceData;
+
+	if (gNVAPI.mClusterSupported && gNVAPI.mClusterEnabled)
+	{
+		InitializeCLAS(inInitializer);
+		return;
+	}
 
 	mDesc = {};
 	mDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
@@ -135,7 +141,254 @@ void BLAS::Initialize(const Initializer& inInitializer)
 	gSetName(mDest, "Scene.", instance_info.mName, ".[BLAS].Dest");
 
 	instance_info.mStats.mScratchDataSizeInBytes = info.ScratchDataSizeInBytes;
-	instance_info.mStats.mBVHDataSizeInBytes = info.ResultDataMaxSizeInBytes;
+	instance_info.mStats.mResultDataSizeInBytes = info.ResultDataMaxSizeInBytes;
+}
+
+void BLAS::InitializeCLAS(const Initializer& inInitializer)
+{
+	// Overall
+	// - The "operation" abstraction make the API unnecessarily complex... (why memmove needs to be part of API?)
+	// - For pre-generated meshlets, NvRTX (transcode from Nanite) is more straightforward than RTXMG (tessellation and template)
+	// - Whole API is designed around "indirect" fashion
+
+	// .mode: related to memory granularity
+	// - NVAPI_D3D12_RAYTRACING_MULTI_INDIRECT_CLUSTER_OPERATION_MODE_IMPLICIT_DESTINATIONS, caller provide 1 VA for all clusters, i.e. batched operation
+	// - NVAPI_D3D12_RAYTRACING_MULTI_INDIRECT_CLUSTER_OPERATION_MODE_EXPLICIT_DESTINATIONS, caller provide VA for each cluster
+	// - NVAPI_D3D12_RAYTRACING_MULTI_INDIRECT_CLUSTER_OPERATION_MODE_GET_SIZES: for explicit only
+
+	// Memory management in NvRTX, managed in pages
+	// - <Build>: Multiple pages of CLAS for build in a single frame
+	// - <Root>: Resident? Huge
+	// - <Streaming>: Streaming? Difference?
+	// - <Aux>: Globals, PageData, etc.
+	// Not handling streaming here, so allocate one big array both for build and for storage
+
+	// Operation usage in NvRTX
+	// - [Build, Implicit] Build, see NaniteRT::CLAS::Build <indirect>
+	//   - Input => <Build>
+	// - [Move, Explicit] Compaction, see NaniteRT::CLAS::Compaction::Move Root <indirect>, NaniteRT::CLAS::Compaction::Move Streaming <indirect>
+	//   - <Build> => <Root> / <Streaming>
+	// - [Move, Explicit] Defrag, see NaniteRT::CLAS::Defrag::Move <indirect>
+
+	// [TODO] About CLAS_BUILD_TEMPLATES / CLAS_INSTANTIATE_TEMPLATES
+
+	const InstanceInfo& instance_info				= inInitializer.mInstanceInfo;
+	const InstanceData& instance_data				= inInitializer.mInstanceData;
+
+	D3D12_RESOURCE_DESC desc_upload					= gGetBufferResourceDesc(0);
+	D3D12_RESOURCE_DESC desc_uav					= gGetUAVResourceDesc(0);
+	D3D12_HEAP_PROPERTIES props_upload				= gGetUploadHeapProperties();
+	D3D12_HEAP_PROPERTIES props_default				= gGetDefaultHeapProperties();
+
+	uint32_t clas_count								= static_cast<uint32_t>(instance_info.mCluster.mMeshlets.size());
+
+	// CLAS
+	mClusterCLAS.mBuildDesc.inputs = 
+	{
+		.maxArgCount								= clas_count,
+		.flags										= NVAPI_D3D12_RAYTRACING_MULTI_INDIRECT_CLUSTER_OPERATION_FLAG_NONE,
+		.type										= NVAPI_D3D12_RAYTRACING_MULTI_INDIRECT_CLUSTER_OPERATION_TYPE_BUILD_CLAS_FROM_TRIANGLES,
+		.mode										= NVAPI_D3D12_RAYTRACING_MULTI_INDIRECT_CLUSTER_OPERATION_MODE_IMPLICIT_DESTINATIONS,
+		.trianglesDesc								=
+		{
+			.vertexFormat							= (NvU32)gGetDXGIFormat<VertexType>(),
+			.maxGeometryIndexValue					= kClusterGeometryIndexMax,							// GeometryIndex not used, See NANITE_RAYTRACING_CLAS_MAX_GEOMETRY_INDEX
+			.maxUniqueGeometryCountPerArg			= kClusterUniqueGeometriesMax,						// GeometryIndex not used, See NANITE_RAYTRACING_CLAS_MAX_UNIQUE_GEOMETRIES
+			.maxTriangleCountPerArg					= kClusterTriangleCountMax,							// ?, See NANITE_MAX_CLUSTER_TRIANGLES
+			.maxVertexCountPerArg					= kClusterVertexCountMax,							// ?, See NANITE_MAX_CLUSTER_VERTICES
+			.maxTotalTriangleCount					= UINT32_MAX,										// ?, See CLASBuildMaxTotalTriangles
+			.maxTotalVertexCount					= UINT32_MAX,										// ?, See CLASBuildMaxTotalVertices
+			.minPositionTruncateBitCount			= kClusterMinPostTruncateBitCount,					// See NANITE_RAYTRACING_CLAS_MIN_POS_TRUNCATE_BIT_COUNT
+		},
+	};
+	
+	// CLAS Buffers
+	{
+		// See GetCLASArraySizeInBytes
+		NVAPI_D3D12_RAYTRACING_MULTI_INDIRECT_CLUSTER_OPERATION_REQUIREMENTS_INFO build_clas_requirements_info = {};
+		NVAPI_GET_RAYTRACING_MULTI_INDIRECT_CLUSTER_OPERATION_REQUIREMENTS_INFO_PARAMS build_clas_requirements_info_params;
+		build_clas_requirements_info_params.version = NVAPI_GET_RAYTRACING_MULTI_INDIRECT_CLUSTER_OPERATION_REQUIREMENTS_INFO_PARAMS_VER;
+		build_clas_requirements_info_params.pInput = &mClusterCLAS.mBuildDesc.inputs;
+		build_clas_requirements_info_params.pInfo = &build_clas_requirements_info;
+		gVerify(NvAPI_D3D12_GetRaytracingMultiIndirectClusterOperationRequirementsInfo(gDevice, &build_clas_requirements_info_params) == NVAPI_OK);
+
+		// See Transient.RDG.BuildCLASScratch
+		desc_uav.Width = build_clas_requirements_info.scratchDataSizeInBytes;
+		gValidate(gDevice->CreateCommittedResource(&props_default, D3D12_HEAP_FLAG_NONE, &desc_uav, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mClusterCLAS.mScratch)));
+		gSetName(mClusterCLAS.mScratch, "Scene.", instance_info.mName, ".[ClusterCLAS].Scratch");
+		instance_info.mStats.mClusterCLAS.mScratchSizeInBytes = desc_uav.Width;
+
+		// See Persistent.CLAS.Build.Buffer, GetCLASBuildArraySizesInBytes
+		desc_uav.Width = build_clas_requirements_info.resultDataMaxSizeInBytes;
+		gValidate(gDevice->CreateCommittedResource(&props_default, D3D12_HEAP_FLAG_NONE, &desc_uav, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, nullptr, IID_PPV_ARGS(&mClusterCLAS.mBuild)));
+		gSetName(mClusterCLAS.mBuild, "Scene.", instance_info.mName, ".[ClusterCLAS].Build");
+		instance_info.mStats.mClusterCLAS.mBuildSizeInBytes = desc_uav.Width;
+
+		// See Transient.RDG.BuildCLASAddresses
+		desc_uav.Width = clas_count * sizeof(uint64_t);
+		gValidate(gDevice->CreateCommittedResource(&props_default, D3D12_HEAP_FLAG_NONE, &desc_uav, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mClusterCLAS.mAddress)));
+		gSetName(mClusterCLAS.mAddress, "Scene.", instance_info.mName, ".[ClusterCLAS].Address");
+		instance_info.mStats.mClusterCLAS.mAddressSizeInBytes = desc_uav.Width;
+
+		// See Transient.RDG.BuildCLASSizes
+		desc_uav.Width = clas_count * sizeof(uint32_t);
+		gValidate(gDevice->CreateCommittedResource(&props_default, D3D12_HEAP_FLAG_NONE, &desc_uav, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mClusterCLAS.mSize)));
+		gSetName(mClusterCLAS.mSize, "Scene.", instance_info.mName, ".[ClusterCLAS].Size");
+		instance_info.mStats.mClusterCLAS.mSizeSizeInBytes = desc_uav.Width;
+
+		desc_upload.Width = clas_count * sizeof(NVAPI_D3D12_RAYTRACING_ACCELERATION_STRUCTURE_MULTI_INDIRECT_TRIANGLE_CLUSTER_ARGS);
+		gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mClusterCLAS.mIndirectArgArray)));
+		gSetName(mClusterCLAS.mIndirectArgArray, "Scene.", instance_info.mName, ".[ClusterCLAS].IndirectArgArray");
+		instance_info.mStats.mClusterCLAS.mIndirectArgArraySizeInBytes = desc_upload.Width;
+	}
+
+	// CLAS IndirectArgArray
+	{
+		// See NaniteRayTracingDecodePageClusters.usf
+		std::vector<NVAPI_D3D12_RAYTRACING_ACCELERATION_STRUCTURE_MULTI_INDIRECT_TRIANGLE_CLUSTER_ARGS> args;
+		args.resize(clas_count);
+		for (uint32_t clas_index = 0; clas_index < clas_count; ++clas_index)
+		{
+			const meshopt_Meshlet& meshlet = instance_info.mCluster.mMeshlets[clas_index];
+			args[clas_index] =
+			{
+				.clusterId							= clas_index,
+				.clusterFlags						= NVAPI_D3D12_RAYTRACING_MULTI_INDIRECT_CLUSTER_OPERATION_CLUSTER_FLAG_NONE,
+				.triangleCount						= meshlet.triangle_count,
+				.vertexCount						= meshlet.vertex_count,
+				.positionTruncateBitCount			= 0,						// Not used
+				.indexFormat						= NVAPI_D3D12_RAYTRACING_MULTI_INDIRECT_CLUSTER_OPERATION_INDEX_FORMAT_32BIT,
+				.opacityMicromapIndexFormat			= 0,						// Not used
+				.baseGeometryIndexAndFlags			= 0 | NVAPI_D3D12_RAYTRACING_MULTI_INDIRECT_CLUSTER_OPERATION_GEOMETRY_FLAG_NONE, // Not used
+				.indexBufferStride					= sizeof(IndexType),
+				.vertexBufferStride					= sizeof(VertexType),
+				.geometryIndexAndFlagsBufferStride	= sizeof(uint32_t),			// Not used
+				.opacityMicromapIndexBufferStride	= 0,						// Not used
+				.indexBuffer						= instance_info.mCluster.mIndexBuffer.mResource->GetGPUVirtualAddress() + meshlet.triangle_offset * sizeof(IndexType),		// Index buffer for cluster
+				.vertexBuffer						= inInitializer.mVerticesBaseAddress + instance_data.mVertexOffset * sizeof(VertexType),									// Vertex buffer same as non-cluster build
+				.geometryIndexAndFlagsBuffer		= 0,						// Not used
+				.opacityMicromapArray				= 0,						// Not used
+				.opacityMicromapIndexBuffer			= 0,						// Not used
+			};
+		}
+
+		void* target = nullptr;
+		mClusterCLAS.mIndirectArgArray->Map(0, nullptr, reinterpret_cast<void**>(&target));
+		memcpy(target, args.data(), clas_count * sizeof(NVAPI_D3D12_RAYTRACING_ACCELERATION_STRUCTURE_MULTI_INDIRECT_TRIANGLE_CLUSTER_ARGS));
+		mClusterCLAS.mIndirectArgArray->Unmap(0, nullptr);
+	}
+
+	// CLAS Build Desc
+	mClusterCLAS.mBuildDesc =
+	{
+		.inputs = mClusterCLAS.mBuildDesc.inputs,
+		.addressResolutionFlags = NVAPI_D3D12_RAYTRACING_MULTI_INDIRECT_CLUSTER_OPERATION_ADDRESS_RESOLUTION_FLAG_NONE, // can interpret parameter as void**
+		.batchResultData = mClusterCLAS.mBuild->GetGPUVirtualAddress(),
+		.batchScratchData = mClusterCLAS.mScratch->GetGPUVirtualAddress(),
+		.destinationAddressArray =
+		{
+			.StartAddress = mClusterCLAS.mAddress->GetGPUVirtualAddress(),
+			.StrideInBytes = sizeof(uint64_t), // Address (Pointer)
+		},
+		.resultSizeArray =
+		{
+			.StartAddress = mClusterCLAS.mSize->GetGPUVirtualAddress(),
+			.StrideInBytes = sizeof(uint32_t), // Size
+		},
+		.indirectArgArray = 
+		{
+			.StartAddress = mClusterCLAS.mIndirectArgArray->GetGPUVirtualAddress(),
+			.StrideInBytes = sizeof(NVAPI_D3D12_RAYTRACING_ACCELERATION_STRUCTURE_MULTI_INDIRECT_TRIANGLE_CLUSTER_ARGS),
+		},
+		.indirectArgCount = 0, // use inputs.maxArgCount, i.e. Count is decided on CPU side
+	};
+
+	// BLAS
+	mClusterBLAS.mBuildDesc.inputs = 
+	{
+		.maxArgCount								= kClusterBLASCountMax,
+		.flags										= NVAPI_D3D12_RAYTRACING_MULTI_INDIRECT_CLUSTER_OPERATION_FLAG_NONE,
+		.type										= NVAPI_D3D12_RAYTRACING_MULTI_INDIRECT_CLUSTER_OPERATION_TYPE_BUILD_BLAS_FROM_CLAS,
+		.mode										= NVAPI_D3D12_RAYTRACING_MULTI_INDIRECT_CLUSTER_OPERATION_MODE_IMPLICIT_DESTINATIONS,
+		.clasDesc									=
+		{
+			.maxTotalClasCount						= kClusterBLASCLASCountMax,
+			.maxClasCountPerArg						= kClusterBLASCLASAddressCountMax,
+		},
+	};
+
+	// BLAS Buffers
+	{
+		// See GetBLASArraySizesInBytes
+		NVAPI_D3D12_RAYTRACING_MULTI_INDIRECT_CLUSTER_OPERATION_REQUIREMENTS_INFO build_blas_requirements_info = {};
+		NVAPI_GET_RAYTRACING_MULTI_INDIRECT_CLUSTER_OPERATION_REQUIREMENTS_INFO_PARAMS build_blas_requirements_info_params;
+		build_blas_requirements_info_params.version = NVAPI_GET_RAYTRACING_MULTI_INDIRECT_CLUSTER_OPERATION_REQUIREMENTS_INFO_PARAMS_VER;
+		build_blas_requirements_info_params.pInput = &mClusterBLAS.mBuildDesc.inputs;
+		build_blas_requirements_info_params.pInfo = &build_blas_requirements_info;
+		gVerify(NvAPI_D3D12_GetRaytracingMultiIndirectClusterOperationRequirementsInfo(gDevice, &build_blas_requirements_info_params) == NVAPI_OK);
+
+		desc_uav.Width = build_blas_requirements_info.scratchDataSizeInBytes;
+		gValidate(gDevice->CreateCommittedResource(&props_default, D3D12_HEAP_FLAG_NONE, &desc_uav, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mClusterBLAS.mScratch)));
+		gSetName(mClusterBLAS.mScratch, "Scene.", instance_info.mName, ".[ClusterBLAS].Scratch");
+		instance_info.mStats.mClusterBLAS.mScratchSizeInBytes = desc_uav.Width;
+
+		desc_uav.Width = build_blas_requirements_info.resultDataMaxSizeInBytes;
+		gValidate(gDevice->CreateCommittedResource(&props_default, D3D12_HEAP_FLAG_NONE, &desc_uav, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, nullptr, IID_PPV_ARGS(&mClusterBLAS.mBuild)));
+		gSetName(mClusterBLAS.mBuild, "Scene.", instance_info.mName, ".[ClusterBLAS].Build");
+		instance_info.mStats.mClusterBLAS.mBuildSizeInBytes = desc_uav.Width;
+
+		desc_uav.Width = kClusterBLASCountMax * sizeof(uint64_t);
+		gValidate(gDevice->CreateCommittedResource(&props_default, D3D12_HEAP_FLAG_NONE, &desc_uav, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mClusterBLAS.mAddress)));
+		gSetName(mClusterBLAS.mAddress, "Scene.", instance_info.mName, ".[ClusterBLAS].Address");
+		instance_info.mStats.mClusterBLAS.mAddressSizeInBytes = desc_uav.Width;
+
+		desc_uav.Width = kClusterBLASCountMax * sizeof(uint32_t);
+		gValidate(gDevice->CreateCommittedResource(&props_default, D3D12_HEAP_FLAG_NONE, &desc_uav, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mClusterBLAS.mSize)));
+		gSetName(mClusterBLAS.mSize, "Scene.", instance_info.mName, ".[ClusterBLAS].Size");
+		instance_info.mStats.mClusterBLAS.mSizeSizeInBytes = desc_uav.Width;
+
+		desc_upload.Width = kClusterBLASCountMax * sizeof(NVAPI_D3D12_RAYTRACING_ACCELERATION_STRUCTURE_MULTI_INDIRECT_CLUSTER_ARGS);
+		gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mClusterBLAS.mIndirectArgArray)));
+		gSetName(mClusterBLAS.mIndirectArgArray, "Scene.", instance_info.mName, ".[ClusterBLAS].IndirectArgArray");
+		instance_info.mStats.mClusterBLAS.mIndirectArgArraySizeInBytes = desc_upload.Width;
+	}
+
+	// BLAS IndirectArgArray
+	{
+		NVAPI_D3D12_RAYTRACING_ACCELERATION_STRUCTURE_MULTI_INDIRECT_CLUSTER_ARGS* indirect_arg_array = nullptr;
+		mClusterBLAS.mIndirectArgArray->Map(0, nullptr, reinterpret_cast<void**>(&indirect_arg_array));
+		indirect_arg_array[0] =
+		{
+			.clusterCount = clas_count,
+			.clusterVAs = mClusterCLAS.mAddress->GetGPUVirtualAddress(),
+		};
+		mClusterBLAS.mIndirectArgArray->Unmap(0, nullptr);
+	}
+
+	// BLAS Build Desc
+	mClusterBLAS.mBuildDesc =
+	{
+		.inputs = mClusterBLAS.mBuildDesc.inputs,
+		.addressResolutionFlags = NVAPI_D3D12_RAYTRACING_MULTI_INDIRECT_CLUSTER_OPERATION_ADDRESS_RESOLUTION_FLAG_NONE,
+		.batchResultData = mClusterBLAS.mBuild->GetGPUVirtualAddress(),
+		.batchScratchData = mClusterBLAS.mScratch->GetGPUVirtualAddress(),
+		.destinationAddressArray =
+		{
+			.StartAddress = mClusterBLAS.mAddress->GetGPUVirtualAddress(),
+			.StrideInBytes = sizeof(uint64_t), // Address (Pointer)
+		},
+		.resultSizeArray =
+		{
+			.StartAddress = mClusterBLAS.mSize->GetGPUVirtualAddress(),
+			.StrideInBytes = sizeof(uint32_t), // Size
+		},
+		.indirectArgArray =
+		{
+			.StartAddress = mClusterBLAS.mIndirectArgArray->GetGPUVirtualAddress(),
+			.StrideInBytes = sizeof(NVAPI_D3D12_RAYTRACING_ACCELERATION_STRUCTURE_MULTI_INDIRECT_CLUSTER_ARGS),
+		},
+		.indirectArgCount = 0, // use inputs.maxArgCount, i.e. Count is decided on CPU side
+	};
 }
 
 void BLAS::Build(ID3D12GraphicsCommandList4* inCommandList)
@@ -143,7 +396,27 @@ void BLAS::Build(ID3D12GraphicsCommandList4* inCommandList)
 	if (mBuilt)
 		return;
 
-	if (gNVAPI.mLinearSweptSpheresSupported)
+	if (mClusterCLAS.mBuild != nullptr)
+	{
+		// CLAS
+		{
+			NVAPI_RAYTRACING_EXECUTE_MULTI_INDIRECT_CLUSTER_OPERATION_PARAMS params = {};
+			params.version = NVAPI_RAYTRACING_EXECUTE_MULTI_INDIRECT_CLUSTER_OPERATION_PARAMS_VER;
+			params.pDesc = &mClusterCLAS.mBuildDesc;
+			gVerify(NvAPI_D3D12_RaytracingExecuteMultiIndirectClusterOperation(gCommandList, &params) == NVAPI_OK);
+		}
+
+		gBarrierUAV(inCommandList, nullptr);
+
+		// BLAS
+		{
+			NVAPI_RAYTRACING_EXECUTE_MULTI_INDIRECT_CLUSTER_OPERATION_PARAMS params = {};
+			params.version = NVAPI_RAYTRACING_EXECUTE_MULTI_INDIRECT_CLUSTER_OPERATION_PARAMS_VER;
+			params.pDesc = &mClusterBLAS.mBuildDesc;
+			gVerify(NvAPI_D3D12_RaytracingExecuteMultiIndirectClusterOperation(gCommandList, &params) == NVAPI_OK);
+		}
+	} 
+	else if (gNVAPI.mLinearSweptSpheresSupported)
 	{
 		NVAPI_D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC_EX desc = {};
 		desc.inputs = mInputsEx;
@@ -1438,8 +1711,11 @@ void Scene::Load(const ScenePreset& inPreset)
 	if (mSceneContent.mInstanceDatas.empty())
 		LoadDummy(mSceneContent);
 
-	if (gNVAPI.mLinearSweptSpheresSupported && gNVAPI.mLSSWireframeEnabled && inPreset.mTriangleAsLSSAllowed)
+	if (gNVAPI.mLinearSweptSpheresSupported && gNVAPI.mLSSWireframeEnabled)
 		GenerateLSSFromTriangle();
+
+	if (gNVAPI.mClusterSupported && gNVAPI.mClusterEnabled)
+		GenerateMeshlets();
 
 	InitializeTextures();
 	InitializeBuffers();
@@ -1464,6 +1740,14 @@ void Scene::Unload()
 
 void Scene::Build()
 {
+	for (auto&& instance_info : mSceneContent.mInstanceInfos)
+	{
+		instance_info.mCluster.mMeshletBuffer.Update();
+		instance_info.mCluster.mIndexBuffer.Update();
+	}
+
+	gBarrierUAV(gCommandList, nullptr);
+
 	for (auto&& blas : mBlases)
 		blas->Build(gCommandList);
 
@@ -1899,6 +2183,94 @@ void Scene::GenerateLSSFromTriangle()
 				for (uint vertex_index = 0; vertex_index < mSceneContent.mInstanceDatas[instance_index].mVertexCount; vertex_index++)
 					mSceneContent.mLSSRadii[mSceneContent.mInstanceDatas[instance_index].mVertexOffset + vertex_index] = wireframe_radius;
 			}
+		}
+	}
+}
+
+void Scene::GenerateMeshlets()
+{
+	D3D12_RESOURCE_DESC desc_upload = gGetBufferResourceDesc(0);
+	D3D12_HEAP_PROPERTIES props_upload = gGetUploadHeapProperties();
+
+	for (int instance_index = 0; instance_index < GetInstanceCount(); instance_index++)
+	{
+		const InstanceInfo& instance_info = GetInstanceInfo(instance_index);
+		InstanceData& instance_data = GetInstanceData(instance_index);
+
+		// https://github.com/zeux/meshoptimizer?tab=readme-ov-file#clustered-raytracing
+		std::span<const VertexType> vertices(&mSceneContent.mVertices[instance_data.mVertexOffset], instance_data.mVertexCount);
+		std::span<const IndexType> indices(&mSceneContent.mIndices[instance_data.mIndexOffset], instance_data.mIndexCount);
+
+		constexpr size_t kMeshletTriangleCountMin = kClusterTriangleCountMin;
+		constexpr size_t kMeshletTriangleCountMax = kClusterTriangleCountMax;
+		STATITC_ASSERT(kMeshletTriangleCountMin <= kClusterTriangleCountMin);
+		STATITC_ASSERT(kMeshletTriangleCountMax <= kClusterTriangleCountMax);
+
+		size_t max_meshlets = meshopt_buildMeshletsBound(indices.size(), kClusterVertexCountMax, kMeshletTriangleCountMin); // note: use min_triangles to compute worst case bound
+		instance_info.mCluster.mMeshlets.resize(max_meshlets);
+		instance_info.mCluster.mVertices.resize(indices.size());
+		instance_info.mCluster.mTriangles.resize(indices.size());
+
+		// meshopt_buildMeshletsSpatial -> ray tracing
+		// meshopt_buildMeshlets -> mesh shading
+		size_t meshlet_count = meshopt_buildMeshletsSpatial(
+			instance_info.mCluster.mMeshlets.data(), instance_info.mCluster.mVertices.data(), instance_info.mCluster.mTriangles.data(),
+			indices.data(), indices.size(),
+			&vertices[0].x, vertices.size(), sizeof(VertexType),
+			kClusterVertexCountMax, kMeshletTriangleCountMin, kMeshletTriangleCountMax, kClusterFillWeight);
+		instance_info.mCluster.mMeshlets.resize(meshlet_count);
+
+		instance_info.mCluster.mIndices.resize(indices.size());
+		auto clas_index_range = std::views::iota(0u, static_cast<uint32_t>(meshlet_count));
+		std::for_each(std::execution::par, clas_index_range.begin(), clas_index_range.end(), [&](uint32_t clas_index)
+		// std::for_each(std::execution::seq, clas_index_range.begin(), clas_index_range.end(), [&](uint32_t clas_index)
+		{
+			const meshopt_Meshlet& meshlet = instance_info.mCluster.mMeshlets[clas_index];
+			for (uint32_t i = 0; i < meshlet.triangle_count * 3; i++)
+			{
+				uint32_t local_index = instance_info.mCluster.mTriangles[meshlet.triangle_offset + i];
+				uint32_t index = instance_info.mCluster.mVertices[meshlet.vertex_offset + local_index];
+
+				instance_info.mCluster.mIndices[meshlet.triangle_offset + i] = index;
+			}
+		});
+
+		// Meshlet
+		{
+			Buffer& buffer = instance_info.mCluster.mMeshletBuffer;
+			buffer = buffer.
+				ByteCount((uint)(instance_info.mCluster.mMeshlets.size() * sizeof(meshopt_Meshlet))).
+				Stride(sizeof(meshopt_Meshlet)).
+				SRVIndex(ViewDescriptorIndex((uint)ViewDescriptorIndex::SceneAutoIndex + mNextViewDescriptorIndex++)).
+				GPU(true).
+				UploadOnce(true).
+				Name("Scene." + instance_info.mName + ".[ClusterCLAS].Meshlet");
+			buffer.Initialize();
+			gAssert(buffer.mUploadPointer[0] != nullptr);
+			memcpy(buffer.mUploadPointer[0], instance_info.mCluster.mMeshlets.data(), buffer.mByteCount);
+			buffer.mUploadResource[0]->Unmap(0, nullptr);
+			buffer.mUploadPointer[0] = nullptr;
+
+			instance_data.mClusterMeshletBufferIndex = (uint)buffer.mSRVIndex;
+		}
+
+		// Index
+		{
+			Buffer& buffer = instance_info.mCluster.mIndexBuffer;
+			buffer = buffer.
+				ByteCount((uint)(instance_info.mCluster.mIndices.size() * sizeof(IndexType))).
+				Stride(sizeof(uint)).
+				SRVIndex(ViewDescriptorIndex((uint)ViewDescriptorIndex::SceneAutoIndex + mNextViewDescriptorIndex++)).
+				GPU(true).
+				UploadOnce(true).
+				Name("Scene." + instance_info.mName + ".[ClusterCLAS].Index");
+			buffer.Initialize();
+			gAssert(buffer.mUploadPointer[0] != nullptr);
+			memcpy(buffer.mUploadPointer[0], instance_info.mCluster.mIndices.data(), buffer.mByteCount);
+			buffer.mUploadResource[0]->Unmap(0, nullptr);
+			buffer.mUploadPointer[0] = nullptr;
+
+			instance_data.mClusterIndexBufferIndex = (uint)buffer.mSRVIndex;
 		}
 	}
 }
