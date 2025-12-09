@@ -7,6 +7,7 @@
 #include "Light.h"
 #include "AtmosphereIntegration.h"
 #include "CloudIntegration.h"
+#include "SpatialCache.h"
 
 #if NVAPI_LSS
 #define IsHit(query) (query.CommittedStatus() == COMMITTED_TRIANGLE_HIT || NvRtCommittedIsLss(query) || NvRtCommittedIsSphere(query))
@@ -354,6 +355,9 @@ void TraceRay(inout PixelContext ioPixelContext)
 					}
 				}
 
+				if (mConstants.mSpatialCache.mFrameActive)
+					SpatialCache::AddData(SpatialCache::FindOrInsert(hit_context.PositionWS(), 0, SpatialCache::kCellSize), 1);
+
 				// DebugMode
 				switch (GetVisualizeMode())
 				{
@@ -370,6 +374,8 @@ void TraceRay(inout PixelContext ioPixelContext)
 				case VisualizeMode::RoughnessAlpha:					path_context.mEmission = hit_context.RoughnessAlpha(); continue_bounce = false; break;
 				case VisualizeMode::RecursionDepth:					continue_bounce = true; break;
 				case VisualizeMode::RandomState:					continue_bounce = path_context.mRecursionDepth <= GetDebugRecursion(); break;
+				case VisualizeMode::SpatialHash:					path_context.mEmission = SpatialCache::HashGridGetColorFromHash32(SpatialCache::FindOrInsert(hit_context.PositionWS(), 0, SpatialCache::kCellSize)); continue_bounce = false; break;
+				case VisualizeMode::SpatialData:					path_context.mEmission = SpatialCache::LoadData(SpatialCache::FindOrInsert(hit_context.PositionWS(), 0, SpatialCache::kCellSize)) / 1024.0; continue_bounce = false; break;
 				default:											path_context.mEmission = sVisualizeModeValue; continue_bounce = false; break;
 				}
 			}

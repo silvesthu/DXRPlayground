@@ -81,7 +81,7 @@ int sFindScenePresetIndex(const std::string_view inName)
 {
 	return static_cast<int>(&sFindScenePreset(inName) - &kScenePresets.front());
 }
-static int sCurrentSceneIndex = sFindScenePresetIndex("Basic");
+static int sCurrentSceneIndex = sFindScenePresetIndex("CornellBox");
 static int sPreviousSceneIndex = sCurrentSceneIndex;
 
 struct CameraSettings
@@ -382,6 +382,22 @@ static void sPrepareImGui()
 		//	gCloud.ImGuiShowMenus();
 		//	ImGui::TreePop();
 		//}
+
+		if (ImGui::TreeNodeEx("Spatial Cache"))
+		{
+			ImGui::Checkbox("Active", (bool*)&gConstants.mSpatialCache.mFrameActive);
+
+			if (ImGui::Button("Active Once"))
+			{
+				gConstants.mSpatialCache.mFrameActive = true;
+				gRenderer.mSpatialCacheActiveOnce = true;
+			}
+
+			if (ImGui::Button("Reset"))
+				gRenderer.mSpatialCacheResetRequested = true;
+
+			ImGui::TreePop();
+		}
 
 		if (ImGui::TreeNodeEx("BRDF Explorer"))
 		{
@@ -1261,6 +1277,7 @@ void sLoadScene(bool inLoadCamera)
 
 	gRenderer.mReloadShader = true;
 	gRenderer.mAccumulationResetRequested = true;
+	gRenderer.mSpatialCacheResetRequested = true;
 
 	if (inLoadCamera)
 		sLoadCamera();
@@ -1362,7 +1379,8 @@ void sRender()
 			sConstantsCopy.mPixelDebugCoord			= gConstants.mPixelDebugCoord;
 			sConstantsCopy.mDebugMode				= gConstants.mDebugMode;
 			sConstantsCopy.mDebugFlag				= gConstants.mDebugFlag;
-			sConstantsCopy.mReSTIR.mTemporalCounter	= gConstants.mReSTIR.mTemporalCounter;
+			sConstantsCopy.mSpatialCache			= gConstants.mSpatialCache;
+			sConstantsCopy.mReSTIR					= gConstants.mReSTIR;
 			sConstantsCopy.mBRDFExplorer			= gConstants.mBRDFExplorer;
 
 			if (memcmp(&sConstantsCopy, &gConstants, sizeof(Constants)) != 0)
@@ -1396,6 +1414,12 @@ void sRender()
 		// Reset
 		{
 			gConstants.mDebugFlag &= ~DebugFlag::UpdateRayInspection;
+
+			if (gRenderer.mSpatialCacheActiveOnce)
+			{
+				gConstants.mSpatialCache.mFrameActive = false;
+				gRenderer.mSpatialCacheActiveOnce = false;
+			}
 		}
 
 		gBarrierTransition(gCommandList, gRenderer.mRuntime.mConstantsBuffer.mResource.Get(), D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, D3D12_RESOURCE_STATE_COPY_DEST);

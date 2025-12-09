@@ -163,24 +163,20 @@ inline std::filesystem::path gCreateDumpFolder()
 
 inline void gOpenDumpFolder()
 {
-	std::filesystem::path dump_folder = gCreateDumpFolder();
-
 	std::filesystem::path command = "";
 	command += std::filesystem::current_path();
 	command += "\\";
-	command += dump_folder;
+	command += gCreateDumpFolder();
 	ShellExecuteA(nullptr, "explore", command.string().c_str(), nullptr, nullptr, SW_SHOWDEFAULT);
 }
 
 inline void gOpenSceneFolder(const std::string_view inPath)
 {
 	std::filesystem::path command = "";
-
 	command += std::filesystem::current_path();
 	command += "\\";
 	command += inPath;
-	command = command.parent_path();
-	ShellExecuteA(nullptr, "explore", command.string().c_str(), nullptr, nullptr, SW_SHOWDEFAULT);
+	ShellExecuteA(nullptr, "explore", command.parent_path().string().c_str(), nullptr, nullptr, SW_SHOWDEFAULT);
 }
 
 inline std::wstring gToWString(const std::string_view string)

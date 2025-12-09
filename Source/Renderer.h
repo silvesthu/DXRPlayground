@@ -65,6 +65,8 @@ struct Renderer
 		Buffer									mPixelInspectionBuffer		= Buffer().ByteCount(sizeof(PixelInspection)).UAVIndex(ViewDescriptorIndex::PixelInspectionUAV).Name("PixelInspection").Readback(true);
 		Buffer									mRayInspectionBuffer		= Buffer().ByteCount(sizeof(RayInspection)).UAVIndex(ViewDescriptorIndex::RayInspectionUAV).Name("RayInspection");
 		Buffer									mQueryBuffer				= Buffer().ByteCount(sizeof(UINT64) * kTimestampCount).Name("Query").GPU(false).Readback(true);
+		Buffer 									mSpatialHashBuffer			= Buffer().ByteCount(sizeof(uint32_t) * kSpatialHashSize).UAVIndex(ViewDescriptorIndex::SpatialHashUAV).Name("SpatialHash");
+		Buffer 									mSpatialDataBuffer			= Buffer().ByteCount(sizeof(uint32_t) * kSpatialHashSize).UAVIndex(ViewDescriptorIndex::SpatialDataUAV).Name("SpatialData");
 
 		Buffer									mSentinelBuffer;
 		std::span<Buffer>						mBuffers					= std::span<Buffer>(&mConstantsBuffer, &mSentinelBuffer);
@@ -141,6 +143,9 @@ struct Renderer
 	bool										mAccumulationPaused = false;
 	int											mAccumulationFrameCount = 384;
 	bool										mAccumulationResetRequested = false;
+
+	bool										mSpatialCacheActiveOnce = false;
+	bool										mSpatialCacheResetRequested = true;
 
 	bool										mSequenceDumpPNG = false;
 	bool										mSequenceCameraEnabled = true;

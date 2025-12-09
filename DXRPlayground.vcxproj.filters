@@ -216,6 +216,7 @@
     <ClInclude Include="Source\Thirdparty\nvapi\nvapi_interface.h" />
     <ClInclude Include="Source\Thirdparty\nvapi\nvapi_lite_common.h" />
     <ClInclude Include="Source\Thirdparty\nvapi\nvapi_lite_d3dext.h" />
+    <ClInclude Include="Shader\SpatialCache.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\DXRPlayground.cpp">

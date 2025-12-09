@@ -27,6 +27,31 @@ void Renderer::Render()
 {
 	for (auto&& texture : mRuntime.mTextures)
 		texture.Update();
+
+	if (mSpatialCacheResetRequested)
+	{
+		FrameContext& frame_context = gGetFrameContext();
+
+		uint32_t clear_value_uint[4] = { 0, 0, 0, 0 };
+		gCommandList->ClearUnorderedAccessViewUint(
+			frame_context.mViewDescriptorHeap.GetGPUHandle(mRuntime.mSpatialHashBuffer.mUAVIndex),
+			frame_context.mViewDescriptorHeap.GetCPUHandle(mRuntime.mSpatialHashBuffer.mUAVIndex),
+			mRuntime.mSpatialHashBuffer.mResource.Get(),
+			clear_value_uint,
+			0,
+			nullptr);
+
+		float clear_value_float[4] = { 0, 0, 0, 0 };
+		gCommandList->ClearUnorderedAccessViewFloat(
+			frame_context.mViewDescriptorHeap.GetGPUHandle(mRuntime.mSpatialDataBuffer.mUAVIndex),
+			frame_context.mViewDescriptorHeap.GetCPUHandle(mRuntime.mSpatialDataBuffer.mUAVIndex),
+			mRuntime.mSpatialDataBuffer.mResource.Get(),
+			clear_value_float,
+			0,
+			nullptr);
+
+		mSpatialCacheResetRequested = false;
+	}
 }
 
 void Renderer::ImGuiShowTextures()
@@ -63,8 +88,6 @@ void Renderer::InitializeScreenSizeTextures()
 
 	for (auto&& screen_texture : mRuntime.mScreenTextures)
 		screen_texture.Width(mScreenWidth).Height(mScreenHeight).Initialize();
-
-
 }
 
 void Renderer::FinalizeScreenSizeTextures()

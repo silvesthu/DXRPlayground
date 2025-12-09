@@ -77,6 +77,9 @@ static Texture2D<float4> UVCheckerMap = ResourceDescriptorHeap[(uint)ViewDescrip
 static Texture3D<float> ErosionNoise3D = ResourceDescriptorHeap[(int)ViewDescriptorIndex::ErosionNoise3DSRV];
 static Texture2D<float4> IESSRV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::IESSRV];
 
+static RWStructuredBuffer<uint> SpatialHashUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::SpatialHashUAV];
+static RWStructuredBuffer<uint> SpatialDataUAV = ResourceDescriptorHeap[(int)ViewDescriptorIndex::SpatialDataUAV];
+
 static Texture2D<float4> TransmittanceSRV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Bruneton17TransmittanceSRV];
 static Texture2D<float4> DeltaIrradianceSRV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Bruneton17DeltaIrradianceSRV];
 static Texture2D<float4> IrradianceSRV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Bruneton17IrradianceSRV];

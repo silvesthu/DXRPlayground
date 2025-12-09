@@ -64,6 +64,8 @@ static const float kSolarLM2KW					= 1.0f / kSolarKW2LM;
 
 static const int kFrameInFlightCount			= 2;
 
+static const uint kSpatialHashSize				= 1024 * 1024;
+
 enum class RTVDescriptorIndex : uint
 {
 	Invalid = 0,
@@ -125,6 +127,10 @@ enum class ViewDescriptorIndex : uint
 	// [Noise]
 	ShapeNoise3DSRV,
 	ErosionNoise3DSRV,
+
+	// [SpatialHash]
+	SpatialHashUAV,
+	SpatialDataUAV,
 
 	// [Misc]
 	IESSRV,
@@ -268,6 +274,11 @@ enum class VisualizeMode : uint
 
 	RecursionDepth,
 	RandomState,
+
+	GENERATE_NEW_LINE_NAME,
+
+	SpatialHash,
+	SpatialData,
 
 	GENERATE_NEW_LINE_NAME,
 
@@ -763,7 +774,15 @@ struct BRDFExplorerConstants
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 };
 
-struct ReSTIR
+struct SpatialCacheConstants
+{
+	uint						mFrameActive					CONSTANT_DEFAULT(0);
+	uint						mFrameCount						CONSTANT_DEFAULT(0);
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+};
+
+struct ReSTIRConstants
 {
 	uint						mTemporalCounter				CONSTANT_DEFAULT(0);
 	uint						mInitialSampleCount				CONSTANT_DEFAULT(1);
@@ -845,7 +864,8 @@ struct Constants
 	AtmosphereConstants			mAtmosphere;
 	CloudConstants				mCloud;
 	BRDFExplorerConstants		mBRDFExplorer;
-	ReSTIR						mReSTIR;
+	SpatialCacheConstants		mSpatialCache;
+	ReSTIRConstants				mReSTIR;
 };
 
 struct PixelInspection
