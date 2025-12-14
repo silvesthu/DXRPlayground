@@ -141,7 +141,7 @@ struct Renderer
 
 	bool										mAccumulationFrameUnlimited = false;
 	bool										mAccumulationPaused = false;
-	int											mAccumulationFrameCount = 384;
+	int											mAccumulationFrameCount = 1;
 	bool										mAccumulationResetRequested = false;
 
 	bool										mSpatialCacheActiveOnce = false;

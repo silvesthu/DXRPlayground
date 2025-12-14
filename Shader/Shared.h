@@ -385,14 +385,6 @@ enum class SampleMode : uint
 	Count
 };
 
-enum class LightSourceMode : uint
-{
-	Emitter = 0,
-	TriangleLights,
-
-	Count,
-};
-
 enum class LightSampleMode : uint
 {
 	Uniform = 0,
@@ -826,8 +818,8 @@ struct Constants
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
 	uint						mLightCount						CONSTANT_DEFAULT(0);
-	LightSourceMode				mLightSourceMode				CONSTANT_DEFAULT(LightSourceMode::Emitter);
 	LightSampleMode				mLightSampleMode				CONSTANT_DEFAULT(LightSampleMode::Uniform);
+	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
 	float4						mSunDirection					CONSTANT_DEFAULT(float4(1.0f, 0.0f, 0.0f, 0.0f));
@@ -837,8 +829,8 @@ struct Constants
 	int							mDebugInstanceIndex				CONSTANT_DEFAULT(-1);
 	int							mDebugLightIndex				CONSTANT_DEFAULT(-1);
 
-	uint						mRecursionDepthCountMax			CONSTANT_DEFAULT(16);
-	uint						mRussianRouletteDepth			CONSTANT_DEFAULT(5);
+	uint						mRecursionDepthCountMax			CONSTANT_DEFAULT(1);
+	uint						mRussianRouletteDepth			CONSTANT_DEFAULT(1);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 

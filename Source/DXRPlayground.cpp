@@ -81,7 +81,7 @@ int sFindScenePresetIndex(const std::string_view inName)
 {
 	return static_cast<int>(&sFindScenePreset(inName) - &kScenePresets.front());
 }
-static int sCurrentSceneIndex = sFindScenePresetIndex("CornellBox");
+static int sCurrentSceneIndex = sFindScenePresetIndex("Arcade");
 static int sPreviousSceneIndex = sCurrentSceneIndex;
 
 struct CameraSettings
@@ -243,14 +243,6 @@ static void sPrepareImGui()
 				const auto& name = nameof::nameof_enum(static_cast<SampleMode>(i));
 				ImGui::SameLine();
 				ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mSampleMode), i);
-			}
-
-			ImGui::Text("Light Source Mode");
-			for (int i = 0; i < static_cast<int>(LightSourceMode::Count); i++)
-			{
-				const auto& name = nameof::nameof_enum(static_cast<LightSourceMode>(i));
-				ImGui::SameLine();
-				ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mLightSourceMode), i);
 			}
 
 			ImGui::Text("Light Sample Mode");
@@ -1358,7 +1350,7 @@ void sRender()
 											(gCameraSettings.mExposureControl.mAperture * gCameraSettings.mExposureControl.mAperture) / 
 											(1.0f / gCameraSettings.mExposureControl.mInvShutterSpeed) * 100.0f / gCameraSettings.mExposureControl.mSensitivity);
 			gConstants.mSunDirection	= glm::vec4(0,1,0,0) * glm::rotate(gConstants.mSunZenith, glm::vec3(0, 0, 1)) * glm::rotate(gConstants.mSunAzimuth + glm::pi<float>() / 2.0f, glm::vec3(0, 1, 0));
-			gConstants.mLightCount		= gConstants.mLightSourceMode != LightSourceMode::TriangleLights ? (glm::uint)gScene.GetSceneContent().mLights.size() : 0;
+			gConstants.mLightCount		= (glm::uint)gScene.GetSceneContent().mLights.size();
 
 			if (!gHeadless && ImGui::IsMouseDown(ImGuiMouseButton_Middle))
 				gConstants.mPixelDebugCoord = glm::uvec2(static_cast<uint32_t>(ImGui::GetMousePos().x), (uint32_t)ImGui::GetMousePos().y);

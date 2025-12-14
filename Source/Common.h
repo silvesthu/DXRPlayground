@@ -401,7 +401,7 @@ struct NVAPI
 	float									mSphereSurfaceFillRadius = -1.0f;
 	bool									mSphereSurfaceRandom = false;
 
-	bool									mClusterEnabled = true;
+	bool									mClusterEnabled = false;
 };
 extern NVAPI								gNVAPI;
 
