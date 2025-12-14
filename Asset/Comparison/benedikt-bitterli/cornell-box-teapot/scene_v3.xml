@@ -116,17 +116,10 @@
 		<float name="ext_ior" value="1" />
 	</bsdf>
 
-	<shape type="obj" id="TeapotBody">
-		<string name="filename" value="models/Mesh001.obj" />
+	<shape type="obj" id="Teapot">
+		<string name="filename" value="utah_teapot.obj" />
 		<transform name="to_world">
-			<matrix value="0.2 0 0 0 0 0.2 0 0 0 0 0.2 0 0 0 0 1" />
-		</transform>
-		<ref id="GlassBSDF" />
-	</shape>
-	<shape type="obj" id="TeapotLid">
-		<string name="filename" value="models/Mesh000.obj" />
-		<transform name="to_world">
-			<matrix value="0.2 0 0 0 0 0.2 0 0 0 0 0.2 0 0 0 0 1" />
+			<matrix value="0.25 0 0 0  0 0.25 0 0.5  0 0 0.25 0  0 0 0 1" />
 		</transform>
 		<ref id="GlassBSDF" />
 	</shape>
