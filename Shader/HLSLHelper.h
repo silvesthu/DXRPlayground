@@ -31,6 +31,12 @@ template <typename T1, typename T2> T1 dot(T1 a, T2 b) { return a; }
 template <typename T1, typename T2, typename T3> T1 lerp(T1 a, T2 b, T3 c) { return a; }
 template <typename T1, typename T2, typename T3> T1 clamp(T1 a, T2 b, T3 c) { return a; }
 
+void InterlockedAdd(
+    in  uint dest,
+    in  uint value,
+    out uint original_value
+);
+
 struct RaytracingAccelerationStructure {};
 struct RayDesc
 {

@@ -31,6 +31,9 @@ using float4x4 = glm::mat4x4;
 #define GET_COLUMN(x, i) x[i]
 #define STATITC_ASSERT(x) static_assert(x)
 
+inline float asfloat(uint x) { return std::bit_cast<float>(x); }
+inline uint asuint(float x) { return std::bit_cast<uint>(x); }
+
 #else
 
 #define CONSTANT_DEFAULT(x)
@@ -131,6 +134,9 @@ enum class ViewDescriptorIndex : uint
 	// [SpatialHash]
 	SpatialHashUAV,
 	SpatialDataUAV,
+
+	// [ShaderPrint]
+	ShaderPrintUAV,
 
 	// [Misc]
 	IESSRV,
@@ -474,6 +480,20 @@ enum class CloudMode : uint
 	Noise,
 
 	Count
+};
+
+enum class ShaderPrintEntryType : uint
+{
+	Nop = 0,
+	String,
+	Float1,
+	Float2,
+	Float3,
+	Float4,
+	UInt1,
+	UInt2,
+	UInt3,
+	UInt4,
 };
 
 enum_class_cpp DebugFlag : uint

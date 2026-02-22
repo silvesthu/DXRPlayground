@@ -144,6 +144,14 @@ void Buffer::Update()
 	mLoaded = true;
 }
 
+void Buffer::Readback()
+{
+	if (!mGPU || !mReadback) { return; }
+
+	BarrierScope scope(gCommandList, mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_SOURCE);
+	gCommandList->CopyResource(mReadbackResource[gGetFrameContextIndex()].Get(), mResource.Get());
+}
+
 int Texture::GetPixelSize() const
 {
 	return static_cast<int>(DirectX::BitsPerPixel(mFormat) / 8);

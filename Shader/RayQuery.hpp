@@ -2,6 +2,7 @@
 #include "Shared.h"
 #include "Binding.h"
 #include "Common.h"
+#include "ShaderPrint.h"
 #include "Context.h"
 #include "BSDF.h"
 #include "Light.h"
@@ -36,6 +37,7 @@ void TraceShadowRay(inout T ioQuery, inout RayDesc ioRay)
 void TraceRay(inout PixelContext ioPixelContext)
 {
 	DebugValueInit();
+	sShaderPrint.Init(ioPixelContext);
 	
 	// From https://www.shadertoy.com/view/tsBBWW
 	// [TODO] Need proper noise
@@ -378,6 +380,9 @@ void TraceRay(inout PixelContext ioPixelContext)
 				case VisualizeMode::SpatialData:					path_context.mEmission = SpatialCache::LoadData(SpatialCache::FindOrInsert(hit_context.PositionWS(), 0, SpatialCache::kCellSize)) / 1024.0; continue_bounce = false; break;
 				default:											path_context.mEmission = sVisualizeModeValue; continue_bounce = false; break;
 				}
+
+				// ShaderPrint
+				PrintNameValueLine("Albedo:", hit_context.Albedo());
 			}
 		}
 		else

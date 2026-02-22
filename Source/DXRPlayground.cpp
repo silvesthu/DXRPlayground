@@ -128,396 +128,480 @@ static LRESULT WINAPI sWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam
 
 static void sPrepareImGui()
 {
+	using namespace ImGui;
+
 	std::string stat = std::format("Frame {} | Time {:.3f} s | Average {:.3f} ms (FPS {:.1f}) | {}x{}###DXRPlayground",
 		gConstants.mCurrentFrameIndex,
 		gConstants.mTime,
-		1000.0f / ImGui::GetIO().Framerate,
-		ImGui::GetIO().Framerate,
+		1000.0f / GetIO().Framerate,
+		GetIO().Framerate,
 		gRenderer.mScreenWidth,
 		gRenderer.mScreenHeight);
-	if (ImGui::Begin(stat.c_str()))
+	if (Begin(stat.c_str()))
 	{
 		{
-			if (ImGui::Button("Reload Shader (F5)"))
+			if (Button("Reload Shader (F5)"))
 				gRenderer.mReloadShader = true;
 
-			ImGui::SameLine();
+			SameLine();
 
-			if (ImGui::Button("Reload Camera (F6)"))
+			if (Button("Reload Camera (F6)"))
 				sLoadCamera();
 
-			ImGui::SameLine();
+			SameLine();
 
-			if (ImGui::Button("Copy Mitsuba Camera"))
+			if (Button("Copy Mitsuba Camera"))
 			{
 				glm::mat4x4 camera_transform = gConstants.mCameraTransform;
-				ImGui::SetClipboardText(gToString(camera_transform).c_str());
+				SetClipboardText(gToString(camera_transform).c_str());
 			}
 		}
 		{
-			if (ImGui::Button("Reload Scene (F4)"))
+			if (Button("Reload Scene (F4)"))
 				gRenderer.mReloadScene = true;
 
-			ImGui::SameLine();
+			SameLine();
 
-			if (ImGui::Button("Open Scene Folder"))
+			if (Button("Open Scene Folder"))
 				gOpenSceneFolder(kScenePresets[sCurrentSceneIndex].mPath);
 		}
 		{
-			if (ImGui::Button("Dump Luminance (F9)"))
+			if (Button("Dump Luminance (F9)"))
 				sDumpLuminance();
 
-			ImGui::SameLine();
+			SameLine();
 
-			if (ImGui::Button("Open Dump Folder"))
+			if (Button("Open Dump Folder"))
 				gOpenDumpFolder();
 		}
 
-		if (ImGui::TreeNodeEx("Debug", ImGuiTreeNodeFlags_DefaultOpen))
+		if (TreeNodeEx("Debug", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			ImGui::InputInt2("Coords", (int*)&gConstants.mPixelDebugCoord);
-			ImGui::SliderInt("Light Index", &gConstants.mPixelDebugLightIndex, 0, (int)gScene.GetSceneContent().mLights.size() - 1);
-			ImGui::InputFloat3("Pixel Value", &gRenderer.mRuntime.mPixelInspectionBuffer.ReadbackAs<PixelInspection>(gGetFrameContextIndex())->mPixelValue.x, "%.8f", ImGuiInputTextFlags_ReadOnly);
-			ImGui::SliderInt("Recursion", &gConstants.mDebugRecursion, 0, gConstants.mRecursionDepthCountMax);
+			InputInt2("Coords", (int*)&gConstants.mPixelDebugCoord);
+			SliderInt("Light Index", &gConstants.mPixelDebugLightIndex, 0, (int)gScene.GetSceneContent().mLights.size() - 1);
+			InputFloat3("Pixel Value", &gRenderer.mRuntime.mPixelInspectionBuffer.GetReadback<PixelInspection>(gGetFrameContextIndex())[0].mPixelValue.x, "%.8f", ImGuiInputTextFlags_ReadOnly);
+			SliderInt("Recursion", &gConstants.mDebugRecursion, 0, gConstants.mRecursionDepthCountMax);
 
-			if (ImGui::TreeNodeEx("Visualize Mode"))
+			if (TreeNodeEx("Visualize Mode"))
 			{
 				for (int i = 0; i < static_cast<int>(VisualizeMode::Count); i++)
 				{
 					const auto& name = nameof::nameof_enum(static_cast<VisualizeMode>(i));
 					if (name.starts_with('_'))
 					{
-						ImGui::NewLine();
+						NewLine();
 						continue;
 					}
 
 					if (i != 0)
-						ImGui::SameLine();
+						SameLine();
 
-					ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mVisualizeMode), i);
+					RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mVisualizeMode), i);
 				}
-				ImGui::TreePop();
+				TreePop();
 			}
 			
-			if (ImGui::TreeNodeEx("Debug Mode"))
+			if (TreeNodeEx("Debug Mode"))
 			{
-				ImGui::InputFloat3("Debug Value", &gRenderer.mRuntime.mPixelInspectionBuffer.ReadbackAs<PixelInspection>(gGetFrameContextIndex())->mDebugValue.x, "%.8f", ImGuiInputTextFlags_ReadOnly);
+				InputFloat3("Debug Value", &gRenderer.mRuntime.mPixelInspectionBuffer.GetReadback<PixelInspection>(gGetFrameContextIndex())[0].mDebugValue.x, "%.8f", ImGuiInputTextFlags_ReadOnly);
 				
 				for (int i = 0; i < static_cast<int>(DebugMode::Count); i++)
 				{
 					const auto& name = nameof::nameof_enum(static_cast<DebugMode>(i));
 					if (name.starts_with('_'))
 					{
-						ImGui::NewLine();
+						NewLine();
 						continue;
 					}
 
 					if (i != 0)
-						ImGui::SameLine();
+						SameLine();
 
-					ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mDebugMode), i);
+					RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mDebugMode), i);
 				}
 
 				for (int i = 0; i < PixelInspection::kArraySize; i++)
-					ImGui::InputFloat4(std::to_string(i).c_str(), &gRenderer.mRuntime.mPixelInspectionBuffer.ReadbackAs<PixelInspection>(gGetFrameContextIndex())->mPixelValueArray[i].x, "%.8f", ImGuiInputTextFlags_ReadOnly);
+					InputFloat4(std::to_string(i).c_str(), &gRenderer.mRuntime.mPixelInspectionBuffer.GetReadback<PixelInspection>(gGetFrameContextIndex())[0].mPixelValueArray[i].x, "%.8f", ImGuiInputTextFlags_ReadOnly);
 
-				ImGui::TreePop();
+				TreePop();
 			}
 
-			ImGui::TreePop();
+			if (TreeNodeEx("ShaderPrint", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				std::span<uint> ShaderPrint = gRenderer.mRuntime.mShaderPrintBuffer.GetReadback<uint>(gGetFrameContextIndex());
+
+				uint uint_count = ShaderPrint[0];
+				gAssert(uint_count <= ShaderPrint.size());				
+				SameLine();
+				Text("(UInt Count = %d)", uint_count);
+
+				std::stringstream ss;
+				uint uint_index = 1;
+				auto process_next = [&]()
+				{
+					if (uint_index >= uint_count) { return false; }
+
+					uint entry_header = ShaderPrint[uint_index++];
+					ShaderPrintEntryType type = (ShaderPrintEntryType)(entry_header & 0xffff);
+					uint option = entry_header >> 16;
+
+					switch (type)
+					{
+					case ShaderPrintEntryType::Float1:
+					{
+						ss << asfloat(ShaderPrint[uint_index++]);
+						break;
+					}
+					case ShaderPrintEntryType::Float2:
+					{
+						ss << asfloat(ShaderPrint[uint_index++]) << ", " << asfloat(ShaderPrint[uint_index++]);
+						break;
+					}
+					case ShaderPrintEntryType::Float3:
+					{
+						ss << asfloat(ShaderPrint[uint_index++]) << ", " << asfloat(ShaderPrint[uint_index++]) << ", " << asfloat(ShaderPrint[uint_index++]);
+						break;
+					}
+					case ShaderPrintEntryType::Float4:
+					{
+						ss << asfloat(ShaderPrint[uint_index++]) << ", " << asfloat(ShaderPrint[uint_index++]) << ", " << asfloat(ShaderPrint[uint_index++]) << ", " << asfloat(ShaderPrint[uint_index++]);
+						break;
+					}
+					case ShaderPrintEntryType::UInt1:
+					{
+						ss << (ShaderPrint[uint_index++]);
+						break;
+					}
+					case ShaderPrintEntryType::UInt2:
+					{
+						ss << (ShaderPrint[uint_index++]) << ", " << (ShaderPrint[uint_index++]);
+						break;
+					}
+					case ShaderPrintEntryType::UInt3:
+					{
+						ss << (ShaderPrint[uint_index++]) << ", " << (ShaderPrint[uint_index++]) << ", " << (ShaderPrint[uint_index++]);
+						break;
+					}
+					case ShaderPrintEntryType::UInt4:
+					{
+						ss << (ShaderPrint[uint_index++]) << ", " << (ShaderPrint[uint_index++]) << ", " << (ShaderPrint[uint_index++]) << ", " << (ShaderPrint[uint_index++]);
+						break;
+					}
+					case ShaderPrintEntryType::String:
+					{
+						uint string_byte_count = option;
+						uint string_uint_count = (string_byte_count + 3) / 4;
+						std::string_view string((const char*)(&ShaderPrint[uint_index]), string_byte_count);
+						ss << string;
+						uint_index += string_uint_count;
+						break;
+					}
+					}
+
+					return true;
+				};
+
+				while (process_next()) {};
+				auto str = ss.str();
+				ImGui::InputTextMultiline("ShaderPrint", str.data(), str.length(), ImVec2(0, 0), ImGuiInputTextFlags_ReadOnly);
+
+				TreePop();
+			}
+
+			TreePop();
 		}
 
-		if (ImGui::TreeNodeEx("Sampling", ImGuiTreeNodeFlags_None /*ImGuiTreeNodeFlags_DefaultOpen*/))
+		if (TreeNodeEx("Sampling", ImGuiTreeNodeFlags_None /*ImGuiTreeNodeFlags_DefaultOpen*/))
 		{
-			ImGui::Text("Offset Mode");
+			Text("Offset Mode");
 			for (int i = 0; i < static_cast<int>(OffsetMode::Count); i++)
 			{
 				const auto& name = nameof::nameof_enum(static_cast<OffsetMode>(i));
-				ImGui::SameLine();
-				ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mOffsetMode), i);
+				SameLine();
+				RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mOffsetMode), i);
 			}
 
-			ImGui::Text("Sample Mode");
+			Text("Sample Mode");
 			for (int i = 0; i < static_cast<int>(SampleMode::Count); i++)
 			{
 				const auto& name = nameof::nameof_enum(static_cast<SampleMode>(i));
-				ImGui::SameLine();
-				ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mSampleMode), i);
+				SameLine();
+				RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mSampleMode), i);
 			}
 
-			ImGui::Text("Light Sample Mode");
+			Text("Light Sample Mode");
 			for (int i = 0; i < static_cast<int>(LightSampleMode::Count); i++)
 			{
 				const auto& name = nameof::nameof_enum(static_cast<LightSampleMode>(i));
-				ImGui::SameLine();
-				ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mLightSampleMode), i);
+				SameLine();
+				RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mLightSampleMode), i);
 			}
 
 			if (gConstants.mLightSampleMode == LightSampleMode::ReSTIR)
 			{
-				ImGui::InputInt("Temporal Counter", reinterpret_cast<int*>(&gConstants.mReSTIR.mTemporalCounter), 0, 0, ImGuiInputTextFlags_ReadOnly);
-				ImGui::SliderInt("Initial Sample Count", reinterpret_cast<int*>(&gConstants.mReSTIR.mInitialSampleCount), 1, 32);
+				InputInt("Temporal Counter", reinterpret_cast<int*>(&gConstants.mReSTIR.mTemporalCounter), 0, 0, ImGuiInputTextFlags_ReadOnly);
+				SliderInt("Initial Sample Count", reinterpret_cast<int*>(&gConstants.mReSTIR.mInitialSampleCount), 1, 32);
 			}
 
-			ImGui::TreePop();
+			TreePop();
 		}
 
-		if (ImGui::TreeNodeEx("Accumulation", ImGuiTreeNodeFlags_DefaultOpen))
+		if (TreeNodeEx("Accumulation", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			if (ImGui::Checkbox("Frame Count Unlimited", &gRenderer.mAccumulationFrameUnlimited))
+			if (Checkbox("Frame Count Unlimited", &gRenderer.mAccumulationFrameUnlimited))
 				gRenderer.mAccumulationResetRequested = true;
-			ImGui::SameLine();
-			ImGui::Checkbox("Paused", &gRenderer.mAccumulationPaused);
-			ImGui::SameLine();
-			ImGui::Checkbox("Vsync", &gDisplaySettings.mVsync);
+			SameLine();
+			Checkbox("Paused", &gRenderer.mAccumulationPaused);
+			SameLine();
+			Checkbox("Vsync", &gDisplaySettings.mVsync);
 
 			if (!gRenderer.mAccumulationFrameUnlimited)
 			{
-				if (ImGui::SliderInt("Frame Count", reinterpret_cast<int*>(&gRenderer.mAccumulationFrameCount), 1, 512))
+				if (SliderInt("Frame Count", reinterpret_cast<int*>(&gRenderer.mAccumulationFrameCount), 1, 512))
 					gRenderer.mAccumulationResetRequested = true;
 
-				ImGui::BeginDisabled();
-				ImGui::SliderInt("Accumulation Frame Index", &gConstants.mCurrentFrameIndex, 0, gRenderer.mAccumulationFrameCount - 1);
-				ImGui::EndDisabled();
+				BeginDisabled();
+				SliderInt("Accumulation Frame Index", &gConstants.mCurrentFrameIndex, 0, gRenderer.mAccumulationFrameCount - 1);
+				EndDisabled();
 			}
 
-			ImGui::SliderInt("Recursion Depth Max", reinterpret_cast<int*>(&gConstants.mRecursionDepthCountMax), 1, 64);
-			ImGui::SliderInt("Russian Roulette Depth", reinterpret_cast<int*>(&gConstants.mRussianRouletteDepth), 1, gConstants.mRecursionDepthCountMax);
+			SliderInt("Recursion Depth Max", reinterpret_cast<int*>(&gConstants.mRecursionDepthCountMax), 1, 64);
+			SliderInt("Russian Roulette Depth", reinterpret_cast<int*>(&gConstants.mRussianRouletteDepth), 1, gConstants.mRecursionDepthCountMax);
 
-			ImGui::TreePop();
+			TreePop();
 		}
 
-		if (ImGui::TreeNodeEx("Camera"))
+		if (TreeNodeEx("Camera"))
 		{
-			auto align_right = [](float pivot = ImGui::GetCursorPosX()) { ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.65f - (ImGui::GetCursorPosX() - pivot)); };
+			auto align_right = [](float pivot = GetCursorPosX()) { SetNextItemWidth(GetWindowWidth() * 0.65f - (GetCursorPosX() - pivot)); };
 
-			ImGui::InputFloat3("Position", (float*)&gConstants.mCameraTransform[3]);
-			ImGui::InputFloat3("Direction", (float*)&gConstants.mCameraTransform[2], "%.3f", ImGuiInputTextFlags_ReadOnly);
-			ImGui::SliderFloat("Horz Fov", (float*)&gCameraSettings.mHorizontalFovDegree, 30.0f, 160.0f);
+			InputFloat3("Position", (float*)&gConstants.mCameraTransform[3]);
+			InputFloat3("Direction", (float*)&gConstants.mCameraTransform[2], "%.3f", ImGuiInputTextFlags_ReadOnly);
+			SliderFloat("Horz Fov", (float*)&gCameraSettings.mHorizontalFovDegree, 30.0f, 160.0f);
 
-			ImGui::PushID("Aperture");
+			PushID("Aperture");
 			{
-				float x = ImGui::GetCursorPosX();
+				float x = GetCursorPosX();
 
-				if (ImGui::Button("<")) { gCameraSettings.mExposureControl.mAperture /= glm::sqrt(2.0f); }
-				ImGui::SameLine();
-				if (ImGui::Button(">")) { gCameraSettings.mExposureControl.mAperture *= glm::sqrt(2.0f); }
-				ImGui::SameLine();
-				align_right(x); ImGui::SliderFloat("Aperture", &gCameraSettings.mExposureControl.mAperture, 1.0f, 22.0f);
+				if (Button("<")) { gCameraSettings.mExposureControl.mAperture /= glm::sqrt(2.0f); }
+				SameLine();
+				if (Button(">")) { gCameraSettings.mExposureControl.mAperture *= glm::sqrt(2.0f); }
+				SameLine();
+				align_right(x); SliderFloat("Aperture", &gCameraSettings.mExposureControl.mAperture, 1.0f, 22.0f);
 			}
-			ImGui::PopID();
-			ImGui::PushID("Shutter Speed");
+			PopID();
+			PushID("Shutter Speed");
 			{
-				float x = ImGui::GetCursorPosX();
+				float x = GetCursorPosX();
 
-				if (ImGui::Button("<")) { gCameraSettings.mExposureControl.mInvShutterSpeed /= 2.0f; }
-				ImGui::SameLine();
-				if (ImGui::Button(">")) { gCameraSettings.mExposureControl.mInvShutterSpeed *= 2.0f; }
-				ImGui::SameLine();
+				if (Button("<")) { gCameraSettings.mExposureControl.mInvShutterSpeed /= 2.0f; }
+				SameLine();
+				if (Button(">")) { gCameraSettings.mExposureControl.mInvShutterSpeed *= 2.0f; }
+				SameLine();
 				std::string format = "%.3f";
 				if (gCameraSettings.mExposureControl.mInvShutterSpeed < 1.0f)
 					format += std::format(" ({:.1f}sec)", 1.0f / gCameraSettings.mExposureControl.mInvShutterSpeed);
-				align_right(x); ImGui::SliderFloat("Shutter Speed (1/sec)", &gCameraSettings.mExposureControl.mInvShutterSpeed, 1.0f, 500.0f, format.c_str());
+				align_right(x); SliderFloat("Shutter Speed (1/sec)", &gCameraSettings.mExposureControl.mInvShutterSpeed, 1.0f, 500.0f, format.c_str());
 			}
-			ImGui::PopID();
-			ImGui::PushID("ISO");
+			PopID();
+			PushID("ISO");
 			{
-				float x = ImGui::GetCursorPosX();
+				float x = GetCursorPosX();
 
-				if (ImGui::Button("<")) { gCameraSettings.mExposureControl.mSensitivity /= 2.0f; }
-				ImGui::SameLine();
-				if (ImGui::Button(">")) { gCameraSettings.mExposureControl.mSensitivity *= 2.0f; }
-				ImGui::SameLine();
-				align_right(x); ImGui::SliderFloat("ISO", &gCameraSettings.mExposureControl.mSensitivity, 100.0f, 3200.0f);
+				if (Button("<")) { gCameraSettings.mExposureControl.mSensitivity /= 2.0f; }
+				SameLine();
+				if (Button(">")) { gCameraSettings.mExposureControl.mSensitivity *= 2.0f; }
+				SameLine();
+				align_right(x); SliderFloat("ISO", &gCameraSettings.mExposureControl.mSensitivity, 100.0f, 3200.0f);
 			}
-			ImGui::PopID();
+			PopID();
 
-			if (ImGui::SmallButton("Reset Exposure"))
+			if (SmallButton("Reset Exposure"))
 				gCameraSettings.ResetExposure();
-			ImGui::SameLine();
-			ImGui::Text("EV100 = %.2f", gConstants.mEV100);
+			SameLine();
+			Text("EV100 = %.2f", gConstants.mEV100);
 
-			ImGui::Text("ToneMappingMode");
+			Text("ToneMappingMode");
 			for (int i = 0; i < static_cast<int>(ToneMappingMode::Count); i++)
 			{
 				const auto& name = nameof::nameof_enum(static_cast<ToneMappingMode>(i));
-				ImGui::SameLine();
-				ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mToneMappingMode), i);
+				SameLine();
+				RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mToneMappingMode), i);
 			}
 
-			ImGui::TreePop();
+			TreePop();
 		}
 
-		if (ImGui::TreeNodeEx("Scene"))
+		if (TreeNodeEx("Scene"))
 		{
 			for (int i = 0; i < kScenePresets.size(); i++)
 			{
 				if (!kScenePresets[i].mName.empty())
-					ImGui::RadioButton(kScenePresets[i].mName.data(), &sCurrentSceneIndex, i);
+					RadioButton(kScenePresets[i].mName.data(), &sCurrentSceneIndex, i);
 			}
 
-			ImGui::SliderFloat("Emission Boost", &gConstants.mEmissionBoost, 1E-16f, 1E16F);
-			ImGui::SliderFloat("Density Boost", &gConstants.mDensityBoost, 1E-16f, 1E16F);
+			SliderFloat("Emission Boost", &gConstants.mEmissionBoost, 1E-16f, 1E16F);
+			SliderFloat("Density Boost", &gConstants.mDensityBoost, 1E-16f, 1E16F);
 
-			ImGui::TreePop();
+			TreePop();
 		}
 
-		if (ImGui::TreeNodeEx("Atmosphere"))
+		if (TreeNodeEx("Atmosphere"))
 		{
 			gAtmosphere.ImGuiShowMenus();
 
-			ImGui::TreePop();
+			TreePop();
 		}
 
-		//if (ImGui::TreeNodeEx("Cloud"))
+		//if (TreeNodeEx("Cloud"))
 		//{
 		//	gCloud.ImGuiShowMenus();
-		//	ImGui::TreePop();
+		//	TreePop();
 		//}
 
-		if (ImGui::TreeNodeEx("Spatial Cache"))
+		if (TreeNodeEx("Spatial Cache"))
 		{
-			ImGui::Checkbox("Active", (bool*)&gConstants.mSpatialCache.mFrameActive);
+			Checkbox("Active", (bool*)&gConstants.mSpatialCache.mFrameActive);
 
-			if (ImGui::Button("Active Once"))
+			if (Button("Active Once"))
 			{
 				gConstants.mSpatialCache.mFrameActive = true;
 				gRenderer.mSpatialCacheActiveOnce = true;
 			}
 
-			if (ImGui::Button("Reset"))
+			if (Button("Reset"))
 				gRenderer.mSpatialCacheResetRequested = true;
 
-			ImGui::TreePop();
+			TreePop();
 		}
 
-		if (ImGui::TreeNodeEx("BRDF Explorer"))
+		if (TreeNodeEx("BRDF Explorer"))
 		{
-			ImGui::Texture1(gRenderer.mRuntime.mBRDFSliceTexture);
+			Texture1(gRenderer.mRuntime.mBRDFSliceTexture);
 
-			ImGui::ColorEdit3("BaseColor",		&gConstants.mBRDFExplorer.mBaseColor.x);
-			ImGui::SliderFloat("Metallic",		&gConstants.mBRDFExplorer.mMetallic, 0.0f, 1.0f);
-			ImGui::SliderFloat("Subsurface",	&gConstants.mBRDFExplorer.mSubsurface, 0.0f, 1.0f);
-			ImGui::SliderFloat("Specular",		&gConstants.mBRDFExplorer.mSpecular, 0.0f, 1.0f);
-			ImGui::SliderFloat("Roughness",		&gConstants.mBRDFExplorer.mRoughness, 0.0f, 1.0f);
-			ImGui::SliderFloat("SpecularTint",	&gConstants.mBRDFExplorer.mSpecularTint, 0.0f, 1.0f);
-			ImGui::SliderFloat("Anisotropic",	&gConstants.mBRDFExplorer.mAnisotropic, 0.0f, 1.0f);
-			ImGui::SliderFloat("Sheen",			&gConstants.mBRDFExplorer.mSheen, 0.0f, 1.0f);
-			ImGui::SliderFloat("SheenTint",		&gConstants.mBRDFExplorer.mSheenTint, 0.0f, 1.0f);
-			ImGui::SliderFloat("Clearcoat",		&gConstants.mBRDFExplorer.mClearcoat, 0.0f, 1.0f);
-			ImGui::SliderFloat("ClearcoatGloss",&gConstants.mBRDFExplorer.mClearcoatGloss, 0.0f, 1.0f);
+			ColorEdit3("BaseColor",		&gConstants.mBRDFExplorer.mBaseColor.x);
+			SliderFloat("Metallic",		&gConstants.mBRDFExplorer.mMetallic, 0.0f, 1.0f);
+			SliderFloat("Subsurface",	&gConstants.mBRDFExplorer.mSubsurface, 0.0f, 1.0f);
+			SliderFloat("Specular",		&gConstants.mBRDFExplorer.mSpecular, 0.0f, 1.0f);
+			SliderFloat("Roughness",		&gConstants.mBRDFExplorer.mRoughness, 0.0f, 1.0f);
+			SliderFloat("SpecularTint",	&gConstants.mBRDFExplorer.mSpecularTint, 0.0f, 1.0f);
+			SliderFloat("Anisotropic",	&gConstants.mBRDFExplorer.mAnisotropic, 0.0f, 1.0f);
+			SliderFloat("Sheen",			&gConstants.mBRDFExplorer.mSheen, 0.0f, 1.0f);
+			SliderFloat("SheenTint",		&gConstants.mBRDFExplorer.mSheenTint, 0.0f, 1.0f);
+			SliderFloat("Clearcoat",		&gConstants.mBRDFExplorer.mClearcoat, 0.0f, 1.0f);
+			SliderFloat("ClearcoatGloss",&gConstants.mBRDFExplorer.mClearcoatGloss, 0.0f, 1.0f);
 
-			ImGui::Separator();
+			Separator();
 
-			ImGui::SliderAngle("PhiD",			&gConstants.mBRDFExplorer.mPhiD, 0.0f, 180.0f);
-			ImGui::SliderFloat("Gamma",			&gConstants.mBRDFExplorer.mGamma, 1.0f, 2.2f);
+			SliderAngle("PhiD",			&gConstants.mBRDFExplorer.mPhiD, 0.0f, 180.0f);
+			SliderFloat("Gamma",			&gConstants.mBRDFExplorer.mGamma, 1.0f, 2.2f);
 
-			if (ImGui::Button("Reset"))
+			if (Button("Reset"))
 			{
 				gConstants.mBRDFExplorer = {};
 			}
 
-			ImGui::TreePop();
+			TreePop();
 		}
 		
-		if (ImGui::TreeNodeEx("TraceRayInline (RayQuery)"))
+		if (TreeNodeEx("TraceRayInline (RayQuery)"))
 		{
-			if (ImGui::Button("Dump Shader"))
+			if (Button("Dump Shader"))
 			{
 				gRenderer.mDumpRayQuery = true;
 				gRenderer.mReloadShader = true;
 			}
 
-			ImGui::TreePop();
+			TreePop();
 		}
 
-		if (ImGui::TreeNodeEx("NVAPI", ImGuiTreeNodeFlags_DefaultOpen))
+		if (TreeNodeEx("NVAPI", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			if (ImGui::Button("Reload Scene"))
+			if (Button("Reload Scene"))
 				gRenderer.mReloadScene = true;
 
-			if (ImGui::TreeNodeEx("LSS", ImGuiTreeNodeFlags_None))
+			if (TreeNodeEx("LSS", ImGuiTreeNodeFlags_None))
 			{
 				bool endcap_chained = gNVAPI.mEndcapMode == NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_CHAINED;
-				if (ImGui::Checkbox("Endcap Chained", &endcap_chained))
+				if (Checkbox("Endcap Chained", &endcap_chained))
 				{
 					gNVAPI.mEndcapMode = endcap_chained ? NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_CHAINED : NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_NONE;
 					gRenderer.mReloadScene = true;
 				}
 
-				ImGui::TreePop();
+				TreePop();
 			}
 
-			if (ImGui::TreeNodeEx("Sphere Surface", ImGuiTreeNodeFlags_None))
+			if (TreeNodeEx("Sphere Surface", ImGuiTreeNodeFlags_None))
 			{
-				ImGui::InputInt("Fill Count X", &gNVAPI.mSphereSurfaceFillCountX);
-				ImGui::InputFloat("Radius", &gNVAPI.mSphereSurfaceFillRadius);
-				ImGui::Checkbox("Random", &gNVAPI.mSphereSurfaceRandom);
+				InputInt("Fill Count X", &gNVAPI.mSphereSurfaceFillCountX);
+				InputFloat("Radius", &gNVAPI.mSphereSurfaceFillRadius);
+				Checkbox("Random", &gNVAPI.mSphereSurfaceRandom);
 
-				ImGui::TreePop();
+				TreePop();
 			}
 
-			if (ImGui::TreeNodeEx("LSS (Wireframe)", ImGuiTreeNodeFlags_None))
+			if (TreeNodeEx("LSS (Wireframe)", ImGuiTreeNodeFlags_None))
 			{
-				if (ImGui::Checkbox("Enabled", &gNVAPI.mLSSWireframeEnabled))
+				if (Checkbox("Enabled", &gNVAPI.mLSSWireframeEnabled))
 					gRenderer.mReloadScene = true;
 
 				bool endcap_chained = gNVAPI.mLSSWireframeEndcapMode == NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_CHAINED;
-				if (ImGui::Checkbox("Endcap Chained", &endcap_chained))
+				if (Checkbox("Endcap Chained", &endcap_chained))
 				{
 					gNVAPI.mLSSWireframeEndcapMode = endcap_chained ? NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_CHAINED : NVAPI_D3D12_RAYTRACING_LSS_ENDCAP_MODE_NONE;
 					gRenderer.mReloadScene = true;
 				}
 
-				ImGui::SliderFloat("Radius", &gNVAPI.mLSSWireframeRadius, 0.001f, 0.1f);
+				SliderFloat("Radius", &gNVAPI.mLSSWireframeRadius, 0.001f, 0.1f);
 
-				ImGui::TreePop();
+				TreePop();
 			}
 
-			if (ImGui::TreeNodeEx("Cluster", ImGuiTreeNodeFlags_DefaultOpen))
+			if (TreeNodeEx("Cluster", ImGuiTreeNodeFlags_DefaultOpen))
 			{
-				if (ImGui::Checkbox("Enabled", &gNVAPI.mClusterEnabled))
+				if (Checkbox("Enabled", &gNVAPI.mClusterEnabled))
 					gRenderer.mReloadScene = true;
 
-				ImGui::TreePop();
+				TreePop();
 			}
 
-			if (ImGui::TreeNodeEx("Caps", ImGuiTreeNodeFlags_None))
+			if (TreeNodeEx("Caps", ImGuiTreeNodeFlags_None))
 			{
-				ImGui::BeginDisabled();
+				BeginDisabled();
 
-				ImGui::Checkbox("Micromap", &gNVAPI.mMicromapSupported);
-				ImGui::Checkbox("Clusters", &gNVAPI.mClusterSupported);
-				ImGui::Checkbox("LinearSweptSpheres", &gNVAPI.mLinearSweptSpheresSupported);
-				ImGui::Checkbox("Spheres", &gNVAPI.mSpheresSupported);
-				ImGui::Checkbox("ShaderExecutionReordering", &gNVAPI.mShaderExecutionReorderingSupported);
+				Checkbox("Micromap", &gNVAPI.mMicromapSupported);
+				Checkbox("Clusters", &gNVAPI.mClusterSupported);
+				Checkbox("LinearSweptSpheres", &gNVAPI.mLinearSweptSpheresSupported);
+				Checkbox("Spheres", &gNVAPI.mSpheresSupported);
+				Checkbox("ShaderExecutionReordering", &gNVAPI.mShaderExecutionReorderingSupported);
 
-				ImGui::EndDisabled();
+				EndDisabled();
 
-				ImGui::TreePop();
+				TreePop();
 			}
 
-			ImGui::TreePop();
+			TreePop();
 		}
 
-		if (ImGui::TreeNodeEx("Sequence", ImGuiTreeNodeFlags_None))
+		if (TreeNodeEx("Sequence", ImGuiTreeNodeFlags_None))
 		{
-			ImGui::Checkbox("Enabled", (bool*)&gConstants.mSequenceEnabled);
-			ImGui::SameLine();
-			ImGui::Checkbox("Camera", &gRenderer.mSequenceCameraEnabled);
-			ImGui::SameLine();
-			ImGui::Checkbox("Vsync", &gDisplaySettings.mVsync);
+			Checkbox("Enabled", (bool*)&gConstants.mSequenceEnabled);
+			SameLine();
+			Checkbox("Camera", &gRenderer.mSequenceCameraEnabled);
+			SameLine();
+			Checkbox("Vsync", &gDisplaySettings.mVsync);
 
-			if (ImGui::Button("Dump PNG"))
+			if (Button("Dump PNG"))
 				gRenderer.mSequenceDumpPNG = true;
 
-			ImGui::SliderInt("Sequence Frame Count", &gConstants.mSequenceFrameCount, 1, 600);
-			ImGui::SliderInt("Sequence Frame Index", &gConstants.mSequenceFrameIndex, 0, gConstants.mSequenceFrameCount - 1);
-			ImGui::BeginDisabled();
-			ImGui::SliderInt("Accumulation Frame Index", &gConstants.mCurrentFrameIndex, 0, gRenderer.mAccumulationFrameCount - 1);
-			ImGui::EndDisabled();
+			SliderInt("Sequence Frame Count", &gConstants.mSequenceFrameCount, 1, 600);
+			SliderInt("Sequence Frame Index", &gConstants.mSequenceFrameIndex, 0, gConstants.mSequenceFrameCount - 1);
+			BeginDisabled();
+			SliderInt("Accumulation Frame Index", &gConstants.mCurrentFrameIndex, 0, gRenderer.mAccumulationFrameCount - 1);
+			EndDisabled();
 
-			if (ImGui::Button("Record"))
+			if (Button("Record"))
 			{
 				gConstants.mSequenceEnabled = 1;
 				gConstants.mCurrentFrameIndex = 0;
@@ -526,46 +610,46 @@ static void sPrepareImGui()
 				gRenderer.mSequenceFrameRecording = 0;
 			}
 
-			ImGui::TreePop();
+			TreePop();
 		}
 
-		if (ImGui::TreeNodeEx("Display"))
+		if (TreeNodeEx("Display"))
 		{
-			ImGui::Checkbox("Vsync", &gDisplaySettings.mVsync);
+			Checkbox("Vsync", &gDisplaySettings.mVsync);
 
-			if (ImGui::Button("1280 x 720"))
+			if (Button("1280 x 720"))
 				gRenderer.Resize(1280, 720);
 
-			if (ImGui::Button("1920 x 1080"))
+			if (Button("1920 x 1080"))
 				gRenderer.Resize(1920, 1080);
 
-			if (ImGui::Button("2560 x 1440"))
+			if (Button("2560 x 1440"))
 				gRenderer.Resize(2560, 1440);
 
-			ImGui::TreePop();
+			TreePop();
 		}
 
-		if (ImGui::TreeNodeEx("Config", ImGuiTreeNodeFlags_DefaultOpen))
+		if (TreeNodeEx("Config", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			if (ImGui::Checkbox("Shader Debug", &gConfigs.mShaderDebug))
+			if (Checkbox("Shader Debug", &gConfigs.mShaderDebug))
 				gRenderer.mReloadShader = true;
 
-			if (ImGui::Checkbox("Use Half", &gConfigs.mUseHalf))
+			if (Checkbox("Use Half", &gConfigs.mUseHalf))
 				gRenderer.mReloadShader = true;
 
-			if (ImGui::Checkbox("Use Texture", &gConfigs.mUseTexture))
+			if (Checkbox("Use Texture", &gConfigs.mUseTexture))
 				gRenderer.mReloadShader = true;
 
-			if (ImGui::Checkbox("Test Lib Shader (ShaderTable)", &gConfigs.mTestHitShader))
+			if (Checkbox("Test Lib Shader (ShaderTable)", &gConfigs.mTestHitShader))
 				gRenderer.mAccumulationResetRequested = true;
 
-			if (ImGui::Checkbox("NanoVDB Generate Texture (in Scene Textures)", &gConfigs.mNanoVDBGenerateTexture))
+			if (Checkbox("NanoVDB Generate Texture (in Scene Textures)", &gConfigs.mNanoVDBGenerateTexture))
 				gRenderer.mReloadScene = true;
 
-			if (ImGui::Checkbox("NanoVDB Use Texture (Require Generate)", &gConfigs.mNanoVDBUseTexture))
+			if (Checkbox("NanoVDB Use Texture (Require Generate)", &gConfigs.mNanoVDBUseTexture))
 				gRenderer.mReloadShader = true;
 
-			ImGui::TreePop();
+			TreePop();
 		}
 
 		// Floating items
@@ -575,21 +659,21 @@ static void sPrepareImGui()
 			gAtmosphere.ImGuiShowTextures();
 			gCloud.ImGuiShowTextures();
 
-			if (ImGui::Begin("Instances"))
+			if (Begin("Instances"))
 			{
 				for (int i = 0; i < static_cast<int>(DebugInstanceMode::Count); i++)
 				{
 					const auto& name = nameof::nameof_enum(static_cast<DebugInstanceMode>(i));
 					if (name.starts_with('_'))
 					{
-						ImGui::NewLine();
+						NewLine();
 						continue;
 					}
 
 					if (i != 0)
-						ImGui::SameLine();
+						SameLine();
 
-					ImGui::RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mDebugInstanceMode), i);
+					RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mDebugInstanceMode), i);
 				}
 
 				const char* columns[] =
@@ -619,230 +703,230 @@ static void sPrepareImGui()
 				};
 				int column_count = (int)std::size(columns);
 
-				if (ImGui::BeginTable("Table", column_count, ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
+				if (BeginTable("Table", column_count, ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
 				{
-					ImGui::TableSetupScrollFreeze(0, 1); // Make top row always visible
+					TableSetupScrollFreeze(0, 1); // Make top row always visible
 
-					ImGui::TableNextRow(ImGuiTableRowFlags_Headers);
+					TableNextRow(ImGuiTableRowFlags_Headers);
 					for (int i = 0; i < column_count; i++)
 					{
-						ImGui::TableSetColumnIndex(i);
-						ImGui::Text(columns[i]);
+						TableSetColumnIndex(i);
+						Text(columns[i]);
 
-						if (ImGui::IsItemHovered())
+						if (IsItemHovered())
 						{
-							ImGui::SetTooltip(columns[i]);
+							SetTooltip(columns[i]);
 						}
 					}
 
 					for (int row = 0; row < gScene.GetInstanceCount(); row++)
 					{
-						ImGui::TableNextRow();
-						ImGui::PushID(row);
+						TableNextRow();
+						PushID(row);
 
 						const InstanceInfo& instance_info = gScene.GetInstanceInfo(row);
 						const InstanceData& instance_data = gScene.GetInstanceData(row);
 
 						int column_index = 0;
 
-						ImGui::TableSetColumnIndex(column_index++);
-						if (ImGui::Selectable(std::to_string(row).c_str(), row == gConstants.mDebugInstanceIndex, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_SelectOnNav))
+						TableSetColumnIndex(column_index++);
+						if (Selectable(std::to_string(row).c_str(), row == gConstants.mDebugInstanceIndex, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_SelectOnNav))
 							gConstants.mDebugInstanceIndex = row;
 
-						if (row == gRenderer.mRuntime.mPixelInspectionBuffer.ReadbackAs<PixelInspection>(gGetFrameContextIndex())->mPixelInstanceID)
-							ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, ImGui::GetColorU32(ImVec4(0.8f, 0.2f, 0.2f, 0.8f)));
+						if (row == gRenderer.mRuntime.mPixelInspectionBuffer.GetReadback<PixelInspection>(gGetFrameContextIndex())[0].mPixelInstanceID)
+							TableSetBgColor(ImGuiTableBgTarget_RowBg1, GetColorU32(ImVec4(0.8f, 0.2f, 0.2f, 0.8f)));
 
-						ImGui::TableSetColumnIndex(column_index++);
-						ImGui::Text("%s", instance_info.mName.c_str());
+						TableSetColumnIndex(column_index++);
+						Text("%s", instance_info.mName.c_str());
 
-						ImGui::TableSetColumnIndex(column_index++);
+						TableSetColumnIndex(column_index++);
 						std::string position = std::format("{:.2f} {:.2f} {:.2f} ", instance_data.mTransform[3][0], instance_data.mTransform[3][1], instance_data.mTransform[3][2]);
 						position = glm::dot(glm::vec3(instance_data.mTransform[3]), glm::vec3(instance_data.mTransform[3])) != 0.0f ? position : "";
-						ImGui::Text(position.c_str());
+						Text(position.c_str());
 
-						ImGui::TableSetColumnIndex(column_index++);
+						TableSetColumnIndex(column_index++);
 						std::string scale = std::format("{:.2f} {:.2f} {:.2f} ", instance_info.mDecomposedScale[0], instance_info.mDecomposedScale[1], instance_info.mDecomposedScale[2]);
 						scale = instance_info.mDecomposedScale != glm::vec3(1.0f) ? scale : "";
-						ImGui::Text(scale.c_str());
+						Text(scale.c_str());
 
-						ImGui::TableSetColumnIndex(column_index++);
-						ImGui::Text("%s", instance_info.mMaterial.mMaterialName.c_str());
+						TableSetColumnIndex(column_index++);
+						Text("%s", instance_info.mMaterial.mMaterialName.c_str());
 
-						ImGui::TableSetColumnIndex(column_index++);
-						ImGui::Text("%s%s", NAMEOF_ENUM(instance_data.mBSDF).data(), instance_data.mFlags.mTwoSided ? " (TwoSided)" : "");
+						TableSetColumnIndex(column_index++);
+						Text("%s%s", NAMEOF_ENUM(instance_data.mBSDF).data(), instance_data.mFlags.mTwoSided ? " (TwoSided)" : "");
 
-						ImGui::TableSetColumnIndex(column_index++);
+						TableSetColumnIndex(column_index++);
 						std::string albedo = std::format("{:.2f} {:.2f} {:.2f} ", instance_data.mAlbedo.x, instance_data.mAlbedo.y, instance_data.mAlbedo.z);
 						albedo = instance_data.mAlbedo != InstanceData().mAlbedo ? albedo : "";
 						albedo += instance_info.mMaterial.mAlbedoTexture.empty() ? "" : (instance_info.mMaterial.mAlbedoTexture.filename().string() + " (" + std::to_string(instance_data.mAlbedoTexture.mTextureIndex) + ", " + std::to_string(instance_data.mAlbedoTexture.mSamplerIndex) + ")");
-						ImGui::Text(albedo.c_str());
+						Text(albedo.c_str());
 
-						ImGui::TableSetColumnIndex(column_index++);
+						TableSetColumnIndex(column_index++);
 						std::string reflectance = std::format("{:.2f} {:.2f} {:.2f} ", instance_data.mReflectance.x, instance_data.mReflectance.y, instance_data.mReflectance.z);
 						reflectance = instance_data.mReflectance != InstanceData().mReflectance ? reflectance : "";
 						reflectance += instance_info.mMaterial.mReflectanceTexture.empty() ? "" : (instance_info.mMaterial.mReflectanceTexture.filename().string() + " (" + std::to_string(instance_data.mReflectanceTexture.mTextureIndex) + ", " + std::to_string(instance_data.mReflectanceTexture.mSamplerIndex) + ")");
-						ImGui::Text(reflectance.c_str());
+						Text(reflectance.c_str());
 
-						ImGui::TableSetColumnIndex(column_index++);
+						TableSetColumnIndex(column_index++);
 						std::string transmittance = std::format("{:.2f} {:.2f} {:.2f} ", instance_data.mSpecularTransmittance.x, instance_data.mSpecularTransmittance.y, instance_data.mSpecularTransmittance.z);
 						transmittance = instance_data.mSpecularTransmittance != InstanceData().mSpecularTransmittance ? transmittance : "";
-						ImGui::Text(transmittance.c_str());
+						Text(transmittance.c_str());
 
-						ImGui::TableSetColumnIndex(column_index++);
+						TableSetColumnIndex(column_index++);
 						std::string eta = std::format("{:.2f} {:.2f} {:.2f} ", instance_data.mEta.x, instance_data.mEta.y, instance_data.mEta.z);
 						eta = instance_data.mEta != InstanceData().mEta ? eta : "";
-						ImGui::Text(eta.c_str());
+						Text(eta.c_str());
 
-						ImGui::TableSetColumnIndex(column_index++);
+						TableSetColumnIndex(column_index++);
 						std::string k = std::format("{:.2f} {:.2f} {:.2f} ", instance_data.mK.x, instance_data.mK.y, instance_data.mK.z);
 						k = instance_data.mK != InstanceData().mK ? k : "";
-						ImGui::Text(k.c_str());
+						Text(k.c_str());
 
-						ImGui::TableSetColumnIndex(column_index++);
+						TableSetColumnIndex(column_index++);
 						bool medium = instance_data.mMedium != 0;
-						ImGui::Checkbox("##Medium", &medium);
+						Checkbox("##Medium", &medium);
 
-						ImGui::TableSetColumnIndex(column_index++);
+						TableSetColumnIndex(column_index++);
 						std::string medium_albedo = std::format("{:.2f} {:.2f} {:.2f} ", instance_data.mMediumAlbedo.x, instance_data.mMediumAlbedo.y, instance_data.mMediumAlbedo.z);
 						medium_albedo = instance_data.mMediumAlbedo != InstanceData().mMediumAlbedo ? medium_albedo : "";
-						ImGui::Text(medium_albedo.c_str());
+						Text(medium_albedo.c_str());
 
-						ImGui::TableSetColumnIndex(column_index++);
+						TableSetColumnIndex(column_index++);
 						std::string medium_sigma_t = std::format("{:.2f} {:.2f} {:.2f} ", instance_data.mMediumSigmaT.x, instance_data.mMediumSigmaT.y, instance_data.mMediumSigmaT.z);
 						medium_sigma_t = instance_data.mMediumSigmaT != InstanceData().mMediumSigmaT ? medium_sigma_t : "";
-						ImGui::Text(medium_sigma_t.c_str());
+						Text(medium_sigma_t.c_str());
 
-						ImGui::TableSetColumnIndex(column_index++);
+						TableSetColumnIndex(column_index++);
 						std::string medium_phase = std::format("{:.2f} ", instance_data.mMediumPhase);
 						medium_phase = instance_data.mMediumPhase != InstanceData().mMediumPhase ? medium_phase : "";
-						ImGui::Text(medium_phase.c_str());
+						Text(medium_phase.c_str());
 
-						ImGui::TableSetColumnIndex(column_index++);
+						TableSetColumnIndex(column_index++);
 						std::string emission = std::format("{:.2f} {:.2f} {:.2f} ", instance_data.mEmission.x, instance_data.mEmission.y, instance_data.mEmission.z);
 						emission = instance_data.mEmission != InstanceData().mEmission ? emission : "";
 						emission += instance_info.mMaterial.mEmissionTexture.empty() ? "" : (instance_info.mMaterial.mEmissionTexture.filename().string() + " (" + std::to_string(instance_data.mEmissionTexture.mTextureIndex) + ", " + std::to_string(instance_data.mEmissionTexture.mSamplerIndex) + ")");
-						ImGui::Text(emission.c_str());
+						Text(emission.c_str());
 
-						ImGui::TableSetColumnIndex(column_index++);
+						TableSetColumnIndex(column_index++);
 						std::string roughness_alpha = std::format("{:.2f} ", instance_data.mRoughnessAlpha);
 						roughness_alpha = instance_data.mRoughnessAlpha != InstanceData().mRoughnessAlpha ? roughness_alpha : "";
-						ImGui::Text(roughness_alpha.c_str());
+						Text(roughness_alpha.c_str());
 
-						ImGui::TableSetColumnIndex(column_index++);
+						TableSetColumnIndex(column_index++);
 						std::string opacity = std::format("{:.2f} ", instance_data.mOpacity);
-						ImGui::Text(opacity.c_str());
+						Text(opacity.c_str());
 
-						ImGui::TableSetColumnIndex(column_index++);
+						TableSetColumnIndex(column_index++);
 						std::string vertex_count = std::format("{} ", instance_data.mVertexCount);
-						ImGui::Text(vertex_count.c_str());
+						Text(vertex_count.c_str());
 
-						ImGui::TableSetColumnIndex(column_index++);
+						TableSetColumnIndex(column_index++);
 						std::string index_count = std::format("{} ", instance_data.mIndexCount / kIndexCountPerTriangle);
-						ImGui::Text(index_count.c_str());
+						Text(index_count.c_str());
 
-						ImGui::TableSetColumnIndex(column_index++);
+						TableSetColumnIndex(column_index++);
 						std::string scratch_data_size_in_mb = std::format("{:.2f} ", instance_info.mStats.mScratchDataSizeInBytes / 1024.0f / 1024.0f);
-						ImGui::Text(scratch_data_size_in_mb.c_str());
+						Text(scratch_data_size_in_mb.c_str());
 
-						ImGui::TableSetColumnIndex(column_index++);
+						TableSetColumnIndex(column_index++);
 						std::string bvh_data_size_in_mb = std::format("{:.2f} ", instance_info.mStats.mResultDataSizeInBytes / 1024.0f / 1024.0f);
-						ImGui::Text(bvh_data_size_in_mb.c_str());
+						Text(bvh_data_size_in_mb.c_str());
 
-						ImGui::PopID();
+						PopID();
 						gAssert(column_index == column_count);
 					}
-					ImGui::EndTable();
+					EndTable();
 				}
 
 				gConstants.mDebugInstanceIndex = glm::clamp(gConstants.mDebugInstanceIndex, -1, gScene.GetInstanceCount() - 1);
 			}
-			ImGui::End();
+			End();
 
-			if (ImGui::Begin("Lights"))
+			if (Begin("Lights"))
 			{
 				static const int kColumnCount = 6;
-				if (ImGui::BeginTable("Table", kColumnCount, ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
+				if (BeginTable("Table", kColumnCount, ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_Borders))
 				{
-					ImGui::TableSetupScrollFreeze(0, 1); // Make top row always visible
+					TableSetupScrollFreeze(0, 1); // Make top row always visible
 
 					{
 						int column_index = 0;
-						ImGui::TableNextRow(ImGuiTableRowFlags_Headers);
-						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("Index");
-						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("Name");
-						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("Position");
-						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("HalfExtends");
-						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("Type");
-						ImGui::TableSetColumnIndex(column_index++); ImGui::Text("Emission");
+						TableNextRow(ImGuiTableRowFlags_Headers);
+						TableSetColumnIndex(column_index++); Text("Index");
+						TableSetColumnIndex(column_index++); Text("Name");
+						TableSetColumnIndex(column_index++); Text("Position");
+						TableSetColumnIndex(column_index++); Text("HalfExtends");
+						TableSetColumnIndex(column_index++); Text("Type");
+						TableSetColumnIndex(column_index++); Text("Emission");
 						gAssert(column_index == kColumnCount);
 					}
 
 					for (int row = 0; row < gScene.GetLightCount(); row++)
 					{
-						ImGui::TableNextRow();
+						TableNextRow();
 
 						const Light& light = gScene.GetLight(row);
 						const InstanceInfo& instance_info = gScene.GetInstanceInfo(light.mInstanceID);
 
 						int column_index = 0;
 
-						ImGui::TableSetColumnIndex(column_index++);
-						if (ImGui::Selectable(std::to_string(row).c_str(), row == gConstants.mDebugLightIndex, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_SelectOnNav))
+						TableSetColumnIndex(column_index++);
+						if (Selectable(std::to_string(row).c_str(), row == gConstants.mDebugLightIndex, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_SelectOnNav))
 							gConstants.mDebugLightIndex = row;
 
-						if (static_cast<int>(light.mInstanceID) == gRenderer.mRuntime.mPixelInspectionBuffer.ReadbackAs<PixelInspection>(gGetFrameContextIndex())->mPixelInstanceID)
-							ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, ImGui::GetColorU32(ImVec4(0.8f, 0.2f, 0.2f, 0.8f)));
+						if (static_cast<int>(light.mInstanceID) == gRenderer.mRuntime.mPixelInspectionBuffer.GetReadback<PixelInspection>(gGetFrameContextIndex())[0].mPixelInstanceID)
+							TableSetBgColor(ImGuiTableBgTarget_RowBg1, GetColorU32(ImVec4(0.8f, 0.2f, 0.2f, 0.8f)));
 
-						ImGui::TableSetColumnIndex(column_index++);
-						ImGui::Text("%s", instance_info.mName.c_str());
+						TableSetColumnIndex(column_index++);
+						Text("%s", instance_info.mName.c_str());
 
-						ImGui::TableSetColumnIndex(column_index++);
+						TableSetColumnIndex(column_index++);
 						std::string position = std::format("{:.2f} {:.2f} {:.2f}", light.mPosition.x, light.mPosition.y, light.mPosition.z);
-						ImGui::Text(position.c_str());
+						Text(position.c_str());
 
-						ImGui::TableSetColumnIndex(column_index++);
+						TableSetColumnIndex(column_index++);
 						std::string half_extends = std::format("{:.2f} {:.2f}", light.mHalfExtends.x, light.mHalfExtends.y);
-						ImGui::Text(half_extends.c_str());
+						Text(half_extends.c_str());
 
-						ImGui::TableSetColumnIndex(column_index++);
-						ImGui::Text("%s", NAMEOF_ENUM(light.mType).data());
+						TableSetColumnIndex(column_index++);
+						Text("%s", NAMEOF_ENUM(light.mType).data());
 
-						ImGui::TableSetColumnIndex(column_index++);
+						TableSetColumnIndex(column_index++);
 						std::string emission = std::format("{:.2f} {:.2f} {:.2f}", light.mEmission.x, light.mEmission.y, light.mEmission.z);
 						emission = glm::dot(light.mEmission, light.mEmission) != 0.0f ? emission : "";
-						ImGui::Text(emission.c_str());
+						Text(emission.c_str());
 
 						gAssert(column_index == kColumnCount);
 					}
-					ImGui::EndTable();
+					EndTable();
 				}
 			}
-			ImGui::End();
+			End();
 
-			if (ImGui::Begin("Stats"))
+			if (Begin("Stats"))
 			{
-				if (ImGui::TreeNodeEx("InstructionCount", ImGuiTreeNodeFlags_DefaultOpen))
+				if (TreeNodeEx("InstructionCount", ImGuiTreeNodeFlags_DefaultOpen))
 				{
-					ImGui::InputInt("Instruction Count", &gStats.mInstructionCount.mRayQuery, 0, 0, ImGuiInputTextFlags_ReadOnly);
+					InputInt("Instruction Count", &gStats.mInstructionCount.mRayQuery, 0, 0, ImGuiInputTextFlags_ReadOnly);
 					
-					ImGui::TreePop();
+					TreePop();
 				}
 
-				if (ImGui::TreeNodeEx("Time (MS)", ImGuiTreeNodeFlags_DefaultOpen))
+				if (TreeNodeEx("Time (MS)", ImGuiTreeNodeFlags_DefaultOpen))
 				{
-					ImGui::InputFloat("Upload", &gStats.mTimeMS.mUpload, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
-					ImGui::InputFloat("Renderer", &gStats.mTimeMS.mRenderer, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
-					ImGui::InputFloat("Scene", &gStats.mTimeMS.mScene, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
-					ImGui::InputFloat("Atmosphere", &gStats.mTimeMS.mAtmosphere, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
-					ImGui::InputFloat("Cloud", &gStats.mTimeMS.mCloud, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
-					ImGui::InputFloat("TextureGenerator", &gStats.mTimeMS.mTextureGenerator, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
-					ImGui::InputFloat("BRDFSlice", &gStats.mTimeMS.mBRDFSlice, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
-					ImGui::InputFloat("Clear", &gStats.mTimeMS.mClear, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
-					ImGui::InputFloat("Depths", &gStats.mTimeMS.mDepths, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
-					ImGui::InputFloat("PrepareLights", &gStats.mTimeMS.mPrepareLights, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
-					ImGui::InputFloat("RayQuery", &gStats.mTimeMS.mRayQuery, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+					InputFloat("Upload", &gStats.mTimeMS.mUpload, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+					InputFloat("Renderer", &gStats.mTimeMS.mRenderer, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+					InputFloat("Scene", &gStats.mTimeMS.mScene, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+					InputFloat("Atmosphere", &gStats.mTimeMS.mAtmosphere, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+					InputFloat("Cloud", &gStats.mTimeMS.mCloud, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+					InputFloat("TextureGenerator", &gStats.mTimeMS.mTextureGenerator, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+					InputFloat("BRDFSlice", &gStats.mTimeMS.mBRDFSlice, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+					InputFloat("Clear", &gStats.mTimeMS.mClear, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+					InputFloat("Depths", &gStats.mTimeMS.mDepths, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+					InputFloat("PrepareLights", &gStats.mTimeMS.mPrepareLights, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+					InputFloat("RayQuery", &gStats.mTimeMS.mRayQuery, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
 
-					static ImGui::ScrollingBuffer sRayQueryBuffer;
+					static ScrollingBuffer sRayQueryBuffer;
 					sRayQueryBuffer.AddPoint(gConstants.mTime, gStats.mTimeMS.mRayQuery);
 
 					float time = gConstants.mTime;
@@ -856,13 +940,13 @@ static void sPrepareImGui()
 						ImPlot::EndPlot();
 					}
 
-					ImGui::TreePop();
+					TreePop();
 				}
 			}
-			ImGui::End();
+			End();
 		}
 	}
-	ImGui::End();
+	End();
 }
 
 static void sUpdate()
@@ -881,11 +965,13 @@ static void sUpdate()
 	// Rotate Camera
 	if (!gHeadless)
 	{
+		using namespace ImGui;
+
 		static ImVec2 mouse_prev_position(0, 0);
 		static bool mouse_prev_right_button_pressed = false;
 
-		ImVec2 mouse_current_position = ImGui::GetMousePos();
-		bool mouse_right_button_pressed = ImGui::IsMouseDown(1);
+		ImVec2 mouse_current_position = GetMousePos();
+		bool mouse_right_button_pressed = IsMouseDown(1);
 
 		ImVec2 mouse_delta(0, 0);
 		if (mouse_prev_right_button_pressed && mouse_right_button_pressed)
@@ -912,54 +998,56 @@ static void sUpdate()
 	// Move Camera
 	if (!gHeadless)
 	{
-		float frame_speed_scale = ImGui::GetIO().DeltaTime / (1.0f / 60.0f);
+		using namespace ImGui;
+
+		float frame_speed_scale = GetIO().DeltaTime / (1.0f / 60.0f);
 		float move_speed = gCameraSettings.mMoveSpeed * frame_speed_scale;
-		if (ImGui::GetIO().KeyShift)
+		if (GetIO().KeyShift)
 			move_speed *= 20.0f;
-		if (ImGui::GetIO().KeyCtrl)
+		if (GetIO().KeyCtrl)
 			move_speed *= 0.1f;
 
-		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_W))
+		if (IsKeyDown(ImGuiKey::ImGuiKey_W))
 			gConstants.CameraPosition() += gConstants.CameraFront() * move_speed;
-		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_S))
+		if (IsKeyDown(ImGuiKey::ImGuiKey_S))
 			gConstants.CameraPosition() -= gConstants.CameraFront() * move_speed;
 
 		glm::vec4 left = glm::vec4(glm::normalize(glm::cross(glm::vec3(0, 1, 0), glm::vec3(gConstants.CameraFront()))), 0);
 
-		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_A))
+		if (IsKeyDown(ImGuiKey::ImGuiKey_A))
 			gConstants.CameraPosition() += left * move_speed;
-		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_D))
+		if (IsKeyDown(ImGuiKey::ImGuiKey_D))
 			gConstants.CameraPosition() -= left * move_speed;
 
 		glm::vec4 up = glm::vec4(glm::normalize(glm::cross(glm::vec3(left), glm::vec3(gConstants.CameraFront()))), 0);
 
-		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_Q))
+		if (IsKeyDown(ImGuiKey::ImGuiKey_Q))
 			gConstants.CameraPosition() += up * move_speed;
-		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_E))
+		if (IsKeyDown(ImGuiKey::ImGuiKey_E))
 			gConstants.CameraPosition() -= up * move_speed;
 
-		if (ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_F4))
+		if (IsKeyPressed(ImGuiKey::ImGuiKey_F4))
 			gRenderer.mReloadScene = true;
 
-		if (ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_F5))
+		if (IsKeyPressed(ImGuiKey::ImGuiKey_F5))
 			gRenderer.mReloadShader = true;
 
-		if (ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_F6))
+		if (IsKeyPressed(ImGuiKey::ImGuiKey_F6))
 			sLoadCamera();
 
-		if (ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_F9))
+		if (IsKeyPressed(ImGuiKey::ImGuiKey_F9))
 			sDumpLuminance();
 
-		if (ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_F10))
+		if (IsKeyPressed(ImGuiKey::ImGuiKey_F10))
 			gOpenDumpFolder();
 
-		if (!ImGui::IsAnyItemFocused() && ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_UpArrow))
+		if (!IsAnyItemFocused() && IsKeyPressed(ImGuiKey::ImGuiKey_UpArrow))
 			gConstants.mPixelDebugCoord -= int2(0, 1);
-		if (!ImGui::IsAnyItemFocused() && ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_DownArrow))
+		if (!IsAnyItemFocused() && IsKeyPressed(ImGuiKey::ImGuiKey_DownArrow))
 			gConstants.mPixelDebugCoord += int2(0, 1);
-		if (!ImGui::IsAnyItemFocused() && ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_LeftArrow))
+		if (!IsAnyItemFocused() && IsKeyPressed(ImGuiKey::ImGuiKey_LeftArrow))
 			gConstants.mPixelDebugCoord -= int2(1, 0);
-		if (!ImGui::IsAnyItemFocused() && ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_RightArrow))
+		if (!IsAnyItemFocused() && IsKeyPressed(ImGuiKey::ImGuiKey_RightArrow))
 			gConstants.mPixelDebugCoord += int2(1, 0);
 	}
 
@@ -1633,14 +1721,13 @@ void sRender()
 		gCommandList->Dispatch(gAlignUpDiv(gRenderer.mScreenWidth, 8u), gAlignUpDiv(gRenderer.mScreenHeight, 8u), 1);
 	}
 
-	// Readback PixelInspection
+	// Readback
 	if (!gHeadless)
 	{
-		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Readback PixelInspection");
+		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Readback");
 
-		gBarrierTransition(gCommandList, gRenderer.mRuntime.mPixelInspectionBuffer.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_SOURCE);
-		gCommandList->CopyResource(gRenderer.mRuntime.mPixelInspectionBuffer.mReadbackResource[gGetFrameContextIndex()].Get(), gRenderer.mRuntime.mPixelInspectionBuffer.mResource.Get());
-		gBarrierTransition(gCommandList, gRenderer.mRuntime.mPixelInspectionBuffer.mResource.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COMMON);
+		for (auto&& buffer : gRenderer.mRuntime.mBuffers)
+			buffer.Readback();
 	}
 
 	// Draw ImGui

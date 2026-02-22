@@ -68,6 +68,8 @@ struct Renderer
 		Buffer 									mSpatialHashBuffer			= Buffer().ByteCount(sizeof(uint32_t) * kSpatialHashSize).UAVIndex(ViewDescriptorIndex::SpatialHashUAV).Name("SpatialHash");
 		Buffer 									mSpatialDataBuffer			= Buffer().ByteCount(sizeof(uint32_t) * kSpatialHashSize).UAVIndex(ViewDescriptorIndex::SpatialDataUAV).Name("SpatialData");
 
+		Buffer 									mShaderPrintBuffer			= Buffer().ByteCount(sizeof(uint32_t) * 64 * 1024).UAVIndex(ViewDescriptorIndex::ShaderPrintUAV).Readback(true).Name("ShaderPrintUAV");
+
 		Buffer									mSentinelBuffer;
 		std::span<Buffer>						mBuffers					= std::span<Buffer>(&mConstantsBuffer, &mSentinelBuffer);
 	};
@@ -165,14 +167,14 @@ struct Timing
 
 	UINT64 TimestampBegin()
 	{
-		UINT64 timestamp = gRenderer.mRuntime.mQueryBuffer.ReadbackAs<UINT64>(gGetFrameContextIndex())[mQueryHeapIndex];
+		UINT64 timestamp = gRenderer.mRuntime.mQueryBuffer.GetReadback<UINT64>(gGetFrameContextIndex())[mQueryHeapIndex];
 		gCommandList->EndQuery(gQueryHeap, D3D12_QUERY_TYPE_TIMESTAMP, mQueryHeapIndex++);
 		return timestamp;
 	}
 
 	void TimestampEnd(UINT64 inTimestampBegin, float& outMS)
 	{
-		UINT64 timestamp = gRenderer.mRuntime.mQueryBuffer.ReadbackAs<UINT64>(gGetFrameContextIndex())[mQueryHeapIndex];
+		UINT64 timestamp = gRenderer.mRuntime.mQueryBuffer.GetReadback<UINT64>(gGetFrameContextIndex())[mQueryHeapIndex];
 		outMS = (timestamp - inTimestampBegin) * 1000.0f / mTimestampFrequency;
 		gCommandList->EndQuery(gQueryHeap, D3D12_QUERY_TYPE_TIMESTAMP, mQueryHeapIndex++);
 	}

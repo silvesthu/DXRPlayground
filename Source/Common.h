@@ -532,8 +532,9 @@ struct Buffer
 	
 	void Initialize();
 	void Update();
+	void Readback();
 	template <typename T>
-	T* ReadbackAs(uint inFrameContextIndex) { return static_cast<T*>(mReadbackPointer[inFrameContextIndex]); }
+	std::span<T> GetReadback(uint inFrameContextIndex) { gAssert(mByteCount % sizeof(T) == 0); return std::span<T>(static_cast<T*>(mReadbackPointer[inFrameContextIndex]), mByteCount / sizeof(T)); }
 
 	ComPtr<ID3D12Resource>					mResource;
 	ComPtr<ID3D12Resource>					mUploadResource[kFrameInFlightCount];
@@ -574,7 +575,6 @@ struct Texture
 	void Initialize();
 	void Update();
 	void InitializeUpload();
-	void Readback();
 
 	ComPtr<ID3D12Resource> mResource;
 	ComPtr<ID3D12Resource> mUploadResource;

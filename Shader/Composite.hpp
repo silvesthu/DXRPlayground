@@ -150,6 +150,10 @@ void ClearCS(
 			RayInspectionUAV[0].mNormalWS[inDispatchThreadID.x] = sqrt(-1.0);
 			RayInspectionUAV[0].mLightPositionWS[inDispatchThreadID.x] = sqrt(-1.0);
 		}
+
+#if SHADER_DEBUG
+	ShaderPrintUAV[0] = 1; // 0 stores count
+#endif // SHADER_DEBUG
 }
 
 [RootSignature(ROOT_SIGNATURE_COMMON)]
