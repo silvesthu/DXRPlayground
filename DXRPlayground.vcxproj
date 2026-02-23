@@ -40,7 +40,9 @@
     <ClInclude Include="Shader\BRDFExplorer.h" />
     <None Include="Shader\HLSLHelper.h" />
     <None Include="Shader\NanoVDB.h" />
+    <None Include="Shader\ShaderPrint.h" />
     <ClInclude Include="Shader\SpatialCache.h" />
+    <ClInclude Include="Source\GUI.h" />
     <ClInclude Include="Source\Thirdparty\glm.h" />
     <ClInclude Include="Source\Thirdparty\imgui_config.h" />
     <None Include="Source\Thirdparty\nvapi\nvHLSLExtns.h" />
@@ -108,6 +110,7 @@
     <ClCompile Include="Source\Color.cpp" />
     <ClCompile Include="Source\Common.cpp" />
     <ClCompile Include="Source\DXRPlayground.cpp" />
+    <ClCompile Include="Source\GUI.cpp" />
     <ClCompile Include="Source\ImGui\imgui_impl_dx12.cpp" />
     <ClCompile Include="Source\ImGui\imgui_impl_helper.cpp" />
     <ClCompile Include="Source\ImGui\imgui_impl_win32.cpp" />

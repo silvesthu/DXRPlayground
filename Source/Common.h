@@ -153,32 +153,6 @@ inline void gTrace(const T& data)
 	OutputDebugStringA(str.c_str());
 }
 
-inline std::filesystem::path gCreateDumpFolder()
-{
-	std::filesystem::path directory = ".\\Dump\\";
-	std::filesystem::create_directory(directory);
-
-	return directory;
-}
-
-inline void gOpenDumpFolder()
-{
-	std::filesystem::path command = "";
-	command += std::filesystem::current_path();
-	command += "\\";
-	command += gCreateDumpFolder();
-	ShellExecuteA(nullptr, "explore", command.string().c_str(), nullptr, nullptr, SW_SHOWDEFAULT);
-}
-
-inline void gOpenSceneFolder(const std::string_view inPath)
-{
-	std::filesystem::path command = "";
-	command += std::filesystem::current_path();
-	command += "\\";
-	command += inPath;
-	ShellExecuteA(nullptr, "explore", command.parent_path().string().c_str(), nullptr, nullptr, SW_SHOWDEFAULT);
-}
-
 inline std::wstring gToWString(const std::string_view string)
 {
 	int wide_size = MultiByteToWideChar(CP_UTF8, 0, string.data(), (int)string.size(), NULL, 0);
@@ -373,6 +347,31 @@ struct Configs
 	std::set<BSDF>							mSceneBSDFs;
 };
 extern Configs								gConfigs;
+
+struct CameraSettings
+{
+	float			mMoveSpeed = 0.1f;
+	float			mRotateSpeed = 0.002f;
+	float			mHorizontalFovDegree = 90.0f;
+
+	struct ExposureControl
+	{
+		// Sunny 16 rule
+		float		mAperture = 16.0;		// N, f-stops
+		float		mInvShutterSpeed = 100.0;	// t, seconds
+		float		mSensitivity = 100.0f;	// S, ISO
+	};
+	ExposureControl mExposureControl;
+	void			ResetExposure() { mExposureControl = ExposureControl(); }
+};
+extern CameraSettings gCameraSettings;
+
+struct DisplaySettings
+{
+	glm::ivec2		mWindowSize = glm::ivec2(0, 0);
+	bool			mVsync = true;
+};
+extern DisplaySettings gDisplaySettings;
 
 extern ID3D12Fence* 						gIncrementalFence;			// Fence value increment each frame (most time)
 extern HANDLE                       		gIncrementalFenceEvent;		// Allow CPU to wait on fence
@@ -905,3 +904,32 @@ struct CPUTimeScope
 	std::chrono::high_resolution_clock::time_point mEnd;
 	std::string_view mText;
 };
+
+inline std::filesystem::path gCreateDumpFolder()
+{
+	std::filesystem::path directory = ".\\Dump\\";
+	std::filesystem::create_directory(directory);
+
+	return directory;
+}
+
+inline void gOpenDumpFolder()
+{
+	std::filesystem::path command = "";
+	command += std::filesystem::current_path();
+	command += "\\";
+	command += gCreateDumpFolder();
+	ShellExecuteA(nullptr, "explore", command.string().c_str(), nullptr, nullptr, SW_SHOWDEFAULT);
+}
+
+inline void gOpenSceneFolder(const std::string_view inPath)
+{
+	std::filesystem::path command = "";
+	command += std::filesystem::current_path();
+	command += "\\";
+	command += inPath;
+	ShellExecuteA(nullptr, "explore", command.parent_path().string().c_str(), nullptr, nullptr, SW_SHOWDEFAULT);
+}
+
+void gDumpLuminance();
+void gLoadCamera();

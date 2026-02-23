@@ -264,6 +264,30 @@ struct ScenePreset
 	SCENE_PRESET_MEMBER(AtmosphereMode,			Atmosphere,				AtmosphereMode::ConstantColor);
 	SCENE_PRESET_MEMBER(glm::vec4,				ConstantColor,			glm::vec4(0, 0, 0, 0));
 	SCENE_PRESET_MEMBER(std::string_view, 		CameraAnimationPath,	"");
+
+	static std::vector<ScenePreset> sPresets;
+
+	static int sCount() { return static_cast<int>(sPresets.size()); }
+
+	static const ScenePreset& sFind(const std::string_view inName)
+	{
+		auto iter = std::find_if(sPresets.begin(), sPresets.end(), [&inName](const ScenePreset& inPreset) { return inPreset.mName == inName; });
+		if (iter == sPresets.end())
+			return sPresets.front();
+		else
+			return *iter;
+	}
+
+	static int sFindIndex(const std::string_view inName)
+	{
+		return static_cast<int>(&sFind(inName) - &sPresets.front());
+	}
+
+	static const ScenePreset& sCurrent() { return sPresets[sCurrentIndex]; }
+	static const ScenePreset& sPrevious() { return sPresets[sPreviousIndex]; }
+
+	static int sCurrentIndex;
+	static int sPreviousIndex;
 };
 
 class Scene
@@ -356,5 +380,4 @@ private:
 
 	uint									mNextViewDescriptorIndex = 0;
 };
-
 extern Scene gScene;

@@ -1,5 +1,6 @@
 #include "Common.h"
 #include "Renderer.h"
+#include "Scene.h"
 #include "ImGui/imgui_impl_dx12.h"
 #include "Thirdparty/tinygltf/stb_image.h"
 
@@ -22,6 +23,9 @@ ID3D12GraphicsCommandList4*			gCommandList = nullptr; // [TODO] Split commandlis
 ID3D12QueryHeap*					gQueryHeap = nullptr;
 Stats								gStats;
 Configs								gConfigs;
+
+CameraSettings						gCameraSettings;
+DisplaySettings						gDisplaySettings;
 
 ID3D12Fence*						gIncrementalFence = nullptr;
 HANDLE                       		gIncrementalFenceEvent = nullptr;
@@ -448,4 +452,35 @@ namespace ImGui
 		}
 		ImGui::End();
 	}
+}
+
+void gDumpLuminance()
+{
+	gCPUContext.mDumpTextureProxy.mResource = gRenderer.mRuntime.mScreenColorTexture.mResource;
+	gCPUContext.mDumpTextureProxy.mName = "Luminance";
+	gCPUContext.mDumpTextureRef = &gCPUContext.mDumpTextureProxy;
+}
+
+void gLoadCamera()
+{
+	auto& preset = ScenePreset::sCurrent();
+
+	gConstants.CameraPosition() = preset.mCameraPosition;
+	gConstants.CameraFront() = preset.mCameraDirection;
+	gConstants.mEmissionBoost = preset.mEmissionBoost;
+	gConstants.mDensityBoost = preset.mDensityBoost;
+	gCameraSettings.mHorizontalFovDegree = preset.mHorizontalFovDegree;
+
+	if (gScene.GetSceneContent().mCameraTransform.has_value())
+	{
+		gConstants.CameraPosition() = gScene.GetSceneContent().mCameraTransform.value()[3];
+		gConstants.CameraFront() = gScene.GetSceneContent().mCameraTransform.value()[2];
+	}
+
+	gConstants.CameraFront() = glm::normalize(gConstants.CameraFront());
+	gConstants.CameraUp() = float4(0, 1, 0, 0);
+	gConstants.CameraLeft() = float4(glm::cross(float3(gConstants.CameraUp()), float3(gConstants.CameraFront())), 0.0f);
+
+	if (gScene.GetSceneContent().mFov.has_value())
+		gCameraSettings.mHorizontalFovDegree = gScene.GetSceneContent().mFov.value();
 }

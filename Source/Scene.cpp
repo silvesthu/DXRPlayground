@@ -492,6 +492,50 @@ void TLAS::Initialize(const std::string& inName, const std::vector<D3D12_RAYTRAC
 	}
 }
 
+std::vector<ScenePreset> ScenePreset::sPresets =
+{
+	ScenePreset().Name("None"),
+
+	// Basic
+	ScenePreset().Name("Basic").Path("Asset/Basic/basic/scene_v3.xml").EmissionBoost(1E4f),
+
+	// CornellBox
+	ScenePreset().Name("CornellBox").Path("Asset/Comparison/benedikt-bitterli/cornell-box/scene_v3.xml").EmissionBoost(1E4f),
+	ScenePreset().Name("CornellBoxDielectric").Path("Asset/Comparison/benedikt-bitterli/cornell-box-dielectric/scene_v3.xml").EmissionBoost(1E4f),
+	ScenePreset().Name("CornellBoxTeapot").Path("Asset/Comparison/benedikt-bitterli/cornell-box-teapot/scene_v3.xml").EmissionBoost(1E4f),
+	ScenePreset().Name("CornellBoxMonkey").Path("Asset/Comparison/benedikt-bitterli/cornell-box-monkey/scene_v3.xml").EmissionBoost(1E4f),
+	ScenePreset().Name("CornellBoxDragon").Path("Asset/Comparison/benedikt-bitterli/cornell-box-dragon/scene_v3.xml").EmissionBoost(1E4f).DensityBoost(150.0f).CameraAnimationPath("Asset/Comparison/benedikt-bitterli/cornell-box-dragon/camera_animation.gltf"),
+	ScenePreset().Name("CornellBoxVDB").Path("Asset/Comparison/benedikt-bitterli/cornell-box-vdb/scene_v3.xml").EmissionBoost(1E4f).DensityBoost(10.0f),
+	ScenePreset().Name("CornellBoxLSS").Path("Asset/Comparison/benedikt-bitterli/cornell-box-lss/scene_v3.xml").EmissionBoost(1E4f),
+	ScenePreset().Name("CornellBoxSphereSurface").Path("Asset/Comparison/benedikt-bitterli/cornell-box-spheresurface/scene_v3.xml").EmissionBoost(1E4f),
+
+	// MIS
+	ScenePreset().Name("VeachMIS").Path("Asset/Comparison/benedikt-bitterli/veach-mis/scene_ggx_v3.xml").EmissionBoost(1E4f),
+
+	// RIS and ReSTIR
+	ScenePreset().Name("VeachMISManyLight").Path("Asset/Comparison/benedikt-bitterli/veach-mis-manylight/scene_ggx_v3.xml").EmissionBoost(1E4f),
+	ScenePreset().Name("Arcade").Path("Asset/Comparison/RTXDI-Assets/Arcade/Arcade.gltf").CameraPosition(glm::vec4(-1.658f, 1.577f, 1.69f, 0.0f)).CameraDirection(glm::vec4(-0.9645f, 1.2672f, 1.0396f, 0.0f) - glm::vec4(-1.658f, 1.577f, 1.69f, 0.0f)).EmissionBoost(1E6f),
+
+	// Complex scenes
+	ScenePreset().Name("LivingRoom2").Path("Asset/Comparison/benedikt-bitterli/living-room-2/scene_v3.xml").EmissionBoost(1E4f),
+	ScenePreset().Name("VeachAjar").Path("Asset/Comparison/benedikt-bitterli/veach-ajar/scene_v3.xml").EmissionBoost(1E4f),
+	ScenePreset().Name("VeachBidir").Path("Asset/Comparison/benedikt-bitterli/veach-bidir/scene_v3.xml").EmissionBoost(1E4f),
+	ScenePreset().Name("Sponza").Path("Asset/glTF-Sample-Assets/Sponza/glTF/Sponza.gltf").CameraPosition(glm::vec4(5.401f, 3.615f, -1.425f, 0.0f)).CameraDirection(glm::vec4(-0.969f, 0.033f, 0.246f, 0.0f)).EmissionBoost(1E6f).ConstantColor(glm::vec4(1.0f)),
+	ScenePreset().Name("PicaPica").Path("Asset/Sketchfab/pica-pica-mini-diorama-01/scene.gltf").CameraPosition(glm::vec4(-20.588f, 2.453f, 13.020f, 0.0f)).CameraDirection(glm::vec4(0.983f, -0.168f, 0.071f, 0.0f)).EmissionBoost(1E6f).ConstantColor(glm::vec4(0.1f)),
+	ScenePreset().Name("Bistro").Path("Asset/Comparison/RTXDI-Assets/bistro/bistro.gltf").CameraPosition(glm::vec4(-20.588f, 2.453f, 13.020f, 0.0f)).CameraDirection(glm::vec4(0.983f, -0.168f, 0.071f, 0.0f)).EmissionBoost(1E6f),
+
+	// Atmosphere
+	ScenePreset().Name("Bruneton17").Path("Asset/primitives/sphere.obj").CameraPosition(glm::vec4(0.0f, 0.0f, 9.0f, 0.0f)).CameraDirection(glm::vec4(0.0f, 0.0f, -1.0f, 0.0f)).Transform(glm::translate(glm::vec3(0.0f, 1.0f, 0.0f))).Atmosphere(AtmosphereMode::Bruneton17),
+	ScenePreset().Name("Bruneton17_Artifact_Mu").Path("Asset/primitives/sphere.obj").CameraPosition(glm::vec4(0.0f, 80.0f, 150.0f, 0.0f)).CameraDirection(glm::vec4(0.0f, 0.0f, -1.0f, 0.0f)).Transform(glm::scale(glm::vec3(100.0f, 100.0f, 100.0f))).Atmosphere(AtmosphereMode::Bruneton17),
+	ScenePreset().Name("Hillaire20").CameraPosition(glm::vec4(0.0f, 0.5, -1.0f, 0.0f)).CameraDirection(glm::vec4(0.0f, 0.0f, 1.0f, 0.0f)).HorizontalFovDegree(98.8514328f).Transform(glm::translate(glm::vec3(0.0f, 1.0f, 0.0f))).SunZenith(glm::pi<float>() / 2.0f - 0.45f).Atmosphere(AtmosphereMode::Hillaire20),
+
+	// IES
+	ScenePreset().Name("IES").Path("Asset/IES/007cfb11e343e2f42e3b476be4ab684e/scene_v3.xml"),
+};
+
+int ScenePreset::sCurrentIndex = sFindIndex("Arcade");
+int ScenePreset::sPreviousIndex = ScenePreset::sCurrentIndex;
+
 bool Scene::LoadDummy(SceneContent& ioSceneContent)
 {
 	ioSceneContent = SceneContent();

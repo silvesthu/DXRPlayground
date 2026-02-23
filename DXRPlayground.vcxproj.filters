@@ -217,6 +217,7 @@
     <ClInclude Include="Source\Thirdparty\nvapi\nvapi_lite_common.h" />
     <ClInclude Include="Source\Thirdparty\nvapi\nvapi_lite_d3dext.h" />
     <ClInclude Include="Shader\SpatialCache.h" />
+    <ClInclude Include="Source\GUI.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\DXRPlayground.cpp">
@@ -281,6 +282,7 @@
     </ClCompile>
     <ClCompile Include="Source\Thirdparty\implot\implot.cpp" />
     <ClCompile Include="Source\Thirdparty\implot\implot_items.cpp" />
+    <ClCompile Include="Source\GUI.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -387,6 +389,7 @@
     <None Include="Shader\RayQuery.hpp">
       <Filter>Shader</Filter>
     </None>
+    <None Include="Shader\ShaderPrint.h" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="Source\Thirdparty\glm\util\glm.natvis">
