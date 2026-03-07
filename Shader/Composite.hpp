@@ -4,6 +4,8 @@
 #include "BRDFExplorer.h"
 #include "NanoVDB.h"
 
+#include "ShaderToHuman/s2h.hlsl"
+
 // https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
 float3 ToneMapping_ACES_Knarkowicz(float3 x)
 {
@@ -75,6 +77,16 @@ float3 RemoveSRGBCurve( float3 x )
 	return select(x < 0.04045, x / 12.92, pow( (x + 0.055) / 1.055, 2.4 ));
 }
 
+float s2h_floatLookupFloat(uint functionId, float x)
+{
+	if (functionId == 0)
+	{
+		return x;
+	}
+
+	return 0;
+}
+
 [RootSignature(ROOT_SIGNATURE_COMMON)]
 float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 {
@@ -119,6 +131,34 @@ float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 	}
 	
 	color.xyz = ApplySRGBCurve(color.xyz);
+
+	// ShaderToHuman
+	if (false)
+	{
+		// https://github.com/electronicarts/ShaderToHuman
+
+		struct ContextGather ui;
+		s2h_init(ui, position.xy);
+
+		s2h_setCursor(ui, float2(50, 50));
+
+		s2h_setScale(ui, 3.0f);
+		s2h_printTxt(ui, _H, _e, _l, _l, _o);
+		s2h_printLF(ui);
+		s2h_printTxt(ui, _S, _c, _r, _e);
+		s2h_printTxt(ui, _e, _n);
+
+		s2h_drawSRGBRamp(ui, float2(50, 150));
+
+		s2h_setCursor(ui, float2(50, 250));
+		float2 rangeX = float2(0.0, 1.0);
+		float2 rangeY = float2(0.0, 1.0);
+		float aspect_ratio = mConstants.mScreenWidth * 1.0 / mConstants.mScreenHeight;
+		s2h_function(ui, 0, float4(0, 0, 0, 0.45f), int2(10, 10), rangeX, rangeY);
+
+		color.xyz = lerp(color.xyz, ui.dstColor.xyz, ui.dstColor.a);
+	}
+
 	return float4(color.xyz, 1);
 }
 
