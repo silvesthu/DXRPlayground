@@ -16,6 +16,7 @@
     <CopyFileToFolders Include="imgui.ini">
       <FileType>Document</FileType>
     </CopyFileToFolders>
+    <None Include="Directory.Build.props" />
     <None Include="Shader\AtmosphereIntegration.Bruneton17.h" />
     <None Include="Shader\AtmosphereIntegration.h" />
     <None Include="Shader\AtmosphereIntegration.Hillaire20.h" />
@@ -98,6 +99,7 @@
     <ClInclude Include="Source\Thirdparty\nameof\include\nameof.hpp" />
     <ClInclude Include="Source\Thirdparty\tinygltf\tiny_gltf.h" />
     <ClInclude Include="Source\Thirdparty\tinyobjloader\tiny_obj_loader.h" />
+    <None Include="vcpkg.json" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Atmosphere.cpp" />
@@ -233,6 +235,7 @@
     <LibraryPath>$(ProjectDir)Source\Thirdparty\DirectXTex\DirectXTex\Bin\Desktop_2022_Win10\x64\$(Configuration);$(ProjectDir)Source\Thirdparty\meshoptimizer\build\$(Configuration);$(LibraryPath)</LibraryPath>
     <IncludePath>$(ProjectDir)Source\Thirdparty\imgui;$(ProjectDir)Source\Thirdparty\openvdb;$(IncludePath)</IncludePath>
   </PropertyGroup>
+  <PropertyGroup Label="Vcpkg" />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <PrecompiledHeader>
@@ -271,6 +274,14 @@ mklink /D $(TargetDir)Asset $(ProjectDir)Asset</Command>
     <Manifest>
       <AdditionalManifestFiles>dpi.manifest</AdditionalManifestFiles>
     </Manifest>
+    <PreBuildEvent>
+      <Command>@echo off
+set VCPKG_ROOT=$(ProjectDir)Source\Thirdparty\vcpkg
+if not exist "%VCPKG_ROOT%\vcpkg.exe" (
+    echo [vcpkg] Executable missing. Bootstrapping...
+    call "%VCPKG_ROOT%\bootstrap-vcpkg.bat"
+)</Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -313,6 +324,14 @@ mklink /D $(TargetDir)Asset $(ProjectDir)Asset</Command>
       <AdditionalManifestFiles>
       </AdditionalManifestFiles>
     </Manifest>
+    <PreBuildEvent>
+      <Command>@echo off
+set VCPKG_ROOT=$(ProjectDir)Source\Thirdparty\vcpkg
+if not exist "%VCPKG_ROOT%\vcpkg.exe" (
+    echo [vcpkg] Executable missing. Bootstrapping...
+    call "%VCPKG_ROOT%\bootstrap-vcpkg.bat"
+)</Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -393,6 +393,8 @@
     <None Include="Shader\ShaderToHuman\s2h.hlsl" />
     <None Include="Shader\ShaderToHuman\s2h_3d.hlsl" />
     <None Include="Shader\ShaderToHuman\s2h_scatter.hlsl" />
+    <None Include="vcpkg.json" />
+    <None Include="Directory.Build.props" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="Source\Thirdparty\glm\util\glm.natvis">

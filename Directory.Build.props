@@ -1,0 +1,8 @@
+<Project>
+  <PropertyGroup>
+    <VcpkgRoot>$(MSBuildThisFileDirectory)Source\Thirdparty\vcpkg\</VcpkgRoot>
+    <VcpkgEnableManifest>true</VcpkgEnableManifest>
+  </PropertyGroup>
+  <Import Project="$(VcpkgRoot)scripts\buildsystems\msbuild\vcpkg.targets" 
+          Condition="Exists('$(VcpkgRoot)scripts\buildsystems\msbuild\vcpkg.targets')" />
+</Project>
