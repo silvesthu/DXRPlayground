@@ -5,6 +5,7 @@
 #include <d3d12.h>			// For D3D12
 #include <dxgi1_4.h>		// For DXGI
 #include <dxcapi.h>			// For IDxcCompiler
+#include <d3dx12.h>			// For DirectXTex
 #include <shellapi.h>		// For ShellExecuteA
 #include <dxgidebug.h>		// For IDXGIDebug1
 #include <d3d12shader.h>	// For shader reflection
@@ -28,8 +29,8 @@ using Microsoft::WRL::ComPtr;
 
 #include "Thirdparty/glm.h"
 #include "Thirdparty/nameof/include/nameof.hpp"
+#include "Thirdparty/DirectXTex/Common/d3dx12.h"
 #include "Thirdparty/DirectXTex/DirectXTex/DirectXTex.h"
-#include "Thirdparty/DirectXTex/DirectXTex/d3dx12.h"
 #include "Thirdparty/nvapi/nvapi.h"
 #include "ImGui/imgui_impl_helper.h"
 #include "ImGui/imgui_impl_dx12.h"
