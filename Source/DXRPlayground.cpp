@@ -18,7 +18,7 @@
 
 #include "wincodec.h" // GUID_ContainerFormatPng
 
-extern "C" { __declspec(dllexport) extern const UINT			D3D12SDKVersion = 618; }
+extern "C" { __declspec(dllexport) extern const UINT			D3D12SDKVersion = 619; }
 extern "C" { __declspec(dllexport) extern const char8_t*		D3D12SDKPath = u8".\\D3D12\\"; }
 
 #define DX12_ENABLE_DEBUG_LAYER			(0)
@@ -952,10 +952,10 @@ static bool sCreateDeviceD3D(HWND hWnd)
 	if (D3D12CreateDevice(nullptr, feature_level, IID_PPV_ARGS(&gDevice)) != S_OK)
 		return false;
 
-	// Check SM 6.7
-	D3D12_FEATURE_DATA_SHADER_MODEL shader_model = { D3D_SHADER_MODEL_6_7 };
+	// Check SM
+	D3D12_FEATURE_DATA_SHADER_MODEL shader_model = { D3D_SHADER_MODEL_6_9 };
 	if (FAILED(gDevice->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &shader_model, sizeof(shader_model)))
-		|| (shader_model.HighestShaderModel < D3D_SHADER_MODEL_6_7))
+		|| (shader_model.HighestShaderModel < D3D_SHADER_MODEL_6_9))
 		return false;
 
 	// Check DXR, see https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html

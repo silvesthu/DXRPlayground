@@ -390,6 +390,9 @@
       <Filter>Shader</Filter>
     </None>
     <None Include="Shader\ShaderPrint.h" />
+    <None Include="Shader\ShaderToHuman\s2h.hlsl" />
+    <None Include="Shader\ShaderToHuman\s2h_3d.hlsl" />
+    <None Include="Shader\ShaderToHuman\s2h_scatter.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="Source\Thirdparty\glm\util\glm.natvis">
@@ -400,8 +403,6 @@
     <Manifest Include="dpi.manifest" />
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="dxil.dll" />
     <CopyFileToFolders Include="imgui.ini" />
-    <CopyFileToFolders Include="dxcompiler.dll" />
   </ItemGroup>
 </Project>

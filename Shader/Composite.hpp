@@ -101,6 +101,8 @@ float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 		PixelInspectionUAV[0].mPixelValue = color;
 		PixelInspectionUAV[0].mDebugValue = screen_debug[position.xy];
 	}
+
+	ScreenReservoirUAV[coords] = coords.xyxy;
 	
 	// For visualization
 	switch (mConstants.mVisualizeMode)
