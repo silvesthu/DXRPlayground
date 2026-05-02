@@ -1782,33 +1782,33 @@ void Scene::Unload()
 	mNextViewDescriptorIndex = 0;
 }
 
-void Scene::Build()
+void Scene::UpdateGPU(ID3D12GraphicsCommandList4* inCommandList)
 {
 	for (auto&& instance_info : mSceneContent.mInstanceInfos)
 	{
-		instance_info.mCluster.mMeshletBuffer.Update();
-		instance_info.mCluster.mIndexBuffer.Update();
+		instance_info.mCluster.mMeshletBuffer.UpdateGPU(inCommandList);
+		instance_info.mCluster.mIndexBuffer.UpdateGPU(inCommandList);
 	}
 
-	gBarrierUAV(gCommandList, nullptr);
+	gBarrierUAV(inCommandList, nullptr);
 
 	for (auto&& blas : mBlases)
-		blas->Build(gCommandList);
+		blas->Build(inCommandList);
 
-	gBarrierUAV(gCommandList, nullptr);
+	gBarrierUAV(inCommandList, nullptr);
 
-	mTLAS->Build(gCommandList);
+	mTLAS->Build(inCommandList);
 
-	gBarrierUAV(gCommandList, nullptr);
+	gBarrierUAV(inCommandList, nullptr);
 }
 
-void Scene::Render()
+void Scene::Render(ID3D12GraphicsCommandList4* inCommandList)
 {
 	for (auto&& texture : mTextures)
-		texture.Update();
+		texture.UpdateGPU(inCommandList);
 
 	for (auto&& buffer : mBuffers)
-		buffer.Update();
+		buffer.UpdateGPU(inCommandList);
 
 	for (auto&& buffer_visualization : mBufferVisualizations)
 	{

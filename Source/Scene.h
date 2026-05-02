@@ -270,8 +270,8 @@ public:
 	void Load(const ScenePreset& inPreset);
 	void Unload();
 
-	void Build();
-	void Render();
+	void UpdateGPU(ID3D12GraphicsCommandList4* inCommandList);
+	void Render(ID3D12GraphicsCommandList4* inCommandList);
 
 	const SceneContent& GetSceneContent() const					{ return mSceneContent; }
 

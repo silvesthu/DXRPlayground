@@ -425,7 +425,7 @@ void sLoadScene(bool inLoadCamera)
 
 	gScene.Unload();
 	gScene.Load(preset);
-	gScene.Build();
+	gScene.UpdateGPU(gCommandList);
 
 	gConstants.mSunAzimuth = preset.mSunAzimuth;
 	gConstants.mSunZenith = preset.mSunZenith;
@@ -472,9 +472,10 @@ void sRender()
 	}
 
 	// Frame Begin
+	ID3D12GraphicsCommandList4* command_list = gCommandList;
 	{
 		frame_context.mCommandAllocator->Reset();
-		gCommandList->Reset(frame_context.mCommandAllocator.Get(), nullptr);
+		command_list->Reset(frame_context.mCommandAllocator.Get(), nullptr);
 	}
 
 	// Reload Scene
@@ -509,7 +510,7 @@ void sRender()
 
 	// Update and Upload Constants
 	{
-		GPU_TIMING_SCOPE("Upload", &gStats.mGPUTimingMS.mUpload);
+		GPU_TIMING_SCOPE("Upload", command_list, &gStats.mGPUTimingMS.mUpload);
 
 		// Update
 		{
@@ -589,77 +590,77 @@ void sRender()
 
 	// Renderer
 	{
-		GPU_TIMING_SCOPE("Renderer", &gStats.mGPUTimingMS.mRenderer);
+		GPU_TIMING_SCOPE("Renderer", command_list, &gStats.mGPUTimingMS.mRenderer);
 
-		gRenderer.Render();
+		gRenderer.Render(command_list);
 	}
 
 	// Scene
 	{
-		GPU_TIMING_SCOPE("Scene", &gStats.mGPUTimingMS.mScene);
+		GPU_TIMING_SCOPE("Scene", command_list, &gStats.mGPUTimingMS.mScene);
 
-		gScene.Render();
+		gScene.Render(command_list);
 	}
 
 	// Atmosphere
 	{
-		GPU_TIMING_SCOPE("Atmosphere", &gStats.mGPUTimingMS.mAtmosphere);
+		GPU_TIMING_SCOPE("Atmosphere", command_list, &gStats.mGPUTimingMS.mAtmosphere);
 
-		gAtmosphere.Render();
+		gAtmosphere.Render(command_list);
 	}
 
 	// Cloud
 	{
-		GPU_TIMING_SCOPE("Cloud", &gStats.mGPUTimingMS.mCloud);
+		GPU_TIMING_SCOPE("Cloud", command_list, &gStats.mGPUTimingMS.mCloud);
 
-		gCloud.Render();
+		gCloud.Render(command_list);
 	}
 
 	// Texture Generator
 	{
-		GPU_TIMING_SCOPE("TextureGenerator", &gStats.mGPUTimingMS.mTextureGenerator);
+		GPU_TIMING_SCOPE("TextureGenerator", command_list, &gStats.mGPUTimingMS.mTextureGenerator);
 
 		gRenderer.Setup(gRenderer.mRuntime.mGenerateTextureShader);
 
-		BarrierScope scope(gCommandList, gRenderer.mRuntime.mGenerateTexture.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		gCommandList->Dispatch(gAlignUpDiv(gRenderer.mRuntime.mGenerateTexture.mWidth, 8u), gAlignUpDiv(gRenderer.mRuntime.mGenerateTexture.mHeight, 8u), 1);
-		
-		gBarrierUAV(gCommandList, nullptr);
+		BarrierScope scope(command_list, gRenderer.mRuntime.mGenerateTexture.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		command_list->Dispatch(gAlignUpDiv(gRenderer.mRuntime.mGenerateTexture.mWidth, 8u), gAlignUpDiv(gRenderer.mRuntime.mGenerateTexture.mHeight, 8u), 1);
+
+		gBarrierUAV(command_list, nullptr);
 	}
 
 	// BRDF Slice
 	if (!gHeadless)
 	{
-		GPU_TIMING_SCOPE("BRDFSlice", &gStats.mGPUTimingMS.mBRDFSlice);
+		GPU_TIMING_SCOPE("BRDFSlice", command_list, &gStats.mGPUTimingMS.mBRDFSlice);
 
 		gRenderer.Setup(gRenderer.mRuntime.mBRDFSliceShader);
 
-		BarrierScope scope(gCommandList, gRenderer.mRuntime.mBRDFSliceTexture.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		gCommandList->Dispatch(gAlignUpDiv(gRenderer.mRuntime.mBRDFSliceTexture.mWidth, 8u), gAlignUpDiv(gRenderer.mRuntime.mBRDFSliceTexture.mHeight, 8u), 1);
+		BarrierScope scope(command_list, gRenderer.mRuntime.mBRDFSliceTexture.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		command_list->Dispatch(gAlignUpDiv(gRenderer.mRuntime.mBRDFSliceTexture.mWidth, 8u), gAlignUpDiv(gRenderer.mRuntime.mBRDFSliceTexture.mHeight, 8u), 1);
 
-		gBarrierUAV(gCommandList, nullptr);
+		gBarrierUAV(command_list, nullptr);
 	}
 
 	// Clear for debug
 	if (!gHeadless)
 	{
-		GPU_TIMING_SCOPE("Clear", &gStats.mGPUTimingMS.mClear);
+		GPU_TIMING_SCOPE("Clear", command_list, &gStats.mGPUTimingMS.mClear);
 
 		gRenderer.Setup(gRenderer.mRuntime.mClearShader);
-		gCommandList->Dispatch(gAlignUpDiv(PixelInspection::kArraySize, 64u), 1, 1);
+		command_list->Dispatch(gAlignUpDiv(PixelInspection::kArraySize, 64u), 1, 1);
 
-		BarrierScope depth_scope(gCommandList, gRenderer.mRuntime.mScreenDebugTexture.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		BarrierScope depth_scope(command_list, gRenderer.mRuntime.mScreenDebugTexture.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		gRenderer.ClearUnorderedAccessViewFloat(gRenderer.mRuntime.mScreenDebugTexture);
 
-		gBarrierUAV(gCommandList, nullptr);
+		gBarrierUAV(command_list, nullptr);
 	}
 	
 	// Depth
 	if (!gHeadless)
 	{
-		GPU_TIMING_SCOPE("Depths", &gStats.mGPUTimingMS.mDepths);
+		GPU_TIMING_SCOPE("Depths", command_list, &gStats.mGPUTimingMS.mDepths);
 
-		BarrierScope depth_scope(gCommandList, gRenderer.mRuntime.mScreenDepthTexture.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+		BarrierScope depth_scope(command_list, gRenderer.mRuntime.mScreenDepthTexture.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
 		D3D12_VIEWPORT viewport =
 		{
@@ -670,7 +671,7 @@ void sRender()
 			.MinDepth = 0.0f,
 			.MaxDepth = 1.0f,
 		};
-		gCommandList->RSSetViewports(1, &viewport);
+		command_list->RSSetViewports(1, &viewport);
 		D3D12_RECT rect =
 		{
 			.left = 0,
@@ -678,44 +679,44 @@ void sRender()
 			.right = static_cast<LONG>(gRenderer.mScreenWidth),
 			.bottom = static_cast<LONG>(gRenderer.mScreenHeight),
 		};
-		gCommandList->RSSetScissorRects(1, &rect);
+		command_list->RSSetScissorRects(1, &rect);
 		D3D12_CPU_DESCRIPTOR_HANDLE depth_cpu_handle = gCPUContext.mDSVDescriptorHeap.GetCPUHandle(gRenderer.mRuntime.mScreenDepthTexture.mDSVIndex);
-		gCommandList->OMSetRenderTargets(0, nullptr, false, &depth_cpu_handle);
-		gCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		command_list->OMSetRenderTargets(0, nullptr, false, &depth_cpu_handle);
+		command_list->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 		gRenderer.Setup(gRenderer.mRuntime.mDepthShader);
-		gCommandList->DrawInstanced(3, 1, 0, 0);
+		command_list->DrawInstanced(3, 1, 0, 0);
 
-		gBarrierUAV(gCommandList, nullptr);
+		gBarrierUAV(command_list, nullptr);
 	}
 
 	// PrepareLights
 	if (gScene.GetSceneContent().mEmissiveTriangleCount > 0)
 	{
-		GPU_TIMING_SCOPE("PrepareLights", &gStats.mGPUTimingMS.mPrepareLights);
+		GPU_TIMING_SCOPE("PrepareLights", command_list, &gStats.mGPUTimingMS.mPrepareLights);
 
 		gRenderer.Setup(gRenderer.mRuntime.mPrepareLightsShader);
 		uint constants[] = { static_cast<uint>(gScene.GetPrepareLightsTaskCount()) };
-		gCommandList->SetComputeRoot32BitConstants(static_cast<int>(RootParameterIndex::ConstantsPrepareLights), 1, &constants, 0);
-		gCommandList->Dispatch(gAlignUpDiv(gScene.GetSceneContent().mEmissiveTriangleCount, 256u), 1, 1);
+		command_list->SetComputeRoot32BitConstants(static_cast<int>(RootParameterIndex::ConstantsPrepareLights), 1, &constants, 0);
+		command_list->Dispatch(gAlignUpDiv(gScene.GetSceneContent().mEmissiveTriangleCount, 256u), 1, 1);
 
-		gBarrierUAV(gCommandList, nullptr);
+		gBarrierUAV(command_list, nullptr);
 	}
 
 	// RayQuery
 	{
-		GPU_TIMING_SCOPE("RayQuery", &gStats.mGPUTimingMS.mRayQuery);
+		GPU_TIMING_SCOPE("RayQuery", command_list, &gStats.mGPUTimingMS.mRayQuery);
 
 		gRenderer.Setup(gRenderer.mRuntime.mRayQueryShader);
-		gCommandList->Dispatch(gAlignUpDiv(gRenderer.mScreenWidth, 8u), gAlignUpDiv(gRenderer.mScreenHeight, 8u), 1);
+		command_list->Dispatch(gAlignUpDiv(gRenderer.mScreenWidth, 8u), gAlignUpDiv(gRenderer.mScreenHeight, 8u), 1);
 
-		gBarrierUAV(gCommandList, nullptr);
+		gBarrierUAV(command_list, nullptr);
 	}
 
 	// Test Hit Shader
 	if (gConfigs.mTestHitShader)
 	{
-		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Test Hit Shader");
+		PIXScopedEvent(command_list, PIX_COLOR(0, 255, 0), "Test Hit Shader");
 
 		D3D12_DISPATCH_RAYS_DESC dispatch_rays_desc = {};
 		{
@@ -739,15 +740,15 @@ void sRender()
 		}
 
 		gRenderer.Setup(gRenderer.mRuntime.mLibShader);
-		gCommandList->DispatchRays(&dispatch_rays_desc);
+		command_list->DispatchRays(&dispatch_rays_desc);
 
-		gBarrierUAV(gCommandList, nullptr);
+		gBarrierUAV(command_list, nullptr);
 	}
 
 	// Composite
 	if (!gHeadless)
 	{
-		GPU_TIMING_SCOPE("Composite", &gStats.mGPUTimingMS.mComposite);
+		GPU_TIMING_SCOPE("Composite", command_list, &gStats.mGPUTimingMS.mComposite);
 
 		gBarrierTransition(gCommandList, back_buffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		BarrierScope depth_scope(gCommandList, gRenderer.mRuntime.mScreenDepthTexture.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_DEPTH_READ);
@@ -806,13 +807,13 @@ void sRender()
 		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Readback");
 
 		for (auto&& buffer : gRenderer.mRuntime.mBuffers)
-			buffer.Readback();
+			buffer.Readback(command_list);
 	}
 
 	// Draw ImGui
 	if (!gHeadless)
 	{
-		GPU_TIMING_SCOPE("ImGui", &gStats.mGPUTimingMS.mImGui);
+		GPU_TIMING_SCOPE("ImGui", command_list, &gStats.mGPUTimingMS.mImGui);
 
 		gPrepareImGui(); // Keep this right before render to get latest data
 
@@ -829,7 +830,7 @@ void sRender()
 		if (!gHeadless)
 			gBarrierTransition(gCommandList, back_buffer, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
 
-		gGPUTiming.FrameEnd(gRenderer.mRuntime.mQueryBuffer.mReadbackResource[gGetFrameContextIndex()].Get());
+		gGPUTiming.FrameEnd(command_list, gRenderer.mRuntime.mQueryBuffer.mReadbackResource[gGetFrameContextIndex()].Get());
 		gCommandList->Close();
 		gCommandQueue->ExecuteCommandLists(1, reinterpret_cast<ID3D12CommandList* const*>(&gCommandList));
 	}

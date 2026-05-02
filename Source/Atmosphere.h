@@ -531,7 +531,7 @@ public:
 	void Initialize();
 	void Finalize();
 	void Update();
-	void Render();
+	void Render(ID3D12GraphicsCommandList4* inCommandList);
 	void ImGuiShowMenus();
 	void ImGuiShowTextures();
 

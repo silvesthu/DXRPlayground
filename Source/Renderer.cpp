@@ -729,10 +729,10 @@ void Renderer::Finalize()
 	mCompiler.Finalize();
 }
 
-void Renderer::Render()
+void Renderer::Render(ID3D12GraphicsCommandList4* inCommandList)
 {
 	for (auto&& texture : mRuntime.mTextures)
-		texture.Update();
+		texture.UpdateGPU(inCommandList);
 
 	if (mSpatialCacheResetRequested)
 	{

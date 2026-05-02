@@ -544,8 +544,8 @@ struct Buffer
 	BUFFER_MEMBER(bool,						Readback,		false);
 	
 	void Initialize();
-	void Update();
-	void Readback();
+	void UpdateGPU(ID3D12GraphicsCommandList4* inCommandList);
+	void Readback(ID3D12GraphicsCommandList4* inCommandList);
 	template <typename T>
 	std::span<T> GetReadback(uint inFrameContextIndex) { gAssert(mByteCount % sizeof(T) == 0); return std::span<T>(static_cast<T*>(mReadbackPointer[inFrameContextIndex]), mByteCount / sizeof(T)); }
 
@@ -586,7 +586,7 @@ struct Texture
 	int GetPixelSize() const;
 	uint64_t GetSubresourceSize() const;
 	void Initialize();
-	void Update();
+	void UpdateGPU(ID3D12GraphicsCommandList4* inCommandList);
 	void InitializeUpload();
 
 	ComPtr<ID3D12Resource> mResource;

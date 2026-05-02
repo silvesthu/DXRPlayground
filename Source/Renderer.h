@@ -105,7 +105,7 @@ struct Renderer
 	void										Initialize();
 	void										Finalize();
 
-	void										Render();
+	void										Render(ID3D12GraphicsCommandList4* inCommandList);
 
 	void										Resize(int inWidth, int inHeight)
 	{
@@ -192,24 +192,24 @@ struct GPUTiming
 	UINT										mQueryHeapIndex = 0;
 	UINT64										mTimestampFrequency = 0;
 
-	UINT64 TimestampBegin()
+	UINT64 TimestampBegin(ID3D12GraphicsCommandList4* inCommandList)
 	{
 		UINT64 timestamp = gRenderer.mRuntime.mQueryBuffer.GetReadback<UINT64>(gGetFrameContextIndex())[mQueryHeapIndex];
-		gCommandList->EndQuery(gQueryHeap, D3D12_QUERY_TYPE_TIMESTAMP, mQueryHeapIndex++);
+		inCommandList->EndQuery(gQueryHeap, D3D12_QUERY_TYPE_TIMESTAMP, mQueryHeapIndex++);
 		return timestamp;
 	}
 
-	void TimestampEnd(UINT64 inTimestampBegin, float* outDurationMSPtr)
+	void TimestampEnd(ID3D12GraphicsCommandList4* inCommandList, UINT64 inTimestampBegin, float* outDurationMSPtr)
 	{
 		UINT64 timestamp = gRenderer.mRuntime.mQueryBuffer.GetReadback<UINT64>(gGetFrameContextIndex())[mQueryHeapIndex];
 		float durationMS = (timestamp - inTimestampBegin) * 1000.0f / mTimestampFrequency;
-		if (outDurationMSPtr != nullptr) { *outDurationMSPtr = durationMS; }	
-		gCommandList->EndQuery(gQueryHeap, D3D12_QUERY_TYPE_TIMESTAMP, mQueryHeapIndex++);
+		if (outDurationMSPtr != nullptr) { *outDurationMSPtr = durationMS; }
+		inCommandList->EndQuery(gQueryHeap, D3D12_QUERY_TYPE_TIMESTAMP, mQueryHeapIndex++);
 	}
 
-	void FrameEnd(ID3D12Resource* inReadbackResource)
+	void FrameEnd(ID3D12GraphicsCommandList4* inCommandList, ID3D12Resource* inReadbackResource)
 	{
-		gCommandList->ResolveQueryData(gQueryHeap, D3D12_QUERY_TYPE_TIMESTAMP, 0, mQueryHeapIndex, inReadbackResource, 0);
+		inCommandList->ResolveQueryData(gQueryHeap, D3D12_QUERY_TYPE_TIMESTAMP, 0, mQueryHeapIndex, inReadbackResource, 0);
 		mQueryHeapIndex = 0;
 	}
 };
@@ -217,11 +217,13 @@ extern GPUTiming								gGPUTiming;
 
 struct GPUTimingScope
 {
-	GPUTimingScope()							{ mTimestampBegin = gGPUTiming.TimestampBegin(); }
-	~GPUTimingScope()							{ gGPUTiming.TimestampEnd(mTimestampBegin, mDurationMSPtr); }
+	GPUTimingScope(ID3D12GraphicsCommandList4* inCommandList) : mCommandList(inCommandList) { mTimestampBegin = gGPUTiming.TimestampBegin(mCommandList); }
+	~GPUTimingScope()							{ gGPUTiming.TimestampEnd(mCommandList, mTimestampBegin, mDurationMSPtr); }
 
 	UINT64										mTimestampBegin = 0;
 	float*										mDurationMSPtr = nullptr;
+	ID3D12GraphicsCommandList4*					mCommandList = nullptr;
 };
-#define GPU_TIMING_SCOPE(inName, outDurationMSPtr)			PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), inName);	\
-															GPUTimingScope mGPUTimingScope_##__LINE__; mGPUTimingScope_##__LINE__.mDurationMSPtr = outDurationMSPtr;
+#define GPU_TIMING_SCOPE(inName, inCommandList, outDurationMSPtr)		\
+		PIXScopedEvent(inCommandList, PIX_COLOR(0, 255, 0), inName);	\
+		GPUTimingScope mGPUTimingScope_##__LINE__(inCommandList); mGPUTimingScope_##__LINE__.mDurationMSPtr = outDurationMSPtr;

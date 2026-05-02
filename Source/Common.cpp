@@ -130,7 +130,7 @@ void Buffer::Initialize()
 	}
 }
 
-void Buffer::Update()
+void Buffer::UpdateGPU(ID3D12GraphicsCommandList4* inCommandList)
 {
 	if (mLoaded)
 		return;
@@ -140,20 +140,20 @@ void Buffer::Update()
 		gAssert(mUploadResource[0]);
 
 		{
-			BarrierScope scope(gCommandList, mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
-			gCommandList->CopyResource(mResource.Get(), mUploadResource[0].Get());
+			BarrierScope scope(inCommandList, mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
+			inCommandList->CopyResource(mResource.Get(), mUploadResource[0].Get());
 		}
 	}
 
 	mLoaded = true;
 }
 
-void Buffer::Readback()
+void Buffer::Readback(ID3D12GraphicsCommandList4* inCommandList)
 {
 	if (!mGPU || !mReadback) { return; }
 
-	BarrierScope scope(gCommandList, mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_SOURCE);
-	gCommandList->CopyResource(mReadbackResource[gGetFrameContextIndex()].Get(), mResource.Get());
+	BarrierScope scope(inCommandList, mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_SOURCE);
+	inCommandList->CopyResource(mReadbackResource[gGetFrameContextIndex()].Get(), mResource.Get());
 }
 
 int Texture::GetPixelSize() const
@@ -267,7 +267,7 @@ void Texture::Initialize()
 		mUIScale = 256.0f / static_cast<float>(mWidth);
 }
 
-void Texture::Update()
+void Texture::UpdateGPU(ID3D12GraphicsCommandList4* inCommandList)
 {
 	if (mLoaded)
 		return;
@@ -290,8 +290,8 @@ void Texture::Update()
 			std::vector<D3D12_SUBRESOURCE_DATA> subresources;
 			PrepareUpload(gDevice, scratch_image.GetImages(), scratch_image.GetImageCount(), scratch_image.GetMetadata(), subresources);
 			InitializeUpload();
-			BarrierScope expected_scope(gCommandList, mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
-			UpdateSubresources(gCommandList, mResource.Get(), mUploadResource.Get(), 0, 0, mSubresourceCount, subresources.data());
+			BarrierScope expected_scope(inCommandList, mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
+			UpdateSubresources(inCommandList, mResource.Get(), mUploadResource.Get(), 0, 0, mSubresourceCount, subresources.data());
 		}
 		else if (extension == ".hdr")
 		{
@@ -346,8 +346,8 @@ void Texture::Update()
 		subresource.RowPitch = mWidth * GetPixelSize();
 		subresource.SlicePitch = mWidth * mHeight * GetPixelSize();
 		InitializeUpload();
-		BarrierScope expected_scope(gCommandList, mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
-		UpdateSubresources(gCommandList, mResource.Get(), mUploadResource.Get(), 0, 0, mSubresourceCount, &subresource);
+		BarrierScope expected_scope(inCommandList, mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
+		UpdateSubresources(inCommandList, mResource.Get(), mUploadResource.Get(), 0, 0, mSubresourceCount, &subresource);
 
 		mUploadData.clear();
 	}

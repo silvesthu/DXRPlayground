@@ -3,18 +3,18 @@
 #include "Renderer.h"
 #include "ImGui/imgui_impl_helper.h"
 
-void Atmosphere::Render()
+void Atmosphere::Render(ID3D12GraphicsCommandList4* inCommandList)
 {
 	if (!mEnabled)
 		return;
 
 	for (auto&& textures : mRuntime.mTexturesSet)
 		for (auto&& texture : textures)
-			texture.Update();
+			texture.UpdateGPU(inCommandList);
 
 	for (auto&& textures : mRuntime.mValidationTexturesSet)
 		for (auto&& texture : textures)
-			texture.Update();
+			texture.UpdateGPU(inCommandList);
 
 	switch (mProfile.mMode)
 	{

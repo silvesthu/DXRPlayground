@@ -16,26 +16,26 @@ void Cloud::Update()
 	constants.mShapeNoise		= mProfile.mShapeNoise;
 }
 
-void Cloud::Render()
+void Cloud::Render(ID3D12GraphicsCommandList4* inCommandList)
 {
 	if (!mEnabled)
 		return;
 
 	// Texture
 	for (auto&& texture : mRuntime.mTextures)
-		texture.Update();
+		texture.UpdateGPU(inCommandList);
 
 	if (mRecomputeRequested)
 	{
 		{
-			mRuntime.mShapeNoise3DTexture.Update();
+			mRuntime.mShapeNoise3DTexture.UpdateGPU(inCommandList);
 
 			gRenderer.Setup(mRuntime.mShapeNoiseShader);
 			gCommandList->Dispatch(mRuntime.mShapeNoise3DTexture.mWidth / 8, mRuntime.mShapeNoise3DTexture.mHeight / 8, mRuntime.mShapeNoise3DTexture.mDepth);
 		}
 
 		{
-			mRuntime.mErosionNoise3DTexture.Update();
+			mRuntime.mErosionNoise3DTexture.UpdateGPU(inCommandList);
 
 			gRenderer.Setup(mRuntime.mErosionNoiseShader);
 			gCommandList->Dispatch(mRuntime.mErosionNoise3DTexture.mWidth / 8, mRuntime.mErosionNoise3DTexture.mHeight / 8, mRuntime.mErosionNoise3DTexture.mDepth);
