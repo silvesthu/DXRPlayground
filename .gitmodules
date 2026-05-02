@@ -47,6 +47,3 @@
 [submodule "Source/Thirdparty/ShaderToHuman"]
 	path = Source/Thirdparty/ShaderToHuman
 	url = https://github.com/electronicarts/ShaderToHuman.git
-[submodule "Source/Thirdparty/vcpkg"]
-	path = Source/Thirdparty/vcpkg
-	url = https://github.com/microsoft/vcpkg.git

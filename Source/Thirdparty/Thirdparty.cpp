@@ -9,3 +9,6 @@
 
 #define TINYEXR_IMPLEMENTATION
 #include "tinyexr.h"
+
+#define TINYOBJLOADER_IMPLEMENTATION
+#include "Thirdparty/tinyobjloader/tiny_obj_loader.h"

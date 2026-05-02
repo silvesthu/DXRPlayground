@@ -24,11 +24,9 @@ bld/
 .idea/
 
 #DXRPlayground
-packages/
 Dump/
-enc_temp_folder/
 Asset/ArPragueSkyModelGround/SkyModelDataset.dat
 imgui.ini
 run_mitsuba.bat
 DXRPlayground.ini
-vcpkg_installed
+build-cmake
