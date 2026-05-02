@@ -61,7 +61,7 @@ void gPrepareImGui()
 			InputFloat3("Pixel Value", &gRenderer.mRuntime.mPixelInspectionBuffer.GetReadback<PixelInspection>(gGetFrameContextIndex())[0].mPixelValue.x, "%.8f", ImGuiInputTextFlags_ReadOnly);
 			SliderInt("Recursion", &gConstants.mDebugRecursion, 0, gConstants.mRecursionDepthCountMax);
 
-			if (TreeNodeEx("Visualize Mode"))
+			if (TreeNodeEx("Visualize Mode", ImGuiTreeNodeFlags_None))
 			{
 				for (int i = 0; i < static_cast<int>(VisualizeMode::Count); i++)
 				{
@@ -80,7 +80,7 @@ void gPrepareImGui()
 				TreePop();
 			}
 
-			if (TreeNodeEx("Debug Mode"))
+			if (TreeNodeEx("Debug Mode", ImGuiTreeNodeFlags_None))
 			{
 				InputFloat3("Debug Value", &gRenderer.mRuntime.mPixelInspectionBuffer.GetReadback<PixelInspection>(gGetFrameContextIndex())[0].mDebugValue.x, "%.8f", ImGuiInputTextFlags_ReadOnly);
 
@@ -105,7 +105,7 @@ void gPrepareImGui()
 				TreePop();
 			}
 
-			if (TreeNodeEx("ShaderPrint", ImGuiTreeNodeFlags_DefaultOpen))
+			if (TreeNodeEx("ShaderPrint", ImGuiTreeNodeFlags_None))
 			{
 				std::span<uint> ShaderPrint = gRenderer.mRuntime.mShaderPrintBuffer.GetReadback<uint>(gGetFrameContextIndex());
 
@@ -394,7 +394,7 @@ void gPrepareImGui()
 			TreePop();
 		}
 
-		if (TreeNodeEx("NVAPI", ImGuiTreeNodeFlags_DefaultOpen))
+		if (TreeNodeEx("NVAPI", ImGuiTreeNodeFlags_None))
 		{
 			if (Button("Reload Scene"))
 				gRenderer.mReloadScene = true;
@@ -437,7 +437,7 @@ void gPrepareImGui()
 				TreePop();
 			}
 
-			if (TreeNodeEx("Cluster", ImGuiTreeNodeFlags_DefaultOpen))
+			if (TreeNodeEx("Cluster", ImGuiTreeNodeFlags_None))
 			{
 				if (Checkbox("Enabled", &gNVAPI.mClusterEnabled))
 					gRenderer.mReloadScene = true;
@@ -508,12 +508,9 @@ void gPrepareImGui()
 			TreePop();
 		}
 
-		if (TreeNodeEx("Config", ImGuiTreeNodeFlags_DefaultOpen))
+		if (TreeNodeEx("Config", ImGuiTreeNodeFlags_None))
 		{
 			if (Checkbox("Shader Debug", &gConfigs.mShaderDebug))
-				gRenderer.mReloadShader = true;
-
-			if (Checkbox("Use Half", &gConfigs.mUseHalf))
 				gRenderer.mReloadShader = true;
 
 			if (Checkbox("Use Texture", &gConfigs.mUseTexture))

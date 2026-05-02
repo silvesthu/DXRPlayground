@@ -132,7 +132,7 @@ std::tuple<T, T, float> gMakeLerpTuple(const std::vector<T>& inArray, float inRa
 
 inline void gTrace(const char* inString)
 {
-	OutputDebugStringA(inString);
+	if (inString != nullptr) { OutputDebugStringA(inString); }
 }
 
 inline void gTrace(const std::string& inString)
@@ -152,12 +152,20 @@ inline void gTrace(const T& data)
 	OutputDebugStringA(str.c_str());
 }
 
-inline std::wstring gToWString(const std::string_view string)
+inline std::wstring gToWString(const std::string_view& input)
 {
-	int wide_size = MultiByteToWideChar(CP_UTF8, 0, string.data(), (int)string.size(), NULL, 0);
-	std::wstring wide_string(wide_size, 0);
-	MultiByteToWideChar(CP_UTF8, 0, string.data(), (int)string.size(), &wide_string[0], wide_size);
-	return wide_string;
+	int size = MultiByteToWideChar(CP_UTF8, 0, input.data(), (int)input.size(), NULL, 0);
+	std::wstring output(size, 0);
+	MultiByteToWideChar(CP_UTF8, 0, input.data(), (int)input.size(), &output[0], size);
+	return output;
+}
+
+inline std::string gToUTF8String(const std::wstring_view& input)
+{
+	int size = WideCharToMultiByte(CP_UTF8, 0, input.data(), (int)input.size(), NULL, 0, NULL, NULL);
+	std::string output(size, 0);
+	WideCharToMultiByte(CP_UTF8, 0, (LPCWCH)input.data(), (int)input.size(), &output[0], size, NULL, NULL);
+	return output;
 }
 
 template <typename T>
@@ -342,7 +350,6 @@ struct Configs
 {
 	bool									mUseNVAPI = true;
 	bool									mShaderDebug = true;
-	bool									mUseHalf = true;
 	bool									mUseTexture = true;
 
 	bool									mTestHitShader = false;

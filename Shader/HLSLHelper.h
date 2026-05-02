@@ -78,7 +78,6 @@ struct RayQuery
 };
 
 #define SHADER_DEBUG 1
-#define USE_HALF 1
 #define USE_TEXTURE 1
 #define NVAPI_LSS 1
 #define NVAPI_SER 1

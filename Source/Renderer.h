@@ -22,6 +22,7 @@ struct Renderer
 		Shader									mLineShader					= Shader().FileName("Shader/Composite.hpp").VSName("LineVS").PSName("LinePS").Topology(D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE).DepthFunc(D3D12_COMPARISON_FUNC_LESS).RTVFormat(kBackBufferFormat).DSVFormat(DXGI_FORMAT_D32_FLOAT);
 		Shader									mLineHiddenShader			= Shader().FileName("Shader/Composite.hpp").VSName("LineVS").PSName("LineHiddenPS").Topology(D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE).DepthFunc(D3D12_COMPARISON_FUNC_GREATER).RTVFormat(kBackBufferFormat).DSVFormat(DXGI_FORMAT_D32_FLOAT);
 		Shader									mCompositeShader			= Shader().FileName("Shader/Composite.hpp").VSName("ScreenspaceTriangleVS").PSName("CompositePS").RTVFormat(kBackBufferFormat).DSVFormat(DXGI_FORMAT_D32_FLOAT);
+		Shader									mSlangShader				= Shader().FileName("Shader/HelloWorld.slang").CSName("HelloWorldCS");
 		Shader									mSentinelShader				= Shader();
 		std::span<Shader>						mShaders					= std::span<Shader>(&mRayQueryShader, &mSentinelShader);
 

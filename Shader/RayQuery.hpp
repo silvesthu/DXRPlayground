@@ -338,7 +338,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 					
 						path_context.mEmission						+= path_context.mThroughput * emission; // Emissive BSDF
 						path_context.mThroughput					*= bsdf_result.mBSDFSamplePDF > 0 ? (bsdf_result.mBSDF * abs(bsdf_context.mNdotL) / bsdf_result.mBSDFSamplePDF) : 0;
-						path_context.mEtaScale						*= ashalf(bsdf_result.mEta);
+						path_context.mEtaScale						*= bsdf_result.mEta;
 						path_context.mMediumInstanceID				= bsdf_result.mMediumInstanceID; // [TODO] Need a medium stack to handle nested medium
 					
 						path_context.mPrevBSDFSamplePDF				= bsdf_result.mBSDFSamplePDF;
@@ -382,7 +382,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 				}
 
 				// ShaderPrint
-				PrintNameValueLine("Albedo:", hit_context.Albedo());
+				// PrintNameValueLine("Albedo:", hit_context.Albedo());
 			}
 		}
 		else

@@ -23,7 +23,7 @@ void RayGeneration()
 
 	RayPayload payload							= (RayPayload)0;
 
-#ifdef NVAPI_SER
+#if NVAPI_SER
 	NvHitObject hit_object = NvTraceRayHitObject(
 		RaytracingScene,
 		0,

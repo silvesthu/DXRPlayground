@@ -4,22 +4,11 @@
 #include "Binding.h"
 #include "NanoVDB.h"
 
-#if USE_HALF
-using half_ = half;
-using half3_ = half3;
-#else
-using half = float;
-using half3 = float3;
-#endif // USE_HALF
-
-half_ ashalf(float inValue) { return (half_)inValue; }
-half3_ ashalf(float3 inValue) { return (half3_)inValue; }
-
 struct PixelContext
 {
 	uint3			mPixelIndex;
 	uint3			mPixelTotal;
-					
+
 	float			mDepth;
 	uint			mOutputDepth : 1;
 };
@@ -32,9 +21,9 @@ struct PathContext
 	float3			mThroughput;					// [0, 1]		Accumulated throughput, [PBRT3] call it beta https://github.com/mmp/pbrt-v3/blob/master/src/integrators/path.cpp#L68
 	float3			mEmission;						// [0, +inf]	Accumulated emission
 	float			mEtaScale;
-					
+
 	float3			mLightEmission;					// [0, +inf]	Emission from light sample
-	
+
 	float			mPrevBSDFSamplePDF;
 	bool			mPrevDiracDeltaDistribution;
 
@@ -60,7 +49,7 @@ struct SurfaceContext
 	{
 		// Only support 32bit index for simplicity
 		// see https://github.com/microsoft/DirectX-Graphics-Samples/blob/master/Samples/Desktop/D3D12Raytracing/src/D3D12RaytracingSimpleLighting/Raytracing.hlsl for reference
-#ifdef NVAPI_CLUSTERS
+#if NVAPI_CLUSTERS
 		StructuredBuffer<meshopt_Meshlet> MeshletBuffer = ResourceDescriptorHeap[mInstanceData.mClusterMeshletBufferIndex];
 		StructuredBuffer<uint> IndexBuffer = ResourceDescriptorHeap[mInstanceData.mClusterIndexBufferIndex];
 
@@ -72,13 +61,7 @@ struct SurfaceContext
 		uint3 indices					= uint3(Indices[base_index], Indices[base_index + 1], Indices[base_index + 2]) + mInstanceData.mVertexOffset;
 #endif // NVAPI_CLUSTERS
 
-		if (VERTEX_TYPE_HALF)
-		{
-			mVertexPositions[0]			= VerticesHalf[indices[0]].xyz;
-			mVertexPositions[1]			= VerticesHalf[indices[1]].xyz;
-			mVertexPositions[2]			= VerticesHalf[indices[2]].xyz;
-		}
-		else
+		mVertexPositionOS				= 0;
 		{
 			mVertexPositions[0]			= Vertices[indices[0]].xyz;
 			mVertexPositions[1]			= Vertices[indices[1]].xyz;
@@ -350,7 +333,7 @@ struct HitContext : SurfaceContext
 		hit_context.mInstanceData				= InstanceDataCache::Load(inRayQuery.CommittedInstanceID());
 		hit_context.mInstanceID					= inRayQuery.CommittedInstanceID();
 		hit_context.mPrimitiveIndex				= inRayQuery.CommittedPrimitiveIndex();
-#ifdef NVAPI_CLUSTERS
+#if NVAPI_CLUSTERS
 		hit_context.mClusterID					= NvRtGetCommittedClusterID(inRayQuery);
 #else
 		hit_context.mClusterID					= 0xFFFFFFFF;
@@ -360,7 +343,7 @@ struct HitContext : SurfaceContext
 		hit_context.mRayWS.mDirection			= inRayDesc.Direction;
 		hit_context.mRayWS.mTCurrent			= inRayQuery.CommittedRayT();
 
-#ifdef NVAPI_LSS
+#if NVAPI_LSS
 		if (NvRtCommittedIsLss(inRayQuery))
 		{
 			// Transform from object space to handle non-uniform scale properly

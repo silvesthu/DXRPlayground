@@ -380,7 +380,7 @@ int sStartup(WNDCLASSEX& wc, HWND& hwnd)
 		[](const std::string& inPath, const filewatch::Event inChangeType)
 		{
 			(void)inChangeType;
-			std::regex pattern(".*\\.(hlsl|hlsli|hpp|h|inl)");
+			std::regex pattern(".*\\.(hlsl|hlsli|hpp|h|inl|slang)");
 			if (std::regex_match(inPath, pattern) && inChangeType == filewatch::Event::modified)
 			{
 				std::string msg = "Reload triggered by " + inPath + "\n";

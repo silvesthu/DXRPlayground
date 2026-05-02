@@ -1,12 +1,12 @@
 #pragma once
 #include "Shared.h"
 
-// #define USE_DYNAMIC_RESOURCE_CBV		// About 2x slower
-#define USE_DYNAMIC_RESOURCE_SRV_UAV	// [TODO] Always enabled, need alternative implementation for comparison
-#define USE_DYNAMIC_RESOURCE_SAMPLER	// [TODO] Always enabled, need alternative implementation for comparison
+#define USE_DYNAMIC_RESOURCE_CBV		0 // About 2x slower
+#define USE_DYNAMIC_RESOURCE_SRV_UAV	1 // [TODO] Always enabled, need alternative implementation for comparison
+#define USE_DYNAMIC_RESOURCE_SAMPLER	1 // [TODO] Always enabled, need alternative implementation for comparison
 
 // CBV
-#ifdef USE_DYNAMIC_RESOURCE_CBV
+#if USE_DYNAMIC_RESOURCE_CBV
 // 0.11ms
 // Top SOLs    SM 59.4% | TEX 45.3% | L2 17.9% | VRAM 1.5% | VPC 0.0%
 static ConstantBuffer<Constants> mConstants = ResourceDescriptorHeap[0];
@@ -61,7 +61,6 @@ static RaytracingAccelerationStructure RaytracingScene = ResourceDescriptorHeap[
 static StructuredBuffer<InstanceData> InstanceDatas = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::RaytraceInstanceDataSRV];
 static StructuredBuffer<uint> Indices = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::RaytraceIndicesSRV];
 static StructuredBuffer<float3> Vertices = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::RaytraceVerticesSRV];
-static StructuredBuffer<half4> VerticesHalf = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::RaytraceVerticesSRV];
 static StructuredBuffer<float3> Normals = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::RaytraceNormalsSRV];
 static StructuredBuffer<float2> UVs = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::RaytraceUVsSRV];
 static StructuredBuffer<Light> Lights = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::RaytraceLightsSRV];

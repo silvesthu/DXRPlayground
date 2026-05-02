@@ -1,11 +1,14 @@
-﻿#include "Renderer.h"
+#include "Renderer.h"
 #include "Atmosphere.h"
 #include "Cloud.h"
+#include "Thirdparty/slang/include/slang.h"
 
 HMODULE Dxcompiler_dll = NULL;
 ComPtr<IDxcUtils> DxcUtils;
 ComPtr<IDxcCompiler> DxcCompiler;
 ComPtr<IDxcIncludeHandler> DxcIncludeHandler;
+ComPtr<SlangSession> gSlangSession;
+
 void gInitializeDxcInterfaces()
 {
 	// LoadLibraryW + GetProcAddress to eliminate dependency on .lib. Make updating .dll easier.
@@ -21,14 +24,18 @@ void gInitializeDxcInterfaces()
 	DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(DxcCompiler.GetAddressOf()));
 
 	DxcUtils->CreateDefaultIncludeHandler(DxcIncludeHandler.GetAddressOf());
+
+	gSlangSession = spCreateSession();
+	gAssert(gSlangSession != nullptr);
 }
 
 void gFinalizeDxcInterfaces()
 {
+	gSlangSession = nullptr;
+
 	DxcUtils = nullptr;
 	DxcCompiler = nullptr;
 	DxcIncludeHandler = nullptr;
-
 	FreeLibrary(Dxcompiler_dll);
 }
 
@@ -434,81 +441,47 @@ ShaderTable gCreateShaderTable(const Shader& inShader)
 }
 
 
-ComPtr<IDxcBlob> gCompileShader(const char* inFilename, const char* inEntryPoint, const char* inProfile)
+ComPtr<IDxcBlob> gCompileShader(const char* inFilename, const char* inEntryPoint, std::string_view inProfile)
 {
-	// Load shader
-	std::ifstream shader_file(inFilename);
-	std::stringstream shader_stream;
-	shader_stream << shader_file.rdbuf();
-	std::string shader_string = shader_stream.str();
-
-	{
-		// AtmosphereMode
-		if (!gAtmosphere.mProfile.mDynamicModeSwitch)
-			shader_string = std::format("#define k{} {}::{}\n", nameof::nameof_enum_type<AtmosphereMode>(), nameof::nameof_enum_type<AtmosphereMode>(), nameof::nameof_enum(gAtmosphere.mProfile.mMode)) + shader_string;
-
-		// CloudMode
-		if (!gCloud.mProfile.mDynamicModeSwitch)
-			shader_string = std::format("#define k{} {}::{}\n", nameof::nameof_enum_type<CloudMode>(), nameof::nameof_enum_type<CloudMode>(), nameof::nameof_enum(gCloud.mProfile.mMode)) + shader_string;
-	}
-
-	IDxcBlobEncoding* blob_encoding;
-	gValidate(DxcUtils->CreateBlobFromPinned(shader_string.c_str(), static_cast<uint32_t>(shader_string.length()), CP_UTF8, &blob_encoding));
-
-	std::string filename(inFilename);
-	std::wstring wfilename(filename.begin(), filename.end());
-
-	std::vector<DxcDefine> defines;
-	std::wstring profile = gToWString(inProfile);
-	const wchar_t* profile_name_string = L"SHADER_PROFILE_UNKNOWN";
-	if (profile.starts_with(L"lib"))
-		profile_name_string = L"SHADER_PROFILE_LIB";
-	if (profile.starts_with(L"cs"))
-		profile_name_string = L"SHADER_PROFILE_CS";
-	if (profile.starts_with(L"ps"))
-		profile_name_string = L"SHADER_PROFILE_PS";
-	if (profile.starts_with(L"vs"))
-		profile_name_string = L"SHADER_PROFILE_VS";
-	defines.push_back({.Name = profile_name_string, .Value = L"1"});
+	// Generated header
+	std::string shader_header;
 
 	// AtmosphereMode
-	std::string atmosphere_mode_string = std::format("{}_{}", nameof::nameof_enum_type<AtmosphereMode>(), nameof::nameof_enum(gAtmosphere.mProfile.mMode));
-	std::wstring atmosphere_mode_wstring = gToWString(atmosphere_mode_string);
-	defines.push_back({.Name = atmosphere_mode_wstring.c_str(), .Value = L"1"});
+	if (!gAtmosphere.mProfile.mDynamicModeSwitch)
+		shader_header += std::format("#define k{} {}::{}\n", nameof::nameof_enum_type<AtmosphereMode>(), nameof::nameof_enum_type<AtmosphereMode>(), nameof::nameof_enum(gAtmosphere.mProfile.mMode));
 
 	// CloudMode
-	std::string cloud_mode_string = std::format("{}_{}", nameof::nameof_enum_type<CloudMode>(), nameof::nameof_enum(gCloud.mProfile.mMode));
-	std::wstring cloud_mode_wstring = gToWString(cloud_mode_string);
-	defines.push_back({ .Name = cloud_mode_wstring.c_str(), .Value = L"1" });
+	if (!gCloud.mProfile.mDynamicModeSwitch)
+		shader_header += std::format("#define k{} {}::{}\n", nameof::nameof_enum_type<CloudMode>(), nameof::nameof_enum_type<CloudMode>(), nameof::nameof_enum(gCloud.mProfile.mMode));
+
+	// Profile
+	shader_header += std::format("#define SHADER_PROFILE_LIB {}\n", inProfile.starts_with("lib") ? 1 : 0);
+	shader_header += std::format("#define SHADER_PROFILE_CS {}\n", inProfile.starts_with("cs") ? 1 : 0);
+	shader_header += std::format("#define SHADER_PROFILE_PS {}\n", inProfile.starts_with("ps") ? 1 : 0);
+	shader_header += std::format("#define SHADER_PROFILE_VS {}\n", inProfile.starts_with("vs") ? 1 : 0);
 
 	// NVAPI
-	if (gNVAPI.mShaderExecutionReorderingSupported)
-		defines.push_back({ .Name = L"NVAPI_SER", .Value = L"1"});
-	if (gNVAPI.mLinearSweptSpheresSupported)
-		defines.push_back({ .Name = L"NVAPI_LSS", .Value = L"1" });
-	if (gNVAPI.mClusterSupported && gNVAPI.mClusterEnabled)
-		defines.push_back({ .Name = L"NVAPI_CLUSTERS", .Value = L"1" });
+	shader_header += std::format("#define NVAPI_SER {}\n", gNVAPI.mShaderExecutionReorderingSupported ? 1 : 0);
+	shader_header += std::format("#define NVAPI_LSS {}\n", gNVAPI.mLinearSweptSpheresSupported ? 1 : 0);
+	shader_header += std::format("#define NVAPI_CLUSTERS {}\n", gNVAPI.mClusterSupported && gNVAPI.mClusterEnabled ? 1 : 0);
 
 	// Config
-	defines.push_back({ .Name = L"SHADER_DEBUG", .Value = gConfigs.mShaderDebug ? L"1" : L"0"});
-	defines.push_back({ .Name = L"USE_HALF", .Value = gConfigs.mUseHalf ? L"1" : L"0" });
-	defines.push_back({ .Name = L"USE_TEXTURE", .Value = gConfigs.mUseTexture ? L"1" : L"0" });
-	defines.push_back({ .Name = L"NANOVDB_USE_TEXTURE", .Value = gConfigs.mNanoVDBUseTexture ? L"1" : L"0" });
+	shader_header += std::format("#define SHADER_DEBUG {}\n", gConfigs.mShaderDebug ? 1: 0);
+	shader_header += std::format("#define USE_TEXTURE {}\n", gConfigs.mUseTexture ? 1: 0);
+	shader_header += std::format("#define NANOVDB_USE_TEXTURE {}\n", gConfigs.mNanoVDBUseTexture ? 1: 0);
+
+	// BSDF
 	std::vector<std::wstring> bsdf_macros;
 	bsdf_macros.resize((int)BSDF::Count);
 	for (int i = 0; i < (int)BSDF::Count; i++)
 	{
 		BSDF bsdf = (BSDF)i;
-		bsdf_macros[i] = L"USE_BSDF_" + gToWString(nameof::nameof_enum(bsdf));
-		defines.push_back({ .Name = bsdf_macros[i].c_str(), .Value = gConfigs.mSceneBSDFs.find(bsdf) != gConfigs.mSceneBSDFs.end() ? L"1" : L"0"});
+		shader_header += std::format("#define USE_BSDF_{} {}\n", nameof::nameof_enum(bsdf), gConfigs.mSceneBSDFs.find(bsdf) != gConfigs.mSceneBSDFs.end() ? 1 : 0);
 	}
 
+	// EntryPoint
 	std::wstring entry_point = gToWString(inEntryPoint);
-	std::wstring entry_point_macro = L"ENTRY_POINT_";
-	entry_point_macro += entry_point;
-	DxcDefine dxc_define_entry_point{};
-	dxc_define_entry_point.Name = entry_point_macro.c_str();
-	defines.push_back(dxc_define_entry_point);
+	shader_header += std::format("#define ENTRY_POINT_{} {}\n", inEntryPoint, 1);
 
 	std::vector<LPCWSTR> arguments;
 	arguments.push_back(L"-WX");									// warning as error
@@ -521,67 +494,138 @@ ComPtr<IDxcBlob> gCompileShader(const char* inFilename, const char* inEntryPoint
 	arguments.push_back(L"-disable-payload-qualifiers");			// -disable-payload-qualifiers, see https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#payload-access-qualifiers
 	arguments.push_back(L"-enable-16bit-types");					// half
 
-	IDxcOperationResult* operation_result;
-	if (FAILED(DxcCompiler->Compile(
-		blob_encoding,												// program text
-		wfilename.c_str(),											// file name, mostly for error messages
-		entry_point.c_str(),										// entry point function
-		profile.c_str(),											// target profile
-		arguments.data(), static_cast<UINT32>(arguments.size()),	// compilation arguments and their count
-		defines.data(), static_cast<UINT32>(defines.size()),		// name/value defines and their count
-		DxcIncludeHandler.Get(),									// handler for #include directives
-		&operation_result)))
-		assert(false);
+	// Load shader
+	std::ifstream shader_file(inFilename);
+	std::stringstream shader_stream;
+	shader_stream << shader_file.rdbuf();
+	std::string shader_string = shader_header + "\n" + shader_stream.str();
 
-	HRESULT compile_result;
-	gValidate(operation_result->GetStatus(&compile_result));
-
-	if (FAILED(compile_result))
+	ComPtr<IDxcBlob> blob_output;
+	if (gToLower(std::filesystem::path(inFilename).extension().string()) == ".slang")
 	{
-		IDxcBlobEncoding* blob = nullptr;
-		IDxcBlobUtf8* blob_8 = nullptr;
-		gValidate(operation_result->GetErrorBuffer(&blob));
-		// We can use the library to get our preferred encoding.
-		gValidate(DxcUtils->GetBlobAsUtf8(blob, &blob_8));
-		std::string str((char*)blob_8->GetBufferPointer(), blob_8->GetBufferSize() - 1);
-		gTrace(str.c_str());
-		blob->Release();
-		blob_8->Release();
-		return nullptr;
-	}
+		ComPtr<SlangCompileRequest> request_ptr = spCreateCompileRequest(gSlangSession.Get());
+		SlangCompileRequest* request = request_ptr.Get();
+		gAssert(request != nullptr);
 
-	ComPtr<IDxcBlob> blob = nullptr;
-	gValidate(operation_result->GetResult(&blob));
+		std::filesystem::path shader_path = std::filesystem::path(inFilename);
+		spAddSearchPath(request, shader_path.parent_path().string().c_str());
 
-	if (std::string_view("RayQueryCS") == inEntryPoint)
-	{
-		D3D12_SHADER_DESC shader_desc;
-		D3D_SHADER_REQUIRES shader_requires;
-		gExtractShaderReflection(blob, shader_desc, shader_requires);
-		gStats.mInstructionCount.mRayQuery = shader_desc.InstructionCount;
+		// Target & Profile
+		const int target_index = spAddCodeGenTarget(request, SLANG_DXIL);
+		SlangProfileID profile_id = spFindProfile(gSlangSession.Get(), inProfile.data());
+		gAssert(profile_id != SLANG_PROFILE_UNKNOWN);
+		spSetTargetProfile(request, target_index, profile_id);
 
-		if (gRenderer.mDumpRayQuery)
+		// Various options
+		spSetPassThrough(request, SLANG_PASS_THROUGH_DXC);
+		spSetMatrixLayoutMode(request, SLANG_MATRIX_LAYOUT_COLUMN_MAJOR);
+		spSetDebugInfoLevel(request, gConfigs.mShaderDebug ? SLANG_DEBUG_INFO_LEVEL_MAXIMAL : SLANG_DEBUG_INFO_LEVEL_STANDARD);
+		spSetOptimizationLevel(request, gConfigs.mShaderDebug ? SLANG_OPTIMIZATION_LEVEL_NONE : SLANG_OPTIMIZATION_LEVEL_HIGH);
+
+		// Macros, seems defines passed by this function can not be used as constexpr, embed all macros in shader code instead
+		// spAddPreprocessorDefine
+
+		// TranslationUnit
+		int translation_unit_index = spAddTranslationUnit(request, SLANG_SOURCE_LANGUAGE_SLANG, "shader");
+		spAddTranslationUnitSourceString(request, translation_unit_index, inFilename, shader_string.c_str());
+
+		// EntryPoint
+		SlangStage stage = SLANG_STAGE_NONE;
+		if (inProfile.starts_with("cs")) { stage = SLANG_STAGE_COMPUTE; }
+		else if (inProfile.starts_with("vs")) { stage = SLANG_STAGE_VERTEX; }
+		else if (inProfile.starts_with("ps")) { stage = SLANG_STAGE_FRAGMENT; }
+		else { gAssert(false); }
+		const int entry_point_index = spAddEntryPoint(request, translation_unit_index, inEntryPoint, stage);
+		gAssert(entry_point_index >= 0);
+
+		// Compile
+		if (SLANG_FAILED(spCompile(request)))
 		{
-			ComPtr<IDxcBlob> blob_to_dissemble = blob;
-			IDxcBlobEncoding* disassemble = nullptr;
-			ComPtr<IDxcBlobUtf8> blob_8 = nullptr;
-			DxcCompiler->Disassemble(blob_to_dissemble.Get(), &disassemble);
-			gValidate(DxcUtils->GetBlobAsUtf8(disassemble, &blob_8));
-			std::string str((char*)blob_8->GetBufferPointer(), blob_8->GetBufferSize() - 1);
-
-			str += "\n" + gGenerateShaderReflectionString(shader_desc);
-
-			std::filesystem::path path = gCreateDumpFolder();
-			path += "RayQueryCS.txt";
-			std::ofstream stream(path);
-			stream << str;
-			stream.close();
-
-			gRenderer.mDumpRayQuery = false;
+			gTrace(spGetDiagnosticOutput(request));
+			return nullptr;
 		}
+
+		// Blob
+		ComPtr<ISlangBlob> blob_code;
+		if (SLANG_FAILED(spGetEntryPointCodeBlob(request, entry_point_index, target_index, &blob_code)) || blob_code == nullptr)
+		{
+			gTrace(spGetDiagnosticOutput(request));
+			return nullptr;
+		}
+
+		ComPtr<IDxcBlobEncoding> dxc_blob_encoding;
+		gValidate(DxcUtils->CreateBlob(blob_code->getBufferPointer(), static_cast<UINT32>(blob_code->getBufferSize()), CP_UTF8, dxc_blob_encoding.GetAddressOf()));
+
+		gValidate(dxc_blob_encoding.As(&blob_output));
+	}
+	else
+	{
+#pragma warning(disable: 6387) // Warning on pass nullptr to DXC API
+		std::string filename(inFilename);
+		std::wstring wfilename(filename.begin(), filename.end());
+
+		IDxcBlobEncoding* blob_encoding = nullptr;
+		gValidate(DxcUtils->CreateBlobFromPinned(shader_string.c_str(), static_cast<uint32_t>(shader_string.length()), CP_UTF8, &blob_encoding));
+		IDxcOperationResult* operation_result = nullptr;
+		gValidate(DxcCompiler->Compile(
+			blob_encoding,												// program text
+			wfilename.c_str(),											// file name, mostly for error messages
+			entry_point.c_str(),										// entry point function
+			gToWString(inProfile).c_str(),								// target profile
+			arguments.data(), static_cast<UINT32>(arguments.size()),	// compilation arguments and their count
+			nullptr, 0,													// name/value defines and their count
+			DxcIncludeHandler.Get(),									// handler for #include directives
+			&operation_result));
+
+		HRESULT compile_result;
+		gValidate(operation_result->GetStatus(&compile_result));
+		if (FAILED(compile_result))
+		{
+			IDxcBlobEncoding* blob_error = nullptr;
+			IDxcBlobUtf8* blob_error_utf8 = nullptr;
+			gValidate(operation_result->GetErrorBuffer(&blob_error));
+			// We can use the library to get our preferred encoding.
+			gValidate(DxcUtils->GetBlobAsUtf8(blob_error, &blob_error_utf8));
+			std::string str((char*)blob_error_utf8->GetBufferPointer(), blob_error_utf8->GetBufferSize() - 1);
+			gTrace(str.c_str());
+			blob_error->Release();
+			blob_error_utf8->Release();
+			return nullptr;
+		}
+		gValidate(operation_result->GetResult(&blob_output));
+
+		if (std::string_view("RayQueryCS") == inEntryPoint)
+		{
+			D3D12_SHADER_DESC shader_desc;
+			D3D_SHADER_REQUIRES shader_requires;
+			gExtractShaderReflection(blob_output, shader_desc, shader_requires);
+			gStats.mInstructionCount.mRayQuery = shader_desc.InstructionCount;
+
+			if (gRenderer.mDumpRayQuery)
+			{
+				IDxcBlobEncoding* blob_disassembled = nullptr;
+				ComPtr<IDxcBlobUtf8> blob_disassembled_utf8 = nullptr;
+				DxcCompiler->Disassemble(blob_output.Get(), &blob_disassembled);
+				gValidate(DxcUtils->GetBlobAsUtf8(blob_disassembled, &blob_disassembled_utf8));
+				std::string shader_disassembled((char*)blob_disassembled_utf8->GetBufferPointer(), blob_disassembled_utf8->GetBufferSize() - 1);
+
+				shader_disassembled += "\n" + gGenerateShaderReflectionString(shader_desc);
+
+				std::filesystem::path path = gCreateDumpFolder();
+				path += "RayQueryCS.txt";
+				std::ofstream stream(path);
+				stream << shader_string;
+				stream << "\n";
+				stream << shader_disassembled;
+				stream.close();
+
+				gRenderer.mDumpRayQuery = false;
+			}
+		}
+#pragma warning(default: 6387)
 	}
 
-	return blob;
+	return blob_output;
 }
 
 bool gCreateVSPSPipelineState(const char* inShaderFileName, const char* inVSName, const char* inPSName, Shader& ioShader)

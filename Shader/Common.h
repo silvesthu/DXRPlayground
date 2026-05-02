@@ -3,6 +3,10 @@
 #include "packing.hlsli"
 #include "utils.hlsli"
 
+#ifndef SHADER_DEBUG
+#define SHADER_DEBUG 0
+#endif // SHADER_DEBUG
+
 #if NVAPI_LSS || NVAPI_SER
 #include "nvapi/nvHLSLExtns.h"
 #endif // NVAPI_LSS || NVAPI_SER
