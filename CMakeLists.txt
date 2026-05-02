@@ -20,6 +20,12 @@ set(BUILD_SAMPLE OFF CACHE BOOL "" FORCE)
 set(BUILD_DX11 OFF CACHE BOOL "" FORCE)
 add_subdirectory(Source/Thirdparty/DirectXTex)
 
+# Build meshoptimizer as a dependency target.
+set(MESHOPT_BUILD_DEMO OFF CACHE BOOL "" FORCE)
+set(MESHOPT_BUILD_GLTFPACK OFF CACHE BOOL "" FORCE)
+set(MESHOPT_INSTALL OFF CACHE BOOL "" FORCE)
+add_subdirectory(Source/Thirdparty/meshoptimizer)
+
 file(GLOB_RECURSE DXRPLAYGROUND_SOURCES CONFIGURE_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/Source/*.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/Source/*.cc"
@@ -118,6 +124,7 @@ target_link_directories(DXRPlayground PRIVATE
 
 target_link_libraries(DXRPlayground PRIVATE
   DirectXTex
+  meshoptimizer
   nvapi64.lib
 )
 

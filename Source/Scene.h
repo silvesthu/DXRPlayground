@@ -2,6 +2,8 @@
 
 #include "Common.h"
 
+#include <meshoptimizer.h>
+
 enum class GeometryType
 {
 	Triangles = 0,
@@ -54,7 +56,7 @@ struct InstanceInfo
 
 	struct Cluster
 	{
-		// std::vector<meshopt_Meshlet> mMeshlets;
+		std::vector<meshopt_Meshlet> mMeshlets;
 		std::vector<uint32_t> mVertices;
 		std::vector<uint8_t> mTriangles;
 
