@@ -76,6 +76,32 @@ struct Renderer
 	};
 	Runtime mRuntime;
 
+	struct Compiler
+	{
+		void									Initialize();
+		void									Finalize();
+
+		bool									CreateVSPSPipelineState(const char* inFileName, const char* inVSName, const char* inPSName, Shader& ioShader);
+		bool									CreateCSPipelineState(const char* inFileName, const char* inCSName, Shader& ioShader);
+		bool									CreateLibPipelineState(const char* inFileName, const wchar_t* inLibName, Shader& ioShader);
+		bool									CreatePipelineState(Shader& ioShader);
+		ComPtr<IDxcBlob>						Compile(const char* inFilename, const char* inEntryPoint, std::string_view inProfile);
+
+		ComPtr<ID3D12RootSignature>				CreateLocalRootSignature();
+		ComPtr<ID3D12RootSignature>				CreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC& desc);
+
+		ComPtr<ID3D12StateObject>				CreateStateObject(IDxcBlob* inBlob, Shader& ioShader);
+		ShaderTable								CreateShaderTable(const Shader& inShader);
+		Shader									CombineShader(const Shader& inBaseShader, std::span<Shader> inCollections);
+
+		HMODULE									mDxcompilerDll = NULL;
+		ComPtr<IDxcUtils>						mDxcUtils;
+		ComPtr<IDxcCompiler>					mDxcCompiler;
+		ComPtr<IDxcIncludeHandler>				mDxcIncludeHandler;
+		ComPtr<slang::IGlobalSession>			mGlobalSession;
+	};
+	Compiler mCompiler;
+
 	void										Initialize();
 	void										Finalize();
 
@@ -161,7 +187,7 @@ struct Renderer
 };
 extern Renderer									gRenderer;
 
-struct Timing
+struct GPUTiming
 {
 	UINT										mQueryHeapIndex = 0;
 	UINT64										mTimestampFrequency = 0;
@@ -187,12 +213,12 @@ struct Timing
 		mQueryHeapIndex = 0;
 	}
 };
-extern Timing									gTiming;
+extern GPUTiming								gGPUTiming;
 
 struct GPUTimingScope
 {
-	GPUTimingScope()							{ mTimestampBegin = gTiming.TimestampBegin(); }
-	~GPUTimingScope()							{ gTiming.TimestampEnd(mTimestampBegin, mDurationMSPtr); }
+	GPUTimingScope()							{ mTimestampBegin = gGPUTiming.TimestampBegin(); }
+	~GPUTimingScope()							{ gGPUTiming.TimestampEnd(mTimestampBegin, mDurationMSPtr); }
 
 	UINT64										mTimestampBegin = 0;
 	float*										mDurationMSPtr = nullptr;

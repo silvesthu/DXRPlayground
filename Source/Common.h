@@ -32,6 +32,7 @@ using Microsoft::WRL::ComPtr;
 #include "Thirdparty/DirectXTex/Common/d3dx12.h"
 #include "Thirdparty/DirectXTex/DirectXTex/DirectXTex.h"
 #include "Thirdparty/nvapi/nvapi.h"
+#include "Thirdparty/slang/include/slang.h"
 #include "ImGui/imgui_impl_helper.h"
 #include "ImGui/imgui_impl_dx12.h"
 #include "Thirdparty/implot/implot.h"
@@ -888,7 +889,7 @@ namespace ImGui
 	void Textures(std::span<Texture> inTextures, const std::string& inName = "Texture", ImGuiTreeNodeFlags inFlags = 0);
 }
 
-inline std::filesystem::path gCreateDumpFolder()
+inline std::filesystem::path gEnsureDumpDirectoryExists()
 {
 	std::filesystem::path directory = ".\\Dump\\";
 	std::filesystem::create_directory(directory);
@@ -896,16 +897,16 @@ inline std::filesystem::path gCreateDumpFolder()
 	return directory;
 }
 
-inline void gOpenDumpFolder()
+inline void gOpenDumpDirectoryInExplorer()
 {
 	std::filesystem::path command = "";
 	command += std::filesystem::current_path();
 	command += "\\";
-	command += gCreateDumpFolder();
+	command += gEnsureDumpDirectoryExists();
 	ShellExecuteA(nullptr, "explore", command.string().c_str(), nullptr, nullptr, SW_SHOWDEFAULT);
 }
 
-inline void gOpenSceneFolder(const std::string_view inPath)
+inline void gOpenSceneDirectoryInExplorer(const std::string_view inPath)
 {
 	std::filesystem::path command = "";
 	command += std::filesystem::current_path();

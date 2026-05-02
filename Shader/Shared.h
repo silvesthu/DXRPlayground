@@ -43,6 +43,12 @@ inline uint asuint(float x) { return std::bit_cast<uint>(x); }
 
 #endif // __cplusplus
 
+#ifdef __SLANG__
+#define MUTATING [mutating]
+#else
+#define MUTATING
+#endif
+
 #define CONCAT(a, b) CONCAT_INNER(a, b)
 #define CONCAT_INNER(a, b) a ## b
 #define GENERATE_PAD_NAME CONCAT(mPad_, __LINE__)
@@ -650,9 +656,9 @@ struct RayState
 		Done					= 1,
 	};
 
-	void						Set(uint inBits)				{ mBits |= inBits; }
-	void						Unset(uint inBits)				{ mBits &= ~inBits; }
-	void						Reset(uint inBits)				{ mBits = inBits; }
+	MUTATING void				Set(uint inBits)				{ mBits |= inBits; }
+	MUTATING void				Unset(uint inBits)				{ mBits &= ~inBits; }
+	MUTATING void				Reset(uint inBits)				{ mBits = inBits; }
 	bool						IsSet(uint inBits)				{ return (mBits & inBits) != 0; }
 
 	uint						mBits;

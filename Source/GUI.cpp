@@ -42,7 +42,7 @@ void gPrepareImGui()
 			SameLine();
 
 			if (Button("Open Scene Folder"))
-				gOpenSceneFolder(ScenePreset::sCurrent().mPath);
+				gOpenSceneDirectoryInExplorer(ScenePreset::sCurrent().mPath);
 		}
 		{
 			if (Button("Dump Luminance (F9)"))
@@ -51,7 +51,7 @@ void gPrepareImGui()
 			SameLine();
 
 			if (Button("Open Dump Folder"))
-				gOpenDumpFolder();
+				gOpenDumpDirectoryInExplorer();
 		}
 
 		if (TreeNodeEx("Debug", ImGuiTreeNodeFlags_DefaultOpen))

@@ -83,6 +83,6 @@ struct RayQuery
 #define NVAPI_SER 1
 
 #define __SHADER_TARGET_MAJOR 6
-#define __SHADER_TARGET_MINOR 7
+#define __SHADER_TARGET_MINOR 9
 
 #endif // __INTELLISENSE__

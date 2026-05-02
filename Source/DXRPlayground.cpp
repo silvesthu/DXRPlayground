@@ -129,7 +129,7 @@ static void sUpdate()
 			gDumpLuminance();
 
 		if (IsKeyPressed(ImGuiKey::ImGuiKey_F10))
-			gOpenDumpFolder();
+			gOpenDumpDirectoryInExplorer();
 
 		if (!IsAnyItemFocused() && IsKeyPressed(ImGuiKey::ImGuiKey_UpArrow))
 			gConstants.mPixelDebugCoord -= int2(0, 1);
@@ -829,7 +829,7 @@ void sRender()
 		if (!gHeadless)
 			gBarrierTransition(gCommandList, back_buffer, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
 
-		gTiming.FrameEnd(gRenderer.mRuntime.mQueryBuffer.mReadbackResource[gGetFrameContextIndex()].Get());
+		gGPUTiming.FrameEnd(gRenderer.mRuntime.mQueryBuffer.mReadbackResource[gGetFrameContextIndex()].Get());
 		gCommandList->Close();
 		gCommandQueue->ExecuteCommandLists(1, reinterpret_cast<ID3D12CommandList* const*>(&gCommandList));
 	}
@@ -844,7 +844,7 @@ void sRender()
 			DirectX::ScratchImage image;
 			DirectX::CaptureTexture(gCommandQueue, gCPUContext.mDumpTextureRef->mResource.Get(), false, image, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COMMON);
 
-			std::filesystem::path path = gCreateDumpFolder();
+			std::filesystem::path path = gEnsureDumpDirectoryExists();
 			path += gCPUContext.mDumpTextureRef->mName;
 			path += ".dds";
 			DirectX::SaveToDDSFile(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::DDS_FLAGS_NONE, path.c_str());
@@ -1049,7 +1049,7 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		desc.NodeMask = 1;
 		gValidate(gDevice->CreateCommandQueue(&desc, IID_PPV_ARGS(&gCommandQueue)));
 		gCommandQueue->SetName(L"gCommandQueue");
-		gCommandQueue->GetTimestampFrequency(&gTiming.mTimestampFrequency);
+		gCommandQueue->GetTimestampFrequency(&gGPUTiming.mTimestampFrequency);
 	}
 
 	// FrameContext

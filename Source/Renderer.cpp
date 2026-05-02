@@ -1,45 +1,119 @@
 #include "Renderer.h"
 #include "Atmosphere.h"
 #include "Cloud.h"
-#include "Thirdparty/slang/include/slang.h"
 
-HMODULE Dxcompiler_dll = NULL;
-ComPtr<IDxcUtils> DxcUtils;
-ComPtr<IDxcCompiler> DxcCompiler;
-ComPtr<IDxcIncludeHandler> DxcIncludeHandler;
-ComPtr<SlangSession> gSlangSession;
+namespace RendererHelper
+{
+	enum class D3D_SHADER_REQUIRES
+	{
+		REQUIRES_DOUBLES															= D3D_SHADER_REQUIRES_DOUBLES,
+		REQUIRES_EARLY_DEPTH_STENCIL												= D3D_SHADER_REQUIRES_EARLY_DEPTH_STENCIL,
+		REQUIRES_UAVS_AT_EVERY_STAGE												= D3D_SHADER_REQUIRES_UAVS_AT_EVERY_STAGE,
+		REQUIRES_64_UAVS															= D3D_SHADER_REQUIRES_64_UAVS,
+		REQUIRES_MINIMUM_PRECISION													= D3D_SHADER_REQUIRES_MINIMUM_PRECISION,
+		REQUIRES_11_1_DOUBLE_EXTENSIONS												= D3D_SHADER_REQUIRES_11_1_DOUBLE_EXTENSIONS,
+		REQUIRES_11_1_SHADER_EXTENSIONS												= D3D_SHADER_REQUIRES_11_1_SHADER_EXTENSIONS,
+		REQUIRES_LEVEL_9_COMPARISON_FILTERING										= D3D_SHADER_REQUIRES_LEVEL_9_COMPARISON_FILTERING,
+		REQUIRES_TILED_RESOURCES													= D3D_SHADER_REQUIRES_TILED_RESOURCES,
+		REQUIRES_STENCIL_REF														= D3D_SHADER_REQUIRES_STENCIL_REF,
+		REQUIRES_INNER_COVERAGE														= D3D_SHADER_REQUIRES_INNER_COVERAGE,
+		REQUIRES_TYPED_UAV_LOAD_ADDITIONAL_FORMATS									= D3D_SHADER_REQUIRES_TYPED_UAV_LOAD_ADDITIONAL_FORMATS,
+		REQUIRES_ROVS																= D3D_SHADER_REQUIRES_ROVS,
+		REQUIRES_VIEWPORT_AND_RT_ARRAY_INDEX_FROM_ANY_SHADER_FEEDING_RASTERIZER		= D3D_SHADER_REQUIRES_VIEWPORT_AND_RT_ARRAY_INDEX_FROM_ANY_SHADER_FEEDING_RASTERIZER,
+		REQUIRES_WAVE_OPS															= D3D_SHADER_REQUIRES_WAVE_OPS,
+		REQUIRES_INT64_OPS															= D3D_SHADER_REQUIRES_INT64_OPS,
+		REQUIRES_VIEW_ID															= D3D_SHADER_REQUIRES_VIEW_ID,
+		REQUIRES_BARYCENTRICS														= D3D_SHADER_REQUIRES_BARYCENTRICS,
+		REQUIRES_NATIVE_16BIT_OPS													= D3D_SHADER_REQUIRES_NATIVE_16BIT_OPS,
+		REQUIRES_SHADING_RATE														= D3D_SHADER_REQUIRES_SHADING_RATE,
+		REQUIRES_RAYTRACING_TIER_1_1												= D3D_SHADER_REQUIRES_RAYTRACING_TIER_1_1,
+		REQUIRES_SAMPLER_FEEDBACK													= D3D_SHADER_REQUIRES_SAMPLER_FEEDBACK,
+		REQUIRES_ATOMIC_INT64_ON_TYPED_RESOURCE										= D3D_SHADER_REQUIRES_ATOMIC_INT64_ON_TYPED_RESOURCE,
+		REQUIRES_ATOMIC_INT64_ON_GROUP_SHARED										= D3D_SHADER_REQUIRES_ATOMIC_INT64_ON_GROUP_SHARED,
+		REQUIRES_DERIVATIVES_IN_MESH_AND_AMPLIFICATION_SHADERS						= D3D_SHADER_REQUIRES_DERIVATIVES_IN_MESH_AND_AMPLIFICATION_SHADERS,
+		REQUIRES_RESOURCE_DESCRIPTOR_HEAP_INDEXING									= D3D_SHADER_REQUIRES_RESOURCE_DESCRIPTOR_HEAP_INDEXING,
+		REQUIRES_SAMPLER_DESCRIPTOR_HEAP_INDEXING									= D3D_SHADER_REQUIRES_SAMPLER_DESCRIPTOR_HEAP_INDEXING,
+		REQUIRES_WAVE_MMA															= D3D_SHADER_REQUIRES_WAVE_MMA,
+		REQUIRES_ATOMIC_INT64_ON_DESCRIPTOR_HEAP_RESOURCE							= D3D_SHADER_REQUIRES_ATOMIC_INT64_ON_DESCRIPTOR_HEAP_RESOURCE,
+		FEATURE_ADVANCED_TEXTURE_OPS												= D3D_SHADER_FEATURE_ADVANCED_TEXTURE_OPS,
+		FEATURE_WRITEABLE_MSAA_TEXTURES												= D3D_SHADER_FEATURE_WRITEABLE_MSAA_TEXTURES,
+	};
 
-void gInitializeDxcInterfaces()
+	std::string ShaderDescToString(const D3D12_SHADER_DESC& inShaderDesc)
+	{
+		std::string string;
+
+		string += "D3D12_SHADER_DESC\n";
+		string += std::format("\t{:64} = {}\n", "Version", gToString(inShaderDesc.Version).c_str());
+		string += std::format("\t{:64} = {}\n", "Creator", gToString(inShaderDesc.Creator).c_str());
+		string += std::format("\t{:64} = {}\n", "Flags", gToString(inShaderDesc.Flags).c_str());
+		string += std::format("\t{:64} = {}\n", "ConstantBuffers", gToString(inShaderDesc.ConstantBuffers).c_str());
+		string += std::format("\t{:64} = {}\n", "BoundResources", gToString(inShaderDesc.BoundResources).c_str());
+		string += std::format("\t{:64} = {}\n", "InputParameters", gToString(inShaderDesc.InputParameters).c_str());
+		string += std::format("\t{:64} = {}\n", "OutputParameters", gToString(inShaderDesc.OutputParameters).c_str());
+		string += std::format("\t{:64} = {}\n", "InstructionCount", gToString(inShaderDesc.InstructionCount).c_str());
+		string += std::format("\t{:64} = {}\n", "TempRegisterCount", gToString(inShaderDesc.TempRegisterCount).c_str());
+		string += std::format("\t{:64} = {}\n", "TempArrayCount", gToString(inShaderDesc.TempArrayCount).c_str());
+		string += std::format("\t{:64} = {}\n", "DefCount", gToString(inShaderDesc.DefCount).c_str());
+		string += std::format("\t{:64} = {}\n", "DclCount", gToString(inShaderDesc.DclCount).c_str());
+		string += std::format("\t{:64} = {}\n", "TextureNormalInstructions", gToString(inShaderDesc.TextureNormalInstructions).c_str());
+		string += std::format("\t{:64} = {}\n", "TextureLoadInstructions", gToString(inShaderDesc.TextureLoadInstructions).c_str());
+		string += std::format("\t{:64} = {}\n", "TextureCompInstructions", gToString(inShaderDesc.TextureCompInstructions).c_str());
+		string += std::format("\t{:64} = {}\n", "TextureBiasInstructions", gToString(inShaderDesc.TextureBiasInstructions).c_str());
+		string += std::format("\t{:64} = {}\n", "TextureGradientInstructions", gToString(inShaderDesc.TextureGradientInstructions).c_str());
+		string += std::format("\t{:64} = {}\n", "FloatInstructionCount", gToString(inShaderDesc.FloatInstructionCount).c_str());
+		string += std::format("\t{:64} = {}\n", "IntInstructionCount", gToString(inShaderDesc.IntInstructionCount).c_str());
+		string += std::format("\t{:64} = {}\n", "UintInstructionCount", gToString(inShaderDesc.UintInstructionCount).c_str());
+		string += std::format("\t{:64} = {}\n", "StaticFlowControlCount", gToString(inShaderDesc.StaticFlowControlCount).c_str());
+		string += std::format("\t{:64} = {}\n", "DynamicFlowControlCount", gToString(inShaderDesc.DynamicFlowControlCount).c_str());
+		string += std::format("\t{:64} = {}\n", "MacroInstructionCount", gToString(inShaderDesc.MacroInstructionCount).c_str());
+		string += std::format("\t{:64} = {}\n", "ArrayInstructionCount", gToString(inShaderDesc.ArrayInstructionCount).c_str());
+		string += std::format("\t{:64} = {}\n", "CutInstructionCount", gToString(inShaderDesc.CutInstructionCount).c_str());
+		string += std::format("\t{:64} = {}\n", "EmitInstructionCount", gToString(inShaderDesc.EmitInstructionCount).c_str());
+		string += std::format("\t{:64} = {}\n", "GSOutputTopology", gToString(inShaderDesc.GSOutputTopology).c_str());
+		string += std::format("\t{:64} = {}\n", "GSMaxOutputVertexCount", gToString(inShaderDesc.GSMaxOutputVertexCount).c_str());
+		string += std::format("\t{:64} = {}\n", "InputPrimitive", gToString(inShaderDesc.InputPrimitive).c_str());
+		string += std::format("\t{:64} = {}\n", "PatchConstantParameters", gToString(inShaderDesc.PatchConstantParameters).c_str());
+		string += std::format("\t{:64} = {}\n", "cGSInstanceCount", gToString(inShaderDesc.cGSInstanceCount).c_str());
+		string += std::format("\t{:64} = {}\n", "cControlPoints", gToString(inShaderDesc.cControlPoints).c_str());
+		string += std::format("\t{:64} = {}\n", "HSOutputPrimitive", gToString(inShaderDesc.HSOutputPrimitive).c_str());
+		string += std::format("\t{:64} = {}\n", "HSPartitioning", gToString(inShaderDesc.HSPartitioning).c_str());
+		string += std::format("\t{:64} = {}\n", "TessellatorDomain", gToString(inShaderDesc.TessellatorDomain).c_str());
+		string += std::format("\t{:64} = {}\n", "cBarrierInstructions", gToString(inShaderDesc.cBarrierInstructions).c_str());
+		string += std::format("\t{:64} = {}\n", "cInterlockedInstructions", gToString(inShaderDesc.cInterlockedInstructions).c_str());
+		string += std::format("\t{:64} = {}\n", "cTextureStoreInstructions", gToString(inShaderDesc.cTextureStoreInstructions).c_str());
+
+		return string;
+	}
+}
+
+void Renderer::Compiler::Initialize()
 {
 	// LoadLibraryW + GetProcAddress to eliminate dependency on .lib. Make updating .dll easier.
-	Dxcompiler_dll = LoadLibraryW(L"dxcompiler.dll");
-	gAssert(Dxcompiler_dll != NULL);
-	DxcCreateInstanceProc DxcCreateInstance = reinterpret_cast<DxcCreateInstanceProc>(GetProcAddress(Dxcompiler_dll, "DxcCreateInstance"));
+	mDxcompilerDll = LoadLibraryW(L"dxcompiler.dll");
+	gAssert(mDxcompilerDll != NULL);
+	DxcCreateInstanceProc DxcCreateInstance = reinterpret_cast<DxcCreateInstanceProc>(GetProcAddress(mDxcompilerDll, "DxcCreateInstance"));
 
 	// See https://simoncoenen.com/blog/programming/graphics/DxcRevised.html
-	DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(DxcUtils.GetAddressOf()));
+	DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(mDxcUtils.GetAddressOf()));
 
 	// [NOTE] There is also IDxcCompiler2, IDxcCompiler3. Improves on result handling.
 	// https://github.com/microsoft/DirectXShaderCompiler/wiki/Using-dxc.exe-and-dxcompiler.dll
-	DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(DxcCompiler.GetAddressOf()));
+	DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(mDxcCompiler.GetAddressOf()));
 
-	DxcUtils->CreateDefaultIncludeHandler(DxcIncludeHandler.GetAddressOf());
+	mDxcUtils->CreateDefaultIncludeHandler(mDxcIncludeHandler.GetAddressOf());
 
-	gSlangSession = spCreateSession();
-	gAssert(gSlangSession != nullptr);
+	slang::createGlobalSession(&mGlobalSession);
 }
 
-void gFinalizeDxcInterfaces()
+void Renderer::Compiler::Finalize()
 {
-	gSlangSession = nullptr;
-
-	DxcUtils = nullptr;
-	DxcCompiler = nullptr;
-	DxcIncludeHandler = nullptr;
-	FreeLibrary(Dxcompiler_dll);
+	HMODULE dxcompilerDll = mDxcompilerDll;
+	*this = {};
+	FreeLibrary(dxcompilerDll);
 }
 
-ComPtr<ID3D12RootSignature> gCreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC& desc)
+ComPtr<ID3D12RootSignature> Renderer::Compiler::CreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC& desc)
 {
 	ComPtr<ID3DBlob> signature_blob;
 	ComPtr<ID3DBlob> error_blob;
@@ -57,122 +131,7 @@ ComPtr<ID3D12RootSignature> gCreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC
 	return root_signature;
 }
 
-enum class D3D_SHADER_REQUIRES
-{
-	REQUIRES_DOUBLES																											= D3D_SHADER_REQUIRES_DOUBLES,
-	REQUIRES_EARLY_DEPTH_STENCIL																								= D3D_SHADER_REQUIRES_EARLY_DEPTH_STENCIL,
-	REQUIRES_UAVS_AT_EVERY_STAGE																								= D3D_SHADER_REQUIRES_UAVS_AT_EVERY_STAGE,
-	REQUIRES_64_UAVS																											= D3D_SHADER_REQUIRES_64_UAVS,
-	REQUIRES_MINIMUM_PRECISION																									= D3D_SHADER_REQUIRES_MINIMUM_PRECISION,
-	REQUIRES_11_1_DOUBLE_EXTENSIONS																								= D3D_SHADER_REQUIRES_11_1_DOUBLE_EXTENSIONS,
-	REQUIRES_11_1_SHADER_EXTENSIONS																								= D3D_SHADER_REQUIRES_11_1_SHADER_EXTENSIONS,
-	REQUIRES_LEVEL_9_COMPARISON_FILTERING																						= D3D_SHADER_REQUIRES_LEVEL_9_COMPARISON_FILTERING,
-	REQUIRES_TILED_RESOURCES																									= D3D_SHADER_REQUIRES_TILED_RESOURCES,
-	REQUIRES_STENCIL_REF																										= D3D_SHADER_REQUIRES_STENCIL_REF,
-	REQUIRES_INNER_COVERAGE																										= D3D_SHADER_REQUIRES_INNER_COVERAGE,
-	REQUIRES_TYPED_UAV_LOAD_ADDITIONAL_FORMATS																					= D3D_SHADER_REQUIRES_TYPED_UAV_LOAD_ADDITIONAL_FORMATS,
-	REQUIRES_ROVS																												= D3D_SHADER_REQUIRES_ROVS,
-	REQUIRES_VIEWPORT_AND_RT_ARRAY_INDEX_FROM_ANY_SHADER_FEEDING_RASTERIZER														= D3D_SHADER_REQUIRES_VIEWPORT_AND_RT_ARRAY_INDEX_FROM_ANY_SHADER_FEEDING_RASTERIZER,
-	REQUIRES_WAVE_OPS																											= D3D_SHADER_REQUIRES_WAVE_OPS,
-	REQUIRES_INT64_OPS																											= D3D_SHADER_REQUIRES_INT64_OPS,
-	REQUIRES_VIEW_ID																											= D3D_SHADER_REQUIRES_VIEW_ID,
-	REQUIRES_BARYCENTRICS																										= D3D_SHADER_REQUIRES_BARYCENTRICS,
-	REQUIRES_NATIVE_16BIT_OPS																									= D3D_SHADER_REQUIRES_NATIVE_16BIT_OPS,
-	REQUIRES_SHADING_RATE																										= D3D_SHADER_REQUIRES_SHADING_RATE,
-	REQUIRES_RAYTRACING_TIER_1_1																								= D3D_SHADER_REQUIRES_RAYTRACING_TIER_1_1,
-	REQUIRES_SAMPLER_FEEDBACK																									= D3D_SHADER_REQUIRES_SAMPLER_FEEDBACK,
-	REQUIRES_ATOMIC_INT64_ON_TYPED_RESOURCE																						= D3D_SHADER_REQUIRES_ATOMIC_INT64_ON_TYPED_RESOURCE,
-	REQUIRES_ATOMIC_INT64_ON_GROUP_SHARED																						= D3D_SHADER_REQUIRES_ATOMIC_INT64_ON_GROUP_SHARED,
-	REQUIRES_DERIVATIVES_IN_MESH_AND_AMPLIFICATION_SHADERS																		= D3D_SHADER_REQUIRES_DERIVATIVES_IN_MESH_AND_AMPLIFICATION_SHADERS,
-	REQUIRES_RESOURCE_DESCRIPTOR_HEAP_INDEXING																					= D3D_SHADER_REQUIRES_RESOURCE_DESCRIPTOR_HEAP_INDEXING,
-	REQUIRES_SAMPLER_DESCRIPTOR_HEAP_INDEXING																					= D3D_SHADER_REQUIRES_SAMPLER_DESCRIPTOR_HEAP_INDEXING,
-	REQUIRES_WAVE_MMA																											= D3D_SHADER_REQUIRES_WAVE_MMA,
-	REQUIRES_ATOMIC_INT64_ON_DESCRIPTOR_HEAP_RESOURCE																			= D3D_SHADER_REQUIRES_ATOMIC_INT64_ON_DESCRIPTOR_HEAP_RESOURCE,
-	FEATURE_ADVANCED_TEXTURE_OPS																								= D3D_SHADER_FEATURE_ADVANCED_TEXTURE_OPS,
-	FEATURE_WRITEABLE_MSAA_TEXTURES																								= D3D_SHADER_FEATURE_WRITEABLE_MSAA_TEXTURES,
-};
-
-void gExtractShaderReflection(ComPtr<IDxcBlob> inBlob, D3D12_SHADER_DESC& outShaderDesc, D3D_SHADER_REQUIRES& ouShaderRequires)
-{
-	DxcBuffer dxc_buffer{ .Ptr = inBlob->GetBufferPointer(), .Size = inBlob->GetBufferSize(), .Encoding = DXC_CP_ACP };
-	ComPtr<ID3D12ShaderReflection> shader_reflection;
-	DxcUtils->CreateReflection(&dxc_buffer, IID_PPV_ARGS(&shader_reflection));
-
-	shader_reflection->GetDesc(&outShaderDesc);
-
-	ouShaderRequires = (D3D_SHADER_REQUIRES)shader_reflection->GetRequiresFlags();
-}
-
-std::string gGenerateShaderReflectionString(const D3D12_SHADER_DESC& inShaderDesc)
-{
-	std::string string;
-
-	string += "D3D12_SHADER_DESC\n";
-    string += std::format("\t{:64} = {}\n", "Version",								gToString(inShaderDesc.Version).c_str());
-	string += std::format("\t{:64} = {}\n", "Creator",								gToString(inShaderDesc.Creator).c_str());
-	string += std::format("\t{:64} = {}\n", "Flags",								gToString(inShaderDesc.Flags).c_str());
-	string += std::format("\t{:64} = {}\n", "ConstantBuffers",						gToString(inShaderDesc.ConstantBuffers).c_str());
-	string += std::format("\t{:64} = {}\n", "BoundResources",						gToString(inShaderDesc.BoundResources).c_str());
-	string += std::format("\t{:64} = {}\n", "InputParameters",						gToString(inShaderDesc.InputParameters).c_str());
-	string += std::format("\t{:64} = {}\n", "OutputParameters",						gToString(inShaderDesc.OutputParameters).c_str());
-	string += std::format("\t{:64} = {}\n", "InstructionCount",						gToString(inShaderDesc.InstructionCount).c_str());
-	string += std::format("\t{:64} = {}\n", "TempRegisterCount",					gToString(inShaderDesc.TempRegisterCount).c_str());
-	string += std::format("\t{:64} = {}\n", "TempArrayCount",						gToString(inShaderDesc.TempArrayCount).c_str());
-	string += std::format("\t{:64} = {}\n", "DefCount",								gToString(inShaderDesc.DefCount).c_str());
-	string += std::format("\t{:64} = {}\n", "DclCount",								gToString(inShaderDesc.DclCount).c_str());
-	string += std::format("\t{:64} = {}\n", "TextureNormalInstructions",			gToString(inShaderDesc.TextureNormalInstructions).c_str());
-	string += std::format("\t{:64} = {}\n", "TextureLoadInstructions",				gToString(inShaderDesc.TextureLoadInstructions).c_str());
-	string += std::format("\t{:64} = {}\n", "TextureCompInstructions",				gToString(inShaderDesc.TextureCompInstructions).c_str());
-	string += std::format("\t{:64} = {}\n", "TextureBiasInstructions",				gToString(inShaderDesc.TextureBiasInstructions).c_str());
-	string += std::format("\t{:64} = {}\n", "TextureGradientInstructions",			gToString(inShaderDesc.TextureGradientInstructions).c_str());
-	string += std::format("\t{:64} = {}\n", "FloatInstructionCount",				gToString(inShaderDesc.FloatInstructionCount).c_str());
-	string += std::format("\t{:64} = {}\n", "IntInstructionCount",					gToString(inShaderDesc.IntInstructionCount).c_str());
-	string += std::format("\t{:64} = {}\n", "UintInstructionCount",					gToString(inShaderDesc.UintInstructionCount).c_str());
-	string += std::format("\t{:64} = {}\n", "StaticFlowControlCount",				gToString(inShaderDesc.StaticFlowControlCount).c_str());
-	string += std::format("\t{:64} = {}\n", "DynamicFlowControlCount",				gToString(inShaderDesc.DynamicFlowControlCount).c_str());
-	string += std::format("\t{:64} = {}\n", "MacroInstructionCount",				gToString(inShaderDesc.MacroInstructionCount).c_str());
-	string += std::format("\t{:64} = {}\n", "ArrayInstructionCount",				gToString(inShaderDesc.ArrayInstructionCount).c_str());
-	string += std::format("\t{:64} = {}\n", "CutInstructionCount",					gToString(inShaderDesc.CutInstructionCount).c_str());
-	string += std::format("\t{:64} = {}\n", "EmitInstructionCount",					gToString(inShaderDesc.EmitInstructionCount).c_str());
-	string += std::format("\t{:64} = {}\n", "GSOutputTopology",						gToString(inShaderDesc.GSOutputTopology).c_str());
-	string += std::format("\t{:64} = {}\n", "GSMaxOutputVertexCount",				gToString(inShaderDesc.GSMaxOutputVertexCount).c_str());
-	string += std::format("\t{:64} = {}\n", "InputPrimitive",						gToString(inShaderDesc.InputPrimitive).c_str());
-	string += std::format("\t{:64} = {}\n", "PatchConstantParameters",				gToString(inShaderDesc.PatchConstantParameters).c_str());
-	string += std::format("\t{:64} = {}\n", "cGSInstanceCount",						gToString(inShaderDesc.cGSInstanceCount).c_str());
-	string += std::format("\t{:64} = {}\n", "cControlPoints",						gToString(inShaderDesc.cControlPoints).c_str());
-	string += std::format("\t{:64} = {}\n", "HSOutputPrimitive",					gToString(inShaderDesc.HSOutputPrimitive).c_str());
-	string += std::format("\t{:64} = {}\n", "HSPartitioning",						gToString(inShaderDesc.HSPartitioning).c_str());
-	string += std::format("\t{:64} = {}\n", "TessellatorDomain",					gToString(inShaderDesc.TessellatorDomain).c_str());
-	string += std::format("\t{:64} = {}\n", "cBarrierInstructions",					gToString(inShaderDesc.cBarrierInstructions).c_str());
-	string += std::format("\t{:64} = {}\n", "cInterlockedInstructions",				gToString(inShaderDesc.cInterlockedInstructions).c_str());
-	string += std::format("\t{:64} = {}\n", "cTextureStoreInstructions",			gToString(inShaderDesc.cTextureStoreInstructions).c_str());
-
-	return string;
-}
-
-void gInspectLibraryReflection(ComPtr<IDxcBlob> inBlob, Shader& ioShader)
-{
-	// For debug only
-	
-	UNUSED(ioShader);
-
-	// Note function name here is mangled, and other information does not seem reliable...
-
-	DxcBuffer dxc_buffer{ .Ptr = inBlob->GetBufferPointer(), .Size = inBlob->GetBufferSize(), .Encoding = DXC_CP_ACP };
-	ComPtr<ID3D12LibraryReflection> library_reflection;
-	DxcUtils->CreateReflection(&dxc_buffer, IID_PPV_ARGS(&library_reflection));
-
-	D3D12_LIBRARY_DESC library_desc;
-	library_reflection->GetDesc(&library_desc);
-	UNUSED(library_desc);
-
-	ID3D12FunctionReflection* function_reflection = library_reflection->GetFunctionByIndex(0);
-	D3D12_FUNCTION_DESC function_desc;
-	function_reflection->GetDesc(&function_desc);
-	UNUSED(function_desc);
-}
-
-ComPtr<ID3D12StateObject> gCreateStateObject(IDxcBlob* inBlob, Shader& ioShader)
+ComPtr<ID3D12StateObject> Renderer::Compiler::CreateStateObject(IDxcBlob* inBlob, Shader& ioShader)
 {
 	// See D3D12_STATE_SUBOBJECT_TYPE
 	// https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#d3d12_state_subobject_type
@@ -230,7 +189,7 @@ ComPtr<ID3D12StateObject> gCreateStateObject(IDxcBlob* inBlob, Shader& ioShader)
 	return state_object;
 }
 
-void gCombineShader(const Shader& inBaseShader, std::span<Shader> inCollections, Shader& outShader)
+Shader Renderer::Compiler::CombineShader(const Shader& inBaseShader, std::span<Shader> inCollections)
 {
 	std::vector<D3D12_STATE_SUBOBJECT> subobjects;
 	subobjects.resize(1 /* D3D12_STATE_OBJECT_CONFIG */ + inCollections.size());
@@ -255,8 +214,10 @@ void gCombineShader(const Shader& inBaseShader, std::span<Shader> inCollections,
 	ComPtr<ID3D12StateObject> state_object;
 	gValidate(gDevice->AddToStateObject(&desc, inBaseShader.mData.mStateObject.Get(), IID_PPV_ARGS(state_object.GetAddressOf())));
 
-	outShader.mData = inBaseShader.mData;
-	outShader.mData.mStateObject = state_object;
+	Shader output = {};
+	output.mData = inBaseShader.mData;
+	output.mData.mStateObject = state_object;
+	return output;
 }
 
 struct ShaderIdentifier
@@ -277,7 +238,7 @@ struct ShaderTableEntry
 static_assert(sizeof(ShaderTableEntry::mShaderIdentifier) == D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES, "D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES check failed");
 static_assert(sizeof(ShaderTableEntry) % D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT == 0, "D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT check failed");
 
-ComPtr<ID3D12RootSignature> gCreateLocalRootSignature()
+ComPtr<ID3D12RootSignature> Renderer::Compiler::CreateLocalRootSignature()
 {
 	D3D12_DESCRIPTOR_RANGE srv_range =
 	{
@@ -310,7 +271,7 @@ ComPtr<ID3D12RootSignature> gCreateLocalRootSignature()
 		// D3D12_ROOT_PARAMETER {.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE, .DescriptorTable = D3D12_ROOT_DESCRIPTOR_TABLE {.NumDescriptorRanges = 1, .pDescriptorRanges = &nvapi_range } },
 	};
 
-	ComPtr<ID3D12RootSignature> local_root_signature = gCreateRootSignature(
+	ComPtr<ID3D12RootSignature> local_root_signature = CreateRootSignature(
 		D3D12_ROOT_SIGNATURE_DESC
 		{
 			.NumParameters = gArraySize(local_root_parameters),
@@ -322,7 +283,7 @@ ComPtr<ID3D12RootSignature> gCreateLocalRootSignature()
 	return local_root_signature;
 }
 
-ShaderTable gCreateShaderTable(const Shader& inShader)
+ShaderTable Renderer::Compiler::CreateShaderTable(const Shader& inShader)
 {
 	ShaderTable shader_table;
 	if (inShader.mData.mStateObject == nullptr)
@@ -440,8 +401,7 @@ ShaderTable gCreateShaderTable(const Shader& inShader)
 	return shader_table;
 }
 
-
-ComPtr<IDxcBlob> gCompileShader(const char* inFilename, const char* inEntryPoint, std::string_view inProfile)
+ComPtr<IDxcBlob> Renderer::Compiler::Compile(const char* inFilename, const char* inEntryPoint, std::string_view inProfile)
 {
 	// Generated header
 	std::string shader_header;
@@ -503,60 +463,68 @@ ComPtr<IDxcBlob> gCompileShader(const char* inFilename, const char* inEntryPoint
 	ComPtr<IDxcBlob> blob_output;
 	if (gToLower(std::filesystem::path(inFilename).extension().string()) == ".slang")
 	{
-		ComPtr<SlangCompileRequest> request_ptr = spCreateCompileRequest(gSlangSession.Get());
-		SlangCompileRequest* request = request_ptr.Get();
-		gAssert(request != nullptr);
+		using namespace slang;
 
-		std::filesystem::path shader_path = std::filesystem::path(inFilename);
-		spAddSearchPath(request, shader_path.parent_path().string().c_str());
-
-		// Target & Profile
-		const int target_index = spAddCodeGenTarget(request, SLANG_DXIL);
-		SlangProfileID profile_id = spFindProfile(gSlangSession.Get(), inProfile.data());
-		gAssert(profile_id != SLANG_PROFILE_UNKNOWN);
-		spSetTargetProfile(request, target_index, profile_id);
-
-		// Various options
-		spSetPassThrough(request, SLANG_PASS_THROUGH_DXC);
-		spSetMatrixLayoutMode(request, SLANG_MATRIX_LAYOUT_COLUMN_MAJOR);
-		spSetDebugInfoLevel(request, gConfigs.mShaderDebug ? SLANG_DEBUG_INFO_LEVEL_MAXIMAL : SLANG_DEBUG_INFO_LEVEL_STANDARD);
-		spSetOptimizationLevel(request, gConfigs.mShaderDebug ? SLANG_OPTIMIZATION_LEVEL_NONE : SLANG_OPTIMIZATION_LEVEL_HIGH);
-
-		// Macros, seems defines passed by this function can not be used as constexpr, embed all macros in shader code instead
-		// spAddPreprocessorDefine
-
-		// TranslationUnit
-		int translation_unit_index = spAddTranslationUnit(request, SLANG_SOURCE_LANGUAGE_SLANG, "shader");
-		spAddTranslationUnitSourceString(request, translation_unit_index, inFilename, shader_string.c_str());
-
-		// EntryPoint
-		SlangStage stage = SLANG_STAGE_NONE;
-		if (inProfile.starts_with("cs")) { stage = SLANG_STAGE_COMPUTE; }
-		else if (inProfile.starts_with("vs")) { stage = SLANG_STAGE_VERTEX; }
-		else if (inProfile.starts_with("ps")) { stage = SLANG_STAGE_FRAGMENT; }
-		else { gAssert(false); }
-		const int entry_point_index = spAddEntryPoint(request, translation_unit_index, inEntryPoint, stage);
-		gAssert(entry_point_index >= 0);
-
-		// Compile
-		if (SLANG_FAILED(spCompile(request)))
+		auto trace_blob = [](ComPtr<IBlob>& blob)
 		{
-			gTrace(spGetDiagnosticOutput(request));
-			return nullptr;
-		}
+			if (blob == nullptr) { return; }
+			std::string_view blob_string((const char*)blob->getBufferPointer(), blob->getBufferSize());
+			gTrace(blob_string);
+		};
 
-		// Blob
-		ComPtr<ISlangBlob> blob_code;
-		if (SLANG_FAILED(spGetEntryPointCodeBlob(request, entry_point_index, target_index, &blob_code)) || blob_code == nullptr)
+		TargetDesc target = {};
+		target.format = SLANG_DXIL;
+		target.profile = mGlobalSession->findProfile(inProfile.data());
+
+		SessionDesc sessionDesc = {};
+		sessionDesc.targets = &target;
+		sessionDesc.targetCount = 1;
+		sessionDesc.defaultMatrixLayoutMode = SLANG_MATRIX_LAYOUT_COLUMN_MAJOR;
+
+		ComPtr<ISession> session;
+		mGlobalSession->createSession(sessionDesc, &session);
+
+		ComPtr<IBlob> diagnostics;
+		ComPtr<IModule> module(session->loadModuleFromSourceString(inFilename, inFilename, shader_string.data(), &diagnostics));
+		trace_blob(diagnostics);
+
+		ComPtr<IEntryPoint> entryPoint;
+		gValidate(module->findEntryPointByName(inEntryPoint, &entryPoint));
+
+		IComponentType* components[] = { module.Get(), entryPoint.Get() };
+		ComPtr<IComponentType> program;
+		gValidate(session->createCompositeComponentType(components, 2, &program, &diagnostics));
+		trace_blob(diagnostics);
+
+		std::string downstreamArgs;
+		for (auto&& argument : arguments)
+			downstreamArgs += gToUTF8String(argument) + "\n";
+		downstreamArgs.pop_back(); // pop last '\n'
+		std::replace(downstreamArgs.begin(), downstreamArgs.end(), ' ', '\n');
+		CompilerOptionEntry options[] =
 		{
-			gTrace(spGetDiagnosticOutput(request));
-			return nullptr;
-		}
+			{
+				.name = CompilerOptionName::DownstreamArgs,
+				.value = {.kind = CompilerOptionValueKind::String, .stringValue0 = "dxc", .stringValue1 = downstreamArgs.data() },
+			},
+			{
+				.name = CompilerOptionName::DebugInformation,
+				.value = {.kind = CompilerOptionValueKind::Int, .intValue0 = int32_t(gConfigs.mShaderDebug ? SLANG_DEBUG_INFO_LEVEL_MAXIMAL : SLANG_DEBUG_INFO_LEVEL_STANDARD) },
+			},
+			{
+				.name = CompilerOptionName::Optimization,
+				.value = {.kind = CompilerOptionValueKind::Int, .intValue0 = int32_t(gConfigs.mShaderDebug ? SLANG_OPTIMIZATION_LEVEL_NONE : SLANG_OPTIMIZATION_LEVEL_HIGH) },
+			},
+		};
 
-		ComPtr<IDxcBlobEncoding> dxc_blob_encoding;
-		gValidate(DxcUtils->CreateBlob(blob_code->getBufferPointer(), static_cast<UINT32>(blob_code->getBufferSize()), CP_UTF8, dxc_blob_encoding.GetAddressOf()));
+		ComPtr<IComponentType> linkedProgram;
+		gValidate(program->linkWithOptions(&linkedProgram, gArraySize(options), options, &diagnostics));
+		trace_blob(diagnostics);
 
-		gValidate(dxc_blob_encoding.As(&blob_output));
+		ComPtr<IBlob> dxilBlob;
+		gValidate(linkedProgram->getEntryPointCode(0, 0, &dxilBlob, &diagnostics));
+		trace_blob(diagnostics);
+		gValidate(dxilBlob.As(&blob_output));
 	}
 	else
 	{
@@ -565,16 +533,16 @@ ComPtr<IDxcBlob> gCompileShader(const char* inFilename, const char* inEntryPoint
 		std::wstring wfilename(filename.begin(), filename.end());
 
 		IDxcBlobEncoding* blob_encoding = nullptr;
-		gValidate(DxcUtils->CreateBlobFromPinned(shader_string.c_str(), static_cast<uint32_t>(shader_string.length()), CP_UTF8, &blob_encoding));
+		gValidate(mDxcUtils->CreateBlobFromPinned(shader_string.c_str(), static_cast<uint32_t>(shader_string.length()), CP_UTF8, &blob_encoding));
 		IDxcOperationResult* operation_result = nullptr;
-		gValidate(DxcCompiler->Compile(
+		gValidate(mDxcCompiler->Compile(
 			blob_encoding,												// program text
 			wfilename.c_str(),											// file name, mostly for error messages
 			entry_point.c_str(),										// entry point function
 			gToWString(inProfile).c_str(),								// target profile
 			arguments.data(), static_cast<UINT32>(arguments.size()),	// compilation arguments and their count
 			nullptr, 0,													// name/value defines and their count
-			DxcIncludeHandler.Get(),									// handler for #include directives
+			mDxcIncludeHandler.Get(),									// handler for #include directives
 			&operation_result));
 
 		HRESULT compile_result;
@@ -585,7 +553,7 @@ ComPtr<IDxcBlob> gCompileShader(const char* inFilename, const char* inEntryPoint
 			IDxcBlobUtf8* blob_error_utf8 = nullptr;
 			gValidate(operation_result->GetErrorBuffer(&blob_error));
 			// We can use the library to get our preferred encoding.
-			gValidate(DxcUtils->GetBlobAsUtf8(blob_error, &blob_error_utf8));
+			gValidate(mDxcUtils->GetBlobAsUtf8(blob_error, &blob_error_utf8));
 			std::string str((char*)blob_error_utf8->GetBufferPointer(), blob_error_utf8->GetBufferSize() - 1);
 			gTrace(str.c_str());
 			blob_error->Release();
@@ -596,27 +564,34 @@ ComPtr<IDxcBlob> gCompileShader(const char* inFilename, const char* inEntryPoint
 
 		if (std::string_view("RayQueryCS") == inEntryPoint)
 		{
+			DxcBuffer dxc_buffer{ .Ptr = blob_output->GetBufferPointer(), .Size = blob_output->GetBufferSize(), .Encoding = DXC_CP_ACP };
+			ComPtr<ID3D12ShaderReflection> shader_reflection;
+			mDxcUtils->CreateReflection(&dxc_buffer, IID_PPV_ARGS(&shader_reflection));
+
+			using RendererHelper::D3D_SHADER_REQUIRES;
+			D3D_SHADER_REQUIRES shader_requires = (D3D_SHADER_REQUIRES)shader_reflection->GetRequiresFlags();
+			gAssert(((uint)shader_requires & (uint)D3D_SHADER_REQUIRES::REQUIRES_DOUBLES) == 0);
+
 			D3D12_SHADER_DESC shader_desc;
-			D3D_SHADER_REQUIRES shader_requires;
-			gExtractShaderReflection(blob_output, shader_desc, shader_requires);
+			shader_reflection->GetDesc(&shader_desc);
 			gStats.mInstructionCount.mRayQuery = shader_desc.InstructionCount;
 
 			if (gRenderer.mDumpRayQuery)
 			{
 				IDxcBlobEncoding* blob_disassembled = nullptr;
 				ComPtr<IDxcBlobUtf8> blob_disassembled_utf8 = nullptr;
-				DxcCompiler->Disassemble(blob_output.Get(), &blob_disassembled);
-				gValidate(DxcUtils->GetBlobAsUtf8(blob_disassembled, &blob_disassembled_utf8));
-				std::string shader_disassembled((char*)blob_disassembled_utf8->GetBufferPointer(), blob_disassembled_utf8->GetBufferSize() - 1);
+				mDxcCompiler->Disassemble(blob_output.Get(), &blob_disassembled);
+				gValidate(mDxcUtils->GetBlobAsUtf8(blob_disassembled, &blob_disassembled_utf8));
+				std::string_view shader_disassembled((char*)blob_disassembled_utf8->GetBufferPointer(), blob_disassembled_utf8->GetBufferSize());
 
-				shader_disassembled += "\n" + gGenerateShaderReflectionString(shader_desc);
-
-				std::filesystem::path path = gCreateDumpFolder();
+				std::filesystem::path path = gEnsureDumpDirectoryExists();
 				path += "RayQueryCS.txt";
 				std::ofstream stream(path);
 				stream << shader_string;
 				stream << "\n";
 				stream << shader_disassembled;
+				stream << "\n";
+				stream << RendererHelper::ShaderDescToString(shader_desc);
 				stream.close();
 
 				gRenderer.mDumpRayQuery = false;
@@ -628,10 +603,10 @@ ComPtr<IDxcBlob> gCompileShader(const char* inFilename, const char* inEntryPoint
 	return blob_output;
 }
 
-bool gCreateVSPSPipelineState(const char* inShaderFileName, const char* inVSName, const char* inPSName, Shader& ioShader)
+bool Renderer::Compiler::CreateVSPSPipelineState(const char* inFileName, const char* inVSName, const char* inPSName, Shader& ioShader)
 {
-	ComPtr<IDxcBlob> vs_blob = gCompileShader(inShaderFileName, inVSName, "vs_6_9");
-	ComPtr<IDxcBlob> ps_blob = gCompileShader(inShaderFileName, inPSName, "ps_6_9");
+	ComPtr<IDxcBlob> vs_blob = Compile(inFileName, inVSName, "vs_6_9");
+	ComPtr<IDxcBlob> ps_blob = Compile(inFileName, inPSName, "ps_6_9");
 	if (vs_blob == nullptr || ps_blob == nullptr)
 		return false;
 
@@ -674,9 +649,9 @@ bool gCreateVSPSPipelineState(const char* inShaderFileName, const char* inVSName
 	return true;
 }
 
-bool gCreateCSPipelineState(const char* inShaderFileName, const char* inCSName, Shader& ioShader)
+bool Renderer::Compiler::CreateCSPipelineState(const char* inFileName, const char* inCSName, Shader& ioShader)
 {
-	ComPtr<IDxcBlob> blob = gCompileShader(inShaderFileName, inCSName, "cs_6_9");
+	ComPtr<IDxcBlob> blob = Compile(inFileName, inCSName, "cs_6_9");
 	if (blob == nullptr)
 		return false;
 
@@ -699,9 +674,9 @@ bool gCreateCSPipelineState(const char* inShaderFileName, const char* inCSName, 
 	return true;
 }
 
-bool gCreateLibPipelineState(const char* inShaderFileName, const wchar_t* inLibName, Shader& ioShader)
+bool Renderer::Compiler::CreateLibPipelineState(const char* inFileName, const wchar_t* inLibName, Shader& ioShader)
 {
-	ComPtr<IDxcBlob> blob = gCompileShader(inShaderFileName, "", "lib_6_9");
+	ComPtr<IDxcBlob> blob = Compile(inFileName, "", "lib_6_9");
 	if (blob == nullptr)
 		return false;
 
@@ -709,7 +684,7 @@ bool gCreateLibPipelineState(const char* inShaderFileName, const wchar_t* inLibN
 		return false;
 
 	std::vector<const wchar_t*> hit_shader_names;
-	ComPtr<ID3D12StateObject> pipeline_object = gCreateStateObject(blob.Get(), ioShader);
+	ComPtr<ID3D12StateObject> pipeline_object = CreateStateObject(blob.Get(), ioShader);
 	if (pipeline_object == nullptr)
 		return false;
 
@@ -720,24 +695,23 @@ bool gCreateLibPipelineState(const char* inShaderFileName, const wchar_t* inLibN
 	return true;
 }
 
-bool gCreatePipelineState(Shader& ioShader)
+bool Renderer::Compiler::CreatePipelineState(Shader& ioShader)
 {
 	if (ioShader.mRayGenerationName != nullptr)
-		return gCreateLibPipelineState(ioShader.mFileName, ioShader.mRayGenerationName, ioShader);
+		return CreateLibPipelineState(ioShader.mFileName, ioShader.mRayGenerationName, ioShader);
 	else if (ioShader.mMissName != nullptr)
-		return gCreateLibPipelineState(ioShader.mFileName, ioShader.mMissName, ioShader);
+		return CreateLibPipelineState(ioShader.mFileName, ioShader.mMissName, ioShader);
 	else if (ioShader.HitName() != nullptr)
-		return gCreateLibPipelineState(ioShader.mFileName, ioShader.HitName(), ioShader);
+		return CreateLibPipelineState(ioShader.mFileName, ioShader.HitName(), ioShader);
 	else if (ioShader.mCSName != nullptr)
-		return gCreateCSPipelineState(ioShader.mFileName, ioShader.mCSName, ioShader);
+		return CreateCSPipelineState(ioShader.mFileName, ioShader.mCSName, ioShader);
 	else
-		return gCreateVSPSPipelineState(ioShader.mFileName, ioShader.mVSName, ioShader.mPSName, ioShader);
+		return CreateVSPSPipelineState(ioShader.mFileName, ioShader.mVSName, ioShader.mPSName, ioShader);
 }
-
 
 void Renderer::Initialize()
 {
-	gInitializeDxcInterfaces();
+	mCompiler.Initialize();
 
 	for (auto&& texture : mRuntime.mTextures)
 		texture.Initialize();
@@ -752,7 +726,7 @@ void Renderer::Initialize()
 void Renderer::Finalize()
 {
 	mRuntime.Reset();
-	gFinalizeDxcInterfaces();
+	mCompiler.Finalize();
 }
 
 void Renderer::Render()
@@ -830,27 +804,27 @@ void Renderer::FinalizeScreenSizeTextures()
 
 void Renderer::InitializeShaders()
 {
-	for (auto&& shader : gRenderer.mRuntime.mShaders)
-		gCreatePipelineState(shader);
+	for (auto&& shader : mRuntime.mShaders)
+		mCompiler.CreatePipelineState(shader);
 
-	gRenderer.mRuntime.mLibLocalRootSignature = gCreateLocalRootSignature();
-	gCreatePipelineState(gRenderer.mRuntime.mRayGenerationShader);
-	for (auto&& shader : gRenderer.mRuntime.mCollectionShaders)
-		gCreatePipelineState(shader);
-	gCombineShader(gRenderer.mRuntime.mRayGenerationShader, gRenderer.mRuntime.mCollectionShaders, gRenderer.mRuntime.mLibShader);
-	gRenderer.mRuntime.mLibShaderTable = gCreateShaderTable(gRenderer.mRuntime.mLibShader);
+	mRuntime.mLibLocalRootSignature		= mCompiler.CreateLocalRootSignature();
+	mCompiler.CreatePipelineState(mRuntime.mRayGenerationShader);
+	for (auto&& shader : mRuntime.mCollectionShaders)
+		mCompiler.CreatePipelineState(shader);
+	mRuntime.mLibShader					= mCompiler.CombineShader(mRuntime.mRayGenerationShader, mRuntime.mCollectionShaders);
+	mRuntime.mLibShaderTable			= mCompiler.CreateShaderTable(mRuntime.mLibShader);
 
 	if (gAtmosphere.mEnabled)
 	{
 		for (auto&& shaders : gAtmosphere.mRuntime.mShadersSet)
 			for (auto&& shader : shaders)
-				gCreatePipelineState(shader);
+				mCompiler.CreatePipelineState(shader);
 	}
 
 	if (gCloud.mEnabled)
 	{
 		for (auto&& shader : gCloud.mRuntime.mShaders)
-			gCreatePipelineState(shader);
+			mCompiler.CreatePipelineState(shader);
 	}
 }
 
@@ -860,4 +834,4 @@ void Renderer::FinalizeShaders()
 }
 
 Renderer gRenderer;
-Timing gTiming;
+GPUTiming gGPUTiming;
