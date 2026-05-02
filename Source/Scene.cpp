@@ -146,6 +146,9 @@ void BLAS::Initialize(const Initializer& inInitializer)
 
 void BLAS::InitializeCLAS(const Initializer& inInitializer)
 {
+#if 1
+	UNUSED(inInitializer);
+#else
 	// Overall
 	// - The "operation" abstraction make the API unnecessarily complex... (why memmove needs to be part of API?)
 	// - For pre-generated meshlets, NvRTX (transcode from Nanite) is more straightforward than RTXMG (tessellation and template)
@@ -389,6 +392,7 @@ void BLAS::InitializeCLAS(const Initializer& inInitializer)
 		},
 		.indirectArgCount = 0, // use inputs.maxArgCount, i.e. Count is decided on CPU side
 	};
+#endif
 }
 
 void BLAS::Build(ID3D12GraphicsCommandList4* inCommandList)
@@ -2233,6 +2237,8 @@ void Scene::GenerateLSSFromTriangle()
 
 void Scene::GenerateMeshlets()
 {
+#if 1
+#else
 	D3D12_RESOURCE_DESC desc_upload = gGetBufferResourceDesc(0);
 	D3D12_HEAP_PROPERTIES props_upload = gGetUploadHeapProperties();
 
@@ -2317,6 +2323,7 @@ void Scene::GenerateMeshlets()
 			instance_data.mClusterIndexBufferIndex = (uint)buffer.mSRVIndex;
 		}
 	}
+#endif
 }
 
 void Scene::InitializeAccelerationStructures()

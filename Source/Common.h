@@ -36,7 +36,7 @@ using Microsoft::WRL::ComPtr;
 #include "ImGui/imgui_impl_dx12.h"
 #include "Thirdparty/implot/implot.h"
 
-#include <meshoptimizer.h>
+// #include <meshoptimizer.h>
 
 #include "../Shader/Shared.h"
 
