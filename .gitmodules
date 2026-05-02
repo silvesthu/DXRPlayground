@@ -50,3 +50,6 @@
 [submodule "Source/Thirdparty/meshoptimizer"]
 	path = Source/Thirdparty/meshoptimizer
 	url = https://github.com/zeux/meshoptimizer.git
+[submodule "Source/Thirdparty/slang"]
+	path = Source/Thirdparty/slang
+	url = https://github.com/shader-slang/slang

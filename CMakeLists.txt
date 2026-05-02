@@ -5,15 +5,11 @@ set(CMAKE_VS_NUGET_PACKAGE_RESTORE ON CACHE BOOL "Auto-restore NuGet packages fo
 
 project(DXRPlayground LANGUAGES CXX)
 
-if(NOT WIN32)
-  message(FATAL_ERROR "DXRPlayground currently targets Windows only.")
-endif()
-
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Build DirectXTex as a dependency target and link it normally.
+# Build DirectXTex as a dependency target.
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 set(BUILD_TOOLS OFF CACHE BOOL "" FORCE)
 set(BUILD_SAMPLE OFF CACHE BOOL "" FORCE)
@@ -25,6 +21,48 @@ set(MESHOPT_BUILD_DEMO OFF CACHE BOOL "" FORCE)
 set(MESHOPT_BUILD_GLTFPACK OFF CACHE BOOL "" FORCE)
 set(MESHOPT_INSTALL OFF CACHE BOOL "" FORCE)
 add_subdirectory(Source/Thirdparty/meshoptimizer)
+
+# Build Slang as a dependency target.
+set(SLANG_EMBED_CORE_MODULE ON CACHE BOOL "" FORCE)
+set(SLANG_EMBED_CORE_MODULE_SOURCE OFF CACHE BOOL "" FORCE)
+set(SLANG_ENABLE_DXIL ON CACHE BOOL "" FORCE)
+set(SLANG_ENABLE_GFX OFF CACHE BOOL "" FORCE)
+set(SLANG_ENABLE_SLANG_RHI OFF CACHE BOOL "" FORCE)
+set(SLANG_ENABLE_SLANGD OFF CACHE BOOL "" FORCE)
+set(SLANG_ENABLE_SLANGC OFF CACHE BOOL "" FORCE)
+set(SLANG_ENABLE_SLANGI OFF CACHE BOOL "" FORCE)
+set(SLANG_ENABLE_SLANGRT OFF CACHE BOOL "" FORCE)
+set(SLANG_ENABLE_SLANG_GLSLANG OFF CACHE BOOL "" FORCE)
+set(SLANG_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
+set(SLANG_ENABLE_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(SLANG_ENABLE_REPLAYER OFF CACHE BOOL "" FORCE)
+set(SLANG_ENABLE_NVAPI OFF CACHE BOOL "" FORCE)
+set(SLANG_ENABLE_CUDA OFF CACHE BOOL "" FORCE)
+set(SLANG_ENABLE_OPTIX OFF CACHE BOOL "" FORCE)
+set(SLANG_ENABLE_AFTERMATH OFF CACHE BOOL "" FORCE)
+set(SLANG_SLANG_LLVM_FLAVOR DISABLE CACHE STRING "" FORCE)
+set(SLANG_EXCLUDE_DAWN ON CACHE BOOL "" FORCE)
+set(SLANG_EXCLUDE_TINT ON CACHE BOOL "" FORCE)
+set(SLANG_ENABLE_RELEASE_DEBUG_INFO OFF CACHE BOOL "" FORCE)
+set(SLANG_ENABLE_SPLIT_DEBUG_INFO OFF CACHE BOOL "" FORCE)
+add_subdirectory(Source/Thirdparty/slang EXCLUDE_FROM_ALL)
+
+# Group all Slang targets under a "Slang" folder in the VS Solution Explorer.
+function(_dxr_group_targets_in_folder _dir _folder)
+  get_property(_targets DIRECTORY "${_dir}" PROPERTY BUILDSYSTEM_TARGETS)
+  foreach(_target IN LISTS _targets)
+    set_property(TARGET ${_target} PROPERTY FOLDER "${_folder}")
+  endforeach()
+  get_property(_subdirs DIRECTORY "${_dir}" PROPERTY SUBDIRECTORIES)
+  foreach(_subdir IN LISTS _subdirs)
+    _dxr_group_targets_in_folder("${_subdir}" "${_folder}")
+  endforeach()
+endfunction()
+
+_dxr_group_targets_in_folder(
+  "${CMAKE_CURRENT_SOURCE_DIR}/Source/Thirdparty/slang"
+  "Slang"
+)
 
 file(GLOB_RECURSE DXRPLAYGROUND_SOURCES CONFIGURE_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/Source/*.cpp"
@@ -125,6 +163,7 @@ target_link_directories(DXRPlayground PRIVATE
 target_link_libraries(DXRPlayground PRIVATE
   DirectXTex
   meshoptimizer
+  slang
   nvapi64.lib
 )
 
