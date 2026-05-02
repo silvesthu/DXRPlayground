@@ -15,7 +15,7 @@
 
 #pragma once
 
-#define DXRPLAYGROUND_IMGUI
+#define PLAYGROUND_IMGUI
 
 #include "../Thirdparty/imgui/imgui.h"      // IMGUI_IMPL_API
 #include <dxgiformat.h>                     // DXGI_FORMAT
@@ -40,7 +40,7 @@ IMGUI_IMPL_API void     ImGui_ImplDX12_RenderDrawData(ImDrawData* draw_data, ID3
 IMGUI_IMPL_API void     ImGui_ImplDX12_InvalidateDeviceObjects();
 IMGUI_IMPL_API bool     ImGui_ImplDX12_CreateDeviceObjects();
 
-#ifdef DXRPLAYGROUND_IMGUI
+#ifdef PLAYGROUND_IMGUI
 struct ID3D12Resource;
 struct D3D12_SHADER_RESOURCE_VIEW_DESC;
 extern void (*ImGui_ImplDX12_CreateShaderResourceViewCallback)(ID3D12Resource* resource, D3D12_SHADER_RESOURCE_VIEW_DESC& desc);
@@ -61,4 +61,4 @@ enum
 };
 
 constexpr unsigned int ImGuiSelectableFlags_SelectOnNav = 1 << 21;  // from imgui_internal.h
-#endif // DXRPLAYGROUND_IMGUI
+#endif // PLAYGROUND_IMGUI

@@ -64,11 +64,11 @@ struct ImGui_ImplDX12_Data
     ID3D12PipelineState*            pPipelineState;
     DXGI_FORMAT                     RTVFormat;
     ID3D12Resource*                 pFontTextureResource;
-#ifdef DXRPLAYGROUND_IMGUI
+#ifdef PLAYGROUND_IMGUI
 #else
     D3D12_CPU_DESCRIPTOR_HANDLE     hFontSrvCpuDescHandle;
     D3D12_GPU_DESCRIPTOR_HANDLE     hFontSrvGpuDescHandle;
-#endif // DXRPLAYGROUND_IMGUI
+#endif // PLAYGROUND_IMGUI
 
     ImGui_ImplDX12_RenderBuffers*   pFrameResources;
     UINT                            numFramesInFlight;
@@ -272,7 +272,7 @@ void ImGui_ImplDX12_RenderDrawData(ImDrawData* draw_data, ID3D12GraphicsCommandL
                 const D3D12_RECT r = { (LONG)clip_min.x, (LONG)clip_min.y, (LONG)clip_max.x, (LONG)clip_max.y };
                 D3D12_GPU_DESCRIPTOR_HANDLE texture_handle = {};
                 texture_handle.ptr = (UINT64)pcmd->GetTexID();
-#ifdef DXRPLAYGROUND_IMGUI
+#ifdef PLAYGROUND_IMGUI
                 bool is_3d = (texture_handle.ptr & ImGui_ImplDX12_ImTextureID_Mask_3D) != 0;
                 texture_handle.ptr &= ~ImGui_ImplDX12_ImTextureID_Mask_3D;
 
@@ -289,7 +289,7 @@ void ImGui_ImplDX12_RenderDrawData(ImDrawData* draw_data, ID3D12GraphicsCommandL
                 ctx->SetGraphicsRoot32BitConstants(3, sizeof(ImGui_ImplDX12_ShaderContantsType) / 4, pcmd->GetTexID() == ImGui_ImplDX12_FontTextureID ? &ImGui_ImplDX12_ShaderContantsDefault : &ImGui_ImplDX12_ShaderContants, 0);
 #else
                 ctx->SetGraphicsRootDescriptorTable(1, texture_handle);
-#endif // DXRPLAYGROUND_IMGUI
+#endif // PLAYGROUND_IMGUI
                 ctx->RSSetScissorRects(1, &r);
                 ctx->DrawIndexedInstanced(pcmd->ElemCount, 1, pcmd->IdxOffset + global_idx_offset, pcmd->VtxOffset + global_vtx_offset, 0);
             }
@@ -439,11 +439,11 @@ static void ImGui_ImplDX12_CreateFontsTexture()
         srvDesc.Texture2D.MipLevels = desc.MipLevels;
         srvDesc.Texture2D.MostDetailedMip = 0;
         srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-#ifdef DXRPLAYGROUND_IMGUI
+#ifdef PLAYGROUND_IMGUI
         ImGui_ImplDX12_CreateShaderResourceViewCallback(pTexture, srvDesc);
 #else
         bd->pd3dDevice->CreateShaderResourceView(pTexture, &srvDesc, bd->hFontSrvCpuDescHandle);
-#endif // DXRPLAYGROUND_IMGUI
+#endif // PLAYGROUND_IMGUI
         SafeRelease(bd->pFontTextureResource);
         bd->pFontTextureResource = pTexture;
     }
@@ -456,20 +456,20 @@ static void ImGui_ImplDX12_CreateFontsTexture()
     // [Solution 2] IDE/msbuild: in "Properties/C++/Preprocessor Definitions" add 'IMGUI_USER_CONFIG="my_imgui_config.h"' and inside 'my_imgui_config.h' add '#define ImTextureID ImU64' and as many other options as you like.
     // [Solution 3] IDE/msbuild: edit imconfig.h and add '#define ImTextureID ImU64' (prefer solution 2 to create your own config file!)
     // [Solution 4] command-line: add '/D ImTextureID=ImU64' to your cl.exe command-line (this is what we do in the example_win32_direct12/build_win32.bat file)
-#ifdef DXRPLAYGROUND_IMGUI
+#ifdef PLAYGROUND_IMGUI
 #else
     static_assert(sizeof(ImTextureID) >= sizeof(bd->hFontSrvGpuDescHandle.ptr), "Can't pack descriptor handle into TexID, 32-bit not supported yet.");
     io.Fonts->SetTexID((ImTextureID)bd->hFontSrvGpuDescHandle.ptr);
-#endif // DXRPLAYGROUND_IMGUI
+#endif // PLAYGROUND_IMGUI
 }
 
-#ifdef DXRPLAYGROUND_IMGUI
+#ifdef PLAYGROUND_IMGUI
 void (*ImGui_ImplDX12_CreateShaderResourceViewCallback)(ID3D12Resource* resource, D3D12_SHADER_RESOURCE_VIEW_DESC& desc) = nullptr;
 ImGui_ImplDX12_ShaderContantsType ImGui_ImplDX12_ShaderContants = {};
 ImTextureID ImGui_ImplDX12_FontTextureID = {};
 ImTextureID ImGui_ImplDX12_NullTexture2D = {};
 ImTextureID ImGui_ImplDX12_NullTexture3D = {};
-#endif // DXRPLAYGROUND_IMGUI
+#endif // PLAYGROUND_IMGUI
 
 bool    ImGui_ImplDX12_CreateDeviceObjects()
 {
@@ -488,7 +488,7 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
         descRange.RegisterSpace = 0;
         descRange.OffsetInDescriptorsFromTableStart = 0;
 
-#ifdef DXRPLAYGROUND_IMGUI
+#ifdef PLAYGROUND_IMGUI
         D3D12_ROOT_PARAMETER param[4] = {};
 
         D3D12_DESCRIPTOR_RANGE descRange1 = {};
@@ -510,7 +510,7 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
         param[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 #else
         D3D12_ROOT_PARAMETER param[2] = {};
-#endif // DXRPLAYGROUND_IMGUI
+#endif // PLAYGROUND_IMGUI
 
         param[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
         param[0].Constants.ShaderRegister = 0;
@@ -607,7 +607,7 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
     // Create the vertex shader
     {
         static const char* vertexShader =
-#ifdef DXRPLAYGROUND_IMGUI
+#ifdef PLAYGROUND_IMGUI
             "cbuffer constants : register(b1) \
             {\
                 float mMin;     \
@@ -615,7 +615,7 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
                 float mSlice;   \
                 float mAlpha;   \
             };"
-#endif // DXRPLAYGROUND_IMGUI
+#endif // PLAYGROUND_IMGUI
             "cbuffer vertexBuffer : register(b0) \
             {\
               float4x4 ProjectionMatrix; \
@@ -660,7 +660,7 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
     // Create the pixel shader
     {
         static const char* pixelShader =
-#ifdef DXRPLAYGROUND_IMGUI
+#ifdef PLAYGROUND_IMGUI
             "cbuffer constants : register(b1) \
             {\
                 float mMin;     \
@@ -704,13 +704,13 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
               float4 out_col = input.col * texture0.Sample(sampler0, input.uv); \
               return out_col; \
             }";
-#endif // DXRPLAYGROUND_IMGUI
+#endif // PLAYGROUND_IMGUI
 
-#ifdef DXRPLAYGROUND_IMGUI
+#ifdef PLAYGROUND_IMGUI
         if (FAILED(D3DCompile(pixelShader, strlen(pixelShader), nullptr, nullptr, nullptr, "main", "ps_5_1", 0, 0, &pixelShaderBlob, nullptr)))
 #else
         if (FAILED(D3DCompile(pixelShader, strlen(pixelShader), nullptr, nullptr, nullptr, "main", "ps_5_0", 0, 0, &pixelShaderBlob, nullptr)))
-#endif // DXRPLAYGROUND_IMGUI
+#endif // PLAYGROUND_IMGUI
         {
             vertexShaderBlob->Release();
             return false; // NB: Pass ID3D10Blob* pErrorBlob to D3DCompile() to get error showing in (const char*)pErrorBlob->GetBufferPointer(). Make sure to Release() the blob!
@@ -766,9 +766,9 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
     if (result_pipeline_state != S_OK)
         return false;
 
-#ifdef DXRPLAYGROUND_IMGUI
+#ifdef PLAYGROUND_IMGUI
     bd->pPipelineState->SetName(L"ImGui");
-#endif // DXRPLAYGROUND_IMGUI
+#endif // PLAYGROUND_IMGUI
 
     ImGui_ImplDX12_CreateFontsTexture();
 
@@ -809,13 +809,13 @@ bool ImGui_ImplDX12_Init(ID3D12Device* device, int num_frames_in_flight, DXGI_FO
 
     bd->pd3dDevice = device;
     bd->RTVFormat = rtv_format;
-#ifdef DXRPLAYGROUND_IMGUI
+#ifdef PLAYGROUND_IMGUI
     IM_UNUSED(font_srv_cpu_desc_handle);
     IM_UNUSED(font_srv_gpu_desc_handle);
 #else
     bd->hFontSrvCpuDescHandle = font_srv_cpu_desc_handle;
     bd->hFontSrvGpuDescHandle = font_srv_gpu_desc_handle;
-#endif // DXRPLAYGROUND_IMGUI
+#endif // PLAYGROUND_IMGUI
     bd->pFrameResources = new ImGui_ImplDX12_RenderBuffers[num_frames_in_flight];
     bd->numFramesInFlight = num_frames_in_flight;
     bd->frameIndex = UINT_MAX;
