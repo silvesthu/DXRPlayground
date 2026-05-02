@@ -14,14 +14,11 @@ copy "%ProjectDir%..\Source\Thirdparty\ShaderToHuman\docs\include\*.hlsl" "%Proj
 mkdir "%ProjectDir%..\Shader\nanovdb"
 copy "%ProjectDir%..\Source\Thirdparty\openvdb\nanovdb\PNanoVDB.h" "%ProjectDir%..\Shader\nanovdb"
 
-REM Copy Shader
-robocopy "%ProjectDir%..\Shader" "%TargetDir%Shader" /MIR
-if ErrorLevel 8 exit /B 1
-
 REM Prepare Asset
 if not exist "%ProjectDir%..\Asset\ArPragueSkyModelGround\SkyModelDataset.dat" powershell Expand-Archive "%ProjectDir%..\Asset\ArPragueSkyModelGround\SkyModelDataset.zip" -DestinationPath "%ProjectDir%..\Asset\ArPragueSkyModelGround"
 
 REM Link Asset
+if not exist "%TargetDir%Shader" mklink /D "%TargetDir%Shader" "%ProjectDir%..\Shader"
 if not exist "%TargetDir%Asset" mklink /D "%TargetDir%Asset" "%ProjectDir%..\Asset"
 
 exit /B 0

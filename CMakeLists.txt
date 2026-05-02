@@ -23,6 +23,7 @@ set(MESHOPT_INSTALL OFF CACHE BOOL "" FORCE)
 add_subdirectory(Source/Thirdparty/meshoptimizer)
 
 # Build Slang as a dependency target.
+set(SLANG_LIB_TYPE STATIC CACHE STRING "" FORCE)
 set(SLANG_EMBED_CORE_MODULE ON CACHE BOOL "" FORCE)
 set(SLANG_EMBED_CORE_MODULE_SOURCE OFF CACHE BOOL "" FORCE)
 set(SLANG_ENABLE_DXIL ON CACHE BOOL "" FORCE)
@@ -94,7 +95,8 @@ file(GLOB_RECURSE DXRPLAYGROUND_PROJECT_FILES CONFIGURE_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/Shader/*.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/Shader/*.hpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/Shader/*.hlsl"
-  "${CMAKE_CURRENT_SOURCE_DIR}/Shader/*.hlsli"
+  "${CMAKE_CURRENT_SOURCE_DIR}/Shader/*.hlsli"  
+  "${CMAKE_CURRENT_SOURCE_DIR}/Shader/*.slang"
 )
 list(APPEND DXRPLAYGROUND_PROJECT_FILES
   "${CMAKE_CURRENT_SOURCE_DIR}/dpi.manifest"
@@ -132,10 +134,12 @@ target_include_directories(DXRPlayground PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/Source
   ${CMAKE_CURRENT_SOURCE_DIR}/Source/Thirdparty
   ${CMAKE_CURRENT_SOURCE_DIR}/Source/Thirdparty/imgui
+  ${CMAKE_CURRENT_SOURCE_DIR}/Source/Thirdparty/openvdb
 )
 
 target_compile_definitions(DXRPlayground PRIVATE
   IMGUI_USER_CONFIG=\"../imgui_config.h\"
+  SLANG_STATIC
   _CRT_SECURE_NO_WARNINGS
   UNICODE
   _UNICODE
@@ -187,5 +191,5 @@ source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES
 
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT DXRPlayground)
 set_target_properties(DXRPlayground PROPERTIES
-  VS_DEBUGGER_WORKING_DIRECTORY "$(TargetDir)"
+  VS_DEBUGGER_WORKING_DIRECTORY "$(OutDir)"
 )
