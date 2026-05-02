@@ -484,3 +484,5 @@ void gLoadCamera()
 	if (gScene.GetSceneContent().mFov.has_value())
 		gCameraSettings.mHorizontalFovDegree = gScene.GetSceneContent().mFov.value();
 }
+
+std::chrono::steady_clock::time_point CPUTimingScope::sTimestampProcessBegin = std::chrono::steady_clock::now();

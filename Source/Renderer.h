@@ -172,10 +172,11 @@ struct Timing
 		return timestamp;
 	}
 
-	void TimestampEnd(UINT64 inTimestampBegin, float& outMS)
+	void TimestampEnd(UINT64 inTimestampBegin, float* outDurationMSPtr)
 	{
 		UINT64 timestamp = gRenderer.mRuntime.mQueryBuffer.GetReadback<UINT64>(gGetFrameContextIndex())[mQueryHeapIndex];
-		outMS = (timestamp - inTimestampBegin) * 1000.0f / mTimestampFrequency;
+		float durationMS = (timestamp - inTimestampBegin) * 1000.0f / mTimestampFrequency;
+		if (outDurationMSPtr != nullptr) { *outDurationMSPtr = durationMS; }	
 		gCommandList->EndQuery(gQueryHeap, D3D12_QUERY_TYPE_TIMESTAMP, mQueryHeapIndex++);
 	}
 
@@ -189,37 +190,11 @@ extern Timing									gTiming;
 
 struct GPUTimingScope
 {
-	GPUTimingScope(float& outMS) : mOutMS(outMS)	{ mTimestampBegin = gTiming.TimestampBegin(); }
-	~GPUTimingScope()								{ gTiming.TimestampEnd(mTimestampBegin, mOutMS); }
+	GPUTimingScope()							{ mTimestampBegin = gTiming.TimestampBegin(); }
+	~GPUTimingScope()							{ gTiming.TimestampEnd(mTimestampBegin, mDurationMSPtr); }
 
 	UINT64										mTimestampBegin = 0;
-	float&										mOutMS;
+	float*										mDurationMSPtr = nullptr;
 };
-#define GPU_TIMING_SCOPE(name, outMS)			PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), name);				\
-												GPUTimingScope mGPUTimingScope_##__LINE__(outMS)
-
-struct CPUTimingScope
-{
-	CPUTimingScope(float& outMS) : mOutMS(outMS)
-	{
-		mTimestampBegin = std::chrono::high_resolution_clock::now();
-	}
-
-	~CPUTimingScope()
-	{
-		auto timestamp_end = std::chrono::high_resolution_clock::now();
-		std::chrono::duration<float, std::milli> duration_ms = timestamp_end - mTimestampBegin;
-		mOutMS = duration_ms.count();
-
-		if (mWriteToFile)
-		{
-			std::ofstream file("stat.txt");
-			file << "Time: " << mOutMS / 1000.0f << " seconds\n";
-		}
-	}
-
-	std::chrono::steady_clock::time_point		mTimestampBegin;
-	float&										mOutMS;
-
-	bool										mWriteToFile = false;
-};
+#define GPU_TIMING_SCOPE(inName, outDurationMSPtr)			PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), inName);	\
+															GPUTimingScope mGPUTimingScope_##__LINE__; mGPUTimingScope_##__LINE__.mDurationMSPtr = outDurationMSPtr;

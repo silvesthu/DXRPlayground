@@ -36,6 +36,7 @@ static void sWaitForGPU();
 static void sUpdate();
 static void sLoadScene(bool inLoadCamera);
 static void sRender();
+static int sStartup(WNDCLASSEX& wc, HWND& hwnd);
 static LRESULT WINAPI sWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 static void sUpdate()
@@ -203,15 +204,87 @@ static void sUpdate()
 // Main code
 int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR lpCmdLine, int /*nCmdShow*/)
 {
-	WNDCLASSEX wc = {};
 	HWND hwnd = 0;
+	WNDCLASSEX wc = {};
 
 	if (lpCmdLine != nullptr && std::string_view(lpCmdLine).starts_with("-headless"))
 		gHeadless = true;
 
-	float app_time = 0.0f;
-	CPUTimingScope app_time_scope(app_time);
-	app_time_scope.mWriteToFile = gHeadless;
+	CPUTimingScope application_timing_scope;
+	application_timing_scope.mTraceName = "Application";
+	application_timing_scope.mFileName = gHeadless ? "stat.txt" : "";
+
+	int error_code = sStartup(wc, hwnd);
+	if (error_code != 0) return error_code;
+
+	// Main loop
+	MSG msg;
+	ZeroMemory(&msg, sizeof(msg));
+	while (msg.message != WM_QUIT)
+	{
+		if (!gHeadless && ::PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE))
+		{
+			::TranslateMessage(&msg);
+			::DispatchMessage(&msg);
+			continue;
+		}
+
+		// New frame	
+		gFrameIndex++;
+
+		if (!gHeadless)
+		{
+			// Start the Dear ImGui frame
+			ImGui_ImplDX12_FontTextureID = (ImTextureID)gGetFrameContext().mViewDescriptorHeap.GetGPUHandle(ViewDescriptorIndex::ImGuiFont).ptr;
+			ImGui_ImplDX12_NullTexture2D = (ImTextureID)gGetFrameContext().mViewDescriptorHeap.GetGPUHandle(ViewDescriptorIndex::ImGuiNull2D).ptr;
+			ImGui_ImplDX12_NullTexture3D = (ImTextureID)gGetFrameContext().mViewDescriptorHeap.GetGPUHandle(ViewDescriptorIndex::ImGuiNull3D).ptr;
+			ImGui::GetIO().Fonts->SetTexID(ImGui_ImplDX12_FontTextureID);
+			ImGui_ImplDX12_NewFrame();
+			ImGui_ImplWin32_NewFrame();
+			ImGui::NewFrame();
+		}
+
+		sUpdate();
+		sRender();
+
+		if (gHeadless && gHeadlessDone)
+			break;
+	}
+
+	// Shutdown
+	{
+		sWaitForGPU();
+
+		gAtmosphere.Finalize();
+		gCloud.Finalize();
+
+		if (!gHeadless)
+		{
+			ImPlot::DestroyContext();
+			ImGui_ImplDX12_Shutdown();
+			ImGui_ImplWin32_Shutdown();
+			ImGui::DestroyContext();
+		}
+
+		gScene.Unload();
+
+		gRenderer.Finalize();
+
+		sCleanupDeviceD3D();
+
+		if (!gHeadless)
+		{
+			::DestroyWindow(hwnd);
+			::UnregisterClass(wc.lpszClassName, wc.hInstance);
+		}
+	}
+
+	return 0;
+}
+
+int sStartup(WNDCLASSEX& wc, HWND& hwnd)
+{
+	CPU_TIMING_SCOPE("Startup", &gStats.mCPUTimingMS.mStartup);
 
 	if (gHeadless)
 	{
@@ -294,7 +367,7 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR lpCmdLine
 
 	// Renderer
 	gRenderer.Initialize();
-	
+
 	// Load Scene
 	sLoadScene(true);
 
@@ -323,7 +396,7 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR lpCmdLine
 	gCommandQueue->Signal(gIncrementalFence, signal_value); // abuse fence to wait only during initialization
 	gIncrementalFence->SetEventOnCompletion(signal_value, gIncrementalFenceEvent);
 	WaitForSingleObject(gIncrementalFenceEvent, INFINITE);
-	
+
 	if (!gHeadless)
 	{
 		// Show the window
@@ -339,68 +412,6 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR lpCmdLine
 		gConstants.mSequenceFrameIndex = 0;
 
 		gRenderer.mSequenceFrameRecording = 0;
-	}
-
-	// Main loop
-	MSG msg;
-	ZeroMemory(&msg, sizeof(msg));
-	while (msg.message != WM_QUIT)
-	{
-		if (!gHeadless && ::PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE))
-		{
-			::TranslateMessage(&msg);
-			::DispatchMessage(&msg);
-			continue;
-		}
-
-		// New frame	
-		gFrameIndex++;
-
-		if (!gHeadless)
-		{
-			// Start the Dear ImGui frame
-			ImGui_ImplDX12_FontTextureID = (ImTextureID)gGetFrameContext().mViewDescriptorHeap.GetGPUHandle(ViewDescriptorIndex::ImGuiFont).ptr;
-			ImGui_ImplDX12_NullTexture2D = (ImTextureID)gGetFrameContext().mViewDescriptorHeap.GetGPUHandle(ViewDescriptorIndex::ImGuiNull2D).ptr;
-			ImGui_ImplDX12_NullTexture3D = (ImTextureID)gGetFrameContext().mViewDescriptorHeap.GetGPUHandle(ViewDescriptorIndex::ImGuiNull3D).ptr;
-			ImGui::GetIO().Fonts->SetTexID(ImGui_ImplDX12_FontTextureID);
-			ImGui_ImplDX12_NewFrame();
-			ImGui_ImplWin32_NewFrame();
-			ImGui::NewFrame();
-		}
-
-		sUpdate();
-		sRender();
-
-		if (gHeadless && gHeadlessDone)
-			break;
-	}
-
-	// Shutdown
-	{
-		sWaitForGPU();
-
-		gAtmosphere.Finalize();
-		gCloud.Finalize();
-
-		if (!gHeadless)
-		{
-			ImPlot::DestroyContext();
-			ImGui_ImplDX12_Shutdown();
-			ImGui_ImplWin32_Shutdown();
-			ImGui::DestroyContext();
-		}
-
-		gScene.Unload();
-
-		gRenderer.Finalize();
-
-		sCleanupDeviceD3D();
-
-		if (!gHeadless)
-		{
-			::DestroyWindow(hwnd);
-			::UnregisterClass(wc.lpszClassName, wc.hInstance);
-		}
 	}
 
 	return 0;
@@ -498,7 +509,7 @@ void sRender()
 
 	// Update and Upload Constants
 	{
-		GPU_TIMING_SCOPE("Upload", gStats.mTimeMS.mUpload);
+		GPU_TIMING_SCOPE("Upload", &gStats.mGPUTimingMS.mUpload);
 
 		// Update
 		{
@@ -578,35 +589,35 @@ void sRender()
 
 	// Renderer
 	{
-		GPU_TIMING_SCOPE("Renderer", gStats.mTimeMS.mRenderer);
+		GPU_TIMING_SCOPE("Renderer", &gStats.mGPUTimingMS.mRenderer);
 
 		gRenderer.Render();
 	}
 
 	// Scene
 	{
-		GPU_TIMING_SCOPE("Scene", gStats.mTimeMS.mScene);
+		GPU_TIMING_SCOPE("Scene", &gStats.mGPUTimingMS.mScene);
 
 		gScene.Render();
 	}
 
 	// Atmosphere
 	{
-		GPU_TIMING_SCOPE("Atmosphere", gStats.mTimeMS.mAtmosphere);
+		GPU_TIMING_SCOPE("Atmosphere", &gStats.mGPUTimingMS.mAtmosphere);
 
 		gAtmosphere.Render();
 	}
 
 	// Cloud
 	{
-		GPU_TIMING_SCOPE("Cloud", gStats.mTimeMS.mCloud);
+		GPU_TIMING_SCOPE("Cloud", &gStats.mGPUTimingMS.mCloud);
 
 		gCloud.Render();
 	}
 
 	// Texture Generator
 	{
-		GPU_TIMING_SCOPE("TextureGenerator", gStats.mTimeMS.mTextureGenerator);
+		GPU_TIMING_SCOPE("TextureGenerator", &gStats.mGPUTimingMS.mTextureGenerator);
 
 		gRenderer.Setup(gRenderer.mRuntime.mGenerateTextureShader);
 
@@ -619,7 +630,7 @@ void sRender()
 	// BRDF Slice
 	if (!gHeadless)
 	{
-		GPU_TIMING_SCOPE("BRDFSlice", gStats.mTimeMS.mBRDFSlice);
+		GPU_TIMING_SCOPE("BRDFSlice", &gStats.mGPUTimingMS.mBRDFSlice);
 
 		gRenderer.Setup(gRenderer.mRuntime.mBRDFSliceShader);
 
@@ -632,7 +643,7 @@ void sRender()
 	// Clear for debug
 	if (!gHeadless)
 	{
-		GPU_TIMING_SCOPE("Clear", gStats.mTimeMS.mClear);
+		GPU_TIMING_SCOPE("Clear", &gStats.mGPUTimingMS.mClear);
 
 		gRenderer.Setup(gRenderer.mRuntime.mClearShader);
 		gCommandList->Dispatch(gAlignUpDiv(PixelInspection::kArraySize, 64u), 1, 1);
@@ -646,7 +657,7 @@ void sRender()
 	// Depth
 	if (!gHeadless)
 	{
-		GPU_TIMING_SCOPE("Depths", gStats.mTimeMS.mDepths);
+		GPU_TIMING_SCOPE("Depths", &gStats.mGPUTimingMS.mDepths);
 
 		BarrierScope depth_scope(gCommandList, gRenderer.mRuntime.mScreenDepthTexture.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
@@ -681,7 +692,7 @@ void sRender()
 	// PrepareLights
 	if (gScene.GetSceneContent().mEmissiveTriangleCount > 0)
 	{
-		GPU_TIMING_SCOPE("PrepareLights", gStats.mTimeMS.mPrepareLights);
+		GPU_TIMING_SCOPE("PrepareLights", &gStats.mGPUTimingMS.mPrepareLights);
 
 		gRenderer.Setup(gRenderer.mRuntime.mPrepareLightsShader);
 		uint constants[] = { static_cast<uint>(gScene.GetPrepareLightsTaskCount()) };
@@ -693,7 +704,7 @@ void sRender()
 
 	// RayQuery
 	{
-		GPU_TIMING_SCOPE("RayQuery", gStats.mTimeMS.mRayQuery);
+		GPU_TIMING_SCOPE("RayQuery", &gStats.mGPUTimingMS.mRayQuery);
 
 		gRenderer.Setup(gRenderer.mRuntime.mRayQueryShader);
 		gCommandList->Dispatch(gAlignUpDiv(gRenderer.mScreenWidth, 8u), gAlignUpDiv(gRenderer.mScreenHeight, 8u), 1);
@@ -736,8 +747,7 @@ void sRender()
 	// Composite
 	if (!gHeadless)
 	{
-		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Composite");
-		GPU_TIMING_SCOPE("Composite", gStats.mTimeMS.mComposite);
+		GPU_TIMING_SCOPE("Composite", &gStats.mGPUTimingMS.mComposite);
 
 		gBarrierTransition(gCommandList, back_buffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		BarrierScope depth_scope(gCommandList, gRenderer.mRuntime.mScreenDepthTexture.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_DEPTH_READ);
@@ -802,7 +812,7 @@ void sRender()
 	// Draw ImGui
 	if (!gHeadless)
 	{
-		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "ImGui");
+		GPU_TIMING_SCOPE("ImGui", &gStats.mGPUTimingMS.mImGui);
 
 		gPrepareImGui(); // Keep this right before render to get latest data
 
@@ -828,7 +838,8 @@ void sRender()
 	{
 		if (gCPUContext.mDumpTextureRef != nullptr && gCPUContext.mDumpTextureRef->mResource != nullptr)
 		{
-			CPUTimeScope cpu_time_scope("Dump Texture");
+			CPUTimingScope timing_scope;
+			timing_scope.mTraceName = "DumpTexture";
 
 			DirectX::ScratchImage image;
 			DirectX::CaptureTexture(gCommandQueue, gCPUContext.mDumpTextureRef->mResource.Get(), false, image, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COMMON);

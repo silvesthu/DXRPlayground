@@ -153,7 +153,7 @@ void gPrepareImGui()
 						}
 						case ShaderPrintEntryType::UInt2:
 						{
-							ss << (ShaderPrint[uint_index++]) << ", " << (ShaderPrint[uint_index++]);
+						 ss << (ShaderPrint[uint_index++]) << ", " << (ShaderPrint[uint_index++]);
 							break;
 						}
 						case ShaderPrintEntryType::UInt3:
@@ -791,22 +791,24 @@ void gPrepareImGui()
 					TreePop();
 				}
 
-				if (TreeNodeEx("Time (MS)", ImGuiTreeNodeFlags_DefaultOpen))
+				if (TreeNodeEx("GPU Timing (MS)", ImGuiTreeNodeFlags_DefaultOpen))
 				{
-					InputFloat("Upload", &gStats.mTimeMS.mUpload, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
-					InputFloat("Renderer", &gStats.mTimeMS.mRenderer, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
-					InputFloat("Scene", &gStats.mTimeMS.mScene, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
-					InputFloat("Atmosphere", &gStats.mTimeMS.mAtmosphere, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
-					InputFloat("Cloud", &gStats.mTimeMS.mCloud, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
-					InputFloat("TextureGenerator", &gStats.mTimeMS.mTextureGenerator, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
-					InputFloat("BRDFSlice", &gStats.mTimeMS.mBRDFSlice, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
-					InputFloat("Clear", &gStats.mTimeMS.mClear, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
-					InputFloat("Depths", &gStats.mTimeMS.mDepths, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
-					InputFloat("PrepareLights", &gStats.mTimeMS.mPrepareLights, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
-					InputFloat("RayQuery", &gStats.mTimeMS.mRayQuery, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+					InputFloat("Upload",			&gStats.mGPUTimingMS.mUpload,			0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+					InputFloat("Renderer",			&gStats.mGPUTimingMS.mRenderer,			0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+					InputFloat("Scene",				&gStats.mGPUTimingMS.mScene,			0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+					InputFloat("Atmosphere",		&gStats.mGPUTimingMS.mAtmosphere,		0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+					InputFloat("Cloud",				&gStats.mGPUTimingMS.mCloud,			0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+					InputFloat("TextureGenerator",	&gStats.mGPUTimingMS.mTextureGenerator, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+					InputFloat("BRDFSlice",			&gStats.mGPUTimingMS.mBRDFSlice,		0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+					InputFloat("Clear",				&gStats.mGPUTimingMS.mClear,			0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+					InputFloat("Depths",			&gStats.mGPUTimingMS.mDepths,			0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+					InputFloat("PrepareLights",		&gStats.mGPUTimingMS.mPrepareLights,	0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+					InputFloat("RayQuery",			&gStats.mGPUTimingMS.mRayQuery,			0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+					InputFloat("Composite",			&gStats.mGPUTimingMS.mComposite,		0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
+					InputFloat("ImGui",				&gStats.mGPUTimingMS.mImGui,			0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
 
 					static ScrollingBuffer sRayQueryBuffer;
-					sRayQueryBuffer.AddPoint(gConstants.mTime, gStats.mTimeMS.mRayQuery);
+					sRayQueryBuffer.AddPoint(gConstants.mTime, gStats.mGPUTimingMS.mRayQuery);
 
 					float time = gConstants.mTime;
 					if (ImPlot::BeginPlot("Time", ImVec2(-1, 400)))
@@ -818,6 +820,13 @@ void gPrepareImGui()
 
 						ImPlot::EndPlot();
 					}
+
+					TreePop();
+				}
+
+				if (TreeNodeEx("CPU Timing (MS)", ImGuiTreeNodeFlags_DefaultOpen))
+				{
+					InputFloat("Startup", &gStats.mCPUTimingMS.mStartup, 0, 0, "%.3f", ImGuiInputTextFlags_ReadOnly);
 
 					TreePop();
 				}

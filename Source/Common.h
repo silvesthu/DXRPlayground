@@ -312,7 +312,7 @@ struct Stats
 	InstructionCount						mInstructionCount;
 
 	// [NOTE] Time might look longer than necessary if GPU is not full load, turn off Vsync to force it run full speed
-	struct TimeMS
+	struct GPUTimingMS
 	{
 		float								mUpload = 0;
 		float								mRenderer = 0;
@@ -326,8 +326,15 @@ struct Stats
 		float								mPrepareLights = 0;
 		float								mRayQuery = 0;
 		float								mComposite = 0;
+		float								mImGui = 0;
 	};
-	TimeMS									mTimeMS;
+	GPUTimingMS								mGPUTimingMS;
+
+	struct CPUTimingMS
+	{
+		float								mStartup = 0;
+	};
+	CPUTimingMS								mCPUTimingMS;
 };
 extern Stats								gStats;
 
@@ -874,36 +881,6 @@ namespace ImGui
 	void Textures(std::span<Texture> inTextures, const std::string& inName = "Texture", ImGuiTreeNodeFlags inFlags = 0);
 }
 
-namespace
-{
-	using std::chrono::high_resolution_clock;
-	using std::chrono::duration_cast;
-	using std::chrono::duration;
-	using std::chrono::milliseconds;
-}
-
-struct CPUTimeScope
-{
-	CPUTimeScope(std::string_view inText)
-	{
-		mText = inText;
-		mStart = std::chrono::high_resolution_clock::now();
-	}
-
-	~CPUTimeScope()
-	{
-		mEnd = std::chrono::high_resolution_clock::now();
-
-		std::chrono::duration<float, std::milli> ms = mEnd - mStart;
-		std::string message = std::format("{} costs {:.2f} ms\n", mText, ms.count());
-		gTrace(message);
-	}
-
-	std::chrono::high_resolution_clock::time_point mStart;
-	std::chrono::high_resolution_clock::time_point mEnd;
-	std::string_view mText;
-};
-
 inline std::filesystem::path gCreateDumpFolder()
 {
 	std::filesystem::path directory = ".\\Dump\\";
@@ -932,3 +909,44 @@ inline void gOpenSceneFolder(const std::string_view inPath)
 
 void gDumpLuminance();
 void gLoadCamera();
+
+struct CPUTimingScope
+{
+	CPUTimingScope()
+	{
+		mTimestampBegin = std::chrono::high_resolution_clock::now();
+	}
+
+	~CPUTimingScope()
+	{
+		auto timestamp_end = std::chrono::high_resolution_clock::now();
+		std::chrono::duration<float, std::milli> duration_ms = timestamp_end - mTimestampBegin;
+
+		if (mDurationMSPtr != nullptr)
+		{
+			*mDurationMSPtr = duration_ms.count();
+		}
+
+		if (!mTraceName.empty())
+		{
+			std::string message = std::format("[CPUTimingScope] {} takes {:.2f} ms\n", mTraceName.data(), duration_ms.count());
+			gTrace(message);
+		}
+
+		if (!mFileName.empty())
+		{
+			std::ofstream file(mFileName.data());
+			file << "Time: " << duration_ms.count() / 1000.0f << " seconds\n";
+		}
+	}
+
+	std::chrono::steady_clock::time_point mTimestampBegin;
+	float* mDurationMSPtr = nullptr;
+	std::string_view mTraceName;
+	std::string_view mFileName;
+
+	static std::chrono::steady_clock::time_point sTimestampProcessBegin;
+	bool mUseProcessBegin = false;
+};
+#define CPU_TIMING_SCOPE(inName, outDurationMSPtr) CPUTimingScope mGPUTimingScope_##__LINE__; mGPUTimingScope_##__LINE__.mTraceName = inName; mGPUTimingScope_##__LINE__.mDurationMSPtr = outDurationMSPtr;
+#define CPU_TIMING_SCOPE_SIMPLE(outDurationMSPtr) CPUTimingScope mGPUTimingScope_##__LINE__; mGPUTimingScope_##__LINE__.mDurationMSPtr = outDurationMSPtr;
