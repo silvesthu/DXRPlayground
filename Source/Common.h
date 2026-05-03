@@ -285,9 +285,6 @@ inline void gSetName(ComPtr<T>& inObject, std::string_view inPrefix, std::string
 	gSetName(inObject, gToWString(inPrefix), gToWString(inName), gToWString(inSuffix));
 }
 
-constexpr int								kScreenWidth = 1920;
-constexpr int								kScreenHeight = 1080;
-
 constexpr int								kVertexCountPerTriangle = 3;
 
 constexpr size_t							kClusterCLASCountMax = 128 * 256;							// See MaxCLASPerFrame

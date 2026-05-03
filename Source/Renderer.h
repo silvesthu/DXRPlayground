@@ -107,12 +107,6 @@ struct Renderer
 
 	void										Render(ID3D12GraphicsCommandList4* inCommandList);
 
-	void										Resize(int inWidth, int inHeight)
-	{
-		mResizeWidth = inWidth;
-		mResizeHeight = inHeight;
-	}
-
 	void										ImGuiShowTextures();
 
 	void										InitializeScreenSizeTextures();
@@ -180,10 +174,8 @@ struct Renderer
 	bool										mSequenceCameraEnabled = true;
 	int											mSequenceFrameRecording = -1;
 
-	uint										mScreenWidth = kScreenWidth;
-	uint										mScreenHeight = kScreenHeight;
-	uint										mResizeWidth = 0;
-	uint										mResizeHeight = 0;
+	uint2										mScreenSize = { 1920, 1080 };
+	uint2										mScreenSizeRequested = { 0, 0 };
 };
 extern Renderer									gRenderer;
 

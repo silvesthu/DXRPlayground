@@ -14,8 +14,8 @@ void gPrepareImGui()
 		gConstants.mTime,
 		1000.0f / GetIO().Framerate,
 		GetIO().Framerate,
-		gRenderer.mScreenWidth,
-		gRenderer.mScreenHeight);
+		gRenderer.mScreenSize.x,
+		gRenderer.mScreenSize.y);
 	if (Begin(stat.c_str()))
 	{
 		{
@@ -496,14 +496,9 @@ void gPrepareImGui()
 		{
 			Checkbox("Vsync", &gDisplaySettings.mVsync);
 
-			if (Button("1280 x 720"))
-				gRenderer.Resize(1280, 720);
-
-			if (Button("1920 x 1080"))
-				gRenderer.Resize(1920, 1080);
-
-			if (Button("2560 x 1440"))
-				gRenderer.Resize(2560, 1440);
+			if (Button("1280 x 720")) { gRenderer.mScreenSizeRequested = { 1280, 720 }; }
+			if (Button("1920 x 1080")) { gRenderer.mScreenSizeRequested = { 1920, 1080 }; }
+			if (Button("2560 x 1440")) { gRenderer.mScreenSizeRequested = { 2560, 1440 }; }
 
 			TreePop();
 		}

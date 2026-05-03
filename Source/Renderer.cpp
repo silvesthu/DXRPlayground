@@ -788,12 +788,12 @@ void Renderer::InitializeScreenSizeTextures()
 			gDevice->CreateRenderTargetView(mRuntime.mBackBuffers[i].mResource.Get(), nullptr, handle);
 		}
 
-		mScreenWidth = swap_chain_desc.Width;
-		mScreenHeight = swap_chain_desc.Height;
+		mScreenSize.x = swap_chain_desc.Width;
+		mScreenSize.y = swap_chain_desc.Height;
 	}
 
 	for (auto&& screen_texture : mRuntime.mScreenTextures)
-		screen_texture.Width(mScreenWidth).Height(mScreenHeight).Initialize();
+		screen_texture.Width(mScreenSize.x).Height(mScreenSize.y).Initialize();
 }
 
 void Renderer::FinalizeScreenSizeTextures()

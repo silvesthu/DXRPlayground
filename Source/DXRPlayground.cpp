@@ -42,14 +42,13 @@ static LRESULT WINAPI sWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam
 static void sUpdate()
 {	
 	// Resize
-	if (gRenderer.mResizeWidth != 0)
+	if (gRenderer.mScreenSizeRequested != uint2{ 0, 0 })
 	{
-		RECT rect = { 0, 0, (LONG)gRenderer.mResizeWidth, (LONG)gRenderer.mResizeHeight };
+		RECT rect = { 0, 0, (LONG)gRenderer.mScreenSizeRequested.x, (LONG)gRenderer.mScreenSizeRequested.y };
 		AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, false);
 		SetWindowPos(::GetActiveWindow(), NULL, 0, 0, rect.right - rect.left, rect.bottom - rect.top, SWP_NOMOVE | SWP_NOOWNERZORDER | SWP_NOZORDER);
 
-		gRenderer.mResizeWidth = 0;
-		gRenderer.mResizeHeight = 0;
+		gRenderer.mScreenSizeRequested = { 0, 0 };
 	}
 
 	// Rotate Camera
@@ -143,8 +142,8 @@ static void sUpdate()
 
 	// Common
 	{
-		gConstants.mScreenWidth					= gRenderer.mScreenWidth;
-		gConstants.mScreenHeight				= gRenderer.mScreenHeight;
+		gConstants.mScreenWidth					= gRenderer.mScreenSize.x;
+		gConstants.mScreenHeight				= gRenderer.mScreenSize.y;
 
 		gConstants.mFrameIndex					= gFrameIndex;
 	}
@@ -304,7 +303,7 @@ int sStartup(WNDCLASSEX& wc, HWND& hwnd)
 		wc = { sizeof(WNDCLASSEX), CS_CLASSDC, sWndProc, 0L, 0L, GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, kApplicationTitleW, nullptr };
 		::RegisterClassEx(&wc);
 
-		RECT rect = { 0, 0, kScreenWidth, kScreenHeight };
+		RECT rect = { 0, 0, static_cast<LONG>(Renderer().mScreenSize.x), static_cast<LONG>(Renderer().mScreenSize.y) };
 		AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, false);
 		hwnd = ::CreateWindow(wc.lpszClassName, kApplicationTitleW, WS_OVERLAPPEDWINDOW, window_x, window_y, rect.right - rect.left, rect.bottom - rect.top, nullptr, nullptr, wc.hInstance, nullptr);
 	}
@@ -666,8 +665,8 @@ void sRender()
 		{
 			.TopLeftX = 0.0f,
 			.TopLeftY = 0.0f,
-			.Width = static_cast<float>(gRenderer.mScreenWidth),
-			.Height = static_cast<float>(gRenderer.mScreenHeight),
+			.Width = static_cast<float>(gRenderer.mScreenSize.x),
+			.Height = static_cast<float>(gRenderer.mScreenSize.y),
 			.MinDepth = 0.0f,
 			.MaxDepth = 1.0f,
 		};
@@ -676,8 +675,8 @@ void sRender()
 		{
 			.left = 0,
 			.top = 0,
-			.right = static_cast<LONG>(gRenderer.mScreenWidth),
-			.bottom = static_cast<LONG>(gRenderer.mScreenHeight),
+			.right = static_cast<LONG>(gRenderer.mScreenSize.x),
+			.bottom = static_cast<LONG>(gRenderer.mScreenSize.y),
 		};
 		command_list->RSSetScissorRects(1, &rect);
 		D3D12_CPU_DESCRIPTOR_HANDLE depth_cpu_handle = gCPUContext.mDSVDescriptorHeap.GetCPUHandle(gRenderer.mRuntime.mScreenDepthTexture.mDSVIndex);
@@ -708,7 +707,7 @@ void sRender()
 		GPU_TIMING_SCOPE("RayQuery", command_list, &gStats.mGPUTimingMS.mRayQuery);
 
 		gRenderer.Setup(gRenderer.mRuntime.mRayQueryShader);
-		command_list->Dispatch(gAlignUpDiv(gRenderer.mScreenWidth, 8u), gAlignUpDiv(gRenderer.mScreenHeight, 8u), 1);
+		command_list->Dispatch(gAlignUpDiv(gRenderer.mScreenSize.x, 8u), gAlignUpDiv(gRenderer.mScreenSize.y, 8u), 1);
 
 		gBarrierUAV(command_list, nullptr);
 	}
@@ -720,8 +719,8 @@ void sRender()
 
 		D3D12_DISPATCH_RAYS_DESC dispatch_rays_desc = {};
 		{
-			dispatch_rays_desc.Width = gRenderer.mScreenWidth;
-			dispatch_rays_desc.Height = gRenderer.mScreenHeight;
+			dispatch_rays_desc.Width = gRenderer.mScreenSize.x;
+			dispatch_rays_desc.Height = gRenderer.mScreenSize.y;
 			dispatch_rays_desc.Depth = 1;
 
 			// RayGen
@@ -757,8 +756,8 @@ void sRender()
 		{
 			.TopLeftX = 0.0f,
 			.TopLeftY = 0.0f,
-			.Width = static_cast<float>(gRenderer.mScreenWidth),
-			.Height = static_cast<float>(gRenderer.mScreenHeight),
+			.Width = static_cast<float>(gRenderer.mScreenSize.x),
+			.Height = static_cast<float>(gRenderer.mScreenSize.y),
 			.MinDepth = 0.0f,
 			.MaxDepth = 1.0f,
 		};
@@ -767,8 +766,8 @@ void sRender()
 		{
 			.left = 0,
 			.top = 0,
-			.right = static_cast<LONG>(gRenderer.mScreenWidth),
-			.bottom = static_cast<LONG>(gRenderer.mScreenHeight),
+			.right = static_cast<LONG>(gRenderer.mScreenSize.x),
+			.bottom = static_cast<LONG>(gRenderer.mScreenSize.y),
 		};
 		gCommandList->RSSetScissorRects(1, &rect);
 		D3D12_CPU_DESCRIPTOR_HANDLE back_buffer_cpu_handle = gCPUContext.mRTVDescriptorHeap.GetCPUHandle(gRenderer.mRuntime.mBackBuffers[back_buffer_index].mRTVIndex);
@@ -798,7 +797,7 @@ void sRender()
 		PIXScopedEvent(gCommandList, PIX_COLOR(0, 255, 0), "Readback SceneColor with postprocess for Sequence");
 
 		gRenderer.Setup(gRenderer.mRuntime.mReadbackShader);
-		gCommandList->Dispatch(gAlignUpDiv(gRenderer.mScreenWidth, 8u), gAlignUpDiv(gRenderer.mScreenHeight, 8u), 1);
+		gCommandList->Dispatch(gAlignUpDiv(gRenderer.mScreenSize.x, 8u), gAlignUpDiv(gRenderer.mScreenSize.y, 8u), 1);
 	}
 
 	// Readback
