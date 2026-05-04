@@ -13,6 +13,7 @@ struct Renderer
 		Shader									mDepthShader				= Shader().FileName("Shader/RayQuery.hpp").VSName("ScreenspaceTriangleVS").PSName("DepthPS").DepthWrite(true).DSVFormat(DXGI_FORMAT_D32_FLOAT);
 		Shader									mPrepareLightsShader		= Shader().FileName("Shader/PrepareLights.hpp").CSName("PrepareLightsCS");
 		Shader									mClearShader				= Shader().FileName("Shader/Composite.hpp").CSName("ClearCS");
+		Shader									mClearBufferShader			= Shader().FileName("Shader/Composite.hpp").CSName("ClearBufferCS");
 		Shader									mGenerateTextureShader		= Shader().FileName("Shader/Composite.hpp").CSName("GeneratTextureCS");
 		Shader									mBRDFSliceShader			= Shader().FileName("Shader/Composite.hpp").CSName("BRDFSliceCS");
 		Shader									mReadbackShader				= Shader().FileName("Shader/Composite.hpp").CSName("ReadbackCS");
@@ -26,17 +27,16 @@ struct Renderer
 		Shader									mSentinelShader				= Shader();
 		std::span<Shader>						mShaders					= std::span<Shader>(&mRayQueryShader, &mSentinelShader);
 
-		Shader									mRayGenerationShader		= Shader().FileName("Shader/RayGeneration.hpp").RayGenerationName(L"RayGeneration").RootSignatureReference(&mRayQueryShader);
-		Shader									mMissShader					= Shader().FileName("Shader/Miss.hpp").MissName(L"Miss").RootSignatureReference(&mRayQueryShader);
-		Shader									mAnyHitShader				= Shader().FileName("Shader/AnyHit.hpp").AnyHitName(L"AnyHit").RootSignatureReference(&mRayQueryShader);														// AnyHit MUST comes before HitGroup referencing it when being AddToStateObject, otherwise DXGI_ERROR_DRIVER_INTERNAL_ERROR
-		Shader									mClosestHit100Shader		= Shader().FileName("Shader/ClosestHit100.hpp").ClosestHitName(L"ClosestHit100").RootSignatureReference(&mRayQueryShader);										// ClosestHit without AnyHit
-		Shader									mClosestHit010Shader		= Shader().FileName("Shader/ClosestHit010.hpp").ClosestHitName(L"ClosestHit010").AnyHitReference(&mAnyHitShader).RootSignatureReference(&mRayQueryShader);		// ClosestHit with AnyHit in different library
-		Shader									mClosestHit001Shader		= Shader().FileName("Shader/ClosestHit001.hpp").ClosestHitName(L"ClosestHit001").AnyHitName(L"AnyHit001").RootSignatureReference(&mRayQueryShader);			// ClosestHit with AnyHit in same library
+		Shader									mRayGenerationShader		= Shader().FileName("Shader/RayGeneration.hpp").RayGenerationName(L"RayGeneration");
+		Shader									mMissShader					= Shader().FileName("Shader/Miss.hpp").MissName(L"Miss");
+		Shader									mAnyHitShader				= Shader().FileName("Shader/AnyHit.hpp").AnyHitName(L"AnyHit");														// AnyHit MUST comes before HitGroup referencing it when being AddToStateObject, otherwise DXGI_ERROR_DRIVER_INTERNAL_ERROR
+		Shader									mClosestHit100Shader		= Shader().FileName("Shader/ClosestHit100.hpp").ClosestHitName(L"ClosestHit100");									// ClosestHit without AnyHit
+		Shader									mClosestHit010Shader		= Shader().FileName("Shader/ClosestHit010.hpp").ClosestHitName(L"ClosestHit010").AnyHitReference(&mAnyHitShader);	// ClosestHit with AnyHit in different library
+		Shader									mClosestHit001Shader		= Shader().FileName("Shader/ClosestHit001.hpp").ClosestHitName(L"ClosestHit001").AnyHitName(L"AnyHit001");			// ClosestHit with AnyHit in same library
 		Shader									mCollectionSentinelShader	= Shader();
 		std::span<Shader>						mCollectionShaders			= std::span<Shader>(&mMissShader,			&mCollectionSentinelShader);
 		std::span<Shader>						mHitGroupShaders			= std::span<Shader>(&mClosestHit100Shader,	&mCollectionSentinelShader);
 		Shader									mLibShader					= Shader();
-		ComPtr<ID3D12RootSignature>				mLibLocalRootSignature;
 		ShaderTable								mLibShaderTable;
 
 		Texture									mScreenColorTexture			= Texture().Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(ViewDescriptorIndex::ScreenColorUAV).SRVIndex(ViewDescriptorIndex::ScreenColorSRV).Name("Renderer.ScreenColorTexture");
@@ -62,14 +62,14 @@ struct Renderer
 																			Texture().Format(kBackBufferFormat).RTVIndex(RTVDescriptorIndex::BackBuffer0).Name("Renderer.BackBuffer0"),
 																			Texture().Format(kBackBufferFormat).RTVIndex(RTVDescriptorIndex::BackBuffer1).Name("Renderer.BackBuffer1") };
 
-		Buffer									mConstantsBuffer			= Buffer().ByteCount(sizeof(Constants)).CBVIndex(ViewDescriptorIndex::ConstantsCBV).Name("Constants").Upload(true);
-		Buffer									mPixelInspectionBuffer		= Buffer().ByteCount(sizeof(PixelInspection)).UAVIndex(ViewDescriptorIndex::PixelInspectionUAV).Name("PixelInspection").Readback(true);
-		Buffer									mRayInspectionBuffer		= Buffer().ByteCount(sizeof(RayInspection)).UAVIndex(ViewDescriptorIndex::RayInspectionUAV).Name("RayInspection");
-		Buffer									mQueryBuffer				= Buffer().ByteCount(sizeof(UINT64) * kTimestampCount).Name("Query").GPU(false).Readback(true);
-		Buffer 									mSpatialHashBuffer			= Buffer().ByteCount(sizeof(uint32_t) * kSpatialHashSize).UAVIndex(ViewDescriptorIndex::SpatialHashUAV).Name("SpatialHash");
-		Buffer 									mSpatialDataBuffer			= Buffer().ByteCount(sizeof(uint32_t) * kSpatialHashSize).UAVIndex(ViewDescriptorIndex::SpatialDataUAV).Name("SpatialData");
+		Buffer									mConstantsBuffer			= Buffer().Stride(sizeof(Constants)).CBVIndex(ViewDescriptorIndex::ConstantsCBV).Name("Constants").Upload(true);
+		Buffer									mPixelInspectionBuffer		= Buffer().Stride(sizeof(PixelInspection)).UAVIndex(ViewDescriptorIndex::PixelInspectionUAV).Name("PixelInspection").Readback(true);
+		Buffer									mRayInspectionBuffer		= Buffer().Stride(sizeof(RayInspection)).UAVIndex(ViewDescriptorIndex::RayInspectionUAV).Name("RayInspection");
+		Buffer									mQueryBuffer				= Buffer().Stride(sizeof(UINT64)).ElementCount(kTimestampCount).Name("Query").GPU(false).Readback(true);
+		Buffer 									mSpatialHashBuffer			= Buffer().Stride(sizeof(uint32_t)).ElementCount(kSpatialHashSize).UAVIndex(ViewDescriptorIndex::SpatialHashUAV).Name("SpatialHash");
+		Buffer 									mSpatialDataBuffer			= Buffer().Stride(sizeof(uint32_t)).ElementCount(kSpatialHashSize).UAVIndex(ViewDescriptorIndex::SpatialDataUAV).Name("SpatialData");
 
-		Buffer 									mShaderPrintBuffer			= Buffer().ByteCount(sizeof(uint32_t) * 64 * 1024).UAVIndex(ViewDescriptorIndex::ShaderPrintUAV).Readback(true).Name("ShaderPrintUAV");
+		Buffer 									mShaderPrintBuffer			= Buffer().Stride(sizeof(uint32_t)).ElementCount(64 * 1024).UAVIndex(ViewDescriptorIndex::ShaderPrintUAV).Readback(true).Name("ShaderPrintUAV");
 
 		Buffer									mSentinelBuffer;
 		std::span<Buffer>						mBuffers					= std::span<Buffer>(&mConstantsBuffer, &mSentinelBuffer);
@@ -81,14 +81,18 @@ struct Renderer
 		void									Initialize();
 		void									Finalize();
 
+		void									CreateCommonRootSignature();
+		void									CreateLocalRootSignature();
+		ComPtr<ID3D12RootSignature>				CreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC& desc);
+
+		ComPtr<ID3D12RootSignature>				mCommonRootSignature;
+		ComPtr<ID3D12RootSignature>				mLocalRootSignature;
+
 		bool									CreateVSPSPipelineState(const char* inFileName, const char* inVSName, const char* inPSName, Shader& ioShader);
 		bool									CreateCSPipelineState(const char* inFileName, const char* inCSName, Shader& ioShader);
 		bool									CreateLibPipelineState(const char* inFileName, const wchar_t* inLibName, Shader& ioShader);
-		bool									CreatePipelineState(Shader& ioShader);
+		bool									CompileShader(Shader& ioShader);
 		ComPtr<IDxcBlob>						Compile(const char* inFilename, const char* inEntryPoint, std::string_view inProfile);
-
-		ComPtr<ID3D12RootSignature>				CreateLocalRootSignature();
-		ComPtr<ID3D12RootSignature>				CreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC& desc);
 
 		ComPtr<ID3D12StateObject>				CreateStateObject(IDxcBlob* inBlob, Shader& ioShader);
 		ShaderTable								CreateShaderTable(const Shader& inShader);
@@ -137,25 +141,31 @@ struct Renderer
 		gCommandList->ClearUnorderedAccessViewFloat(gpu_handle, cpu_handle, inTexture.mResource.Get(), &clear_value.x, 0, nullptr);
 	}
 
-	void										Setup(const Shader& inShader)
+	void										Setup(const Shader& inShader, const RootConstants& inRootConstants = {})
 	{
 		SetHeaps();
 
 		if (inShader.mCSName == nullptr)
-			gCommandList->SetGraphicsRootSignature(inShader.mData.mRootSignature.Get());
+			gCommandList->SetGraphicsRootSignature(mCompiler.mCommonRootSignature.Get());
 		else
-			gCommandList->SetComputeRootSignature(inShader.mData.mRootSignature.Get());
+			gCommandList->SetComputeRootSignature(mCompiler.mCommonRootSignature.Get());
 
 		if (inShader.mData.mStateObject != nullptr)
 			gCommandList->SetPipelineState1(inShader.mData.mStateObject.Get());
 		else
 			gCommandList->SetPipelineState(inShader.mData.mPipelineState.Get());
 
-		// Root parameters need to be set after RootSignature
+		// See CreateCommonRootSignature for layout
 		if (inShader.mCSName == nullptr)
-			gCommandList->SetGraphicsRootConstantBufferView((int)RootParameterIndex::Constants, mRuntime.mConstantsBuffer.mResource->GetGPUVirtualAddress());
+		{
+			gCommandList->SetGraphicsRoot32BitConstants(ROOT_CONSTANTS_REGISTER, ROOT_CONSTANTS_NUM_32BIT, &inRootConstants, 0);
+			gCommandList->SetGraphicsRootConstantBufferView(ROOT_CBV_REGISTER, mRuntime.mConstantsBuffer.mResource->GetGPUVirtualAddress());
+		}
 		else
-			gCommandList->SetComputeRootConstantBufferView((int)RootParameterIndex::Constants, mRuntime.mConstantsBuffer.mResource->GetGPUVirtualAddress());
+		{
+			gCommandList->SetComputeRoot32BitConstants(ROOT_CONSTANTS_REGISTER, ROOT_CONSTANTS_NUM_32BIT, &inRootConstants, 0);
+			gCommandList->SetComputeRootConstantBufferView(ROOT_CBV_REGISTER, mRuntime.mConstantsBuffer.mResource->GetGPUVirtualAddress());
+		}
 	}
 
 	bool										mReloadShader = false;

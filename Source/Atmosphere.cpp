@@ -152,17 +152,13 @@ void Atmosphere::Runtime::Bruneton17::ComputeSingleScattering()
 
 void Atmosphere::Runtime::Bruneton17::ComputeScatteringDensity(uint32_t inScatteringOrder)
 {
-	gRenderer.Setup(mComputeScatteringDensityShader);
-	uint32_t scattering_order = inScatteringOrder;
-	gCommandList->SetComputeRoot32BitConstants((int)RootParameterIndex::ConstantsAtmosphere, 1, &scattering_order, 0);
+	gRenderer.Setup(mComputeScatteringDensityShader, { .mData0 = { inScatteringOrder, 0, 0, 0 } });
 	gCommandList->Dispatch(mDeltaScatteringDensityTexture.mWidth / 8, mDeltaScatteringDensityTexture.mHeight / 8, mDeltaScatteringDensityTexture.mDepth);
 }
 
 void Atmosphere::Runtime::Bruneton17::ComputeIndirectIrradiance(uint32_t inScatteringOrder)
 {
-	gRenderer.Setup(mComputeIndirectIrradianceShader);
-	uint32_t scattering_order = inScatteringOrder - 1;
-	gCommandList->SetComputeRoot32BitConstants((int)RootParameterIndex::ConstantsAtmosphere, 1, &scattering_order, 0);
+	gRenderer.Setup(mComputeIndirectIrradianceShader, { .mData0 = { inScatteringOrder - 1, 0, 0, 0 } });
 	gCommandList->Dispatch(mIrradianceTexture.mWidth / 8, mIrradianceTexture.mHeight / 8, mIrradianceTexture.mDepth);
 }
 
@@ -230,21 +226,17 @@ void Atmosphere::Runtime::Hillaire20::Validate()
 {
 	auto diff = [](const Texture& inComputed, const Texture& inExpected, const Texture& inOutput)
 	{
+		gAssert(inComputed.mUAVIndex != ViewDescriptorIndex::Invalid);
+		gAssert(inExpected.mUAVIndex != ViewDescriptorIndex::Invalid);
+		gAssert(inOutput.mUAVIndex != ViewDescriptorIndex::Invalid);
+
 		BarrierScope computed_scope(gCommandList, inComputed.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		BarrierScope expected_scope(gCommandList, inExpected.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		BarrierScope output_scope(gCommandList, inOutput.mResource.Get(), D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 		Shader& shader = inExpected.mDepth == 1 ? gRenderer.mRuntime.mDiffTexture2DShader : gRenderer.mRuntime.mDiffTexture3DShader;
-		gRenderer.Setup(shader);
 
-		gAssert(inComputed.mUAVIndex != ViewDescriptorIndex::Invalid);
-		gAssert(inExpected.mUAVIndex != ViewDescriptorIndex::Invalid);
-		gAssert(inOutput.mUAVIndex != ViewDescriptorIndex::Invalid);
-
-		gCommandList->SetComputeRoot32BitConstant((int)RootParameterIndex::ConstantsDiff, static_cast<UINT>(inComputed.mUAVIndex), 0);
-		gCommandList->SetComputeRoot32BitConstant((int)RootParameterIndex::ConstantsDiff, static_cast<UINT>(inExpected.mUAVIndex), 1);
-		gCommandList->SetComputeRoot32BitConstant((int)RootParameterIndex::ConstantsDiff, static_cast<UINT>(inOutput.mUAVIndex), 2);
-
+		gRenderer.Setup(shader, { .mData0 = {inComputed.mUAVIndex, inExpected.mUAVIndex, inOutput.mUAVIndex, 0} });
 		gCommandList->Dispatch((inExpected.mWidth + 7) / 8, (inExpected.mHeight + 7) / 8, inExpected.mDepth);
 	};
 

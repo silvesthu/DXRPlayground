@@ -87,7 +87,6 @@ float s2h_floatLookupFloat(uint functionId, float x)
 	return 0;
 }
 
-[RootSignature(ROOT_SIGNATURE_COMMON)]
 float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 {
 	RWTexture2D<float4> screen_color = ResourceDescriptorHeap[(int)ViewDescriptorIndex::ScreenColorUAV];
@@ -164,7 +163,6 @@ float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 	return float4(color.xyz, 1);
 }
 
-[RootSignature(ROOT_SIGNATURE_COMMON)]
 [numthreads(64, 1, 1)]
 void ClearCS(
 	uint3 inGroupThreadID : SV_GroupThreadID,
@@ -198,7 +196,17 @@ void ClearCS(
 #endif // SHADER_DEBUG
 }
 
-[RootSignature(ROOT_SIGNATURE_COMMON)]
+[numthreads(64, 1, 1)]
+void ClearBufferCS(
+	uint3 inGroupThreadID : SV_GroupThreadID,
+	uint3 inGroupID : SV_GroupID,
+	uint3 inDispatchThreadID : SV_DispatchThreadID,
+	uint inGroupIndex : SV_GroupIndex)
+{
+	RWStructuredBuffer<uint4> buffer = ResourceDescriptorHeap[mRootConstants.mData0.x];
+	buffer[inDispatchThreadID.x] = mRootConstants.mData1;
+}
+
 [numthreads(8, 8, 1)]
 void GeneratTextureCS(
 	uint3 inGroupThreadID : SV_GroupThreadID,
@@ -214,7 +222,6 @@ void GeneratTextureCS(
 	texture[inDispatchThreadID.xy] = float4(color, 1.0); 
 }
 
-[RootSignature(ROOT_SIGNATURE_COMMON)]
 [numthreads(8, 8, 1)]
 void BRDFSliceCS(
 	uint3 inGroupThreadID : SV_GroupThreadID,
@@ -236,7 +243,6 @@ void BRDFSliceCS(
 	texture[inDispatchThreadID.xy] = fragColor;
 }
 
-[RootSignature(ROOT_SIGNATURE_COMMON)]
 [numthreads(8, 8, 1)]
 void ReadbackCS(
 	uint3 inGroupThreadID : SV_GroupThreadID,
@@ -310,13 +316,11 @@ float4 LineVS(uint inVertexID : SV_VertexID, out float4 outColor : COLOR) : SV_P
 	return mul(mConstants.mViewProjectionMatrix, position_ws);
 }
 
-[RootSignature(ROOT_SIGNATURE_COMMON)]
 float4 LinePS(float4 position : SV_POSITION, in float4 inColor : COLOR) : SV_TARGET
 {
 	return float4(inColor.xyz, 1.0);
 }
 
-[RootSignature(ROOT_SIGNATURE_COMMON)]
 float4 LineHiddenPS(float4 position : SV_POSITION, in float4 inColor : COLOR) : SV_TARGET
 {
 	// Dashed line
@@ -329,11 +333,6 @@ float4 LineHiddenPS(float4 position : SV_POSITION, in float4 inColor : COLOR) : 
 	return float4(inColor.xyz, 1.0);
 }
 
-ConstantBuffer<RootConstantsNanoVDBVisualize> mRootConstantsNanoVDBVisualize : register(b0, space1);
-#define ROOT_SIGNATURE_NANOVDB_VISUALIZE \
-ROOT_SIGNATURE_BASE ", RootConstants(num32BitConstants=4, b0, space = 1)"
-
-[RootSignature(ROOT_SIGNATURE_NANOVDB_VISUALIZE)]
 [numthreads(8, 8, 1)]
 void NanoVDBVisualizeCS(
 	uint3 inGroupThreadID : SV_GroupThreadID,
@@ -341,9 +340,12 @@ void NanoVDBVisualizeCS(
 	uint3 inDispatchThreadID : SV_DispatchThreadID,
 	uint inGroupIndex : SV_GroupIndex)
 {
-	InstanceData instance_data					= InstanceDatas[mRootConstantsNanoVDBVisualize.mInstanceIndex];
+	uint instance_index							= mRootConstants.mData0.x;
+	uint uav_index								= mRootConstants.mData0.y;
 
-	RWTexture3D<float> output					= ResourceDescriptorHeap[mRootConstantsNanoVDBVisualize.mTexutureUAVIndex];
+	InstanceData instance_data					= InstanceDatas[instance_index];
+
+	RWTexture3D<float> output					= ResourceDescriptorHeap[uav_index];
 	if (any(inDispatchThreadID >= instance_data.mMediumNanoVBD.mSize))
 		return;
 

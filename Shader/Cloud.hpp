@@ -1,7 +1,6 @@
 #include "Shared.h"
 #include "Binding.h"
 
-[RootSignature(ROOT_SIGNATURE_COMMON)]
 [numthreads(8, 8, 1)]
 void CloudShapeNoiseCS(
 	uint3 inGroupThreadID : SV_GroupThreadID,
@@ -19,7 +18,6 @@ void CloudShapeNoiseCS(
 	output_UAV[inDispatchThreadID.xyz] = input;
 }
 
-[RootSignature(ROOT_SIGNATURE_COMMON)]
 [numthreads(8, 8, 1)]
 void CloudErosionNoiseCS(
 	uint3 inGroupThreadID : SV_GroupThreadID,

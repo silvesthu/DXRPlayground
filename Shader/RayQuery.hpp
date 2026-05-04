@@ -484,7 +484,6 @@ void TraceRay(inout PixelContext ioPixelContext)
 	}
 }
 
-[RootSignature(ROOT_SIGNATURE_COMMON)]
 [numthreads(8, 8, 1)]
 void RayQueryCS(
 	uint3 inGroupThreadID : SV_GroupThreadID,
@@ -508,7 +507,6 @@ void RayQueryCS(
 	TraceRay(pixel_context);
 }
 
-[RootSignature(ROOT_SIGNATURE_COMMON)]
 void DepthPS(
 	float4 inPosition : SV_POSITION,
 	out float outDepth : SV_DEPTH)

@@ -442,7 +442,7 @@ struct DescriptorHeap
 
 		Reset();
 
-		bool shader_visible = !mForceCPU && mType == D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV || mType == D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER;
+		bool shader_visible = !mForceCPU && (mType == D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV || mType == D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
 
 		D3D12_DESCRIPTOR_HEAP_DESC desc = {};
 		desc.NumDescriptors = mCount;
@@ -494,7 +494,6 @@ struct Shader
 	SHADER_MEMBER(const Shader*, AnyHitReference, nullptr);
 	SHADER_MEMBER(const wchar_t*, ClosestHitName, nullptr);
 	SHADER_MEMBER(const wchar_t*, IntersectionName, nullptr);
-	SHADER_MEMBER(const Shader*, RootSignatureReference, nullptr);
 	SHADER_MEMBER(D3D12_PRIMITIVE_TOPOLOGY_TYPE, Topology, D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
 	SHADER_MEMBER(bool, DepthWrite, false);
 	SHADER_MEMBER(D3D12_COMPARISON_FUNC, DepthFunc, D3D12_COMPARISON_FUNC_ALWAYS);
@@ -516,7 +515,6 @@ struct Shader
 
 	struct Data
 	{
-		ComPtr<ID3D12RootSignature>					mRootSignature;
 		ComPtr<ID3D12PipelineState>					mPipelineState;
 		ComPtr<ID3D12StateObject>					mStateObject;
 	};
@@ -529,22 +527,24 @@ struct Buffer
 {
 #define BUFFER_MEMBER(type, name, default_value) MEMBER(Buffer, type, name, default_value)
 
-	BUFFER_MEMBER(uint,						ByteCount,		0);
+	BUFFER_MEMBER(uint,						Stride,			0);
+	BUFFER_MEMBER(uint,						ElementCount,	1);
 	BUFFER_MEMBER(std::string,				Name,			"");
 	BUFFER_MEMBER(ViewDescriptorIndex,		CBVIndex,		ViewDescriptorIndex::Invalid);
 	BUFFER_MEMBER(ViewDescriptorIndex,		SRVIndex,		ViewDescriptorIndex::Invalid);
 	BUFFER_MEMBER(ViewDescriptorIndex,		UAVIndex,		ViewDescriptorIndex::Invalid);
-	BUFFER_MEMBER(uint,						Stride,			0);
 	BUFFER_MEMBER(bool,						GPU,			true);
 	BUFFER_MEMBER(bool,						Upload,			false);
 	BUFFER_MEMBER(bool,						UploadOnce,		false);
 	BUFFER_MEMBER(bool,						Readback,		false);
+
+	uint GetSizeInBytes() const { return mStride * mElementCount; }
 	
 	void Initialize();
 	void UpdateGPU(ID3D12GraphicsCommandList4* inCommandList);
 	void Readback(ID3D12GraphicsCommandList4* inCommandList);
 	template <typename T>
-	std::span<T> GetReadback(uint inFrameContextIndex) { gAssert(mByteCount % sizeof(T) == 0); return std::span<T>(static_cast<T*>(mReadbackPointer[inFrameContextIndex]), mByteCount / sizeof(T)); }
+	std::span<T> GetReadback(uint inFrameContextIndex) { gAssert(mStride == sizeof(T)); return std::span<T>(static_cast<T*>(mReadbackPointer[inFrameContextIndex]), mElementCount); }
 
 	ComPtr<ID3D12Resource>					mResource;
 	ComPtr<ID3D12Resource>					mUploadResource[kFrameInFlightCount];

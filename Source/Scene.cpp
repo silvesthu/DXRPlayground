@@ -1812,17 +1812,11 @@ void Scene::Render(ID3D12GraphicsCommandList4* inCommandList)
 
 	for (auto&& buffer_visualization : mBufferVisualizations)
 	{
-		gRenderer.Setup(gRenderer.mRuntime.mNanoVDBVisualizeShader);
-
 		Texture& texture = mTextures[buffer_visualization.mTexutureIndex];
-		RootConstantsNanoVDBVisualize constants =
-		{
-			.mInstanceIndex = buffer_visualization.mInstanceIndex,
-			.mTexutureUAVIndex = (uint)texture.mUAVIndex,
-		};
-		gCommandList->SetComputeRoot32BitConstants((int)RootParameterIndex::ConstantsNanoVDBVisualize, 4, &constants, 0);
 
 		BarrierScope scope(gCommandList, texture.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+		gRenderer.Setup(gRenderer.mRuntime.mNanoVDBVisualizeShader, { .mData0 = { buffer_visualization.mInstanceIndex, texture.mUAVIndex, 0, 0 } });
 		gCommandList->Dispatch(gAlignUpDiv(texture.mWidth, 8u), gAlignUpDiv(texture.mHeight, 8u), texture.mDepth);
 	}
 	mBufferVisualizations.clear();
@@ -1940,8 +1934,8 @@ void Scene::InitializeBuffers()
 			mBuffers.push_back({});
 			Buffer& buffer = mBuffers.back();
 			buffer = buffer.
-				ByteCount((uint)meta_data->gridSize).
 				Stride(sizeof(uint)).
+				ElementCount((uint)meta_data->gridSize).
 				SRVIndex(ViewDescriptorIndex((uint)ViewDescriptorIndex::SceneAutoIndex + mNextViewDescriptorIndex++)).
 				GPU(true).
 				UploadOnce(true).
@@ -2283,15 +2277,15 @@ void Scene::GenerateMeshlets()
 		{
 			Buffer& buffer = instance_info.mCluster.mMeshletBuffer;
 			buffer = buffer.
-				ByteCount((uint)(instance_info.mCluster.mMeshlets.size() * sizeof(meshopt_Meshlet))).
 				Stride(sizeof(meshopt_Meshlet)).
+				ElementCount((uint)(instance_info.mCluster.mMeshlets.size())).
 				SRVIndex(ViewDescriptorIndex((uint)ViewDescriptorIndex::SceneAutoIndex + mNextViewDescriptorIndex++)).
 				GPU(true).
 				UploadOnce(true).
 				Name("Scene." + instance_info.mName + ".[ClusterCLAS].Meshlet");
 			buffer.Initialize();
 			gAssert(buffer.mUploadPointer[0] != nullptr);
-			memcpy(buffer.mUploadPointer[0], instance_info.mCluster.mMeshlets.data(), buffer.mByteCount);
+			memcpy(buffer.mUploadPointer[0], instance_info.mCluster.mMeshlets.data(), buffer.GetSizeInBytes());
 			buffer.mUploadResource[0]->Unmap(0, nullptr);
 			buffer.mUploadPointer[0] = nullptr;
 
@@ -2302,15 +2296,15 @@ void Scene::GenerateMeshlets()
 		{
 			Buffer& buffer = instance_info.mCluster.mIndexBuffer;
 			buffer = buffer.
-				ByteCount((uint)(instance_info.mCluster.mIndices.size() * sizeof(IndexType))).
 				Stride(sizeof(uint)).
+				ElementCount((uint)(instance_info.mCluster.mIndices.size())).
 				SRVIndex(ViewDescriptorIndex((uint)ViewDescriptorIndex::SceneAutoIndex + mNextViewDescriptorIndex++)).
 				GPU(true).
 				UploadOnce(true).
 				Name("Scene." + instance_info.mName + ".[ClusterCLAS].Index");
 			buffer.Initialize();
 			gAssert(buffer.mUploadPointer[0] != nullptr);
-			memcpy(buffer.mUploadPointer[0], instance_info.mCluster.mIndices.data(), buffer.mByteCount);
+			memcpy(buffer.mUploadPointer[0], instance_info.mCluster.mIndices.data(), buffer.GetSizeInBytes());
 			buffer.mUploadResource[0]->Unmap(0, nullptr);
 			buffer.mUploadPointer[0] = nullptr;
 

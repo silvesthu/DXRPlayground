@@ -5,52 +5,23 @@
 #define USE_DYNAMIC_RESOURCE_SRV_UAV	1 // [TODO] Always enabled, need alternative implementation for comparison
 #define USE_DYNAMIC_RESOURCE_SAMPLER	1 // [TODO] Always enabled, need alternative implementation for comparison
 
+// RootConstants
+ConstantBuffer<RootConstants> mRootConstants : REGISTER_CBV(ROOT_CONSTANTS_REGISTER, COMMON_ROOT_SIGNATURE_REGISTER_SPACE);
+
 // CBV
 #if USE_DYNAMIC_RESOURCE_CBV
 // 0.11ms
 // Top SOLs    SM 59.4% | TEX 45.3% | L2 17.9% | VRAM 1.5% | VPC 0.0%
 static ConstantBuffer<Constants> mConstants = ResourceDescriptorHeap[0];
-ConstantBuffer<Constants> mConstantsUnused : register(b0, space0);
+ConstantBuffer<Constants> mConstantsUnused : REGISTER_CBV(COMMON_ROOT_CBV_REGISTER, COMMON_ROOT_SIGNATURE_REGISTER_SPACE);
 #else
 // 0.05ms
 // Top SOLs    SM 48.8% | TEX 17.5% | L2 0.9% | VRAM 0.4% | VPC 0.0%
-ConstantBuffer<Constants> mConstants : register(b0, space0);
+ConstantBuffer<Constants> mConstants : REGISTER_CBV(ROOT_CBV_REGISTER, COMMON_ROOT_SIGNATURE_REGISTER_SPACE);
 #endif // USE_DYNAMIC_RESOURCE_CBV
 
-#define ROOT_SIGNATURE_BASE \
-"RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0)" // RootParameterIndex::Constants
-
-#define ROOT_SIGNATURE_COMMON \
-ROOT_SIGNATURE_BASE \
-ROOT_SIGNATURE_NVAPI
-
-cbuffer RootConstantsPrepareLights : register(b0, space1)
-{
-	uint mNumTasks;
-};
-#define ROOT_SIGNATURE_PREPARE_LIGHTS \
-"RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0), RootConstants(num32BitConstants=1, b0, space = 1)"
-
-cbuffer RootConstantsDiff : register(b0, space1)
-{
-	uint mComputedIndex;
-	uint mExpectedIndex;
-	uint mOutputIndex;
-};
-#define ROOT_SIGNATURE_DIFF \
-"RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0), RootConstants(num32BitConstants=3, b0, space = 1)"
-
-cbuffer RootConstantsAtmosphere : register(b0, space1)
-{
-	uint mScatteringOrder;
-}
-#define ROOT_SIGNATURE_ATMOSPHERE \
-"RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED), CBV(b0, space = 0), RootConstants(num32BitConstants=1, b0, space = 1)"
-
-// Local Root Parameters, see also ShaderTableEntry, gCreateLocalRootSignature
-ConstantBuffer<LocalConstants> mLocalConstants : register(b0, space100);
-ConstantBuffer<Constants> mLocalCBV : register(b1, space100);
-Texture2D LocalSRVs[] : register(s0, space100);
+// Local Root Parameters, see ShaderTableEntry
+ConstantBuffer<LocalConstants> mLocalConstants : REGISTER_CBV(ROOT_CONSTANTS_REGISTER, LOCAL_ROOT_SIGNATURE_REGISTER_SPACE);
 
 // CBV Helper
 float3 GetSunDirection() { return mConstants.mSunDirection.xyz; }

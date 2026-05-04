@@ -9,11 +9,13 @@
 bool FindTask(uint3 inDispatchThreadID, out PrepareLightsTask task)
 {
 	// [TODO] Is binary search the best way?
+
+	uint num_tasks = mRootConstants.mData0.x;
 	
 	// Use binary search to find the task that contains the current thread's output index:
 	//   task.mLightBufferOffset <= inDispatchThreadID.x < (task.mLightBufferOffset + task.mTriangleCount)
 	int left = 0;
-	int right = int(mNumTasks) - 1;
+	int right = int(num_tasks) - 1;
 
 	while (right >= left)
 	{
@@ -42,7 +44,6 @@ bool FindTask(uint3 inDispatchThreadID, out PrepareLightsTask task)
 	return false;
 }
 
-[RootSignature(ROOT_SIGNATURE_PREPARE_LIGHTS)]
 [numthreads(256, 1, 1)]
 void PrepareLightsCS(
 	uint3 inGroupThreadID : SV_GroupThreadID,

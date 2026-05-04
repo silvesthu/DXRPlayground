@@ -526,7 +526,6 @@ void ComputeSingleScatteringIntegrand(float4 r_mu_mu_s_nu, float d, bool interse
 	mie = transmittance * GetProfileDensity(mConstants.mAtmosphere.mMieDensity, r_d - mConstants.mAtmosphere.mBottomRadius);
 }
 
-[RootSignature(ROOT_SIGNATURE_COMMON)]
 [numthreads(8, 8, 1)]
 void ComputeTransmittanceCS(
 	uint3 inGroupThreadID : SV_GroupThreadID,
@@ -557,7 +556,6 @@ void ComputeTransmittanceCS(
 	// TransmittanceUAV[inDispatchThreadID.xy] = float4(1,0,0, 1.0);
 }
 
-[RootSignature(ROOT_SIGNATURE_COMMON)]
 [numthreads(8, 8, 1)]
 void ComputeDirectIrradianceCS(
 	uint3 inGroupThreadID : SV_GroupThreadID,
@@ -637,7 +635,6 @@ void IntegrateSingleScattering(float4 r_mu_mu_s_nu, bool intersects_ground, out 
 	mie = mie_sum * dx * mConstants.mAtmosphere.mMieScattering;
 }
 
-[RootSignature(ROOT_SIGNATURE_COMMON)]
 [numthreads(8, 8, 1)]
 void ComputeSingleScatteringCS(
 	uint3 inGroupThreadID : SV_GroupThreadID,
@@ -763,11 +760,13 @@ float3 ComputeScatteringDensity(float4 r_mu_mu_s_nu, bool intersects_ground)
 				float3(cos(phi) * sin_theta, sin(phi) * sin_theta, cos_theta);
 			float domega_i = (dtheta) * (dphi)*sin(theta);
 
+			uint scattering_order = mRootConstants.mData0.x;
+
 			// The radiance L_i arriving from direction omega_i after n-1 bounces is
 			// the sum of a term given by the precomputed scattering texture for the
 			// (n-1)-th order:
 			float nu1 = dot(omega_s, omega_i);
-			float3 incident_radiance = GetScattering(r, omega_i.z, mu_s, nu1, ray_r_theta_intersects_ground, mScatteringOrder - 1);
+			float3 incident_radiance = GetScattering(r, omega_i.z, mu_s, nu1, ray_r_theta_intersects_ground, scattering_order - 1);
 
 			// and of the contribution from the light paths with n-1 bounces and whose
 			// last bounce is on the ground. This contribution is the product of the
@@ -804,7 +803,6 @@ float3 ComputeScatteringDensity(float4 r_mu_mu_s_nu, bool intersects_ground)
 	return rayleigh_mie;
 }
 
-[RootSignature(ROOT_SIGNATURE_ATMOSPHERE)]
 [numthreads(8, 8, 1)]
 void ComputeScatteringDensityCS(
 	uint3 inGroupThreadID : SV_GroupThreadID,
@@ -869,7 +867,8 @@ float3 ComputeIndirectIrradiance(float2 mu_s_r)
 			float domega = (dtheta) * (dphi)*sin(theta);
 
 			// Integration
-			result += GetScattering(r, omega.z, mu_s, nu, false /* ray_r_theta_intersects_ground */, mScatteringOrder) * omega.z * domega;
+			uint scattering_order = mRootConstants.mData0.x;
+			result += GetScattering(r, omega.z, mu_s, nu, false /* ray_r_theta_intersects_ground */, scattering_order) * omega.z * domega;
 		}
 	}
 
@@ -887,7 +886,6 @@ float3 ComputeIndirectIrradiance(float2 mu_s_r)
 	return result;
 }
 
-[RootSignature(ROOT_SIGNATURE_ATMOSPHERE)]
 [numthreads(8, 8, 1)]
 void ComputeIndirectIrradianceCS(
 	uint3 inGroupThreadID : SV_GroupThreadID,
@@ -958,7 +956,6 @@ void ComputeMultipleScattering(float4 r_mu_mu_s_nu, bool intersects_ground, out 
 	delta_multiple_scattering = rayleigh_mie_sum;
 }
 
-[RootSignature(ROOT_SIGNATURE_COMMON)]
 [numthreads(8, 8, 1)]
 void ComputeMultipleScatteringCS(
 	uint3 inGroupThreadID : SV_GroupThreadID,

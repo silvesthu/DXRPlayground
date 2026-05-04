@@ -104,6 +104,9 @@ void Renderer::Compiler::Initialize()
 	mDxcUtils->CreateDefaultIncludeHandler(mDxcIncludeHandler.GetAddressOf());
 
 	slang::createGlobalSession(&mGlobalSession);
+
+	CreateCommonRootSignature();
+	CreateLocalRootSignature();
 }
 
 void Renderer::Compiler::Finalize()
@@ -111,6 +114,35 @@ void Renderer::Compiler::Finalize()
 	HMODULE dxcompilerDll = mDxcompilerDll;
 	*this = {};
 	FreeLibrary(dxcompilerDll);
+}
+
+void Renderer::Compiler::CreateCommonRootSignature()
+{
+	D3D12_DESCRIPTOR_RANGE nvapi_range =
+	{
+		.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV,
+		.NumDescriptors = 1,
+		.BaseShaderRegister = NV_SHADER_EXTN_SLOT,
+		.RegisterSpace = NV_SHADER_EXTN_REGISTER_SPACE,
+		.OffsetInDescriptorsFromTableStart = 0,
+	};
+
+	D3D12_ROOT_PARAMETER root_parameters[] =
+	{
+		D3D12_ROOT_PARAMETER {.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS, .Constants = {.ShaderRegister = ROOT_CONSTANTS_REGISTER, .RegisterSpace = COMMON_ROOT_SIGNATURE_REGISTER_SPACE, .Num32BitValues = ROOT_CONSTANTS_NUM_32BIT } },
+		D3D12_ROOT_PARAMETER {.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV, .Descriptor = { .ShaderRegister = ROOT_CBV_REGISTER, .RegisterSpace = COMMON_ROOT_SIGNATURE_REGISTER_SPACE }  },
+		// https://developer.nvidia.com/blog/improve-shader-performance-and-in-game-frame-rates-with-shader-execution-reordering/
+		D3D12_ROOT_PARAMETER {.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE, .DescriptorTable = D3D12_ROOT_DESCRIPTOR_TABLE { .NumDescriptorRanges = 1, .pDescriptorRanges = &nvapi_range } },
+	};
+
+	mCommonRootSignature = CreateRootSignature(
+		D3D12_ROOT_SIGNATURE_DESC
+		{
+			.NumParameters = gArraySize(root_parameters),
+			.pParameters = root_parameters,
+			.Flags = D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED,
+		});
+	mCommonRootSignature->SetName(L"CommonRootSignature");
 }
 
 ComPtr<ID3D12RootSignature> Renderer::Compiler::CreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC& desc)
@@ -153,7 +185,7 @@ ComPtr<ID3D12StateObject> Renderer::Compiler::CreateStateObject(IDxcBlob* inBlob
 		subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP, &hit_group_desc };
 
 	// Local root signature and associations
-	subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE, gRenderer.mRuntime.mLibLocalRootSignature.GetAddressOf() };
+	subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE, mLocalRootSignature.GetAddressOf() };
 	D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION subobject_to_exports_association{ .pSubobjectToAssociate = &subobjects[index - 1], .NumExports = 0 /* as default association, maybe can be omit? */ };
 	subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION, &subobject_to_exports_association };
 
@@ -166,7 +198,7 @@ ComPtr<ID3D12StateObject> Renderer::Compiler::CreateStateObject(IDxcBlob* inBlob
 	subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG, &pipeline_config };
 
 	// Global root signature
-	subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE, ioShader.mRootSignatureReference->mData.mRootSignature.GetAddressOf() };
+	subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE, mCommonRootSignature.GetAddressOf() };
 
 	// State object config
 	D3D12_STATE_OBJECT_CONFIG state_object_config = { .Flags = D3D12_STATE_OBJECT_FLAG_ALLOW_STATE_OBJECT_ADDITIONS };
@@ -230,57 +262,28 @@ struct ShaderTableEntry
 	ShaderIdentifier				mShaderIdentifier = {};		// 32 bytes
 
 	// Local Root Parameters, see also gCreateLocalRootSignature
-	LocalConstants					mLocalConstants = {};		// 16 bytes, as SetGraphicsRoot32BitConstant for global root signature
-	D3D12_GPU_VIRTUAL_ADDRESS		mLocalCBV = {};				// 8 bytes, as SetGraphicsRootConstantBufferView for global root signature
-	D3D12_GPU_DESCRIPTOR_HANDLE		mLocalSRVs = {};			// 8 bytes, as SetGraphicsRootDescriptorTable for global root signature
+	LocalConstants					mLocalConstants = {};		// 32 bytes, as SetGraphicsRoot32BitConstant for global root signature
 };
 
 static_assert(sizeof(ShaderTableEntry::mShaderIdentifier) == D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES, "D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES check failed");
 static_assert(sizeof(ShaderTableEntry) % D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT == 0, "D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT check failed");
 
-ComPtr<ID3D12RootSignature> Renderer::Compiler::CreateLocalRootSignature()
+void Renderer::Compiler::CreateLocalRootSignature()
 {
-	D3D12_DESCRIPTOR_RANGE srv_range =
+	// See ShaderTableEntry
+	D3D12_ROOT_PARAMETER root_parameters[] =
 	{
-		.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV,
-		.NumDescriptors = 4096, // Unbounded, match size with referencing FrameContext::mViewDescriptorHeap
-		.BaseShaderRegister = 0,
-		.RegisterSpace = LOCAL_ROOT_SIGNATURE_REGISTER_SPACE,
-		.OffsetInDescriptorsFromTableStart = 0,
+		D3D12_ROOT_PARAMETER {.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS, .Constants = {.ShaderRegister = 0, .RegisterSpace = LOCAL_ROOT_SIGNATURE_REGISTER_SPACE, .Num32BitValues = 8 } },
 	};
 
-	D3D12_DESCRIPTOR_RANGE nvapi_range =
-	{
-		.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV,
-		.NumDescriptors = 1,
-		.BaseShaderRegister = NV_SHADER_EXTN_SLOT,
-		.RegisterSpace = NV_SHADER_EXTN_REGISTER_SPACE,
-		.OffsetInDescriptorsFromTableStart = 0,
-	};
-	UNUSED(nvapi_range);
-
-	// Local Root Parameters, see also ShaderTableEntry
-	D3D12_ROOT_PARAMETER local_root_parameters[] =
-	{
-		D3D12_ROOT_PARAMETER {.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS, .Constants = {.ShaderRegister = 0, .RegisterSpace = LOCAL_ROOT_SIGNATURE_REGISTER_SPACE, .Num32BitValues = 4 } },
-		D3D12_ROOT_PARAMETER {.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV, .Descriptor = {.ShaderRegister = 1, .RegisterSpace = LOCAL_ROOT_SIGNATURE_REGISTER_SPACE }  },
-		D3D12_ROOT_PARAMETER {.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE, .DescriptorTable = D3D12_ROOT_DESCRIPTOR_TABLE {.NumDescriptorRanges = 1, .pDescriptorRanges = &srv_range } },
-
-		// https://developer.nvidia.com/blog/improve-shader-performance-and-in-game-frame-rates-with-shader-execution-reordering/
-		// Already added in GlobalRootSignature, skip for LocalRootSignature
-		// D3D12_ROOT_PARAMETER {.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE, .DescriptorTable = D3D12_ROOT_DESCRIPTOR_TABLE {.NumDescriptorRanges = 1, .pDescriptorRanges = &nvapi_range } },
-	};
-
-	ComPtr<ID3D12RootSignature> local_root_signature = CreateRootSignature(
+	mLocalRootSignature = CreateRootSignature(
 		D3D12_ROOT_SIGNATURE_DESC
 		{
-			.NumParameters = gArraySize(local_root_parameters),
-			.pParameters = local_root_parameters,
+			.NumParameters = gArraySize(root_parameters),
+			.pParameters = root_parameters,
 			.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE,
 		});
-	local_root_signature->SetName(L"LocalRootSignature");
-
-	return local_root_signature;
+	mLocalRootSignature->SetName(L"LocalRootSignature");
 }
 
 ShaderTable Renderer::Compiler::CreateShaderTable(const Shader& inShader)
@@ -293,8 +296,6 @@ ShaderTable Renderer::Compiler::CreateShaderTable(const Shader& inShader)
 	std::vector<ShaderTableEntry> shader_table_entries;
 	{
 		// Local root argument layout
-		// 
-		// 
 		// 
 		// Reference
 		// - https://github.com/NVIDIAGameWorks/DxrTutorials/blob/dcb8810086f80e77157a6a3b7deff2f24e0986d7/Tutorials/06-Raytrace/06-Raytrace.cpp#L734
@@ -335,9 +336,8 @@ ShaderTable Renderer::Compiler::CreateShaderTable(const Shader& inShader)
 
 			shader_table_entries.push_back({});
 			memcpy(&shader_table_entries.back().mShaderIdentifier, state_object_properties->GetShaderIdentifier(gRenderer.mRuntime.mRayGenerationShader.mRayGenerationName), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-			shader_table_entries.back().mLocalConstants.mShaderIndex = static_cast<uint32_t>(shader_table_entries.size() - 1);
-			shader_table_entries.back().mLocalCBV = gRenderer.mRuntime.mConstantsBuffer.mResource->GetGPUVirtualAddress();
-			shader_table_entries.back().mLocalSRVs = gGetFrameContext().mViewDescriptorHeap.GetGPUHandle(ViewDescriptorIndex::Invalid);
+			shader_table_entries.back().mLocalConstants.mData0 = { shader_table_entries.size() - 1, 0, 0, 0 };
+			shader_table_entries.back().mLocalConstants.mData1 = { 0, 0, 0, 0 };
 
 			shader_table.mRayGenCount = shader_table_entries.size() - shader_table.mRayGenOffset;
 		}
@@ -348,9 +348,8 @@ ShaderTable Renderer::Compiler::CreateShaderTable(const Shader& inShader)
 
 			shader_table_entries.push_back({});
 			memcpy(&shader_table_entries.back().mShaderIdentifier, state_object_properties->GetShaderIdentifier(gRenderer.mRuntime.mMissShader.mMissName), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-			shader_table_entries.back().mLocalConstants.mShaderIndex = static_cast<uint32_t>(shader_table_entries.size() - 1);
-			shader_table_entries.back().mLocalCBV = gRenderer.mRuntime.mConstantsBuffer.mResource->GetGPUVirtualAddress();
-			shader_table_entries.back().mLocalSRVs = gGetFrameContext().mViewDescriptorHeap.GetGPUHandle(ViewDescriptorIndex::Invalid);
+			shader_table_entries.back().mLocalConstants.mData0 = { shader_table_entries.size() - 1, 0, 0, 0 };
+			shader_table_entries.back().mLocalConstants.mData1 = { 0, 0, 0, 0 };
 
 			shader_table.mMissCount = shader_table_entries.size() - shader_table.mMissOffset;
 		}
@@ -365,9 +364,8 @@ ShaderTable Renderer::Compiler::CreateShaderTable(const Shader& inShader)
 				shader_table_entries.push_back({});
 				void* shader_identifier = state_object_properties->GetShaderIdentifier(shader.HitGroupName().c_str());
 				memcpy(&shader_table_entries.back().mShaderIdentifier, shader_identifier, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-				shader_table_entries.back().mLocalConstants.mShaderIndex = static_cast<uint32_t>(shader_table_entries.size() - 1);
-				shader_table_entries.back().mLocalCBV = gRenderer.mRuntime.mConstantsBuffer.mResource->GetGPUVirtualAddress();
-				shader_table_entries.back().mLocalSRVs = gGetFrameContext().mViewDescriptorHeap.GetGPUHandle(ViewDescriptorIndex::Invalid);
+				shader_table_entries.back().mLocalConstants.mData0 = { shader_table_entries.size() - 1, 0, 0, 0 };
+				shader_table_entries.back().mLocalConstants.mData1 = { 0, 0, 0, 0 };
 			}
 
 			shader_table.mHitGroupCount = shader_table_entries.size() - shader_table.mHitGroupOffset;
@@ -610,9 +608,6 @@ bool Renderer::Compiler::CreateVSPSPipelineState(const char* inFileName, const c
 	if (vs_blob == nullptr || ps_blob == nullptr)
 		return false;
 
-	if (FAILED(gDevice->CreateRootSignature(0, ps_blob->GetBufferPointer(), ps_blob->GetBufferSize(), IID_PPV_ARGS(&ioShader.mData.mRootSignature))))
-		return false;
-
 	D3D12_RASTERIZER_DESC rasterizer_desc = {};
 	rasterizer_desc.FillMode = D3D12_FILL_MODE_SOLID;
 	rasterizer_desc.CullMode = D3D12_CULL_MODE_NONE;
@@ -627,7 +622,7 @@ bool Renderer::Compiler::CreateVSPSPipelineState(const char* inFileName, const c
 	pipeline_state_desc.VS.BytecodeLength = vs_blob->GetBufferSize();
 	pipeline_state_desc.PS.pShaderBytecode = ps_blob->GetBufferPointer();
 	pipeline_state_desc.PS.BytecodeLength = ps_blob->GetBufferSize();
-	pipeline_state_desc.pRootSignature = ioShader.mData.mRootSignature.Get();
+	pipeline_state_desc.pRootSignature = mCommonRootSignature.Get();
 	pipeline_state_desc.RasterizerState = rasterizer_desc;
 	pipeline_state_desc.BlendState = blend_desc;
 	pipeline_state_desc.DepthStencilState.DepthEnable = TRUE;
@@ -655,16 +650,10 @@ bool Renderer::Compiler::CreateCSPipelineState(const char* inFileName, const cha
 	if (blob == nullptr)
 		return false;
 
-	LPVOID root_signature_pointer = blob->GetBufferPointer();
-	SIZE_T root_signature_size = blob->GetBufferSize();
-
-	if (FAILED(gDevice->CreateRootSignature(0, root_signature_pointer, root_signature_size, IID_PPV_ARGS(&ioShader.mData.mRootSignature))))
-		return false;
-
 	D3D12_COMPUTE_PIPELINE_STATE_DESC pipeline_state_desc = {};
 	pipeline_state_desc.CS.pShaderBytecode = blob->GetBufferPointer();
 	pipeline_state_desc.CS.BytecodeLength = blob->GetBufferSize();
-	pipeline_state_desc.pRootSignature = ioShader.mData.mRootSignature.Get();
+	pipeline_state_desc.pRootSignature = mCommonRootSignature.Get();
 	if (FAILED(gDevice->CreateComputePipelineState(&pipeline_state_desc, IID_PPV_ARGS(&ioShader.mData.mPipelineState))))
 		return false;
 
@@ -680,22 +669,18 @@ bool Renderer::Compiler::CreateLibPipelineState(const char* inFileName, const wc
 	if (blob == nullptr)
 		return false;
 
-	if (ioShader.mRootSignatureReference == nullptr || ioShader.mRootSignatureReference->mData.mRootSignature == nullptr)
-		return false;
-
 	std::vector<const wchar_t*> hit_shader_names;
 	ComPtr<ID3D12StateObject> pipeline_object = CreateStateObject(blob.Get(), ioShader);
 	if (pipeline_object == nullptr)
 		return false;
 
-	ioShader.mData.mRootSignature = ioShader.mRootSignatureReference->mData.mRootSignature;
 	ioShader.mData.mStateObject = pipeline_object;
 	ioShader.mData.mStateObject->SetName(inLibName);
 
 	return true;
 }
 
-bool Renderer::Compiler::CreatePipelineState(Shader& ioShader)
+bool Renderer::Compiler::CompileShader(Shader& ioShader)
 {
 	if (ioShader.mRayGenerationName != nullptr)
 		return CreateLibPipelineState(ioShader.mFileName, ioShader.mRayGenerationName, ioShader);
@@ -736,27 +721,15 @@ void Renderer::Render(ID3D12GraphicsCommandList4* inCommandList)
 
 	if (mSpatialCacheResetRequested)
 	{
-		FrameContext& frame_context = gGetFrameContext();
+		uint4 clear_value_uint = { 0, 0, 0, 0 };
 
-		uint32_t clear_value_uint[4] = { 0, 0, 0, 0 };
-		gCommandList->ClearUnorderedAccessViewUint(
-			frame_context.mViewDescriptorHeap.GetGPUHandle(mRuntime.mSpatialHashBuffer.mUAVIndex),
-			frame_context.mViewDescriptorHeap.GetCPUHandle(mRuntime.mSpatialHashBuffer.mUAVIndex),
-			mRuntime.mSpatialHashBuffer.mResource.Get(),
-			clear_value_uint,
-			0,
-			nullptr);
+		gRenderer.Setup(gRenderer.mRuntime.mClearBufferShader, { .mData0 = { mRuntime.mSpatialHashBuffer.mUAVIndex, ClearMode::UInt4, 0, 0 }, .mData1 = clear_value_uint });
+		inCommandList->Dispatch(gAlignUpDiv(mRuntime.mSpatialHashBuffer.GetSizeInBytes() / 16 /* UInt4 */, 64u), 1, 1);
 
-		float clear_value_float[4] = { 0, 0, 0, 0 };
-		gCommandList->ClearUnorderedAccessViewFloat(
-			frame_context.mViewDescriptorHeap.GetGPUHandle(mRuntime.mSpatialDataBuffer.mUAVIndex),
-			frame_context.mViewDescriptorHeap.GetCPUHandle(mRuntime.mSpatialDataBuffer.mUAVIndex),
-			mRuntime.mSpatialDataBuffer.mResource.Get(),
-			clear_value_float,
-			0,
-			nullptr);
+		gRenderer.Setup(gRenderer.mRuntime.mClearBufferShader, { .mData0 = { mRuntime.mSpatialDataBuffer.mUAVIndex, ClearMode::UInt4, 0, 0 }, .mData1 = clear_value_uint });
+		inCommandList->Dispatch(gAlignUpDiv(mRuntime.mSpatialHashBuffer.GetSizeInBytes() / 16 /* UInt4 */, 64u), 1, 1);
 
-		mSpatialCacheResetRequested = false;
+		// mSpatialCacheResetRequested = false;
 	}
 }
 
@@ -805,26 +778,25 @@ void Renderer::FinalizeScreenSizeTextures()
 void Renderer::InitializeShaders()
 {
 	for (auto&& shader : mRuntime.mShaders)
-		mCompiler.CreatePipelineState(shader);
+		mCompiler.CompileShader(shader);
 
-	mRuntime.mLibLocalRootSignature		= mCompiler.CreateLocalRootSignature();
-	mCompiler.CreatePipelineState(mRuntime.mRayGenerationShader);
+	mCompiler.CompileShader(mRuntime.mRayGenerationShader);
 	for (auto&& shader : mRuntime.mCollectionShaders)
-		mCompiler.CreatePipelineState(shader);
-	mRuntime.mLibShader					= mCompiler.CombineShader(mRuntime.mRayGenerationShader, mRuntime.mCollectionShaders);
-	mRuntime.mLibShaderTable			= mCompiler.CreateShaderTable(mRuntime.mLibShader);
+		mCompiler.CompileShader(shader);
+	mRuntime.mLibShader			= mCompiler.CombineShader(mRuntime.mRayGenerationShader, mRuntime.mCollectionShaders);
+	mRuntime.mLibShaderTable	= mCompiler.CreateShaderTable(mRuntime.mLibShader);
 
 	if (gAtmosphere.mEnabled)
 	{
 		for (auto&& shaders : gAtmosphere.mRuntime.mShadersSet)
 			for (auto&& shader : shaders)
-				mCompiler.CreatePipelineState(shader);
+				mCompiler.CompileShader(shader);
 	}
 
 	if (gCloud.mEnabled)
 	{
 		for (auto&& shader : gCloud.mRuntime.mShaders)
-			mCompiler.CreatePipelineState(shader);
+			mCompiler.CompileShader(shader);
 	}
 }
 

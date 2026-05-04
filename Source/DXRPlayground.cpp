@@ -21,8 +21,8 @@
 extern "C" { __declspec(dllexport) extern const UINT			D3D12SDKVersion = 619; }
 extern "C" { __declspec(dllexport) extern const char8_t*		D3D12SDKPath = u8".\\D3D12\\"; }
 
-#define DX12_ENABLE_DEBUG_LAYER			(0)
-#define DX12_ENABLE_INFO_QUEUE_CALLBACK (0)
+#define DX12_ENABLE_DEBUG_LAYER			(1)
+#define DX12_ENABLE_INFO_QUEUE_CALLBACK (1)
 #define DX12_ENABLE_GBV					(0)
 
 static const wchar_t*											kApplicationTitleW = L"DXR Playground";
@@ -60,7 +60,7 @@ static void sUpdate()
 		static bool mouse_prev_right_button_pressed = false;
 
 		ImVec2 mouse_current_position = GetMousePos();
-		bool mouse_right_button_pressed = IsMouseDown(1);
+		bool mouse_right_button_pressed = IsMouseDown(ImGuiMouseButton_Right);
 
 		ImVec2 mouse_delta(0, 0);
 		if (mouse_prev_right_button_pressed && mouse_right_button_pressed)
@@ -375,7 +375,8 @@ int sStartup(WNDCLASSEX& wc, HWND& hwnd)
 	gCloud.Initialize();
 
 	// File watch
-	filewatch::FileWatch<std::string> file_watch("Shader/",
+	std::string shader_directory = std::filesystem::canonical("Shader\\").string(); // canonical to follow symbol link
+	static filewatch::FileWatch<std::string> file_watch(shader_directory,
 		[](const std::string& inPath, const filewatch::Event inChangeType)
 		{
 			(void)inChangeType;
@@ -694,9 +695,7 @@ void sRender()
 	{
 		GPU_TIMING_SCOPE("PrepareLights", command_list, &gStats.mGPUTimingMS.mPrepareLights);
 
-		gRenderer.Setup(gRenderer.mRuntime.mPrepareLightsShader);
-		uint constants[] = { static_cast<uint>(gScene.GetPrepareLightsTaskCount()) };
-		command_list->SetComputeRoot32BitConstants(static_cast<int>(RootParameterIndex::ConstantsPrepareLights), 1, &constants, 0);
+		gRenderer.Setup(gRenderer.mRuntime.mPrepareLightsShader, { .mData0 = { gScene.GetPrepareLightsTaskCount(), 0, 0, 0 } });
 		command_list->Dispatch(gAlignUpDiv(gScene.GetSceneContent().mEmissiveTriangleCount, 256u), 1, 1);
 
 		gBarrierUAV(command_list, nullptr);

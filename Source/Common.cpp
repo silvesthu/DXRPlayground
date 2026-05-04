@@ -46,7 +46,7 @@ Constants							gConstants = {};
 
 void Buffer::Initialize()
 {
-	uint byte_count = gAlignUp(mByteCount, static_cast<uint>(D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
+	uint byte_count = gAlignUp(mStride * mElementCount, static_cast<uint>(D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
 
 	if (mGPU)
 	{
@@ -67,8 +67,6 @@ void Buffer::Initialize()
 		
 			for (int i = 0; i < kFrameInFlightCount; i++)
 				gDevice->CreateConstantBufferView(&desc, gFrameContexts[i].mViewDescriptorHeap.GetCPUHandle(mCBVIndex));
-
-			gAssert(mStride == 0);
 		}
 
 		if (mSRVIndex != ViewDescriptorIndex::Invalid)
@@ -77,8 +75,8 @@ void Buffer::Initialize()
 			desc.Format = DXGI_FORMAT_UNKNOWN;
 			desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
 			desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			desc.Buffer.NumElements = mStride == 0 ? 1 : (mByteCount / mStride);
-			desc.Buffer.StructureByteStride = mStride == 0 ? mByteCount : mStride;
+			desc.Buffer.NumElements = mElementCount;
+			desc.Buffer.StructureByteStride = mStride;
 			desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
 
 			for (int i = 0; i < kFrameInFlightCount; i++)
@@ -90,8 +88,8 @@ void Buffer::Initialize()
 			D3D12_UNORDERED_ACCESS_VIEW_DESC desc = {};
 			desc.Format = DXGI_FORMAT_UNKNOWN;
 			desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-			desc.Buffer.NumElements = mStride == 0 ? 1 : (mByteCount / mStride);
-			desc.Buffer.StructureByteStride = mStride == 0 ? mByteCount : mStride;
+			desc.Buffer.NumElements = mElementCount;
+			desc.Buffer.StructureByteStride = mStride;
 			desc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
 
 			for (int i = 0; i < kFrameInFlightCount; i++)

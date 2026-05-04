@@ -222,16 +222,37 @@ enum class ViewDescriptorIndex : uint
 	SceneAutoIndex = Count,		// Indices started from this are allocated incrementally by Scene
 };
 
-#define LOCAL_ROOT_SIGNATURE_REGISTER_SPACE 100
+enum class ClearMode : uint
+{
+	Invalid		= 0,
+
+	UInt4,
+	Float4,
+
+	Count,
+};
+
+#define ROOT_CONSTANTS_NUM_32BIT				8
+#define ROOT_CONSTANTS_REGISTER					0
+#define ROOT_CBV_REGISTER						1
+
+#define COMMON_ROOT_SIGNATURE_REGISTER_SPACE	0
+#define LOCAL_ROOT_SIGNATURE_REGISTER_SPACE		100
+
+#define REGISTER_CBV_CONCAT(R, S)				register(b ## R, space ## S)
+#define REGISTER_CBV(R, S)						REGISTER_CBV_CONCAT(R, S)
+#define REGISTER_SRV_CONCAT(R, S)				register(t ## R, space ## S)
+#define REGISTER_SRV(R, S)						REGISTER_SRV_CONCAT(R, S)
+#define REGISTER_UAV_CONCAT(R, S)				register(u ## R, space ## S)
+#define REGISTER_UAV(R, S)						REGISTER_UAV_CONCAT(R, S)
 
 // https://developer.nvidia.com/blog/improve-shader-performance-and-in-game-frame-rates-with-shader-execution-reordering/
 #ifdef __cplusplus
-#define NV_SHADER_EXTN_SLOT					999999
-#define NV_SHADER_EXTN_REGISTER_SPACE		999999
+#define NV_SHADER_EXTN_SLOT						999999
+#define NV_SHADER_EXTN_REGISTER_SPACE			999999
 #else
-#define NV_SHADER_EXTN_SLOT					u999999
-#define NV_SHADER_EXTN_REGISTER_SPACE		space999999
-#define ROOT_SIGNATURE_NVAPI				", DescriptorTable(UAV(u999999, numDescriptors=1, space=999999))"
+#define NV_SHADER_EXTN_SLOT						u999999
+#define NV_SHADER_EXTN_REGISTER_SPACE			space999999
 #endif // __cplusplus
 
 enum class SamplerDescriptorIndex : uint
@@ -243,16 +264,6 @@ enum class SamplerDescriptorIndex : uint
 	PointWrap,
 
 	Count,
-};
-
-enum class RootParameterIndex : uint
-{
-	Constants = 0,								// ROOT_SIGNATURE_BASE
-
-	ConstantsNanoVDBVisualize = 1,				// ROOT_SIGNATURE_NANOVDB_VISUALIZE
-	ConstantsPrepareLights = 1,					// ROOT_SIGNATURE_PREPARE_LIGHTS
-	ConstantsDiff = 1,							// ROOT_SIGNATURE_DIFF
-	ConstantsAtmosphere = 1,					// ROOT_SIGNATURE_ATMOSPHERE
 };
 
 enum class VisualizeMode : uint
@@ -806,6 +817,13 @@ struct ReSTIRConstants
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 };
 
+struct RootConstants
+{
+	uint4						mData0							CONSTANT_DEFAULT(uint4(0, 0, 0, 0));
+	uint4						mData1							CONSTANT_DEFAULT(uint4(0, 0, 0, 0));
+};
+STATITC_ASSERT(sizeof(RootConstants) == ROOT_CONSTANTS_NUM_32BIT * 4);
+
 struct Constants
 {
 	// Right-handed Y-up
@@ -908,17 +926,11 @@ struct RayInspection
 
 struct LocalConstants
 {
-	uint						mShaderIndex					CONSTANT_DEFAULT(0);
-	uint3						mPad							CONSTANT_DEFAULT(uint3(0, 0, 0));
+	uint4						mData0					CONSTANT_DEFAULT(uint4(0, 0, 0, 0));
+	uint4						mData1					CONSTANT_DEFAULT(uint4(0, 0, 0, 0));
 };
 
-struct RootConstantsNanoVDBVisualize
-{
-	uint						mInstanceIndex					CONSTANT_DEFAULT(0);
-	uint						mTexutureUAVIndex				CONSTANT_DEFAULT(0);
-	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
-	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
-};
+
 
 #undef GET_COLUMN
 #undef RETURN_AS_REFERENCE
