@@ -419,6 +419,9 @@ int sStartup(WNDCLASSEX& wc, HWND& hwnd)
 
 void sLoadScene(bool inLoadCamera)
 {
+	CPUTimingScope timing_scope;
+	timing_scope.mTraceName = "sLoadScene";
+
 	sWaitForGPU();
 
 	auto& preset = ScenePreset::sCurrent();
@@ -714,7 +717,7 @@ void sRender()
 	// Test Hit Shader
 	if (gConfigs.mTestHitShader)
 	{
-		PIXScopedEvent(command_list, PIX_COLOR(0, 255, 0), "Test Hit Shader");
+		GPU_TIMING_SCOPE("HitShader", command_list, &gStats.mGPUTimingMS.mHitShader);
 
 		D3D12_DISPATCH_RAYS_DESC dispatch_rays_desc = {};
 		{
@@ -739,6 +742,16 @@ void sRender()
 
 		gRenderer.Setup(gRenderer.mRuntime.mLibShader);
 		command_list->DispatchRays(&dispatch_rays_desc);
+
+		gBarrierUAV(command_list, nullptr);
+	}
+
+	if (gConfigs.mTestSlangShader)
+	{
+		GPU_TIMING_SCOPE("Slang", command_list, &gStats.mGPUTimingMS.mSlangShader);
+
+		gRenderer.Setup(gRenderer.mRuntime.mSlangShader);
+		command_list->Dispatch(gAlignUpDiv(gRenderer.mScreenSize.x, 8u), gAlignUpDiv(gRenderer.mScreenSize.y, 8u), 1);
 
 		gBarrierUAV(command_list, nullptr);
 	}

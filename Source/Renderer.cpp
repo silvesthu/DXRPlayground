@@ -485,6 +485,7 @@ ComPtr<IDxcBlob> Renderer::Compiler::Compile(const char* inFilename, const char*
 		ComPtr<IBlob> diagnostics;
 		ComPtr<IModule> module(session->loadModuleFromSourceString(inFilename, inFilename, shader_string.data(), &diagnostics));
 		trace_blob(diagnostics);
+		if (module == nullptr) { return nullptr; }
 
 		ComPtr<IEntryPoint> entryPoint;
 		gValidate(module->findEntryPointByName(inEntryPoint, &entryPoint));

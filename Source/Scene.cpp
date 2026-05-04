@@ -533,7 +533,7 @@ std::vector<ScenePreset> ScenePreset::sPresets =
 	ScenePreset().Name("IES").Path("Asset/IES/007cfb11e343e2f42e3b476be4ab684e/scene_v3.xml"),
 };
 
-int ScenePreset::sCurrentIndex = sFindIndex("Arcade");
+int ScenePreset::sCurrentIndex = sFindIndex("VeachMIS");
 int ScenePreset::sPreviousIndex = ScenePreset::sCurrentIndex;
 
 bool Scene::LoadDummy(SceneContent& ioSceneContent)

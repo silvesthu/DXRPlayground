@@ -331,6 +331,8 @@ struct Stats
 		float								mDepths = 0;
 		float								mPrepareLights = 0;
 		float								mRayQuery = 0;
+		float								mHitShader = 0;
+		float								mSlangShader = 0;
 		float								mComposite = 0;
 		float								mImGui = 0;
 	};
@@ -351,6 +353,8 @@ struct Configs
 	bool									mUseTexture = true;
 
 	bool									mTestHitShader = false;
+
+	bool									mTestSlangShader = false;
 
 	bool									mNanoVDBGenerateTexture = false;
 	bool									mNanoVDBUseTexture = false;
