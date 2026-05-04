@@ -196,6 +196,8 @@ void ClearCS(
 #endif // SHADER_DEBUG
 }
 
+// Replacement for complex ClearUnorderedAccessViewUint/Float
+// https://asawicki.info/news_1795_secrets_of_direct3d_12_the_behavior_of_clearunorderedaccessviewuintfloat
 [numthreads(64, 1, 1)]
 void ClearBufferCS(
 	uint3 inGroupThreadID : SV_GroupThreadID,

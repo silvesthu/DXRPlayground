@@ -68,9 +68,7 @@ struct Renderer
 		Buffer									mQueryBuffer				= Buffer().Stride(sizeof(UINT64)).ElementCount(kTimestampCount).Name("Query").GPU(false).Readback(true);
 		Buffer 									mSpatialHashBuffer			= Buffer().Stride(sizeof(uint32_t)).ElementCount(kSpatialHashSize).UAVIndex(ViewDescriptorIndex::SpatialHashUAV).Name("SpatialHash");
 		Buffer 									mSpatialDataBuffer			= Buffer().Stride(sizeof(uint32_t)).ElementCount(kSpatialHashSize).UAVIndex(ViewDescriptorIndex::SpatialDataUAV).Name("SpatialData");
-
 		Buffer 									mShaderPrintBuffer			= Buffer().Stride(sizeof(uint32_t)).ElementCount(64 * 1024).UAVIndex(ViewDescriptorIndex::ShaderPrintUAV).Readback(true).Name("ShaderPrintUAV");
-
 		Buffer									mSentinelBuffer;
 		std::span<Buffer>						mBuffers					= std::span<Buffer>(&mConstantsBuffer, &mSentinelBuffer);
 	};
