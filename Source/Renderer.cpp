@@ -424,9 +424,9 @@ ComPtr<IDxcBlob> Renderer::Compiler::Compile(const char* inFilename, const char*
 	shader_header += std::format("#define NVAPI_CLUSTERS {}\n", gNVAPI.mClusterSupported && gNVAPI.mClusterEnabled ? 1 : 0);
 
 	// Config
-	shader_header += std::format("#define SHADER_DEBUG {}\n", gConfigs.mShaderDebug ? 1: 0);
-	shader_header += std::format("#define USE_TEXTURE {}\n", gConfigs.mUseTexture ? 1: 0);
-	shader_header += std::format("#define NANOVDB_USE_TEXTURE {}\n", gConfigs.mNanoVDBUseTexture ? 1: 0);
+	shader_header += std::format("#define SHADER_DEBUG {}\n", gConfigs.mShaderDebug ? 1 : 0);
+	shader_header += std::format("#define USE_TEXTURE {}\n", gConfigs.mUseTexture ? 1 : 0);
+	shader_header += std::format("#define NANOVDB_USE_TEXTURE {}\n", gConfigs.mNanoVDBUseTexture ? 1 : 0);
 
 	// BSDF
 	std::vector<std::wstring> bsdf_macros;
@@ -470,14 +470,53 @@ ComPtr<IDxcBlob> Renderer::Compiler::Compile(const char* inFilename, const char*
 			gTrace(blob_string);
 		};
 
+		std::string downstreamArgs;
+		for (auto&& argument : arguments)
+			downstreamArgs += gToUTF8String(argument) + "\n";
+		downstreamArgs.pop_back(); // pop last '\n'
+		std::replace(downstreamArgs.begin(), downstreamArgs.end(), ' ', '\n');
+		CompilerOptionEntry options_target[] =
+		{
+			// Backend options, see also DXCDownstreamCompiler::compile
+			{
+				// Pass down same arguments used to compile HLSL
+				.name = CompilerOptionName::DownstreamArgs,
+				.value = {.kind = CompilerOptionValueKind::String, .stringValue0 = "dxc", .stringValue1 = downstreamArgs.data() },
+			},
+			{
+				// Mapped to /Zi, not sure how it affect Slang -> HLSL
+				.name = CompilerOptionName::DebugInformation,
+				.value = {.kind = CompilerOptionValueKind::Int, .intValue0 = SLANG_DEBUG_INFO_LEVEL_MAXIMAL },
+			},
+			{
+				// Mapped to /O3, same as DXC default, not sure how it affect Slang -> HLSL
+				.name = CompilerOptionName::Optimization,
+				.value = {.kind = CompilerOptionValueKind::Int, .intValue0 = SLANG_OPTIMIZATION_LEVEL_MAXIMAL },
+			},
+		};
+
 		TargetDesc target = {};
 		target.format = SLANG_DXIL;
 		target.profile = mGlobalSession->findProfile(inProfile.data());
+		target.compilerOptionEntries = options_target;
+		target.compilerOptionEntryCount = gArraySize(options_target);
 
+		CompilerOptionEntry options_session[] =
+		{
+			// Frontend options
+			{
+				// Disable warning on using int macro as bool, "implicit conversion from 'int' to 'bool' is not recommended"
+				// However Slang pass "-no-warnings" to DXC, it should be better to keep warnings enabled for Slang
+				.name = CompilerOptionName::DisableWarnings,
+				.value = {.kind = CompilerOptionValueKind::String, .stringValue0 = "30081" },
+			},
+		};
 		SessionDesc sessionDesc = {};
 		sessionDesc.targets = &target;
 		sessionDesc.targetCount = 1;
 		sessionDesc.defaultMatrixLayoutMode = SLANG_MATRIX_LAYOUT_COLUMN_MAJOR;
+		sessionDesc.compilerOptionEntries = options_session;
+		sessionDesc.compilerOptionEntryCount = gArraySize(options_session);
 
 		ComPtr<ISession> session;
 		mGlobalSession->createSession(sessionDesc, &session);
@@ -495,29 +534,8 @@ ComPtr<IDxcBlob> Renderer::Compiler::Compile(const char* inFilename, const char*
 		gValidate(session->createCompositeComponentType(components, 2, &program, &diagnostics));
 		trace_blob(diagnostics);
 
-		std::string downstreamArgs;
-		for (auto&& argument : arguments)
-			downstreamArgs += gToUTF8String(argument) + "\n";
-		downstreamArgs.pop_back(); // pop last '\n'
-		std::replace(downstreamArgs.begin(), downstreamArgs.end(), ' ', '\n');
-		CompilerOptionEntry options[] =
-		{
-			{
-				.name = CompilerOptionName::DownstreamArgs,
-				.value = {.kind = CompilerOptionValueKind::String, .stringValue0 = "dxc", .stringValue1 = downstreamArgs.data() },
-			},
-			{
-				.name = CompilerOptionName::DebugInformation,
-				.value = {.kind = CompilerOptionValueKind::Int, .intValue0 = int32_t(gConfigs.mShaderDebug ? SLANG_DEBUG_INFO_LEVEL_MAXIMAL : SLANG_DEBUG_INFO_LEVEL_STANDARD) },
-			},
-			{
-				.name = CompilerOptionName::Optimization,
-				.value = {.kind = CompilerOptionValueKind::Int, .intValue0 = int32_t(gConfigs.mShaderDebug ? SLANG_OPTIMIZATION_LEVEL_NONE : SLANG_OPTIMIZATION_LEVEL_HIGH) },
-			},
-		};
-
 		ComPtr<IComponentType> linkedProgram;
-		gValidate(program->linkWithOptions(&linkedProgram, gArraySize(options), options, &diagnostics));
+		gValidate(program->link(&linkedProgram, &diagnostics));
 		trace_blob(diagnostics);
 
 		ComPtr<IBlob> dxilBlob;

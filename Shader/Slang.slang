@@ -1,5 +1,6 @@
 #include "Shared.h"
 #include "Binding.h"
+#include "Common.h"
 
 [Differentiable]
 float sqr_autodiff(float x)

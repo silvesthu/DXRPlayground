@@ -1,28 +1,29 @@
 #pragma once
 
-#include "packing.hlsli"
-#include "utils.hlsli"
-
 #ifndef SHADER_DEBUG
 #define SHADER_DEBUG 0
 #endif // SHADER_DEBUG
 
+#ifdef __SLANG__
+T Sqr<T : __BuiltinArithmeticType>(T x)                         { return x * x; }
+T SafeSqrt<T : __BuiltinFloatingPointType>(T x) where T         { return sqrt(max(T(0), x)); }
+
+#undef __HLSL_VERSION
+#define __HLSL_VERSION 2021                                     // force 2021 for select, e.g. in utils.hlsli
+#else
+template <typename T> T Sqr(T x)                                { return x * x; }
+template <typename T> T SafeSqrt(T x)                           { return sqrt(max(T(0), x)); }
+
 #if NVAPI_LSS || NVAPI_SER
 #include "nvapi/nvHLSLExtns.h"
 #endif // NVAPI_LSS || NVAPI_SER
+#endif // __SLANG__
 
-template <typename T> T fmadd(T inA, T inB, T inC)              { return inA * inB + inC; }
-template <typename T> T fmsub(T inA, T inB, T inC)              { return inA * inB - inC; }
-template <typename T> T fnmadd(T inA, T inB, T inC)             { return -inA * inB + inC; }
-template <typename T> T fnmsub(T inA, T inB, T inC)             { return -inA * inB - inC; }
+#include "packing.hlsli"
+#include "utils.hlsli"
 
-template <typename T> T sqr(T inValue)                          { return inValue * inValue; }
-template <typename T> T safe_sqrt(T inValue)                    { return sqrt(max(0, inValue)); }
-
-template <typename T> T remap(T x, T a, T b, T c, T d)          { return (((x - a) / (b - a)) * (d - c)) + c; }
-
-float qnan()                                                    { return asfloat(0x7fc00000); }
-float inf()                                                     { return asfloat(0x7f800000); }
+float QNaN()                                                    { return asfloat(0x7fc00000); }
+float Inf()                                                     { return asfloat(0x7f800000); }
 
 float MinComponent(float2 inValue)                              { return min(inValue.x, inValue.y); }
 float MinComponent(float3 inValue)                              { return min(MinComponent(inValue.xy), inValue.z); }
@@ -243,8 +244,15 @@ float3 F_Schlick(float3 inR0, float inHoV)
 
 // [Mitsuba3] fresnel in fresnel.h for dielectric-dielectric interface, unpolarized
 // Same as formulation on https://en.wikipedia.org/wiki/Fresnel_equations where r = R_eff = 1/2 * (R_s + R_p)
+namespace MitsubaHelper
+{
+    float fmadd(float inA, float inB, float inC) { return inA * inB + inC; }
+    float fnmadd(float inA, float inB, float inC) { return -inA * inB + inC; }
+}
 void F_Dielectric_Mitsuba(float inCosThetaI, float inEta, out float outR, out float outCosThetaT, out float outEtaIT, out float outEtaTI)
 {
+    using namespace MitsubaHelper;
+
     float eta = inEta;
     float cos_theta_i = inCosThetaI;
 
@@ -263,7 +271,7 @@ void F_Dielectric_Mitsuba(float inCosThetaI, float inEta, out float outR, out fl
 
     /* Find the absolute cosines of the incident/transmitted rays */
     float cos_theta_i_abs = abs(cos_theta_i);
-    float cos_theta_t_abs = safe_sqrt(cos_theta_t_sqr);
+    float cos_theta_t_abs = SafeSqrt(cos_theta_t_sqr);
 
     bool index_matched = (eta == 1.f);
     bool special_case = index_matched || (cos_theta_i_abs == 0.f);
@@ -277,7 +285,7 @@ void F_Dielectric_Mitsuba(float inCosThetaI, float inEta, out float outR, out fl
     float a_p = fnmadd(eta_it, cos_theta_i_abs, cos_theta_t_abs) /
         fmadd(eta_it, cos_theta_i_abs, cos_theta_t_abs);
 
-    float r = 0.5f * (sqr(a_s) + sqr(a_p));
+    float r = 0.5f * (Sqr(a_s) + Sqr(a_p));
 
     if (special_case)
         r = r_sc;
@@ -298,13 +306,13 @@ void F_Dielectric_Mitsuba(float inCosThetaI, float inEta, out float outR, out fl
 // See also https://seblagarde.wordpress.com/2013/04/29/memo-on-fresnel-equations/
 float3 F_Conductor_Mitsuba(float3 inEta, float3 inK, float inCosThetaI)
 {
+    float3 eta_r = inEta;
+    float3 eta_i = inK;
+
     // Modified from "Optics" by K.D. Moeller, University Science Books, 1988
     float cos_theta_i_2 = inCosThetaI * inCosThetaI,
         sin_theta_i_2 = 1.f - cos_theta_i_2,
         sin_theta_i_4 = sin_theta_i_2 * sin_theta_i_2;
-
-    float3 eta_r = inEta;
-    float3 eta_i = inK;
 
     float3 temp_1 = eta_r * eta_r - eta_i * eta_i - sin_theta_i_2,
         a_2_pb_2 = sqrt(temp_1 * temp_1 + 4.f * eta_i * eta_i * eta_r * eta_r),
@@ -407,8 +415,8 @@ void VisualizeValue(VisualizeMode inDebugMode, float3 inValue)
 
 static float4       sDebugValue = 0;
 static bool         sDebugValueUpdated = false;
-static uint3        sDebugDispatchRaysIndex;
-static uint3        sDebugDispatchRaysDimensions;
+static uint3        sDebugDispatchRaysIndex = 0;
+static uint3        sDebugDispatchRaysDimensions = 0;
 void DebugValueInit()
 {
 #if SHADER_DEBUG

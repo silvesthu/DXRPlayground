@@ -43,8 +43,8 @@ namespace BSDFEvaluation
 					float e1					= RandomFloat01(ioPathContext.mRandomState);
 
 					// 2D Distribution -> GGX Distribution (Polar)
-					float cos_theta				= safe_sqrt((1.0 - e0) / ((a2 - 1) * e0 + 1.0));
-					float sin_theta				= safe_sqrt(1 - cos_theta * cos_theta);
+					float cos_theta				= SafeSqrt((1.0 - e0) / ((a2 - 1) * e0 + 1.0));
+					float sin_theta				= SafeSqrt(1 - cos_theta * cos_theta);
 					float phi					= 2 * MATH_PI * e1;
 
 					// Polar -> Cartesian
@@ -109,14 +109,14 @@ namespace BSDFEvaluation
 
 			if (inBSDFContext.mMode == BSDFContext::Mode::BSDF)
 			{
-				DebugValue(DebugMode::BSDF__D, ioPathContext.mRecursionDepth, float3(qnan(), 0, 0));
-				DebugValue(DebugMode::BSDF__G, ioPathContext.mRecursionDepth, float3(qnan(), 0, 0));
+				DebugValue(DebugMode::BSDF__D, ioPathContext.mRecursionDepth, float3(QNaN(), 0, 0));
+				DebugValue(DebugMode::BSDF__G, ioPathContext.mRecursionDepth, float3(QNaN(), 0, 0));
 				DebugValue(DebugMode::BSDF__F, ioPathContext.mRecursionDepth, float3(F));
 			}
 			else
 			{
-				DebugValue(DebugMode::Light_D, ioPathContext.mRecursionDepth, float3(qnan(), 0, 0));
-				DebugValue(DebugMode::Light_G, ioPathContext.mRecursionDepth, float3(qnan(), 0, 0));
+				DebugValue(DebugMode::Light_D, ioPathContext.mRecursionDepth, float3(QNaN(), 0, 0));
+				DebugValue(DebugMode::Light_G, ioPathContext.mRecursionDepth, float3(QNaN(), 0, 0));
 				DebugValue(DebugMode::Light_F, ioPathContext.mRecursionDepth, float3(F));
 			}
 
@@ -276,7 +276,7 @@ namespace BSDFEvaluation
 			//        [PBRT3] > Account for non-symmetry with transmission to different medium 
 			//	              https://github.com/mmp/pbrt-v3/blob/aaa552a4b9cbf9dccb71450f47b268e0ed6370e2/src/core/reflection.cpp#L163
 			//		          https://www.pbr-book.org/3ed-2018/Light_Transport_III_Bidirectional_Methods/The_Path-Space_Measurement_Equation#x3-Non-symmetryDuetoRefraction
-			result.mBSDF						*= select(selected_r, 1.0, sqr(eta_ti));
+			result.mBSDF						*= select(selected_r, 1.0, Sqr(eta_ti));
 
 			result.mLobeIndex					= select(selected_r, 0, 1);
 
@@ -396,7 +396,7 @@ namespace BSDFEvaluation
 				}
 
 				float microfacet_pdf			= D * inBSDFContext.mNdotH;
-				float jacobian					= abs(sqr(eta_it) * inBSDFContext.mHdotL / sqr(inBSDFContext.mHdotV + eta_it * inBSDFContext.mHdotL));
+				float jacobian					= abs(Sqr(eta_it) * inBSDFContext.mHdotL / Sqr(inBSDFContext.mHdotV + eta_it * inBSDFContext.mHdotL));
 
 				result.mBSDF					= abs(D * G * F * inBSDFContext.mHdotV * jacobian / (abs(inBSDFContext.mNdotV) * abs(inBSDFContext.mNdotL)));
 				result.mBSDFSamplePDF			= microfacet_pdf * jacobian;
@@ -404,7 +404,7 @@ namespace BSDFEvaluation
 			result.mBSDFSamplePDF				*= select(selected_r, r_i, 1.0 - r_i);
 
 			// See Dielectric::Evaluate
-			result.mBSDF						*= select(selected_r, 1.0, sqr(eta_ti));
+			result.mBSDF						*= select(selected_r, 1.0, Sqr(eta_ti));
 			result.mLobeIndex					= select(selected_r, 0, 1);
 			result.mEta							= select(selected_r, 1.0, eta_it);
 			result.mMediumInstanceID			= select(inHitContext.HasMedium() && inBSDFContext.mNdotL < 0, inHitContext.mInstanceID, InvalidInstanceID);
