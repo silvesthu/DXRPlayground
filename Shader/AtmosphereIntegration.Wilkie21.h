@@ -2,6 +2,9 @@ namespace AtmosphereIntegration { namespace Wilkie21 {
 
 void GetSkyRadiance(Ray inRayPS, out float3 outSkyRadiance, out float3 outTransmittanceToTop)
 {
+	USING_RESOURCE(Texture2D<float4>, Wilkie21SkyViewSRV);
+	USING_SAMPLER(SamplerState, BilinearClamp);
+
 	outSkyRadiance = 0;
 	outTransmittanceToTop = 1; // [TODO]
 
@@ -47,9 +50,10 @@ void GetSkyRadiance(Ray inRayPS, out float3 outSkyRadiance, out float3 outTransm
 
 	float2 uv;
 	SkyViewLutParamsToUv(Atmosphere, ray_r_mu_intersects_ground, mu, lightViewCosAngle, r, uv);
-	outSkyRadiance = Wilkie21SkyViewLutTexSRV.SampleLevel(samplerLinearClamp, uv, 0).rgb;
+	outSkyRadiance = Wilkie21SkyViewSRV.SampleLevel(samplerLinearClamp, uv, 0).rgb;
 	
 	outSkyRadiance = outSkyRadiance / kPreExposure * kSolarLM2KW; // PreExposed lm/m^2 -> kW/m^2
 }
 
 }} // namespace AtmosphereIntegration { namespace Wilkie21 {
+

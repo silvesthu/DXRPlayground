@@ -1,12 +1,5 @@
 #include "Shared.h"
-
-ConstantBuffer<Constants> mConstants : REGISTER_CBV(ROOT_CBV_REGISTER, COMMON_ROOT_SIGNATURE_REGISTER_SPACE);
-
-#ifdef __SLANG__
-#define USING_RESOURCE(type, name) type.Handle name = type.Handle(uint2((uint)ViewDescriptorIndex::name, 0));
-#else
-#define USING_RESOURCE(type, name) type name = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::name];
-#endif // __SLANG__
+#include "Binding.h"
 
 [Differentiable]
 float sqr_autodiff(float x)

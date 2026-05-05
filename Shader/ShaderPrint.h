@@ -23,6 +23,8 @@ struct ShaderPrint
 
 	uint _Allocate(int inUIntCount)
 	{
+		USING_RESOURCE(RWStructuredBuffer<uint>, ShaderPrintUAV);
+
 		if (!mEnabled) { return 0; }
 
 		uint offset = 0;
@@ -39,6 +41,8 @@ struct ShaderPrint
 
 	void _PrintFloat(float4 inValue, uint inN)
 	{
+		USING_RESOURCE(RWStructuredBuffer<uint>, ShaderPrintUAV);
+
 		if (!mEnabled) { return; }
 		uint offset = _Allocate(1 + inN);
 		ShaderPrintUAV[offset] = _MakeEntryHeader((uint)ShaderPrintEntryType::Float1 + inN - 1, 0);
@@ -50,6 +54,8 @@ struct ShaderPrint
 
 	void _PrintUInt(uint4 inValue, uint inN)
 	{
+		USING_RESOURCE(RWStructuredBuffer<uint>, ShaderPrintUAV);
+
 		if (!mEnabled) { return; }
 		uint offset = _Allocate(1 + inN);
 		ShaderPrintUAV[offset] = _MakeEntryHeader((uint)ShaderPrintEntryType::UInt1 + inN - 1, 0);
@@ -270,9 +276,10 @@ void Print(uint2 inValue) { sShaderPrint._PrintUInt(inValue.xyxx, 2); }
 void Print(uint3 inValue) { sShaderPrint._PrintUInt(inValue.xyzx, 3); }
 void Print(uint4 inValue) { sShaderPrint._PrintUInt(inValue.xyzw, 4); }
 
-#define PrintString(inString)																\
+#define PrintString(inString)																                \
 if (sShaderPrint.mEnabled)																					\
 {																											\
+	USING_RESOURCE(RWStructuredBuffer<uint>, ShaderPrintUAV);												\
 	uint byte_count = 0;																					\
 	for (;; byte_count++)																					\
 	{																										\
@@ -288,7 +295,7 @@ if (sShaderPrint.mEnabled)																					\
         {                                                                                                   \
             uint byte_index = uint_index * 4 + local_byte_index;                                            \
             if (byte_index >= byte_count) { break; }                                                        \
-            data |= (sShaderPrint.CharToUint(inString[byte_index]) << (local_byte_index * 8));                       \
+            data |= (sShaderPrint.CharToUint(inString[byte_index]) << (local_byte_index * 8));              \
         }                                                                                                   \
         ShaderPrintUAV[offset + 1 + uint_index] = data;                                                     \
 	}                                                                                                       \

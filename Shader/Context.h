@@ -47,6 +47,11 @@ struct SurfaceContext
 {	
 	void			LoadSurface()
 	{
+		USING_RESOURCE(StructuredBuffer<uint>,   RaytraceIndicesSRV);
+		USING_RESOURCE(StructuredBuffer<float3>, RaytraceVerticesSRV);
+		USING_RESOURCE(StructuredBuffer<float3>, RaytraceNormalsSRV);
+		USING_RESOURCE(StructuredBuffer<float2>, RaytraceUVsSRV);
+
 		// Only support 32bit index for simplicity
 		// see https://github.com/microsoft/DirectX-Graphics-Samples/blob/master/Samples/Desktop/D3D12Raytracing/src/D3D12RaytracingSimpleLighting/Raytracing.hlsl for reference
 #if NVAPI_CLUSTERS
@@ -58,23 +63,23 @@ struct SurfaceContext
 		uint3 indices					= uint3(IndexBuffer[base_index], IndexBuffer[base_index + 1], IndexBuffer[base_index + 2]) + mInstanceData.mVertexOffset;
 #else
 		uint base_index					= mPrimitiveIndex * kIndexCountPerTriangle + mInstanceData.mIndexOffset;
-		uint3 indices					= uint3(Indices[base_index], Indices[base_index + 1], Indices[base_index + 2]) + mInstanceData.mVertexOffset;
+		uint3 indices					= uint3(RaytraceIndicesSRV[base_index], RaytraceIndicesSRV[base_index + 1], RaytraceIndicesSRV[base_index + 2]) + mInstanceData.mVertexOffset;
 #endif // NVAPI_CLUSTERS
 
 		mVertexPositionOS				= 0;
 		{
-			mVertexPositions[0]			= Vertices[indices[0]].xyz;
-			mVertexPositions[1]			= Vertices[indices[1]].xyz;
-			mVertexPositions[2]			= Vertices[indices[2]].xyz;
+			mVertexPositions[0]			= RaytraceVerticesSRV[indices[0]].xyz;
+			mVertexPositions[1]			= RaytraceVerticesSRV[indices[1]].xyz;
+			mVertexPositions[2]			= RaytraceVerticesSRV[indices[2]].xyz;
 		}
 		mVertexPositionOS				= mVertexPositions[0] * mBarycentrics.x + mVertexPositions[1] * mBarycentrics.y + mVertexPositions[2] * mBarycentrics.z;
 
 		mVertexNormalOS					= 0;
 		if (mInstanceData.mFlags.mNormal)
 		{
-			mVertexNormals[0]			= Normals[indices[0]];
-			mVertexNormals[1]			= Normals[indices[1]];
-			mVertexNormals[2]			= Normals[indices[2]];
+			mVertexNormals[0]			= RaytraceNormalsSRV[indices[0]];
+			mVertexNormals[1]			= RaytraceNormalsSRV[indices[1]];
+			mVertexNormals[2]			= RaytraceNormalsSRV[indices[2]];
 			float3 normal				= normalize(mVertexNormals[0] * mBarycentrics.x + mVertexNormals[1] * mBarycentrics.y + mVertexNormals[2] * mBarycentrics.z);
 			mVertexNormalOS				= normal;	
 		}
@@ -87,9 +92,9 @@ struct SurfaceContext
 		mUV								= 0;
 		if (mInstanceData.mFlags.mUV)
 		{
-			mVertexUVs[0]				= UVs[indices[0]];
-			mVertexUVs[1]				= UVs[indices[1]];
-			mVertexUVs[2]				= UVs[indices[2]];
+			mVertexUVs[0]				= RaytraceUVsSRV[indices[0]];
+			mVertexUVs[1]				= RaytraceUVsSRV[indices[1]];
+			mVertexUVs[2]				= RaytraceUVsSRV[indices[2]];
 			mUV							= mVertexUVs[0] * mBarycentrics.x + mVertexUVs[1] * mBarycentrics.y + mVertexUVs[2] * mBarycentrics.z;
 		}
 	}
@@ -575,3 +580,4 @@ struct MediumContext
 
 	NanoVDBContext	mNanoVDBContext;
 };
+

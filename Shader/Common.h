@@ -412,6 +412,7 @@ static uint3        sDebugDispatchRaysDimensions;
 void DebugValueInit()
 {
 #if SHADER_DEBUG
+    USING_RESOURCE(RWStructuredBuffer<PixelInspection>, PixelInspectionUAV);
     if (sDebugDispatchRaysIndex.x == mConstants.mPixelDebugCoord.x && sDebugDispatchRaysIndex.y == mConstants.mPixelDebugCoord.y)
         for (int i = 0; i < PixelInspection::kArraySize; i++)
             PixelInspectionUAV[0].mPixelValueArray[i] = 0;
@@ -421,6 +422,7 @@ void DebugValueInit()
 void DebugValue(DebugMode inDebugMode, uint inRecursionDepth, float3 inValue)
 {
 #if SHADER_DEBUG
+    USING_RESOURCE(RWStructuredBuffer<PixelInspection>, PixelInspectionUAV);
     if (GetDebugMode() == inDebugMode)
     {
         if (sDebugDispatchRaysIndex.x == mConstants.mPixelDebugCoord.x && sDebugDispatchRaysIndex.y == mConstants.mPixelDebugCoord.y && inRecursionDepth < PixelInspection::kArraySize)
@@ -449,6 +451,7 @@ void DebugValue(float3 inValue)
 void WriteScreenDebugUAV(uint2 inCoords, float4 inValue)
 {
 #if SHADER_DEBUG
+    USING_RESOURCE(RWTexture2D<float4>, ScreenDebugUAV);
     ScreenDebugUAV[inCoords] = inValue;
 #endif // SHADER_DEBUG
 }

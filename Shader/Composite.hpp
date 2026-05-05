@@ -89,16 +89,18 @@ float s2h_floatLookupFloat(uint functionId, float x)
 
 float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 {
-	RWTexture2D<float4> screen_color = ResourceDescriptorHeap[(int)ViewDescriptorIndex::ScreenColorUAV];
-	RWTexture2D<float4> screen_debug = ResourceDescriptorHeap[(int)ViewDescriptorIndex::ScreenDebugUAV];
+	USING_RESOURCE(RWTexture2D<float4>, ScreenColorUAV);
+	USING_RESOURCE(RWTexture2D<float4>, ScreenDebugUAV);
+	USING_RESOURCE(RWTexture2D<uint4>, ScreenReservoirUAV);
+	USING_RESOURCE(RWStructuredBuffer<PixelInspection>, PixelInspectionUAV);
 
 	uint2 coords = (uint2)position.xy;
-	float4 color = screen_color[position.xy];
+	float4 color = ScreenColorUAV[position.xy];
 	bool debug_pixel = all(coords == mConstants.mPixelDebugCoord);
 	if (debug_pixel)
 	{
 		PixelInspectionUAV[0].mPixelValue = color;
-		PixelInspectionUAV[0].mDebugValue = screen_debug[position.xy];
+		PixelInspectionUAV[0].mDebugValue = ScreenDebugUAV[position.xy];
 	}
 
 	ScreenReservoirUAV[coords] = coords.xyxy;
@@ -170,6 +172,10 @@ void ClearCS(
 	uint3 inDispatchThreadID : SV_DispatchThreadID,
 	uint inGroupIndex : SV_GroupIndex)
 {
+	USING_RESOURCE(RWStructuredBuffer<PixelInspection>, PixelInspectionUAV);
+	USING_RESOURCE(RWStructuredBuffer<RayInspection>, RayInspectionUAV);
+	USING_RESOURCE(RWStructuredBuffer<uint>, ShaderPrintUAV);
+
 	if (inDispatchThreadID.x == 0)
 	{
 		PixelInspectionUAV[0].mPixelValue = 0;
@@ -216,12 +222,12 @@ void GeneratTextureCS(
 	uint3 inDispatchThreadID : SV_DispatchThreadID,
 	uint inGroupIndex : SV_GroupIndex)
 {
-	RWTexture2D<float4> texture = ResourceDescriptorHeap[(int)ViewDescriptorIndex::GeneratedUAV];
+	USING_RESOURCE(RWTexture2D<float4>, GeneratedUAV);
 
 	// this shader is solely used to generate texture 
 	float3 color = inDispatchThreadID.x % 2 == inDispatchThreadID.y % 2 ? 0.8 : 0.2;
 	
-	texture[inDispatchThreadID.xy] = float4(color, 1.0); 
+	GeneratedUAV[inDispatchThreadID.xy] = float4(color, 1.0); 
 }
 
 [numthreads(8, 8, 1)]
@@ -231,10 +237,10 @@ void BRDFSliceCS(
 	uint3 inDispatchThreadID : SV_DispatchThreadID,
 	uint inGroupIndex : SV_GroupIndex)
 {
-	RWTexture2D<float4> texture = ResourceDescriptorHeap[(int)ViewDescriptorIndex::BRDFSliceUAV];
+	USING_RESOURCE(RWTexture2D<float4>, BRDFSliceUAV);
 
 	uint2 dimensions;
-	texture.GetDimensions(dimensions.x, dimensions.y);
+	BRDFSliceUAV.GetDimensions(dimensions.x, dimensions.y);
 
 	float2 texCoord = (inDispatchThreadID.xy + 0.5) / dimensions;	// [0, 1]
 	texCoord.y = 1.0 - texCoord.y;									// match GLSL
@@ -242,7 +248,7 @@ void BRDFSliceCS(
 	float4 fragColor = 0;
 	BRDFExplorer::BRDFSlice(texCoord, fragColor);
 
-	texture[inDispatchThreadID.xy] = fragColor;
+	BRDFSliceUAV[inDispatchThreadID.xy] = fragColor;
 }
 
 [numthreads(8, 8, 1)]
@@ -252,21 +258,23 @@ void ReadbackCS(
 	uint3 inDispatchThreadID : SV_DispatchThreadID,
 	uint inGroupIndex : SV_GroupIndex)
 {
-	Texture2D<float4> Input = ResourceDescriptorHeap[(int)ViewDescriptorIndex::ScreenColorSRV];
-	RWTexture2D<float4> Output = ResourceDescriptorHeap[(int)ViewDescriptorIndex::ScreenReadbackUAV];
+	USING_RESOURCE(Texture2D<float4>, ScreenColorSRV);
+	USING_RESOURCE(RWTexture2D<float4>, ScreenReadbackUAV);
 
-	float3 luminance = Input[inDispatchThreadID.xy].xyz;
+	float3 luminance = ScreenColorSRV[inDispatchThreadID.xy].xyz;
 	float3 color = luminance;
 	if (true)
 	{
 		color = LuminanceToColor(luminance, mConstants);
 		color = ApplySRGBCurve(color);
 	}
-	Output[inDispatchThreadID.xy] = float4(color, 1.0);
+	ScreenReadbackUAV[inDispatchThreadID.xy] = float4(color, 1.0);
 }
 
 float4 LineVS(uint inVertexID : SV_VertexID, out float4 outColor : COLOR) : SV_POSITION
 {
+	USING_RESOURCE(RWStructuredBuffer<RayInspection>, RayInspectionUAV);
+
 	float4 position_ws = 0;
 	outColor = 1.0;
 

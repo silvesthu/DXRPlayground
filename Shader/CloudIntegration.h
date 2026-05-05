@@ -15,6 +15,10 @@ CloudMode GetCloudMode()
 // [Schneider16]
 float SampleCloudDensity(float3 p, bool sample_coarse)
 {
+	USING_RESOURCE(Texture3D<float4>, CloudShapeNoise3DSRV);
+	USING_RESOURCE(Texture3D<float4>, CloudErosionNoise3DSRV);
+	USING_SAMPLER(SamplerState, BilinearWrap);
+
 	float frequency = mConstants.mCloud.mShapeNoise.mFrequency;
 	float power = mConstants.mCloud.mShapeNoise.mPower;
 	float scale = mConstants.mCloud.mShapeNoise.mScale;
@@ -22,10 +26,10 @@ float SampleCloudDensity(float3 p, bool sample_coarse)
 
 	// [TODO] Skew
 
-	float shape = CloudShapeNoiseSRV.SampleLevel(BilinearWrapSampler, (p + offset) * frequency, 0).x;
+	float shape = CloudShapeNoise3DSRV.SampleLevel(BilinearWrap, (p + offset) * frequency, 0).x;
 	shape = pow(shape, power) * scale;
 
-	float erosion = CloudErosionNoiseSRV.SampleLevel(BilinearWrapSampler, (p + offset * 0.9) * frequency * 2, 0).x;
+	float erosion = CloudErosionNoise3DSRV.SampleLevel(BilinearWrap, (p + offset * 0.9) * frequency * 2, 0).x;
 	// shape *= saturate(pow(erosion, 4));
 
 	float density = shape;
@@ -169,3 +173,4 @@ void RaymarchCloud(Ray inRayWS, out float3 outTransmittance, out float3 outLumin
 	outTransmittance = 1.0 - accumulated_density;
 	outLuminance = accumulated_light;
 }
+

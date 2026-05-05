@@ -463,13 +463,16 @@ float3 ComputeTransmittance(float2 mu_r)
 
 float3 GetTransmittanceToTopAtmosphereBoundary(float r, float mu)
 {
+	USING_RESOURCE(Texture2D<float4>, Bruneton17TransmittanceSRV);
+	USING_SAMPLER(SamplerState, BilinearClamp);
+
 	// [Bruneton17] GetTransmittanceToTopAtmosphereBoundary
 
 	float2 mu_r = float2(mu, r);
-	float2 transmittance_uv = XY_to_UV(Encode2D_Transmittance(mu_r), TransmittanceSRV);
+	float2 transmittance_uv = XY_to_UV(Encode2D_Transmittance(mu_r), Bruneton17TransmittanceSRV);
 
 	// Sample 2D LUT
-	float3 transmittance = TransmittanceSRV.SampleLevel(BilinearClampSampler, transmittance_uv, 0).xyz;
+	float3 transmittance = Bruneton17TransmittanceSRV.SampleLevel(BilinearClamp, transmittance_uv, 0).xyz;
 
 	// Debug - Compute transmittance directly instead of sampling LUT
 	if (false)
@@ -533,8 +536,10 @@ void ComputeTransmittanceCS(
 	uint3 inDispatchThreadID : SV_DispatchThreadID,
 	uint inGroupIndex : SV_GroupIndex)
 {
+	USING_RESOURCE(RWTexture2D<float4>, Bruneton17TransmittanceUAV);
+
 	// XY
-	float2 xy = DispatchThreadID_to_XY(inDispatchThreadID.xy, TransmittanceUAV);
+	float2 xy = DispatchThreadID_to_XY(inDispatchThreadID.xy, Bruneton17TransmittanceUAV);
 
 	// Decode
 	float2 mu_r = Decode2D_Transmittance(xy);
@@ -543,17 +548,17 @@ void ComputeTransmittanceCS(
 	float3 transmittance = ComputeTransmittance(mu_r);
 
 	// Output
-	TransmittanceUAV[inDispatchThreadID.xy] = float4(transmittance, 1.0);
+	Bruneton17TransmittanceUAV[inDispatchThreadID.xy] = float4(transmittance, 1.0);
 
 	// Debug
 	// float3 debug = float3(uv, 0);
 	// debug = (r - 6360) / 60.0;
 	// debug = mu.xxx;
 	// debug = IntegrateDensity(mConstants.mAtmosphere.mRayleighDensity, r, mu).xxx;
-	// TransmittanceUAV[inDispatchThreadID.xy] = float4(debug, 1.0);
-	// TransmittanceUAV[inDispatchThreadID.xy] = float4(mu_r.xy, 0, 1);
-	// TransmittanceUAV[inDispatchThreadID.xy] = float4(xy, 0, 1);
-	// TransmittanceUAV[inDispatchThreadID.xy] = float4(1,0,0, 1.0);
+	// Bruneton17TransmittanceUAV[inDispatchThreadID.xy] = float4(debug, 1.0);
+	// Bruneton17TransmittanceUAV[inDispatchThreadID.xy] = float4(mu_r.xy, 0, 1);
+	// Bruneton17TransmittanceUAV[inDispatchThreadID.xy] = float4(xy, 0, 1);
+	// Bruneton17TransmittanceUAV[inDispatchThreadID.xy] = float4(1,0,0, 1.0);
 }
 
 [numthreads(8, 8, 1)]
@@ -563,8 +568,11 @@ void ComputeDirectIrradianceCS(
 	uint3 inDispatchThreadID : SV_DispatchThreadID,
 	uint inGroupIndex : SV_GroupIndex)
 {
+	USING_RESOURCE(RWTexture2D<float4>, Bruneton17DeltaIrradianceUAV);
+	USING_RESOURCE(RWTexture2D<float4>, Bruneton17IrradianceUAV);
+
 	// xy
-	float2 xy = DispatchThreadID_to_XY(inDispatchThreadID.xy, IrradianceUAV);
+	float2 xy = DispatchThreadID_to_XY(inDispatchThreadID.xy, Bruneton17IrradianceUAV);
 
 	// Decode
 	float2 mu_r = Decode2D_Irradiance(xy);
@@ -586,14 +594,14 @@ void ComputeDirectIrradianceCS(
 	float3 direct_irradiance = transmittance * average_cosine_factor; // [Bruneton08] 2.2 (9) L_0
 
 	// Output
-	DeltaIrradianceUAV[inDispatchThreadID.xy] = float4(direct_irradiance, 1.0);
-	IrradianceUAV[inDispatchThreadID.xy] = float4(0, 0, 0, 1.0);
+	Bruneton17DeltaIrradianceUAV[inDispatchThreadID.xy] = float4(direct_irradiance, 1.0);
+	Bruneton17IrradianceUAV[inDispatchThreadID.xy] = float4(0, 0, 0, 1.0);
 
 	// Debug
-	// DeltaIrradianceUAV[inDispatchThreadID.xy] = float4(xy, 0, 1);
-	// DeltaIrradianceUAV[inDispatchThreadID.xy] = float4(mu_r, 0, 1);
-	// DeltaIrradianceUAV[inDispatchThreadID.xy] = float4(transmittance, 1);
-	// IrradianceUAV[inDispatchThreadID.xy] = float4(uv, 0, 1);
+	// Bruneton17DeltaIrradianceUAV[inDispatchThreadID.xy] = float4(xy, 0, 1);
+	// Bruneton17DeltaIrradianceUAV[inDispatchThreadID.xy] = float4(mu_r, 0, 1);
+	// Bruneton17DeltaIrradianceUAV[inDispatchThreadID.xy] = float4(transmittance, 1);
+	// Bruneton17IrradianceUAV[inDispatchThreadID.xy] = float4(uv, 0, 1);
 }
 
 void IntegrateSingleScattering(float4 r_mu_mu_s_nu, bool intersects_ground, out float3 rayleigh, out float3 mie)
@@ -642,11 +650,15 @@ void ComputeSingleScatteringCS(
 	uint3 inDispatchThreadID : SV_DispatchThreadID,
 	uint inGroupIndex : SV_GroupIndex)
 {
-	float3 xyz = DispatchThreadID_to_XYZ(inDispatchThreadID.xyz, DeltaRayleighScatteringUAV);
+	USING_RESOURCE(RWTexture3D<float4>, Bruneton17DeltaRayleighScatteringUAV);
+	USING_RESOURCE(RWTexture3D<float4>, Bruneton17DeltaMieScatteringUAV);
+	USING_RESOURCE(RWTexture3D<float4>, Bruneton17ScatteringUAV);
+
+	float3 xyz = DispatchThreadID_to_XYZ(inDispatchThreadID.xyz, Bruneton17DeltaRayleighScatteringUAV);
 
 	// Decode
 	bool intersects_ground = false;
-	float4 r_mu_mu_s_nu = Decode4D(inDispatchThreadID.xyz, DeltaRayleighScatteringUAV, intersects_ground);
+	float4 r_mu_mu_s_nu = Decode4D(inDispatchThreadID.xyz, Bruneton17DeltaRayleighScatteringUAV, intersects_ground);
 
 	// Compute
 	float3 delta_rayleigh = 0;
@@ -654,16 +666,16 @@ void ComputeSingleScatteringCS(
 	IntegrateSingleScattering(r_mu_mu_s_nu, intersects_ground, delta_rayleigh, delta_mie);
 
 	// Output
-	DeltaRayleighScatteringUAV[inDispatchThreadID.xyz] = float4(delta_rayleigh, 1);
-	DeltaMieScatteringUAV[inDispatchThreadID.xyz] = float4(delta_mie, 1);
-	ScatteringUAV[inDispatchThreadID.xyz] = float4(delta_rayleigh.xyz, delta_mie.x);
+	Bruneton17DeltaRayleighScatteringUAV[inDispatchThreadID.xyz] = float4(delta_rayleigh, 1);
+	Bruneton17DeltaMieScatteringUAV[inDispatchThreadID.xyz] = float4(delta_mie, 1);
+	Bruneton17ScatteringUAV[inDispatchThreadID.xyz] = float4(delta_rayleigh.xyz, delta_mie.x);
 
 	// Debug
-	// DeltaRayleighScatteringUAV[inDispatchThreadID.xyz] = TransmittanceSRV.SampleLevel(BilinearClampSampler, float2(1,1), 0) * 100;
-	// DeltaRayleighScatteringUAV[inDispatchThreadID.xyz] = float4(r_mu_mu_s_nu.xyz, 1);
-	// DeltaRayleighScatteringUAV[inDispatchThreadID.xyz] = float4(xyz, xyz.x);
-	// DeltaMieScatteringUAV[inDispatchThreadID.xyz] = float4(xyz, xyz.y);
-	// ScatteringUAV[inDispatchThreadID.xyz] = float4(xyz, xyz.z);
+	// Bruneton17DeltaRayleighScatteringUAV[inDispatchThreadID.xyz] = Bruneton17TransmittanceSRV.SampleLevel(BilinearClamp, float2(1,1), 0) * 100;
+	// Bruneton17DeltaRayleighScatteringUAV[inDispatchThreadID.xyz] = float4(r_mu_mu_s_nu.xyz, 1);
+	// Bruneton17DeltaRayleighScatteringUAV[inDispatchThreadID.xyz] = float4(xyz, xyz.x);
+	// Bruneton17DeltaMieScatteringUAV[inDispatchThreadID.xyz] = float4(xyz, xyz.y);
+	// Bruneton17ScatteringUAV[inDispatchThreadID.xyz] = float4(xyz, xyz.z);
 }
 
 float RayleighPhaseFunction(float nu)
@@ -679,34 +691,42 @@ float MiePhaseFunction(float g, float nu)
 
 float3 GetIrradiance(float r, float mu_s)
 {
-	float2 uv = XY_to_UV(Encode2D_Irradiance(float2(mu_s, r)), DeltaIrradianceSRV);
+	USING_RESOURCE(Texture2D<float4>, Bruneton17DeltaIrradianceSRV);
+	USING_SAMPLER(SamplerState, BilinearClamp);
+
+	float2 uv = XY_to_UV(Encode2D_Irradiance(float2(mu_s, r)), Bruneton17DeltaIrradianceSRV);
 
 	// Sample 2D LUT
-	return DeltaIrradianceSRV.SampleLevel(BilinearClampSampler, uv, 0).xyz;
+	return Bruneton17DeltaIrradianceSRV.SampleLevel(BilinearClamp, uv, 0).xyz;
 }
 
 float4 GetScattering(Texture3D<float4> scattering_texture, float r, float mu, float mu_s, float nu, bool intersects_ground)
 {
+	USING_SAMPLER(SamplerState, BilinearClamp);
+
 	float3 uvw0, uvw1;
 	float s;
 	Encode4D(float4(r, mu, mu_s, nu), intersects_ground, scattering_texture, uvw0, uvw1, s);
 
 	// Sample 4D LUT
-	return lerp(scattering_texture.SampleLevel(BilinearClampSampler, uvw0, 0), scattering_texture.SampleLevel(BilinearClampSampler, uvw1, 0), s);
+	return lerp(scattering_texture.SampleLevel(BilinearClamp, uvw0, 0), scattering_texture.SampleLevel(BilinearClamp, uvw1, 0), s);
 }
 
 float3 GetScattering(float r, float mu, float mu_s, float nu, bool intersects_ground, int scattering_order)
 {
+	USING_RESOURCE(Texture3D<float4>, Bruneton17DeltaRayleighScatteringSRV);
+	USING_RESOURCE(Texture3D<float4>, Bruneton17DeltaMieScatteringSRV);
+
 	// [TODO] Add note
 
 	if (scattering_order == 1)
 	{
-		float3 rayleigh = GetScattering(DeltaRayleighScatteringSRV, r, mu, mu_s, nu, intersects_ground).xyz;
-		float3 mie = GetScattering(DeltaMieScatteringSRV, r, mu, mu_s, nu, intersects_ground).xyz;
+		float3 rayleigh = GetScattering(Bruneton17DeltaRayleighScatteringSRV, r, mu, mu_s, nu, intersects_ground).xyz;
+		float3 mie = GetScattering(Bruneton17DeltaMieScatteringSRV, r, mu, mu_s, nu, intersects_ground).xyz;
 		return rayleigh * RayleighPhaseFunction(nu) + mie * MiePhaseFunction(mConstants.mAtmosphere.mMiePhaseFunctionG, nu);
 	}
 
-	return GetScattering(DeltaRayleighScatteringSRV, r, mu, mu_s, nu, intersects_ground).xyz;
+	return GetScattering(Bruneton17DeltaRayleighScatteringSRV, r, mu, mu_s, nu, intersects_ground).xyz;
 }
 
 float3 ComputeScatteringDensity(float4 r_mu_mu_s_nu, bool intersects_ground)
@@ -797,7 +817,7 @@ float3 ComputeScatteringDensity(float4 r_mu_mu_s_nu, bool intersects_ground)
 	// rayleigh_mie *= 1000.0;
 	// float3 uvw0, uvw1;
 	// float s;
-	// Encode4D(float4(r, mu, mu_s, nu), false, DeltaRayleighScatteringSRV, uvw0, uvw1, s);
+	// Encode4D(float4(r, mu, mu_s, nu), false, Bruneton17DeltaRayleighScatteringSRV, uvw0, uvw1, s);
 	// return uvw0;
 
 	return rayleigh_mie;
@@ -810,30 +830,35 @@ void ComputeScatteringDensityCS(
 	uint3 inDispatchThreadID : SV_DispatchThreadID,
 	uint inGroupIndex : SV_GroupIndex)
 {
-	float3 xyz = DispatchThreadID_to_XYZ(inDispatchThreadID.xyz, DeltaScatteringDensityUAV);
+	USING_RESOURCE(RWTexture3D<float4>, Bruneton17DeltaScatteringDensityUAV);
+
+	float3 xyz = DispatchThreadID_to_XYZ(inDispatchThreadID.xyz, Bruneton17DeltaScatteringDensityUAV);
 
 	uint3 dispatch_thread_id = inDispatchThreadID.xyz;
 
 	// Decode
 	bool intersects_ground = false;
-	float4 r_mu_mu_s_nu = Decode4D(dispatch_thread_id, DeltaScatteringDensityUAV, intersects_ground);
+	float4 r_mu_mu_s_nu = Decode4D(dispatch_thread_id, Bruneton17DeltaScatteringDensityUAV, intersects_ground);
 
 	// Compute
 	float3 scattering_density = ComputeScatteringDensity(r_mu_mu_s_nu, intersects_ground);
 
 	// Output
-	DeltaScatteringDensityUAV[inDispatchThreadID.xyz] = float4(scattering_density, 1.0);
+	Bruneton17DeltaScatteringDensityUAV[inDispatchThreadID.xyz] = float4(scattering_density, 1.0);
 
 	// Debug
 	bool ray_r_theta_intersects_ground = false;
-	// DeltaScatteringDensityUAV[inDispatchThreadID.xyz] = float4(xyz, 1.0);
-	// DeltaScatteringDensityUAV[inDispatchThreadID.xyz] = float4(GetScattering(r_mu_mu_s_nu.x, r_mu_mu_s_nu.y, r_mu_mu_s_nu.z, r_mu_mu_s_nu.w, ray_r_theta_intersects_ground, mScatteringOrder - 1), 1.0);
-	// DeltaScatteringDensityUAV[inDispatchThreadID.xyz] = r_mu_mu_s_nu;
-	// DeltaScatteringDensityUAV[inDispatchThreadID.xyz] = float4(tan((2.0 * xyz - 1.0 + 0.26) * 1.1) / tan(1.26 * 1.1), 1.0);
+	// Bruneton17DeltaScatteringDensityUAV[inDispatchThreadID.xyz] = float4(xyz, 1.0);
+	// Bruneton17DeltaScatteringDensityUAV[inDispatchThreadID.xyz] = float4(GetScattering(r_mu_mu_s_nu.x, r_mu_mu_s_nu.y, r_mu_mu_s_nu.z, r_mu_mu_s_nu.w, ray_r_theta_intersects_ground, mScatteringOrder - 1), 1.0);
+	// Bruneton17DeltaScatteringDensityUAV[inDispatchThreadID.xyz] = r_mu_mu_s_nu;
+	// Bruneton17DeltaScatteringDensityUAV[inDispatchThreadID.xyz] = float4(tan((2.0 * xyz - 1.0 + 0.26) * 1.1) / tan(1.26 * 1.1), 1.0);
 }
 
 float3 ComputeIndirectIrradiance(float2 mu_s_r)
 {
+	USING_RESOURCE(Texture3D<float4>, Bruneton17DeltaRayleighScatteringSRV);
+	USING_SAMPLER(SamplerState, BilinearClamp);
+
 	float mu_s = mu_s_r.x;
 	float r = mu_s_r.y;
 
@@ -877,10 +902,10 @@ float3 ComputeIndirectIrradiance(float2 mu_s_r)
 	{
 		float3 uvw0, uvw1;
 		float s;
-		Encode4D(float4(r, 0, mu_s, 0), false, DeltaRayleighScatteringSRV, uvw0, uvw1, s);
+		Encode4D(float4(r, 0, mu_s, 0), false, Bruneton17DeltaRayleighScatteringSRV, uvw0, uvw1, s);
 		return uvw0;
-		return lerp(DeltaRayleighScatteringSRV.SampleLevel(BilinearClampSampler, uvw0, 0), DeltaRayleighScatteringSRV.SampleLevel(BilinearClampSampler, uvw1, 0), s).xyz;
-		return GetScattering(DeltaRayleighScatteringSRV, r, 0, mu_s, 0, false).xyz;
+		return lerp(Bruneton17DeltaRayleighScatteringSRV.SampleLevel(BilinearClamp, uvw0, 0), Bruneton17DeltaRayleighScatteringSRV.SampleLevel(BilinearClamp, uvw1, 0), s).xyz;
+		return GetScattering(Bruneton17DeltaRayleighScatteringSRV, r, 0, mu_s, 0, false).xyz;
 	}
 
 	return result;
@@ -893,8 +918,11 @@ void ComputeIndirectIrradianceCS(
 	uint3 inDispatchThreadID : SV_DispatchThreadID,
 	uint inGroupIndex : SV_GroupIndex)
 {
+	USING_RESOURCE(RWTexture2D<float4>, Bruneton17DeltaIrradianceUAV);
+	USING_RESOURCE(RWTexture2D<float4>, Bruneton17IrradianceUAV);
+
 	// XY
-	float2 xy = DispatchThreadID_to_XY(inDispatchThreadID.xy, IrradianceUAV);
+	float2 xy = DispatchThreadID_to_XY(inDispatchThreadID.xy, Bruneton17IrradianceUAV);
 
 	// Decode
 	float2 mu_s_r = Decode2D_Irradiance(xy);
@@ -904,19 +932,21 @@ void ComputeIndirectIrradianceCS(
 	float3 irradiance = delta_irradiance;
 
 	// Output
-	DeltaIrradianceUAV[inDispatchThreadID.xy] = float4(delta_irradiance, 1.0);
-	IrradianceUAV[inDispatchThreadID.xy] = IrradianceUAV[inDispatchThreadID.xy] + float4(irradiance, 0.0); // Accumulation
+	Bruneton17DeltaIrradianceUAV[inDispatchThreadID.xy] = float4(delta_irradiance, 1.0);
+	Bruneton17IrradianceUAV[inDispatchThreadID.xy] = Bruneton17IrradianceUAV[inDispatchThreadID.xy] + float4(irradiance, 0.0); // Accumulation
 
 	// Debug
-	// DeltaIrradianceUAV[inDispatchThreadID.xy] = float4(xy, 0.0, 1.0);
-	// IrradianceUAV[inDispatchThreadID.xy] = float4(xy, 0.0, 1.0);
-	// DeltaIrradianceUAV[inDispatchThreadID.xy] = float4(mu_s_r.x, (mu_s_r.y - mConstants.mAtmosphere.mBottomRadius) / (mConstants.mAtmosphere.mTopRadius - mConstants.mAtmosphere.mBottomRadius), 0.0, 1.0);
-	// DeltaIrradianceUAV[inDispatchThreadID.xy] = DeltaRayleighScatteringSRV.SampleLevel(BilinearClampSampler, float3(xy, 0), 0);
-	// DeltaIrradianceUAV[inDispatchThreadID.xy] = DeltaMieScatteringSRV.SampleLevel(BilinearClampSampler, float3(xy, 0), 0);
+	// Bruneton17DeltaIrradianceUAV[inDispatchThreadID.xy] = float4(xy, 0.0, 1.0);
+	// Bruneton17IrradianceUAV[inDispatchThreadID.xy] = float4(xy, 0.0, 1.0);
+	// Bruneton17DeltaIrradianceUAV[inDispatchThreadID.xy] = float4(mu_s_r.x, (mu_s_r.y - mConstants.mAtmosphere.mBottomRadius) / (mConstants.mAtmosphere.mTopRadius - mConstants.mAtmosphere.mBottomRadius), 0.0, 1.0);
+	// Bruneton17DeltaIrradianceUAV[inDispatchThreadID.xy] = Bruneton17DeltaRayleighScatteringSRV.SampleLevel(BilinearClamp, float3(xy, 0), 0);
+	// Bruneton17DeltaIrradianceUAV[inDispatchThreadID.xy] = Bruneton17DeltaMieScatteringSRV.SampleLevel(BilinearClamp, float3(xy, 0), 0);
 }
 
 void ComputeMultipleScattering(float4 r_mu_mu_s_nu, bool intersects_ground, out float3 delta_multiple_scattering)
 {
+	USING_RESOURCE(Texture3D<float4>, Bruneton17DeltaScatteringDensitySRV);
+
 	float r = r_mu_mu_s_nu.x;
 	float mu = r_mu_mu_s_nu.y;
 	float mu_s = r_mu_mu_s_nu.z;
@@ -942,7 +972,7 @@ void ComputeMultipleScattering(float4 r_mu_mu_s_nu, bool intersects_ground, out 
 
 		// The Rayleigh and Mie multiple scattering at the current sample point.
 		float3 rayleigh_mie_i =
-			GetScattering(DeltaScatteringDensitySRV, r_i, mu_i, mu_s_i, nu, intersects_ground).xyz
+			GetScattering(Bruneton17DeltaScatteringDensitySRV, r_i, mu_i, mu_s_i, nu, intersects_ground).xyz
 			*
 			GetTransmittance(r, mu, d_i, intersects_ground)
 			*
@@ -963,11 +993,14 @@ void ComputeMultipleScatteringCS(
 	uint3 inDispatchThreadID : SV_DispatchThreadID,
 	uint inGroupIndex : SV_GroupIndex)
 {
-	float3 xyz = DispatchThreadID_to_XYZ(inDispatchThreadID.xyz, ScatteringUAV);
+	USING_RESOURCE(RWTexture3D<float4>, Bruneton17DeltaRayleighScatteringUAV);
+	USING_RESOURCE(RWTexture3D<float4>, Bruneton17ScatteringUAV);
+
+	float3 xyz = DispatchThreadID_to_XYZ(inDispatchThreadID.xyz, Bruneton17ScatteringUAV);
 
 	// Decode
 	bool intersects_ground = false;
-	float4 r_mu_mu_s_nu = Decode4D(inDispatchThreadID, DeltaRayleighScatteringUAV, intersects_ground);
+	float4 r_mu_mu_s_nu = Decode4D(inDispatchThreadID, Bruneton17DeltaRayleighScatteringUAV, intersects_ground);
 
 	// Scatter
 	float3 delta_multiple_scattering = 0;
@@ -975,15 +1008,15 @@ void ComputeMultipleScatteringCS(
 	float3 delta_scattering = delta_multiple_scattering.rgb / RayleighPhaseFunction(r_mu_mu_s_nu.w);
 
 	// Output
-	DeltaRayleighScatteringUAV[inDispatchThreadID.xyz] = float4(delta_multiple_scattering, 1.0);
-	ScatteringUAV[inDispatchThreadID.xyz] = ScatteringUAV[inDispatchThreadID.xyz] + float4(delta_scattering, 0.0); // Accumulation
+	Bruneton17DeltaRayleighScatteringUAV[inDispatchThreadID.xyz] = float4(delta_multiple_scattering, 1.0);
+	Bruneton17ScatteringUAV[inDispatchThreadID.xyz] = Bruneton17ScatteringUAV[inDispatchThreadID.xyz] + float4(delta_scattering, 0.0); // Accumulation
 
 	// Debug
-	// DeltaRayleighScatteringUAV[inDispatchThreadID.xyz] = r_mu_mu_s_nu;
-	// DeltaRayleighScatteringUAV[inDispatchThreadID.xyz] = DeltaScatteringDensitySRV[inDispatchThreadID.xyz];
-	// DeltaRayleighScatteringUAV[inDispatchThreadID.xyz] = float4(r_mu_mu_s_nu.xyz, 1);
-	// DeltaRayleighScatteringUAV[inDispatchThreadID.xyz] = float4(xyz, 1.0);
-	// ScatteringUAV[inDispatchThreadID.xyz] = float4(xyz, 1.0);
+	// Bruneton17DeltaRayleighScatteringUAV[inDispatchThreadID.xyz] = r_mu_mu_s_nu;
+	// Bruneton17DeltaRayleighScatteringUAV[inDispatchThreadID.xyz] = Bruneton17DeltaScatteringDensitySRV[inDispatchThreadID.xyz];
+	// Bruneton17DeltaRayleighScatteringUAV[inDispatchThreadID.xyz] = float4(r_mu_mu_s_nu.xyz, 1);
+	// Bruneton17DeltaRayleighScatteringUAV[inDispatchThreadID.xyz] = float4(xyz, 1.0);
+	// Bruneton17ScatteringUAV[inDispatchThreadID.xyz] = float4(xyz, 1.0);
 
 	// [NOTE] Accumulation here inside shader may produce different result compared with RenderDoc capture from [Bruneton17] using alpha blend
 
@@ -1008,7 +1041,9 @@ float3 GetExtrapolatedSingleMieScattering(float4 scattering)
 
 void GetCombinedScattering(float r, float mu, float mu_s, float nu, bool ray_r_mu_intersects_ground, out float3 rayleigh_scattering, out float3 single_mie_scattering)
 {
-	float4 scattering = GetScattering(ScatteringSRV, r, mu, mu_s, nu, ray_r_mu_intersects_ground);
+	USING_RESOURCE(Texture3D<float4>, Bruneton17ScatteringSRV);
+
+	float4 scattering = GetScattering(Bruneton17ScatteringSRV, r, mu, mu_s, nu, ray_r_mu_intersects_ground);
 
 	single_mie_scattering = GetExtrapolatedSingleMieScattering(scattering);
 	rayleigh_scattering = scattering.xyz;
@@ -1061,9 +1096,9 @@ void GetSkyRadiance(Ray inRayPS, out float3 outSkyRadiance, out float3 outTransm
 		//outSkyRadiance = float3(1.1, 1.2, 1.3);
 		//float3 uvw0, uvw1;
 		//float s;
-		//Encode4D(float4(r, mu, mu_s, nu), ray_r_mu_intersects_ground, ScatteringSRV, uvw0, uvw1, s);
+		//Encode4D(float4(r, mu, mu_s, nu), ray_r_mu_intersects_ground, Bruneton17ScatteringSRV, uvw0, uvw1, s);
 		//rayleigh_scattering = uvw0;
-		//rayleigh_scattering = ScatteringSRV.SampleLevel(BilinearClampSampler, uvw0, 0);
+		//rayleigh_scattering = Bruneton17ScatteringSRV.SampleLevel(BilinearClamp, uvw0, 0);
 	}
 }
 
@@ -1164,3 +1199,4 @@ void GetSunAndSkyIrradiance(float3 inPositionPS, float3 inNormal, out float3 out
 }
 
 }} // namespace AtmosphereIntegration { namespace Bruneton17 {
+

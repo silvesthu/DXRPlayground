@@ -6,6 +6,8 @@
 [shader("raygeneration")]
 void RayGeneration()
 {
+	USING_RESOURCE(RWTexture2D<float4>, ScreenColorUAV);
+
 	float2 screen_coords						= float2(DispatchRaysIndex().xy) + 0.5;
 	float2 screen_size							= float2(DispatchRaysDimensions().xy);
 

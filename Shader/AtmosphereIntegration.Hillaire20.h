@@ -29,9 +29,9 @@ float AerialPerspectiveSliceToDepth(float slice)
 	return slice * AP_KM_PER_SLICE;
 }
 
-#define TransmittanceLutTexture TransmittanceTexSRV
-#define MultiScatTexture MultiScattTexSRV
-#define samplerLinearClamp BilinearClampSampler
+#define TransmittanceLutTexture Hillaire20TransmittanceTexSRV
+#define MultiScatTexture Hillaire20MultiScattSRV
+#define samplerLinearClamp BilinearClamp
 
 // We should precompute those terms from resolutions (Or set resolution as #defined constants)
 float fromUnitToSubUvs(float u, float resolution) { return (u + 0.5f / resolution) * (resolution / (resolution + 1.0f)); }
@@ -298,6 +298,9 @@ bool MoveToTopAtmosphere(inout float3 WorldPos, in float3 WorldDir, in float Atm
 
 float3 GetMultipleScattering(AtmosphereParameters Atmosphere, float3 scattering, float3 extinction, float3 worlPos, float viewZenithCosAngle)
 {
+	USING_RESOURCE(Texture2D<float4>, Hillaire20MultiScattSRV);
+	USING_SAMPLER(SamplerState, BilinearClamp);
+
 	float2 uv = saturate(float2(viewZenithCosAngle * 0.5f + 0.5f, (length(worlPos) - Atmosphere.BottomRadius) / (Atmosphere.TopRadius - Atmosphere.BottomRadius)));
 	uv = float2(fromUnitToSubUvs(uv.x, MultiScatteringLUTRes), fromUnitToSubUvs(uv.y, MultiScatteringLUTRes));
 
@@ -321,6 +324,10 @@ SingleScatteringResult IntegrateScatteredLuminance(
 	in bool ground, in float SampleCountIni, in float DepthBufferValue, in bool VariableSampleCount,
 	in bool MieRayPhase, in float tMaxMax = 9000000.0f)
 {
+	USING_RESOURCE(Texture2D<float4>, Hillaire20TransmittanceTexSRV);
+	USING_RESOURCE(Texture2D<float4>, Hillaire20MultiScattSRV);
+	USING_SAMPLER(SamplerState, BilinearClamp);
+
 	// Adapter
 	float3 gSunIlluminance = 1.0;
 
@@ -608,10 +615,12 @@ void TransLUT(
 	uint3 inDispatchThreadID : SV_DispatchThreadID,
 	uint inGroupIndex : SV_GroupIndex)
 {
+	USING_RESOURCE(RWTexture2D<float4>, Hillaire20TransmittanceTexUAV);
+
 	// Adapter
 	uint TRANSMITTANCE_TEXTURE_WIDTH = 256;
 	uint TRANSMITTANCE_TEXTURE_HEIGHT = 64;
-	// TransmittanceTexUAV.GetDimensions(TRANSMITTANCE_TEXTURE_WIDTH, TRANSMITTANCE_TEXTURE_HEIGHT); // calculate in shader introduce extra error
+	// Hillaire20TransmittanceTexUAV.GetDimensions(TRANSMITTANCE_TEXTURE_WIDTH, TRANSMITTANCE_TEXTURE_HEIGHT); // calculate in shader introduce extra error
 	float2 pixPos = inDispatchThreadID.xy + 0.5; // half pixel offset
 	float3 sun_direction = mConstants.mSunDirection.xyz;
 
@@ -651,13 +660,13 @@ void TransLUT(
 	const bool MieRayPhase = false;
 	float3 transmittance = exp(-IntegrateScatteredLuminance(pixPos, WorldPos, WorldDir, sun_direction, Atmosphere, ground, SampleCountIni, DepthBufferValue, VariableSampleCount, MieRayPhase).OpticalDepth);
 
-	TransmittanceTexUAV[inDispatchThreadID.xy] = float4(transmittance, 1);
+	Hillaire20TransmittanceTexUAV[inDispatchThreadID.xy] = float4(transmittance, 1);
 
 	// Debug
-	// TransmittanceTexUAV[inDispatchThreadID.xy] = float4(viewZenithCosAngle, viewHeight, 0, 1);
-	// TransmittanceTexUAV[inDispatchThreadID.xy] = float4(WorldDir, 1);
-	// TransmittanceTexUAV[inDispatchThreadID.xy] = float4(uv, 0, 1);
-	// TransmittanceTexUAV[inDispatchThreadID.xy] = float4(pixPos, 0, 1);
+	// Hillaire20TransmittanceTexUAV[inDispatchThreadID.xy] = float4(viewZenithCosAngle, viewHeight, 0, 1);
+	// Hillaire20TransmittanceTexUAV[inDispatchThreadID.xy] = float4(WorldDir, 1);
+	// Hillaire20TransmittanceTexUAV[inDispatchThreadID.xy] = float4(uv, 0, 1);
+	// Hillaire20TransmittanceTexUAV[inDispatchThreadID.xy] = float4(pixPos, 0, 1);
 }
 
 groupshared float3 MultiScatAs1SharedMem[64];
@@ -670,6 +679,8 @@ void NewMultiScatCS(
 	uint3 inDispatchThreadID : SV_DispatchThreadID,
 	uint inGroupIndex : SV_GroupIndex)
 {
+	USING_RESOURCE(RWTexture2D<float4>, Hillaire20MultiScattUAV);
+
 	// Adapter
 	uint3 ThreadId = inDispatchThreadID.xyz;
 	float MultipleScatteringFactor = 1.0;
@@ -723,7 +734,7 @@ void NewMultiScatCS(
 		SingleScatteringResult result = IntegrateScatteredLuminance(pixPos, WorldPos, WorldDir, sunDir, Atmosphere, ground, SampleCountIni, DepthBufferValue, VariableSampleCount, MieRayPhase);
 
 		// Debug
-		// MultiScattTexUAV[inDispatchThreadID.xy] = float4(sunDir, 1.0f);
+		// Hillaire20MultiScattUAV[inDispatchThreadID.xy] = float4(sunDir, 1.0f);
 		// return;
 
 		MultiScatAs1SharedMem[ThreadId.z] = result.MultiScatAs1 * SphereSolidAngle / (sqrtSample * sqrtSample);
@@ -795,7 +806,7 @@ void NewMultiScatCS(
 	float3 L = InScatteredLuminance * SumOfAllMultiScatteringEventsContribution;// Equation 10 Psi_ms
 #endif
 
-	MultiScattTexUAV[ThreadId.xy] = float4(MultipleScatteringFactor * L, 1.0f);
+	Hillaire20MultiScattUAV[ThreadId.xy] = float4(MultipleScatteringFactor * L, 1.0f);
 
 	// Debug
 }
@@ -807,6 +818,8 @@ void SkyViewLut(
 	uint3 inDispatchThreadID : SV_DispatchThreadID,
 	uint inGroupIndex : SV_GroupIndex)
 {
+	USING_RESOURCE(RWTexture2D<float4>, Hillaire20SkyViewLutUAV);
+
 	AtmosphereParameters Atmosphere = GetAtmosphereParameters();
 
 	float2 dimensions = float2(192, 108);
@@ -844,7 +857,7 @@ void SkyViewLut(
 	// Move to top atmospehre
 	if (!MoveToTopAtmosphere(WorldPos, WorldDir, Atmosphere.TopRadius))
 	{
-		SkyViewLutTexUAV[inDispatchThreadID.xy] = float4(0, 0, 0, 1);
+		Hillaire20SkyViewLutUAV[inDispatchThreadID.xy] = float4(0, 0, 0, 1);
 		return;
 	}
 
@@ -858,20 +871,20 @@ void SkyViewLut(
 	float3 L = ss.L;
 	if (mConstants.mAtmosphere.mHillaire20SkyViewInLuminance)
 		L *= kSolarKW2LM * kPreExposure * mConstants.mAtmosphere.mSolarIrradiance;
-	SkyViewLutTexUAV[inDispatchThreadID.xy] = float4(L, 1); // match
+	Hillaire20SkyViewLutUAV[inDispatchThreadID.xy] = float4(L, 1); // match
 
 	// Debug
-	// SkyViewLutTexUAV[inDispatchThreadID.xy] = float4(pixPos, 0, 1); // match
-	// SkyViewLutTexUAV[inDispatchThreadID.xy] = float4(RelativeWorldPos, 1); // match
-	// SkyViewLutTexUAV[inDispatchThreadID.xy] = float4(WorldDir, 1); // tiny error
-	// SkyViewLutTexUAV[inDispatchThreadID.xy] = float4(viewZenithSinAngle, viewZenithCosAngle, 0, 1);	// tiny error, from UvToSkyViewLutParams
-	// SkyViewLutTexUAV[inDispatchThreadID.xy] = float4(uv, viewHeight, 1); // match
-	// SkyViewLutTexUAV[inDispatchThreadID.xy] = float4(SunDir, 1); // match, 0.90052, 0.00, 0.43482
-	// SkyViewLutTexUAV[inDispatchThreadID.xy] = MultiScatTexture.SampleLevel(samplerLinearClamp, uv, 0); // match
+	// Hillaire20SkyViewLutUAV[inDispatchThreadID.xy] = float4(pixPos, 0, 1); // match
+	// Hillaire20SkyViewLutUAV[inDispatchThreadID.xy] = float4(RelativeWorldPos, 1); // match
+	// Hillaire20SkyViewLutUAV[inDispatchThreadID.xy] = float4(WorldDir, 1); // tiny error
+	// Hillaire20SkyViewLutUAV[inDispatchThreadID.xy] = float4(viewZenithSinAngle, viewZenithCosAngle, 0, 1);	// tiny error, from UvToSkyViewLutParams
+	// Hillaire20SkyViewLutUAV[inDispatchThreadID.xy] = float4(uv, viewHeight, 1); // match
+	// Hillaire20SkyViewLutUAV[inDispatchThreadID.xy] = float4(SunDir, 1); // match, 0.90052, 0.00, 0.43482
+	// Hillaire20SkyViewLutUAV[inDispatchThreadID.xy] = MultiScatTexture.SampleLevel(samplerLinearClamp, uv, 0); // match
 
-	// SkyViewLutTexUAV[inDispatchThreadID.xy] = float4(WorldPos, 1);
-	// SkyViewLutTexUAV[inDispatchThreadID.xy] = float4(WorldDir, 1);
-	// SkyViewLutTexUAV[inDispatchThreadID.xy] = float4(SunDir, 1);
+	// Hillaire20SkyViewLutUAV[inDispatchThreadID.xy] = float4(WorldPos, 1);
+	// Hillaire20SkyViewLutUAV[inDispatchThreadID.xy] = float4(WorldDir, 1);
+	// Hillaire20SkyViewLutUAV[inDispatchThreadID.xy] = float4(SunDir, 1);
 }
 
 [numthreads(8, 8, 1)]
@@ -881,6 +894,8 @@ void CameraVolumes(
 	uint3 inDispatchThreadID : SV_DispatchThreadID,
 	uint inGroupIndex : SV_GroupIndex)
 {
+	USING_RESOURCE(RWTexture3D<float4>, Hillaire20AtmosphereCameraScatteringVolumeUAV);
+
 	AtmosphereParameters Atmosphere = GetAtmosphereParameters();
 
 	float2 pixPos = inDispatchThreadID.xy + 0.5; // half pixel offset
@@ -958,14 +973,14 @@ void CameraVolumes(
 		if (!MoveToTopAtmosphere(WorldPos, WorldDir, Atmosphere.TopRadius))
 		{
 			// Ray is not intersecting the atmosphere
-			AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(0.0, 0.0, 0.0, 1.0);
+			Hillaire20AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(0.0, 0.0, 0.0, 1.0);
 			return;
 		}
 		float LengthToAtmosphere = length(prevWorlPos - WorldPos);
 		if (tMaxMax < LengthToAtmosphere)
 		{
 			// tMaxMax for this voxel is not within earth atmosphere
-			AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(0.0, 0.0, 0.0, 1.0);
+			Hillaire20AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(0.0, 0.0, 0.0, 1.0);
 			return;
 		}
 		// Now world position has been moved to the atmosphere boundary: we need to reduce tMaxMax accordingly. 
@@ -985,19 +1000,19 @@ void CameraVolumes(
 	SingleScatteringResult ss = IntegrateScatteredLuminance(pixPos, WorldPos, WorldDir, SunDir, Atmosphere, ground, SampleCountIni, DepthBufferValue, VariableSampleCount, MieRayPhase, tMaxMax);
 
 	const float Transmittance = dot(ss.Transmittance, float3(1.0f / 3.0f, 1.0f / 3.0f, 1.0f / 3.0f)); // ?
-	AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(ss.L, 1.0 - Transmittance); // almost match
+	Hillaire20AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(ss.L, 1.0 - Transmittance); // almost match
 
 	// Debug
-	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(inDispatchThreadID.xyz, 1.0); // match
-	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(pixPos, 0.0, 1.0); // match
-	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(WorldPos, 1.0); // match
-	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(SunDir, 1.0); // match
-	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(SampleCountIni.xxx, 1.0); // match
-	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(mConstants.CameraFront().xzy, 1.0); // match
-	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(WorldDir_Raw, 1.0); // match	
-	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(newWorldPos, 1.0); // almost match
-	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(WorldDir, 1.0); // match
-	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(tMax.xxx, 1.0); // match
+	//Hillaire20AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(inDispatchThreadID.xyz, 1.0); // match
+	//Hillaire20AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(pixPos, 0.0, 1.0); // match
+	//Hillaire20AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(WorldPos, 1.0); // match
+	//Hillaire20AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(SunDir, 1.0); // match
+	//Hillaire20AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(SampleCountIni.xxx, 1.0); // match
+	//Hillaire20AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(mConstants.CameraFront().xzy, 1.0); // match
+	//Hillaire20AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(WorldDir_Raw, 1.0); // match	
+	//Hillaire20AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(newWorldPos, 1.0); // almost match
+	//Hillaire20AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(WorldDir, 1.0); // match
+	//Hillaire20AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(tMax.xxx, 1.0); // match
 }
 
 namespace AtmosphereIntegration {
@@ -1005,6 +1020,10 @@ namespace AtmosphereIntegration {
 
 		void GetSkyRadiance(Ray inRayPS, out float3 outSkyRadiance, out float3 outTransmittanceToTop)
 		{
+			USING_RESOURCE(Texture2D<float4>, Hillaire20TransmittanceTexSRV);
+			USING_RESOURCE(Texture2D<float4>, Hillaire20SkyViewLutSRV);
+			USING_SAMPLER(SamplerState, BilinearClamp);
+
 			outSkyRadiance = 0;
 			outTransmittanceToTop = 1; // [TODO]
 
@@ -1053,7 +1072,7 @@ namespace AtmosphereIntegration {
 	outTransmittanceToTop = TransmittanceLutTexture.SampleLevel(samplerLinearClamp, uv, 0).rgb;
 
 	SkyViewLutParamsToUv(Atmosphere, ray_r_mu_intersects_ground, mu, lightViewCosAngle, r, uv);
-	outSkyRadiance = SkyViewLutTexSRV.SampleLevel(samplerLinearClamp, uv, 0).rgb;
+	outSkyRadiance = Hillaire20SkyViewLutSRV.SampleLevel(samplerLinearClamp, uv, 0).rgb;
 
 	if (mConstants.mAtmosphere.mHillaire20SkyViewInLuminance)
 		outSkyRadiance = outSkyRadiance / kPreExposure * kSolarLM2KW; // PreExposed lm/m^2 -> kW/m^2
@@ -1066,3 +1085,4 @@ namespace AtmosphereIntegration {
 }
 
 }} // namespace AtmosphereIntegration { namespace Hillaire20 {
+

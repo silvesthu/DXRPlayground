@@ -40,6 +40,11 @@ void TraceShadowRay(inout T ioQuery, inout RayDesc ioRay)
 
 void TraceRay(inout PixelContext ioPixelContext)
 {
+	USING_RESOURCE(RWStructuredBuffer<RayInspection>, RayInspectionUAV);
+	USING_RESOURCE(RWStructuredBuffer<PixelInspection>, PixelInspectionUAV);
+	USING_RESOURCE(RWTexture2D<float4>, ScreenColorUAV);
+	USING_RESOURCE(StructuredBuffer<Light>, RaytraceLightsSRV);
+
 	DebugValueInit();
 	sShaderPrint.Init(ioPixelContext);
 	
@@ -258,7 +263,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 					
 						// Select light
 						uint light_index							= hit_context.LightIndex();
-						Light light									= Lights[light_index];
+						Light light									= RaytraceLightsSRV[light_index];
 
 						LightContext light_context					= LightEvaluation::GenerateContext(LightEvaluation::ContextType::Input, ray.Direction, light_index, ray.Origin, path_context);
 						float light_mis_pdf							= light_context.mSolidAnglePDF * light_context.UniformSelectionPDF();
@@ -302,7 +307,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 							TraceShadowRay(shadow_query, shadow_ray);
 						
 							// Shadow ray hit the light
-							if (IsHit(shadow_query) && shadow_query.CommittedInstanceID() == light_context.Light().mInstanceID)
+							if (IsHit(shadow_query) && shadow_query.CommittedInstanceID() == light_context.GetLight().mInstanceID)
 							{
 								if (GetDebugFlag() & DebugFlag::UpdateRayInspection)
 									if (ioPixelContext.mPixelIndex.x == mConstants.mPixelDebugCoord.x && ioPixelContext.mPixelIndex.y == mConstants.mPixelDebugCoord.y)
@@ -319,7 +324,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 								DebugValue(DebugMode::Light_BSDF,	path_context.mRecursionDepth, float3(bsdf_result.mBSDF));
 								DebugValue(DebugMode::Light_PDF,	path_context.mRecursionDepth, float3(1.0 / light_weight, 0, 0));
 
-								float3 luminance					= light_context.Light().mEmission * (mConstants.mEmissionBoost * kPreExposure);
+								float3 luminance					= light_context.GetLight().mEmission * (mConstants.mEmissionBoost * kPreExposure);
 								float3 light_emission				= luminance * bsdf_result.mBSDF * abs(bsdf_context.mNdotL) * light_weight;
 
 								if (GetSampleMode() == SampleMode::MIS)
@@ -495,6 +500,8 @@ void RayQueryCS(
 	uint3 inDispatchThreadID : SV_DispatchThreadID,
 	uint inGroupIndex : SV_GroupIndex)
 {
+	USING_RESOURCE(RWTexture2D<float4>, ScreenColorUAV);
+
 	InstanceDataCache::Initialize(inGroupIndex);
 	GroupMemoryBarrierWithGroupSync();
 
@@ -515,6 +522,8 @@ void DepthPS(
 	float4 inPosition : SV_POSITION,
 	out float outDepth : SV_DEPTH)
 {
+	USING_RESOURCE(RWTexture2D<float4>, ScreenColorUAV);
+
 	uint2 output_dimensions;
 	ScreenColorUAV.GetDimensions(output_dimensions.x, output_dimensions.y);
 	

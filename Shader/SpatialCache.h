@@ -33,6 +33,8 @@ namespace SpatialCache
     //Adapted from https://gboisse.github.io/posts/this-is-us/
     uint FindOrInsert(float3 position, float3 normal, float cellSize)
     {
+        USING_RESOURCE(RWStructuredBuffer<uint>, SpatialHashUAV);
+
         // Inputs to hashing
         int3 p = floor(position / cellSize + 1E-3 /* Z-fighting in CornellBox */);
         int3 n = floor(normal * 3.0);
@@ -68,6 +70,8 @@ namespace SpatialCache
 
     uint LoadData(uint inCellIndex)
     {
+		USING_RESOURCE(RWStructuredBuffer<uint>, SpatialDataUAV);
+
 		if (inCellIndex == kInvalidCellIndex)
             return 0;
 
@@ -76,6 +80,8 @@ namespace SpatialCache
 
     uint AddData(uint inCellIndex, uint inValue)
     {
+        USING_RESOURCE(RWStructuredBuffer<uint>, SpatialDataUAV);
+
         if (inCellIndex == kInvalidCellIndex)
             return 0;
 

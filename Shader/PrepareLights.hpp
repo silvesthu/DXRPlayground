@@ -8,6 +8,8 @@
 
 bool FindTask(uint3 inDispatchThreadID, out PrepareLightsTask task)
 {
+	USING_RESOURCE(StructuredBuffer<PrepareLightsTask>, TaskBufferSRV);
+
 	// [TODO] Is binary search the best way?
 
 	uint num_tasks = mRootConstants.mData0.x;
@@ -51,6 +53,8 @@ void PrepareLightsCS(
 	uint3 inDispatchThreadID : SV_DispatchThreadID,
 	uint inGroupIndex : SV_GroupIndex)
 {
+	USING_RESOURCE(RWStructuredBuffer<RAB_LightInfo>, LightDataBufferUAV);
+
 	PrepareLightsTask task = (PrepareLightsTask)0;
 
 	if (!FindTask(inDispatchThreadID, task))
