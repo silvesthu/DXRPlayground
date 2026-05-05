@@ -1018,13 +1018,13 @@ void GetSkyRadiance(Ray inRayPS, out float3 outSkyRadiance, out float3 outTransm
 {
 	float3 camera = inRayPS.mOrigin - PlanetCenterPositionPS();
 	float3 view_ray = inRayPS.mDirection;
-	float3 sun_direction = GetSunDirection();
+	float3 sun_direction = mConstants.mSunDirection.xyz;
 
 	float r = length(camera);
 	float rmu = dot(camera, view_ray);
 	float distance_to_top_atmosphere_boundary = -rmu - sqrt(rmu * rmu - r * r + mConstants.mAtmosphere.mTopRadius * mConstants.mAtmosphere.mTopRadius);
 
-	if (distance_to_top_atmosphere_boundary > 0.0) 
+	if (distance_to_top_atmosphere_boundary > 0.0)
 	{
 		// Outer space
 
@@ -1033,7 +1033,7 @@ void GetSkyRadiance(Ray inRayPS, out float3 outSkyRadiance, out float3 outTransm
 		r = mConstants.mAtmosphere.mTopRadius;
 		rmu += distance_to_top_atmosphere_boundary;
 	}
-	else if (r > mConstants.mAtmosphere.mTopRadius) 
+	else if (r > mConstants.mAtmosphere.mTopRadius)
 	{
 		// No hit
 		return;
@@ -1071,7 +1071,7 @@ void GetSkyRadianceToPoint(Ray inRayPS, out float3 outSkyRadiance, out float3 ou
 {
 	float3 hit_position = inRayPS.Target() - PlanetCenterPositionPS();
 	float3 camera = inRayPS.mOrigin - PlanetCenterPositionPS();
-	float3 sun_direction = GetSunDirection();
+	float3 sun_direction = mConstants.mSunDirection.xyz;
 
 	float3 view_ray = inRayPS.mDirection;
 	float r = length(camera);
@@ -1142,14 +1142,14 @@ void GetSkyRadianceToPoint(Ray inRayPS, out float3 outSkyRadiance, out float3 ou
 	// Hack to avoid rendering artifacts when the sun is below the horizon.
 	single_mie_scattering = single_mie_scattering * smoothstep(float(0.0), float(0.01), mu_s);
 
-	outSkyRadiance = rayleigh_scattering* RayleighPhaseFunction(nu) + single_mie_scattering * MiePhaseFunction(mConstants.mAtmosphere.mMiePhaseFunctionG, nu);
+	outSkyRadiance = rayleigh_scattering * RayleighPhaseFunction(nu) + single_mie_scattering * MiePhaseFunction(mConstants.mAtmosphere.mMiePhaseFunctionG, nu);
 	outSkyRadiance *= mConstants.mAtmosphere.mSolarIrradiance;
 }
 
 void GetSunAndSkyIrradiance(float3 inPositionPS, float3 inNormal, out float3 outSunIrradiance, out float3 outSkyIrradiance)
 {
 	float3 local_position = inPositionPS - PlanetCenterPositionPS();
-	float3 sun_direction = GetSunDirection();
+	float3 sun_direction = mConstants.mSunDirection.xyz;
 
 	float r = length(local_position);
 	float mu_s = dot(local_position, sun_direction) / r;

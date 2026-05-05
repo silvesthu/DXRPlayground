@@ -308,13 +308,16 @@ namespace InstanceDataCache
 		if (inGroupIndex >= CacheSize)
 			return;
 
-		CacheDatas[inGroupIndex] = InstanceDatas[inGroupIndex];
+		USING_RESOURCE(StructuredBuffer<InstanceData>, RaytraceInstanceDataSRV);
+		CacheDatas[inGroupIndex] = RaytraceInstanceDataSRV[inGroupIndex];
 	}
 
 	InstanceData Load(uint inInstanceID)
 	{
+		USING_RESOURCE(StructuredBuffer<InstanceData>, RaytraceInstanceDataSRV);
+
 		// if (inInstanceID >= CacheSize)
-			return InstanceDatas[inInstanceID];
+			return RaytraceInstanceDataSRV[inInstanceID];
 		
 		// return CacheDatas[inInstanceID];
 	}

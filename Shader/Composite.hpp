@@ -342,10 +342,12 @@ void NanoVDBVisualizeCS(
 	uint3 inDispatchThreadID : SV_DispatchThreadID,
 	uint inGroupIndex : SV_GroupIndex)
 {
+	USING_RESOURCE(StructuredBuffer<InstanceData>, RaytraceInstanceDataSRV);
+
 	uint instance_index							= mRootConstants.mData0.x;
 	uint uav_index								= mRootConstants.mData0.y;
 
-	InstanceData instance_data					= InstanceDatas[instance_index];
+	InstanceData instance_data					= RaytraceInstanceDataSRV[instance_index];
 
 	RWTexture3D<float> output					= ResourceDescriptorHeap[uav_index];
 	if (any(inDispatchThreadID >= instance_data.mMediumNanoVBD.mSize))

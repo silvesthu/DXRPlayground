@@ -19,18 +19,22 @@
 template<typename T>
 void TracePrimaryRay(inout T ioQuery, inout RayDesc ioRay)
 {
+	USING_RESOURCE(RaytracingAccelerationStructure, RaytraceTLASSRV);
+
 	uint additional_ray_flags = 0;
 	uint ray_instance_mask = 0xffffffff;
-	ioQuery.TraceRayInline(RaytracingScene, additional_ray_flags, ray_instance_mask, ioRay);
+	ioQuery.TraceRayInline(RaytraceTLASSRV, additional_ray_flags, ray_instance_mask, ioRay);
 	ioQuery.Proceed();
 }
 
 template<typename T>
 void TraceShadowRay(inout T ioQuery, inout RayDesc ioRay)
 {
+	USING_RESOURCE(RaytracingAccelerationStructure, RaytraceTLASSRV);
+
 	uint additional_ray_flags = 0;
 	uint ray_instance_mask = 0xffffffff;
-	ioQuery.TraceRayInline(RaytracingScene, additional_ray_flags, ray_instance_mask, ioRay);
+	ioQuery.TraceRayInline(RaytraceTLASSRV, additional_ray_flags, ray_instance_mask, ioRay);
 	ioQuery.Proceed();
 }
 

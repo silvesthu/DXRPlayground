@@ -1,7 +1,12 @@
 #include "Shared.h"
 
 ConstantBuffer<Constants> mConstants : REGISTER_CBV(ROOT_CBV_REGISTER, COMMON_ROOT_SIGNATURE_REGISTER_SPACE);
-static RWTexture2D<float4>.Handle ScreenDebugUAV = RWTexture2D<float4>.Handle(uint2((uint)ViewDescriptorIndex::ScreenDebugUAV, 0));
+
+#ifdef __SLANG__
+#define USING_RESOURCE(type, name) type.Handle name = type.Handle(uint2((uint)ViewDescriptorIndex::name, 0));
+#else
+#define USING_RESOURCE(type, name) type name = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::name];
+#endif // __SLANG__
 
 [Differentiable]
 float sqr_autodiff(float x)
@@ -29,5 +34,6 @@ void SlangCS(uint3 inDispatchThreadID : SV_DispatchThreadID)
     if (y >= 0.50 + border && y < 0.75 - border) value = 2 * x;
     if (y >= 0.75 + border && y < 1.00 - border) value = x_sqr_pair.d;
 
+    USING_RESOURCE(RWTexture2D<float4>, ScreenDebugUAV);
     ScreenDebugUAV[inDispatchThreadID.xy] = float4(value, 0, 0, 1);
 }

@@ -930,8 +930,6 @@ struct LocalConstants
 	uint4						mData1					CONSTANT_DEFAULT(uint4(0, 0, 0, 0));
 };
 
-
-
 #undef GET_COLUMN
 #undef RETURN_AS_REFERENCE
 #undef CONSTANT_DEFAULT

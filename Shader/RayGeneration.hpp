@@ -23,9 +23,11 @@ void RayGeneration()
 
 	RayPayload payload							= (RayPayload)0;
 
+	USING_RESOURCE(RaytracingAccelerationStructure, RaytraceTLASSRV);
+
 #if NVAPI_SER
 	NvHitObject hit_object = NvTraceRayHitObject(
-		RaytracingScene,
+		RaytraceTLASSRV,
 		0,
 		0xFF,
 		0,
@@ -44,10 +46,10 @@ void RayGeneration()
 	NvReorderThread(hit_object, CoherenceHint, NumCoherenceHintBits);
 	// void NvReorderThread(uint CoherenceHint, uint NumCoherenceHintBits); // Generic ver.
 
-	NvInvokeHitObject(RaytracingScene, hit_object, payload);
+	NvInvokeHitObject(RaytraceTLASSRV, hit_object, payload);
 #else
 	TraceRay(
-		RaytracingScene, 		// RaytracingAccelerationStructure
+		RaytraceTLASSRV, 		// RaytracingAccelerationStructure
 		0,						// RayFlags 
 		0xFF,					// InstanceInclusionMask
 		0,						// RayContributionToHitGroupIndex, 4bits

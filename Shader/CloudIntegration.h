@@ -135,7 +135,7 @@ void RaymarchCloud(Ray inRayWS, out float3 outTransmittance, out float3 outLumin
 		// Lighting
 		{
 			float3 ray_end;
-			float accumulated_density_along_cone = SampleCloudDensityAlongCone(position, GetSunDirection(), ray_end);
+			float accumulated_density_along_cone = SampleCloudDensityAlongCone(position, mConstants.mSunDirection.xyz, ray_end);
 
 			float light_samples = accumulated_density_along_cone * 1.0;
 
@@ -147,7 +147,7 @@ void RaymarchCloud(Ray inRayWS, out float3 outTransmittance, out float3 outLumin
 			float beers_law = exp(-light_samples);
 			float light_energy = 2.0 * beers_law * powder_sugar_effect;
 
-			float phase = PhaseFunction_HenyeyGreenstein(0.2, dot(ray_PS.mDirection, GetSunDirection()));
+			float phase = PhaseFunction_HenyeyGreenstein(0.2, dot(ray_PS.mDirection, mConstants.mSunDirection.xyz));
 			light_energy *= phase;
 
 			accumulated_light += (1 - accumulated_density) * light_energy * (sun_irradiance + sky_irradiance);

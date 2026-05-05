@@ -60,8 +60,10 @@ void PrepareLightsCS(
     RAB_LightInfo lightInfo					= (RAB_LightInfo)0;
  
 	{
+		USING_RESOURCE(StructuredBuffer<InstanceData>, RaytraceInstanceDataSRV);
+
 		SurfaceContext surface_context;
-		surface_context.mInstanceData		= InstanceDatas[task.mInstanceIndex];
+		surface_context.mInstanceData		= RaytraceInstanceDataSRV[task.mInstanceIndex];
 		surface_context.mInstanceID			= task.mInstanceIndex;
 		surface_context.mPrimitiveIndex		= light_index;
 		surface_context.mBarycentrics		= 1.0 / 3.0; // use barycenter

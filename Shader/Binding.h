@@ -23,13 +23,13 @@ ConstantBuffer<Constants> mConstants : REGISTER_CBV(ROOT_CBV_REGISTER, COMMON_RO
 // Local Root Parameters, see ShaderTableEntry
 ConstantBuffer<LocalConstants> mLocalConstants : REGISTER_CBV(ROOT_CONSTANTS_REGISTER, LOCAL_ROOT_SIGNATURE_REGISTER_SPACE);
 
-// CBV Helper
-float3 GetSunDirection() { return mConstants.mSunDirection.xyz; }
+// ResourceDescriptorHeap Helper
+#ifdef __SLANG__
+#define USING_RESOURCE(type, name) type.Handle name = type.Handle(uint2((uint)ViewDescriptorIndex::name, 0));
+#else
+#define USING_RESOURCE(type, name) type name = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::name];
+#endif // __SLANG__
 
-// SRV Helper
-static RaytracingAccelerationStructure RaytracingScene = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::RaytraceTLASSRV];
-
-static StructuredBuffer<InstanceData> InstanceDatas = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::RaytraceInstanceDataSRV];
 static StructuredBuffer<uint> Indices = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::RaytraceIndicesSRV];
 static StructuredBuffer<float3> Vertices = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::RaytraceVerticesSRV];
 static StructuredBuffer<float3> Normals = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::RaytraceNormalsSRV];
@@ -68,7 +68,6 @@ static Texture2D<float4> Wilkie21SkyViewLutTexSRV = ResourceDescriptorHeap[(uint
 static Texture3D<float4> CloudShapeNoiseSRV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::CloudShapeNoise3DSRV];
 static Texture3D<float4> CloudErosionNoiseSRV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::CloudErosionNoise3DSRV];
 
-// UAV Helper
 static RWTexture2D<float4> TransmittanceUAV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Bruneton17TransmittanceUAV];
 static RWTexture2D<float4> DeltaIrradianceUAV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Bruneton17DeltaIrradianceUAV];
 static RWTexture2D<float4> IrradianceUAV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::Bruneton17IrradianceUAV];
@@ -85,7 +84,13 @@ static RWTexture2D<float4> ScreenColorUAV = ResourceDescriptorHeap[(uint)ViewDes
 static RWTexture2D<float4> ScreenDebugUAV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::ScreenDebugUAV];
 static RWTexture2D<uint4> ScreenReservoirUAV = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::ScreenReservoirUAV];
 
-// Samplers Helper
+// SamplerDescriptorHeap Helper
+#ifdef __SLANG__
+#define USING_SAMPLER(type, name) type.Handle name = type.Handle(uint2((uint)ViewDescriptorIndex::name, 0));
+#else
+#define USING_SAMPLER(type, name) type name = SamplerDescriptorHeap[(uint)ViewDescriptorIndex::name];
+#endif // __SLANG__
+
 static SamplerState BilinearClampSampler = SamplerDescriptorHeap[(uint)SamplerDescriptorIndex::BilinearClamp];
 static SamplerState BilinearWrapSampler = SamplerDescriptorHeap[(uint)SamplerDescriptorIndex::BilinearWrap];
 static SamplerState PointClampSampler = SamplerDescriptorHeap[(uint)SamplerDescriptorIndex::PointClamp];

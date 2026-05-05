@@ -7,7 +7,7 @@ void GetSkyRadiance(Ray inRayPS, out float3 outSkyRadiance, out float3 outTransm
 
 	float3 camera = inRayPS.mOrigin - PlanetCenterPositionPS();
 	float3 view_ray = inRayPS.mDirection;
-	float3 sun_direction = GetSunDirection();
+	float3 sun_direction = mConstants.mSunDirection.xyz;
 
 	float r = length(camera);
 	float rmu = dot(camera, view_ray);

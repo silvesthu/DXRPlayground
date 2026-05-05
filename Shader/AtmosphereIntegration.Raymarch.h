@@ -161,7 +161,7 @@ void GetSkyRadiance(Ray inRayPS, out float3 outSkyRadiance, out float3 outTransm
 		}
 	}
 
-	outSkyRadiance = in_scatter(camera, view_ray, from_to, GetSunDirection());
+	outSkyRadiance = in_scatter(camera, view_ray, from_to, mConstants.mSunDirection.xyz);
 	outSkyRadiance *= mConstants.mAtmosphere.mSolarIrradiance;
 }
 

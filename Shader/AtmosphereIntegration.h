@@ -227,7 +227,7 @@ float3 GetSkyLuminance(Ray inRayWS)
 
 	// Sun
 	if (GetAtmosphereMode() != AtmosphereMode::ConstantColor &&
-		dot(ray_PS.mDirection, GetSunDirection()) > cos(mConstants.mAtmosphere.mSunAngularRadius))
+		dot(ray_PS.mDirection, mConstants.mSunDirection.xyz) > cos(mConstants.mAtmosphere.mSunAngularRadius))
 	{
 		// https://en.wikipedia.org/wiki/Solid_angle#Celestial_objects
 		// https://pages.mtu.edu/~scarn/teaching/GE4250/radiation_lecture_slides.pdf

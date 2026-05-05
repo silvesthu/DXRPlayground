@@ -613,7 +613,7 @@ void TransLUT(
 	uint TRANSMITTANCE_TEXTURE_HEIGHT = 64;
 	// TransmittanceTexUAV.GetDimensions(TRANSMITTANCE_TEXTURE_WIDTH, TRANSMITTANCE_TEXTURE_HEIGHT); // calculate in shader introduce extra error
 	float2 pixPos = inDispatchThreadID.xy + 0.5; // half pixel offset
-	float3 sun_direction = GetSunDirection();
+	float3 sun_direction = mConstants.mSunDirection.xyz;
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -623,7 +623,7 @@ void TransLUT(
 	// Compute camera position from LUT coords
 	float2 uv = (pixPos) / float2(TRANSMITTANCE_TEXTURE_WIDTH, TRANSMITTANCE_TEXTURE_HEIGHT);
 
-// #define APPLY_SUB_UVS_TO_UNIT
+	// #define APPLY_SUB_UVS_TO_UNIT
 #ifdef APPLY_SUB_UVS_TO_UNIT
 	// uv = float2(fromSubUvsToUnit(uv.x, TRANSMITTANCE_TEXTURE_WIDTH), fromSubUvsToUnit(uv.y, TRANSMITTANCE_TEXTURE_HEIGHT));
 
@@ -810,7 +810,7 @@ void SkyViewLut(
 	AtmosphereParameters Atmosphere = GetAtmosphereParameters();
 
 	float2 dimensions = float2(192, 108);
-	float3 sun_direction = GetSunDirection();
+	float3 sun_direction = mConstants.mSunDirection.xyz;
 
 	float2 pixPos = inDispatchThreadID.xy + 0.5; 		// half pixel offset
 	float2 uv = pixPos / dimensions;
@@ -886,12 +886,12 @@ void CameraVolumes(
 	float2 pixPos = inDispatchThreadID.xy + 0.5; // half pixel offset
 	float2 dims = float2(32, 32);
 
-	float2 ndc_xy								= ((pixPos / dims) * 2.f - 1.f);										// [0,1] => [-1,1]
-	ndc_xy.y									= -ndc_xy.y;															// Flip y
-	float4 point_on_near_plane					= mul(mConstants.mInverseProjectionMatrix, float4(ndc_xy, 0.0, 1.0));
-	float3 ray_direction_vs						= normalize(point_on_near_plane.xyz / point_on_near_plane.w);
-	float3 ray_direction_ws						= mul(mConstants.mInverseViewMatrix, float4(ray_direction_vs, 0.0)).xyz;
-	
+	float2 ndc_xy = ((pixPos / dims) * 2.f - 1.f);										// [0,1] => [-1,1]
+	ndc_xy.y = -ndc_xy.y;															// Flip y
+	float4 point_on_near_plane = mul(mConstants.mInverseProjectionMatrix, float4(ndc_xy, 0.0, 1.0));
+	float3 ray_direction_vs = normalize(point_on_near_plane.xyz / point_on_near_plane.w);
+	float3 ray_direction_ws = mul(mConstants.mInverseViewMatrix, float4(ray_direction_vs, 0.0)).xyz;
+
 	float3 WorldDir = ray_direction_ws;
 	WorldDir.xyz = WorldDir.xzy; // Y-up to Z-up
 	float3 SunDir = mConstants.mSunDirection.xzy; // Y-up to Z-up
@@ -1000,16 +1000,17 @@ void CameraVolumes(
 	//AtmosphereCameraScatteringVolumeUAV[inDispatchThreadID.xyz] = float4(tMax.xxx, 1.0); // match
 }
 
-namespace AtmosphereIntegration { namespace Hillaire20 {
+namespace AtmosphereIntegration {
+	namespace Hillaire20 {
 
-void GetSkyRadiance(Ray inRayPS, out float3 outSkyRadiance, out float3 outTransmittanceToTop)
-{
-	outSkyRadiance = 0;
-	outTransmittanceToTop = 1; // [TODO]
+		void GetSkyRadiance(Ray inRayPS, out float3 outSkyRadiance, out float3 outTransmittanceToTop)
+		{
+			outSkyRadiance = 0;
+			outTransmittanceToTop = 1; // [TODO]
 
-	float3 camera = inRayPS.mOrigin - PlanetCenterPositionPS();
-	float3 view_ray = inRayPS.mDirection;
-	float3 sun_direction = GetSunDirection();
+			float3 camera = inRayPS.mOrigin - PlanetCenterPositionPS();
+			float3 view_ray = inRayPS.mDirection;
+			float3 sun_direction = mConstants.mSunDirection.xyz;
 
 	float r = length(camera);
 	float rmu = dot(camera, view_ray);
