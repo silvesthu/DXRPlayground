@@ -91,7 +91,6 @@ float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 {
 	USING_RESOURCE(RWTexture2D<float4>, ScreenColorUAV);
 	USING_RESOURCE(RWTexture2D<float4>, ScreenDebugUAV);
-	USING_RESOURCE(RWTexture2D<uint4>, ScreenReservoirUAV);
 	USING_RESOURCE(RWStructuredBuffer<PixelInspection>, PixelInspectionUAV);
 
 	uint2 coords = (uint2)position.xy;
@@ -102,8 +101,6 @@ float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 		PixelInspectionUAV[0].mPixelValue = color;
 		PixelInspectionUAV[0].mDebugValue = ScreenDebugUAV[position.xy];
 	}
-
-	ScreenReservoirUAV[coords] = coords.xyxy;
 	
 	// For visualization
 	switch (mConstants.mVisualizeMode)

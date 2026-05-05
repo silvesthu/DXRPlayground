@@ -748,14 +748,14 @@ void Renderer::Render(ID3D12GraphicsCommandList4* inCommandList)
 		gRenderer.Setup(gRenderer.mRuntime.mClearBufferShader, { .mData0 = { mRuntime.mSpatialDataBuffer.mUAVIndex, ClearMode::UInt4, 0, 0 }, .mData1 = clear_value_uint });
 		inCommandList->Dispatch(gAlignUpDiv(mRuntime.mSpatialHashBuffer.GetSizeInBytes() / 16 /* UInt4 */, 64u), 1, 1);
 
-		// mSpatialCacheResetRequested = false;
+		mSpatialCacheResetRequested = false;
 	}
 }
 
 void Renderer::ImGuiShowTextures()
 {
-	ImGui::Textures(mRuntime.mScreenTextures, "Renderer.Screen", ImGuiTreeNodeFlags_None);
-	ImGui::Textures(mRuntime.mTextures, "Renderer", ImGuiTreeNodeFlags_None);
+	ImGui::Textures(mRuntime.mScreenTextures, "Renderer.Screen", ImGuiTreeNodeFlags_DefaultOpen);
+	ImGui::Textures(mRuntime.mTextures, "Renderer", ImGuiTreeNodeFlags_DefaultOpen);
 }
 
 void Renderer::InitializeScreenSizeTextures()

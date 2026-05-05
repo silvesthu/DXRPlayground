@@ -7,13 +7,13 @@ struct Reservoir
 	static const uint kLightValidBit			= 0x80000000;
 	static const uint kLightIndexMask			= 0x7FFFFFFF;
 	
-	uint			mLightData;                 																		// r.y                  // Selected sample
-	float			mTargetPDF;																							// \hat{p_{q}}(r.y)		// Target PDF of selected sample
+	uint			mLightData;                 // r.y                  // Selected sample
+	float			mTargetPDF;					// \hat{p_{q}}(r.y)		// Target PDF of selected sample
 	
-	float			mWeightSum;																							// r.w_sum				// Sum of processed sample weight	                                            																		
-	uint			mCountSum;																							// r.M					// Sum of processed sample count
+	float			mWeightSum;					// r.w_sum				// Sum of processed sample weight	                                            																		
+	uint			mCountSum;					// r.M					// Sum of processed sample count
 
-	float			StochasticWeight()																					// r.W                  // Stochastic weight, expected value is 1/p(y). Eq(6)
+	float			StochasticWeight()			// r.W                  // Stochastic weight, expected value is 1/p(y). Eq(6)
 	{
 		if (mTargetPDF == 0.0)
 			return 0.0;
@@ -44,7 +44,7 @@ struct Reservoir
 		Reservoir reservoir;
 		reservoir.mLightData					= 0;
 		reservoir.mWeightSum					= 0.0;
-		reservoir.mCountSum					= 0;
+		reservoir.mCountSum						= 0;
 		reservoir.mTargetPDF					= 0.0;
 		return reservoir;
 	}
