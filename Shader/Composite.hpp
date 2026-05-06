@@ -93,6 +93,9 @@ float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 	USING_RESOURCE(RWTexture2D<float4>, ScreenDebugUAV);
 	USING_RESOURCE(RWStructuredBuffer<PixelInspection>, PixelInspectionUAV);
 
+	// USING_RESOURCE(RWTexture2D<uint4>, ScreenReservoirUAV);
+	// ScreenReservoirUAV[position.xy] = uint4(0xffffffff, 0xffff0000, 0x0000ffff, 0x00000000);
+
 	uint2 coords = (uint2)position.xy;
 	float4 color = ScreenColorUAV[position.xy];
 	bool debug_pixel = all(coords == mConstants.mPixelDebugCoord);

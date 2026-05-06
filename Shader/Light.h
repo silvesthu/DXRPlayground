@@ -177,25 +177,6 @@ namespace LightEvaluation
 		Reservoir reservoir = Reservoir::Generate();
 		switch (mConstants.mLightSampleMode)
 		{
-		case LightSampleMode::RIS:
-		{
-			for (uint light_index = 0; light_index < mConstants.mLightCount; light_index++)
-			{
-				// [TODO] Use second-best implementation as target pdf. See RAB_GetLightSampleTargetPdfForSurface in RTXDI.
-				// Currently, it is only based on luminance of light and pdf of solid angle, better to use full evaluation of rendering equation.
-				LightContext light_context = LightEvaluation::GenerateContext(LightEvaluation::ContextType::Random, 0, light_index, inLitPositionWS, ioPathContext);
-				light_context.mReservoir.mTargetPDF = light_context.mSolidAnglePDF <= 0.0 ? 0.0 : (RGBToLuminance(RaytraceLightsSRV[light_index].mEmission) / light_context.mSolidAnglePDF);
-				float target_pdf = light_context.mReservoir.mTargetPDF;
-				float candidate_pdf = light_context.UniformSelectionPDF();
-				light_context.mReservoir.mWeightSum = target_pdf / candidate_pdf;			
-
-				if (reservoir.Update(light_context.mReservoir, ioPathContext))
-					selected_light_context = light_context;
-			}
-
-			selected_light_context.mReservoir = reservoir;
-			return selected_light_context;
-		}
 		case LightSampleMode::ReSTIR:  // [passthrough]
 		case LightSampleMode::Uniform: // [passthrough]
 		default:
