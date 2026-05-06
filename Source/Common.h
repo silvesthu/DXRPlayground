@@ -146,6 +146,21 @@ inline void gTrace(const std::string_view& inString)
 	OutputDebugStringA(inString.data());
 }
 
+inline void gTrace(const wchar_t* inString)
+{
+	if (inString != nullptr) { OutputDebugStringW(inString); }
+}
+
+inline void gTrace(const std::wstring& inString)
+{
+	OutputDebugStringW(inString.c_str());
+}
+
+inline void gTrace(const std::wstring_view& inString)
+{
+	OutputDebugStringW(inString.data());
+}
+
 template <typename T>
 inline void gTrace(const T& data)
 {
@@ -217,7 +232,6 @@ inline glm::mat4x4 gFromString(const char* inString)
 
 template <typename T>
 inline std::string gToString(const T& inValue) { return std::to_string(inValue); }
-
 
 template <>
 inline std::string gToString(const LPCSTR& inValue) { return std::string(inValue); }
@@ -487,24 +501,24 @@ struct Shader
 {
 #define SHADER_MEMBER(type, name, default_value) MEMBER(Shader, type, name, default_value)
 
-	SHADER_MEMBER(const char*, FileName, nullptr);
-	SHADER_MEMBER(const char*, VSName, nullptr);
-	SHADER_MEMBER(const char*, PSName, nullptr);
-	SHADER_MEMBER(const char*, CSName, nullptr);
+	SHADER_MEMBER(std::string_view, FileName, "");
+	SHADER_MEMBER(std::string_view, VSName, "");
+	SHADER_MEMBER(std::string_view, PSName, "");
+	SHADER_MEMBER(std::string_view, CSName, "");
 
-	SHADER_MEMBER(const wchar_t*, RayGenerationName, nullptr);
-	SHADER_MEMBER(const wchar_t*, MissName, nullptr);
-	SHADER_MEMBER(const wchar_t*, AnyHitName, nullptr);
+	SHADER_MEMBER(std::string_view, RayGenerationName, "");
+	SHADER_MEMBER(std::string_view, MissName, "");
+	SHADER_MEMBER(std::string_view, AnyHitName, "");
 	SHADER_MEMBER(const Shader*, AnyHitReference, nullptr);
-	SHADER_MEMBER(const wchar_t*, ClosestHitName, nullptr);
-	SHADER_MEMBER(const wchar_t*, IntersectionName, nullptr);
+	SHADER_MEMBER(std::string_view, ClosestHitName, "");
+	SHADER_MEMBER(std::string_view, IntersectionName, "");
 	SHADER_MEMBER(D3D12_PRIMITIVE_TOPOLOGY_TYPE, Topology, D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
 	SHADER_MEMBER(bool, DepthWrite, false);
 	SHADER_MEMBER(D3D12_COMPARISON_FUNC, DepthFunc, D3D12_COMPARISON_FUNC_ALWAYS);
 	SHADER_MEMBER(DXGI_FORMAT, RTVFormat, DXGI_FORMAT_UNKNOWN);
 	SHADER_MEMBER(DXGI_FORMAT, DSVFormat, DXGI_FORMAT_UNKNOWN);
-	const wchar_t* HitName() const { return mAnyHitName != nullptr ? mAnyHitName : (mClosestHitName != nullptr ? mClosestHitName : mIntersectionName); }
-	const std::wstring HitGroupName() const { if (HitName() == nullptr) return L""; std::wstring name = HitName(); name += L"Group"; return name; }
+	const std::string_view HitName() const { return !mAnyHitName.empty() ? mAnyHitName : (!mClosestHitName.empty() ? mClosestHitName : mIntersectionName); }
+	const std::string HitGroupName() const { if (HitName() == nullptr) return ""; std::string name; name += HitName(); name += "Group"; return name; }
 
 	struct DescriptorInfo
 	{
@@ -951,7 +965,7 @@ struct CPUTimingScope
 
 	std::chrono::steady_clock::time_point mTimestampBegin;
 	float* mDurationMSPtr = nullptr;
-	std::string_view mTraceName;
+	std::string mTraceName;
 	std::string_view mFileName;
 
 	static std::chrono::steady_clock::time_point sTimestampProcessBegin;

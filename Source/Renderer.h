@@ -11,7 +11,6 @@ struct Renderer
 	{
 		Shader									mRayQueryShader				= Shader().FileName("Shader/RayQuery.hpp").CSName("RayQueryCS");
 		Shader									mDepthShader				= Shader().FileName("Shader/RayQuery.hpp").VSName("ScreenspaceTriangleVS").PSName("DepthPS").DepthWrite(true).DSVFormat(DXGI_FORMAT_D32_FLOAT);
-		Shader									mPrepareLightsShader		= Shader().FileName("Shader/PrepareLights.hpp").CSName("PrepareLightsCS");
 		Shader									mClearShader				= Shader().FileName("Shader/Composite.hpp").CSName("ClearCS");
 		Shader									mClearBufferShader			= Shader().FileName("Shader/Composite.hpp").CSName("ClearBufferCS");
 		Shader									mGenerateTextureShader		= Shader().FileName("Shader/Composite.hpp").CSName("GeneratTextureCS");
@@ -27,12 +26,12 @@ struct Renderer
 		Shader									mSentinelShader				= Shader();
 		std::span<Shader>						mShaders					= std::span<Shader>(&mRayQueryShader, &mSentinelShader);
 
-		Shader									mRayGenerationShader		= Shader().FileName("Shader/RayGeneration.hpp").RayGenerationName(L"RayGeneration");
-		Shader									mMissShader					= Shader().FileName("Shader/Miss.hpp").MissName(L"Miss");
-		Shader									mAnyHitShader				= Shader().FileName("Shader/AnyHit.hpp").AnyHitName(L"AnyHit");														// AnyHit MUST comes before HitGroup referencing it when being AddToStateObject, otherwise DXGI_ERROR_DRIVER_INTERNAL_ERROR
-		Shader									mClosestHit100Shader		= Shader().FileName("Shader/ClosestHit100.hpp").ClosestHitName(L"ClosestHit100");									// ClosestHit without AnyHit
-		Shader									mClosestHit010Shader		= Shader().FileName("Shader/ClosestHit010.hpp").ClosestHitName(L"ClosestHit010").AnyHitReference(&mAnyHitShader);	// ClosestHit with AnyHit in different library
-		Shader									mClosestHit001Shader		= Shader().FileName("Shader/ClosestHit001.hpp").ClosestHitName(L"ClosestHit001").AnyHitName(L"AnyHit001");			// ClosestHit with AnyHit in same library
+		Shader									mRayGenerationShader		= Shader().FileName("Shader/RayGeneration.hpp").RayGenerationName("RayGeneration");
+		Shader									mMissShader					= Shader().FileName("Shader/Miss.hpp").MissName("Miss");
+		Shader									mAnyHitShader				= Shader().FileName("Shader/AnyHit.hpp").AnyHitName("AnyHit");														// AnyHit MUST comes before HitGroup referencing it when being AddToStateObject, otherwise DXGI_ERROR_DRIVER_INTERNAL_ERROR
+		Shader									mClosestHit100Shader		= Shader().FileName("Shader/ClosestHit100.hpp").ClosestHitName("ClosestHit100");									// ClosestHit without AnyHit
+		Shader									mClosestHit010Shader		= Shader().FileName("Shader/ClosestHit010.hpp").ClosestHitName("ClosestHit010").AnyHitReference(&mAnyHitShader);	// ClosestHit with AnyHit in different library
+		Shader									mClosestHit001Shader		= Shader().FileName("Shader/ClosestHit001.hpp").ClosestHitName("ClosestHit001").AnyHitName("AnyHit001");			// ClosestHit with AnyHit in same library
 		Shader									mCollectionSentinelShader	= Shader();
 		std::span<Shader>						mCollectionShaders			= std::span<Shader>(&mMissShader,			&mCollectionSentinelShader);
 		std::span<Shader>						mHitGroupShaders			= std::span<Shader>(&mClosestHit100Shader,	&mCollectionSentinelShader);
@@ -86,14 +85,14 @@ struct Renderer
 		ComPtr<ID3D12RootSignature>				mCommonRootSignature;
 		ComPtr<ID3D12RootSignature>				mLocalRootSignature;
 
-		bool									CreateVSPSPipelineState(const char* inFileName, const char* inVSName, const char* inPSName, Shader& ioShader);
-		bool									CreateCSPipelineState(const char* inFileName, const char* inCSName, Shader& ioShader);
-		bool									CreateLibPipelineState(const char* inFileName, const wchar_t* inLibName, Shader& ioShader);
+		bool									CreateVSPSPipelineState(const std::string_view& inFileName, const std::string_view& inVSName, const std::string_view& inPSName, Shader& ioShader);
+		bool									CreateCSPipelineState(const std::string_view& inFileName, const std::string_view& inCSName, Shader& ioShader);
+		bool									CreateLibPipelineState(const std::string_view& inFileName, const std::string_view& inLibName, Shader& ioShader);
 		bool									CompileShader(Shader& ioShader);
-		ComPtr<IDxcBlob>						Compile(const char* inFilename, const char* inEntryPoint, std::string_view inProfile);
+		ComPtr<IDxcBlob>						Compile(const std::string_view& inFilename, const std::string_view& inEntryPoint, const std::string_view& inProfile);
 
 		ComPtr<ID3D12StateObject>				CreateStateObject(IDxcBlob* inBlob, Shader& ioShader);
-		ShaderTable								CreateShaderTable(const Shader& inShader);
+		ShaderTable								CreateShaderTable(const Shader& inShader, const Shader& inRayGenerationShader, const Shader& inMissShader);
 		Shader									CombineShader(const Shader& inBaseShader, std::span<Shader> inCollections);
 
 		HMODULE									mDxcompilerDll = NULL;
@@ -143,7 +142,7 @@ struct Renderer
 	{
 		SetHeaps();
 
-		if (inShader.mCSName == nullptr)
+		if (inShader.mCSName.empty())
 			gCommandList->SetGraphicsRootSignature(mCompiler.mCommonRootSignature.Get());
 		else
 			gCommandList->SetComputeRootSignature(mCompiler.mCommonRootSignature.Get());
@@ -154,7 +153,7 @@ struct Renderer
 			gCommandList->SetPipelineState(inShader.mData.mPipelineState.Get());
 
 		// See CreateCommonRootSignature for layout
-		if (inShader.mCSName == nullptr)
+		if (inShader.mCSName.empty())
 		{
 			gCommandList->SetGraphicsRoot32BitConstants(ROOT_CONSTANTS_REGISTER, ROOT_CONSTANTS_NUM_32BIT, &inRootConstants, 0);
 			gCommandList->SetGraphicsRootConstantBufferView(ROOT_CBV_REGISTER, mRuntime.mConstantsBuffer.mResource->GetGPUVirtualAddress());

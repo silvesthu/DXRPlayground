@@ -512,10 +512,10 @@ void gPrepareImGui()
 				gRenderer.mReloadShader = true;
 
 			if (Checkbox("Test Hit Shader", &gConfigs.mTestHitShader))
-				gRenderer.mAccumulationResetRequested = true;
+				gRenderer.mReloadShader = true;
 
 			if (Checkbox("Test Slang Shader", &gConfigs.mTestSlangShader))
-				gRenderer.mAccumulationResetRequested = true;
+				gRenderer.mReloadShader = true;
 
 			if (Checkbox("NanoVDB Generate Texture (in Scene Textures)", &gConfigs.mNanoVDBGenerateTexture))
 				gRenderer.mReloadScene = true;

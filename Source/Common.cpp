@@ -362,8 +362,7 @@ void Texture::InitializeUpload()
 	D3D12_RESOURCE_DESC desc = gGetBufferResourceDesc(byte_count);
 	D3D12_HEAP_PROPERTIES upload_properties = gGetUploadHeapProperties();
 	gValidate(gDevice->CreateCommittedResource(&upload_properties, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mUploadResource)));
-	std::wstring name = gToWString(mName);
-	mUploadResource->SetName(name.c_str());
+	gSetName(mUploadResource, "Texture.", mName, ".Upload");
 }
 
 namespace ImGui 

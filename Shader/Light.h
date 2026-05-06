@@ -5,31 +5,6 @@
 #include "Common.h"
 #include "Reservoir.h"
 
-// RTXDI - minimal-sample
-// For computation (RAB_LightInfo is for storage)
-struct TriangleLight
-{
-	float3			mBase;
-	float3			mEdge1;
-	float3			mEdge2;
-	float3			mRadiance;
-	float3			mNormal;
-	float			mSurfaceArea;
-
-	RAB_LightInfo Store()
-	{
-		RAB_LightInfo lightInfo = (RAB_LightInfo)0;
-
-		lightInfo.mRadiance		= Pack_R16G16B16A16_FLOAT(float4(mRadiance, 0));
-		lightInfo.mCenter		= mBase + (mEdge1 + mEdge2) / 3.0;
-		lightInfo.mDirection1	= ndirToOctUnorm32(normalize(mEdge1));
-		lightInfo.mDirection2	= ndirToOctUnorm32(normalize(mEdge2));
-		lightInfo.mScalars		= f32tof16(length(mEdge1)) | (f32tof16(length(mEdge2)) << 16);
-        
-		return lightInfo;
-	}
-};
-
 struct LightContext
 {
 	bool		IsValid()				{ return mReservoir.IsValid(); }
@@ -189,7 +164,6 @@ namespace LightEvaluation
 			{
 				uint light_index = min(RandomFloat01(ioPathContext.mRandomState) * mConstants.mLightCount, mConstants.mLightCount - 1);
 				
-				// [TODO] Use second-best implementation as target pdf. See RAB_GetLightSampleTargetPdfForSurface in RTXDI.
 				// Currently, it is only based on luminance of light and pdf of sampling direction, need to add BRDF evaluation.
 				LightContext light_context = LightEvaluation::GenerateContext(LightEvaluation::ContextType::Random, 0, light_index, inLitPositionWS, ioPathContext);
 				light_context.mReservoir.mTargetPDF = light_context.mSolidAnglePDF <= 0.0 ? 0.0 : (RGBToLuminance(RaytraceLightsSRV[light_index].mEmission) / light_context.mSolidAnglePDF);

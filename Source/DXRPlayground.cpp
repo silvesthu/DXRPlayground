@@ -693,17 +693,6 @@ void sRender()
 		gBarrierUAV(command_list, nullptr);
 	}
 
-	// PrepareLights
-	if (gScene.GetSceneContent().mEmissiveTriangleCount > 0)
-	{
-		GPU_TIMING_SCOPE("PrepareLights", command_list, &gStats.mGPUTimingMS.mPrepareLights);
-
-		gRenderer.Setup(gRenderer.mRuntime.mPrepareLightsShader, { .mData0 = { gScene.GetPrepareLightsTaskCount(), 0, 0, 0 } });
-		command_list->Dispatch(gAlignUpDiv(gScene.GetSceneContent().mEmissiveTriangleCount, 256u), 1, 1);
-
-		gBarrierUAV(command_list, nullptr);
-	}
-
 	// RayQuery
 	{
 		GPU_TIMING_SCOPE("RayQuery", command_list, &gStats.mGPUTimingMS.mRayQuery);

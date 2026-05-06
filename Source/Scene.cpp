@@ -2105,47 +2105,6 @@ void Scene::InitializeRuntime()
 			mRuntime.mLights->Unmap(0, nullptr);
 		}
 	}
-
-	// RTXDI
-	{
-		{
-			desc_upload.Width = sizeof(PrepareLightsTask) * gMax(1ull, mSceneContent.mEmissiveInstances.size());
-			gValidate(gDevice->CreateCommittedResource(&props_upload, D3D12_HEAP_FLAG_NONE, &desc_upload, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&mRuntime.mTaskBuffer)));
-			gSetName(mRuntime.mTaskBuffer, "Scene.", "mBuffers.mTaskBuffer", "");
-
-			if (!mSceneContent.mEmissiveInstances.empty())
-			{
-				// See PrepareLightsPass::Process
-				// Handle here for now since Scene changes after load is not supported yet
-				uint light_buffer_offset = 0;
-				for (auto&& emissive_instance : mSceneContent.mEmissiveInstances)
-				{
-					auto& instance_data = mSceneContent.mInstanceDatas[emissive_instance.mInstanceIndex];
-
-					PrepareLightsTask task;
-					task.mInstanceIndex = emissive_instance.mInstanceIndex;
-					task.mGeometryIndex = emissive_instance.mInstanceIndex; // Currently only 1 geometry per instance is supported
-					task.mTriangleCount = instance_data.mIndexCount / kVertexCountPerTriangle;
-					task.mLightBufferOffset = light_buffer_offset;
-
-					mRuntime.mTaskBufferCPU.push_back(task);
-
-					light_buffer_offset += task.mTriangleCount;
-				}
-
-				uint8_t* pData = nullptr;
-				mRuntime.mTaskBuffer->Map(0, nullptr, reinterpret_cast<void**>(&pData));
-				memcpy(pData, mRuntime.mTaskBufferCPU.data(), desc_upload.Width);
-				mRuntime.mTaskBuffer->Unmap(0, nullptr);
-			}
-		}
-
-		{
-			desc_uav.Width = sizeof(RAB_LightInfo) * gMax(1u, mSceneContent.mEmissiveTriangleCount);
-			gValidate(gDevice->CreateCommittedResource(&props_default, D3D12_HEAP_FLAG_NONE, &desc_uav, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mRuntime.mLightDataBuffer)));
-			gSetName(mRuntime.mLightDataBuffer, "Scene.", "mBuffers.mLightDataBuffer", "");
-		}
-	}
 }
 
 void Scene::GenerateLSSFromTriangle()
@@ -2396,9 +2355,4 @@ void Scene::InitializeViews()
 	create_buffer_SRV(mRuntime.mNormals.Get(), sizeof(NormalType), ViewDescriptorIndex::RaytraceNormalsSRV);
 	create_buffer_SRV(mRuntime.mUVs.Get(), sizeof(UVType), ViewDescriptorIndex::RaytraceUVsSRV);
 	create_buffer_SRV(mRuntime.mLights.Get(), sizeof(Light), ViewDescriptorIndex::RaytraceLightsSRV);
-
-	// RTXDI - minimal-sample
-	create_buffer_SRV(mRuntime.mTaskBuffer.Get(), sizeof(PrepareLightsTask), ViewDescriptorIndex::TaskBufferSRV);
-	create_buffer_SRV(mRuntime.mLightDataBuffer.Get(), sizeof(RAB_LightInfo), ViewDescriptorIndex::LightDataBufferSRV);
-	create_buffer_UAV(mRuntime.mLightDataBuffer.Get(), sizeof(RAB_LightInfo), ViewDescriptorIndex::LightDataBufferUAV);
 }

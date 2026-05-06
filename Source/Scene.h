@@ -284,8 +284,6 @@ public:
 	int GetLightCount() const									{ return static_cast<int>(mSceneContent.mLights.size()); }
 	const Light& GetLight(int inIndex) const					{ return mSceneContent.mLights[inIndex]; }
 
-	int GetPrepareLightsTaskCount() const						{ return static_cast<int>(mRuntime.mTaskBufferCPU.size()); }
-
 	void ImGuiShowTextures()									{ ImGui::Textures(mTextures, "Scene", ImGuiTreeNodeFlags_None); }
 
 private:
@@ -328,11 +326,6 @@ private:
 
 		ComPtr<ID3D12Resource>				mInstanceDatas;
 		ComPtr<ID3D12Resource>				mLights;
-
-		// RTXDI
-		ComPtr<ID3D12Resource>				mTaskBuffer;
-		std::vector<PrepareLightsTask>		mTaskBufferCPU; // CPU copy for debugging
-		ComPtr<ID3D12Resource>				mLightDataBuffer;
 
 		// LSS
 		ComPtr<ID3D12Resource>				mLSSVertices;

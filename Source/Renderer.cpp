@@ -90,7 +90,7 @@ namespace RendererHelper
 void Renderer::Compiler::Initialize()
 {
 	// LoadLibraryW + GetProcAddress to eliminate dependency on .lib. Make updating .dll easier.
-	mDxcompilerDll = LoadLibraryW(L"dxcompiler.dll");
+	mDxcompilerDll = LoadLibraryA("dxcompiler.dll");
 	gAssert(mDxcompilerDll != NULL);
 	DxcCreateInstanceProc DxcCreateInstance = reinterpret_cast<DxcCreateInstanceProc>(GetProcAddress(mDxcompilerDll, "DxcCreateInstance"));
 
@@ -142,7 +142,7 @@ void Renderer::Compiler::CreateCommonRootSignature()
 			.pParameters = root_parameters,
 			.Flags = D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED,
 		});
-	mCommonRootSignature->SetName(L"CommonRootSignature");
+	gSetName(mCommonRootSignature, "RootSignature.", "Common", "");
 }
 
 ComPtr<ID3D12RootSignature> Renderer::Compiler::CreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC& desc)
@@ -177,11 +177,16 @@ ComPtr<ID3D12StateObject> Renderer::Compiler::CreateStateObject(IDxcBlob* inBlob
 	subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY, &dxil_library_desc };
 
 	// Hit group, assume 0 or 1 hit group per lib
-	std::wstring hit_group_name = ioShader.HitGroupName(); // Need the string object on stack
-	D3D12_HIT_GROUP_DESC hit_group_desc{ .HitGroupExport = hit_group_name.c_str(), .Type = D3D12_HIT_GROUP_TYPE_TRIANGLES, .AnyHitShaderImport = ioShader.mAnyHitName, .ClosestHitShaderImport = ioShader.mClosestHitName };
+	std::wstring hit_group_name = gToWString(ioShader.HitGroupName()); // Need the string object on stack
+	std::wstring any_hit_name = gToWString(ioShader.mAnyHitName);
+	std::wstring closest_hit_name = gToWString(ioShader.mClosestHitName);
+	D3D12_HIT_GROUP_DESC hit_group_desc{ .HitGroupExport = hit_group_name.c_str(), .Type = D3D12_HIT_GROUP_TYPE_TRIANGLES, .AnyHitShaderImport = any_hit_name.c_str(), .ClosestHitShaderImport = closest_hit_name.c_str() };
 	if (ioShader.mAnyHitReference != nullptr)
-		hit_group_desc.AnyHitShaderImport = ioShader.mAnyHitReference->mAnyHitName;
-	if (ioShader.mClosestHitName != nullptr)
+	{
+		any_hit_name = gToWString(ioShader.mAnyHitReference->mAnyHitName);
+		hit_group_desc.AnyHitShaderImport = any_hit_name.c_str();
+	}
+	if (!ioShader.mClosestHitName.empty())
 		subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP, &hit_group_desc };
 
 	// Local root signature and associations
@@ -204,7 +209,7 @@ ComPtr<ID3D12StateObject> Renderer::Compiler::CreateStateObject(IDxcBlob* inBlob
 	D3D12_STATE_OBJECT_CONFIG state_object_config = { .Flags = D3D12_STATE_OBJECT_FLAG_ALLOW_STATE_OBJECT_ADDITIONS };
 	if (ioShader.mAnyHitReference != nullptr)
 		state_object_config.Flags |= D3D12_STATE_OBJECT_FLAG_ALLOW_LOCAL_DEPENDENCIES_ON_EXTERNAL_DEFINITIONS;	// Reference to separated AnyHit
-	if (ioShader.mClosestHitName == nullptr && ioShader.mAnyHitName != nullptr)
+	if (ioShader.mClosestHitName.empty() && !ioShader.mAnyHitName.empty())
 		state_object_config.Flags |= D3D12_STATE_OBJECT_FLAG_ALLOW_EXTERNAL_DEPENDENCIES_ON_LOCAL_DEFINITIONS;	// Separated AnyHit being referenced
 	subobjects[index++] = D3D12_STATE_SUBOBJECT{ D3D12_STATE_SUBOBJECT_TYPE_STATE_OBJECT_CONFIG, &state_object_config };
 
@@ -212,7 +217,7 @@ ComPtr<ID3D12StateObject> Renderer::Compiler::CreateStateObject(IDxcBlob* inBlob
 	D3D12_STATE_OBJECT_DESC desc;
 	desc.NumSubobjects = index;
 	desc.pSubobjects = subobjects.data();
-	desc.Type = ioShader.mRayGenerationName != nullptr ? D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE : D3D12_STATE_OBJECT_TYPE_COLLECTION;
+	desc.Type = !ioShader.mRayGenerationName.empty() ? D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE : D3D12_STATE_OBJECT_TYPE_COLLECTION;
 
 	ComPtr<ID3D12StateObject> state_object;
 	if (FAILED(gDevice->CreateStateObject(&desc, IID_PPV_ARGS(&state_object))))
@@ -283,10 +288,10 @@ void Renderer::Compiler::CreateLocalRootSignature()
 			.pParameters = root_parameters,
 			.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE,
 		});
-	mLocalRootSignature->SetName(L"LocalRootSignature");
+	gSetName(mCommonRootSignature, "RootSignature.", "Local", "");
 }
 
-ShaderTable Renderer::Compiler::CreateShaderTable(const Shader& inShader)
+ShaderTable Renderer::Compiler::CreateShaderTable(const Shader& inShader, const Shader& inRayGenerationShader, const Shader& inMissShader)
 {
 	ShaderTable shader_table;
 	if (inShader.mData.mStateObject == nullptr)
@@ -335,7 +340,7 @@ ShaderTable Renderer::Compiler::CreateShaderTable(const Shader& inShader)
 			shader_table.mRayGenOffset = shader_table_entries.size();
 
 			shader_table_entries.push_back({});
-			memcpy(&shader_table_entries.back().mShaderIdentifier, state_object_properties->GetShaderIdentifier(gRenderer.mRuntime.mRayGenerationShader.mRayGenerationName), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+			memcpy(&shader_table_entries.back().mShaderIdentifier, state_object_properties->GetShaderIdentifier(gToWString(inRayGenerationShader.mRayGenerationName).c_str()), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 			shader_table_entries.back().mLocalConstants.mData0 = { shader_table_entries.size() - 1, 0, 0, 0 };
 			shader_table_entries.back().mLocalConstants.mData1 = { 0, 0, 0, 0 };
 
@@ -347,7 +352,7 @@ ShaderTable Renderer::Compiler::CreateShaderTable(const Shader& inShader)
 			shader_table.mMissOffset = shader_table_entries.size();
 
 			shader_table_entries.push_back({});
-			memcpy(&shader_table_entries.back().mShaderIdentifier, state_object_properties->GetShaderIdentifier(gRenderer.mRuntime.mMissShader.mMissName), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+			memcpy(&shader_table_entries.back().mShaderIdentifier, state_object_properties->GetShaderIdentifier(gToWString(inMissShader.mMissName).c_str()), D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 			shader_table_entries.back().mLocalConstants.mData0 = { shader_table_entries.size() - 1, 0, 0, 0 };
 			shader_table_entries.back().mLocalConstants.mData1 = { 0, 0, 0, 0 };
 
@@ -362,7 +367,7 @@ ShaderTable Renderer::Compiler::CreateShaderTable(const Shader& inShader)
 			for (const Shader& shader : gRenderer.mRuntime.mHitGroupShaders)
 			{
 				shader_table_entries.push_back({});
-				void* shader_identifier = state_object_properties->GetShaderIdentifier(shader.HitGroupName().c_str());
+				void* shader_identifier = state_object_properties->GetShaderIdentifier(gToWString(shader.HitGroupName()).c_str());
 				memcpy(&shader_table_entries.back().mShaderIdentifier, shader_identifier, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 				shader_table_entries.back().mLocalConstants.mData0 = { shader_table_entries.size() - 1, 0, 0, 0 };
 				shader_table_entries.back().mLocalConstants.mData1 = { 0, 0, 0, 0 };
@@ -399,7 +404,7 @@ ShaderTable Renderer::Compiler::CreateShaderTable(const Shader& inShader)
 	return shader_table;
 }
 
-ComPtr<IDxcBlob> Renderer::Compiler::Compile(const char* inFilename, const char* inEntryPoint, std::string_view inProfile)
+ComPtr<IDxcBlob> Renderer::Compiler::Compile(const std::string_view& inFilename, const std::string_view& inEntryPoint, const std::string_view& inProfile)
 {
 	// Generated header
 	std::string shader_header;
@@ -438,7 +443,6 @@ ComPtr<IDxcBlob> Renderer::Compiler::Compile(const char* inFilename, const char*
 	}
 
 	// EntryPoint
-	std::wstring entry_point = gToWString(inEntryPoint);
 	shader_header += std::format("#define ENTRY_POINT_{} {}\n", inEntryPoint, 1);
 
 	std::vector<LPCWSTR> arguments;
@@ -453,7 +457,7 @@ ComPtr<IDxcBlob> Renderer::Compiler::Compile(const char* inFilename, const char*
 	arguments.push_back(L"-enable-16bit-types");					// half
 
 	// Load shader
-	std::ifstream shader_file(inFilename);
+	std::ifstream shader_file(inFilename.data());
 	std::stringstream shader_stream;
 	shader_stream << shader_file.rdbuf();
 	std::string shader_string = shader_header + "\n" + shader_stream.str();
@@ -461,6 +465,9 @@ ComPtr<IDxcBlob> Renderer::Compiler::Compile(const char* inFilename, const char*
 	ComPtr<IDxcBlob> blob_output;
 	if (gToLower(std::filesystem::path(inFilename).extension().string()) == ".slang")
 	{
+		// An almost trivial .slang takes 3s to compile in debug build... Only trigger compile when enabled
+		if (!gConfigs.mTestSlangShader) { return nullptr; }
+
 		using namespace slang;
 
 		auto trace_blob = [](ComPtr<IBlob>& blob)
@@ -522,12 +529,12 @@ ComPtr<IDxcBlob> Renderer::Compiler::Compile(const char* inFilename, const char*
 		mGlobalSession->createSession(sessionDesc, &session);
 
 		ComPtr<IBlob> diagnostics;
-		ComPtr<IModule> module(session->loadModuleFromSourceString(inFilename, inFilename, shader_string.data(), &diagnostics));
+		ComPtr<IModule> module(session->loadModuleFromSourceString(inFilename.data(), inFilename.data(), shader_string.data(), &diagnostics));
 		trace_blob(diagnostics);
 		if (module == nullptr) { return nullptr; }
 
 		ComPtr<IEntryPoint> entryPoint;
-		gValidate(module->findEntryPointByName(inEntryPoint, &entryPoint));
+		gValidate(module->findEntryPointByName(inEntryPoint.data(), &entryPoint));
 
 		IComponentType* components[] = { module.Get(), entryPoint.Get() };
 		ComPtr<IComponentType> program;
@@ -546,16 +553,13 @@ ComPtr<IDxcBlob> Renderer::Compiler::Compile(const char* inFilename, const char*
 	else
 	{
 #pragma warning(disable: 6387) // Warning on pass nullptr to DXC API
-		std::string filename(inFilename);
-		std::wstring wfilename(filename.begin(), filename.end());
-
 		IDxcBlobEncoding* blob_encoding = nullptr;
 		gValidate(mDxcUtils->CreateBlobFromPinned(shader_string.c_str(), static_cast<uint32_t>(shader_string.length()), CP_UTF8, &blob_encoding));
 		IDxcOperationResult* operation_result = nullptr;
 		gValidate(mDxcCompiler->Compile(
 			blob_encoding,												// program text
-			wfilename.c_str(),											// file name, mostly for error messages
-			entry_point.c_str(),										// entry point function
+			gToWString(inFilename).c_str(),								// file name, mostly for error messages
+			gToWString(inEntryPoint).c_str(),							// entry point function
 			gToWString(inProfile).c_str(),								// target profile
 			arguments.data(), static_cast<UINT32>(arguments.size()),	// compilation arguments and their count
 			nullptr, 0,													// name/value defines and their count
@@ -620,8 +624,11 @@ ComPtr<IDxcBlob> Renderer::Compiler::Compile(const char* inFilename, const char*
 	return blob_output;
 }
 
-bool Renderer::Compiler::CreateVSPSPipelineState(const char* inFileName, const char* inVSName, const char* inPSName, Shader& ioShader)
+bool Renderer::Compiler::CreateVSPSPipelineState(const std::string_view& inFileName, const std::string_view& inVSName, const std::string_view& inPSName, Shader& ioShader)
 {
+	CPUTimingScope timing_scope;
+	timing_scope.mTraceName = std::format("CreateVSPSPipelineState [{}], [{}]", inVSName, inPSName);
+
 	ComPtr<IDxcBlob> vs_blob = Compile(inFileName, inVSName, "vs_6_9");
 	ComPtr<IDxcBlob> ps_blob = Compile(inFileName, inPSName, "ps_6_9");
 	if (vs_blob == nullptr || ps_blob == nullptr)
@@ -657,14 +664,16 @@ bool Renderer::Compiler::CreateVSPSPipelineState(const char* inFileName, const c
 	if (FAILED(gDevice->CreateGraphicsPipelineState(&pipeline_state_desc, IID_PPV_ARGS(&ioShader.mData.mPipelineState))))
 		return false;
 
-	std::wstring name = gToWString(inVSName) + L"_" + gToWString(inPSName);
-	ioShader.mData.mPipelineState->SetName(name.c_str());
+	gSetName(ioShader.mData.mPipelineState, "PipelineState.", std::format("{}_{}", inVSName, inPSName), "");
 
 	return true;
 }
 
-bool Renderer::Compiler::CreateCSPipelineState(const char* inFileName, const char* inCSName, Shader& ioShader)
+bool Renderer::Compiler::CreateCSPipelineState(const std::string_view& inFileName, const std::string_view& inCSName, Shader& ioShader)
 {
+	CPUTimingScope timing_scope;
+	timing_scope.mTraceName = std::format("CreateCSPipelineState   [{}]", inCSName);
+
 	ComPtr<IDxcBlob> blob = Compile(inFileName, inCSName, "cs_6_9");
 	if (blob == nullptr)
 		return false;
@@ -676,38 +685,38 @@ bool Renderer::Compiler::CreateCSPipelineState(const char* inFileName, const cha
 	if (FAILED(gDevice->CreateComputePipelineState(&pipeline_state_desc, IID_PPV_ARGS(&ioShader.mData.mPipelineState))))
 		return false;
 
-	std::wstring name = gToWString(inCSName);
-	ioShader.mData.mPipelineState->SetName(name.c_str());
+	gSetName(ioShader.mData.mPipelineState, "PipelineState.", inCSName.data(), "");
 
 	return true;
 }
 
-bool Renderer::Compiler::CreateLibPipelineState(const char* inFileName, const wchar_t* inLibName, Shader& ioShader)
+bool Renderer::Compiler::CreateLibPipelineState(const std::string_view& inFileName, const std::string_view& inLibName, Shader& ioShader)
 {
+	CPUTimingScope timing_scope;
+	timing_scope.mTraceName = std::format("CreateLibPipelineState  [{}]", inLibName);
+
 	ComPtr<IDxcBlob> blob = Compile(inFileName, "", "lib_6_9");
 	if (blob == nullptr)
 		return false;
 
-	std::vector<const wchar_t*> hit_shader_names;
-	ComPtr<ID3D12StateObject> pipeline_object = CreateStateObject(blob.Get(), ioShader);
-	if (pipeline_object == nullptr)
+	ioShader.mData.mStateObject = CreateStateObject(blob.Get(), ioShader);
+	if (ioShader.mData.mStateObject == nullptr)
 		return false;
 
-	ioShader.mData.mStateObject = pipeline_object;
-	ioShader.mData.mStateObject->SetName(inLibName);
+	gSetName(ioShader.mData.mStateObject, "StateObject.", inLibName.data(), "");
 
 	return true;
 }
 
 bool Renderer::Compiler::CompileShader(Shader& ioShader)
 {
-	if (ioShader.mRayGenerationName != nullptr)
+	if (!ioShader.mRayGenerationName.empty())
 		return CreateLibPipelineState(ioShader.mFileName, ioShader.mRayGenerationName, ioShader);
-	else if (ioShader.mMissName != nullptr)
+	else if (!ioShader.mMissName.empty())
 		return CreateLibPipelineState(ioShader.mFileName, ioShader.mMissName, ioShader);
-	else if (ioShader.HitName() != nullptr)
+	else if (!ioShader.HitName().empty())
 		return CreateLibPipelineState(ioShader.mFileName, ioShader.HitName(), ioShader);
-	else if (ioShader.mCSName != nullptr)
+	else if (!ioShader.mCSName.empty())
 		return CreateCSPipelineState(ioShader.mFileName, ioShader.mCSName, ioShader);
 	else
 		return CreateVSPSPipelineState(ioShader.mFileName, ioShader.mVSName, ioShader.mPSName, ioShader);
@@ -799,11 +808,14 @@ void Renderer::InitializeShaders()
 	for (auto&& shader : mRuntime.mShaders)
 		mCompiler.CompileShader(shader);
 
-	mCompiler.CompileShader(mRuntime.mRayGenerationShader);
-	for (auto&& shader : mRuntime.mCollectionShaders)
-		mCompiler.CompileShader(shader);
-	mRuntime.mLibShader			= mCompiler.CombineShader(mRuntime.mRayGenerationShader, mRuntime.mCollectionShaders);
-	mRuntime.mLibShaderTable	= mCompiler.CreateShaderTable(mRuntime.mLibShader);
+	if (gConfigs.mTestHitShader)
+	{
+		mCompiler.CompileShader(mRuntime.mRayGenerationShader);
+		for (auto&& shader : mRuntime.mCollectionShaders)
+			mCompiler.CompileShader(shader);
+		mRuntime.mLibShader = mCompiler.CombineShader(mRuntime.mRayGenerationShader, mRuntime.mCollectionShaders);
+		mRuntime.mLibShaderTable = mCompiler.CreateShaderTable(mRuntime.mLibShader, mRuntime.mRayGenerationShader, mRuntime.mMissShader);
+	}
 
 	if (gAtmosphere.mEnabled)
 	{
