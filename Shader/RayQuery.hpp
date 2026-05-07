@@ -81,6 +81,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 	PathContext path_context					= (PathContext)0;
 	path_context.mThroughput					= 1.0;
 	path_context.mPrevBSDFSamplePDF				= 0.0;
+	path_context.mPrevLobeIndex					= 0;
 	path_context.mPrevDiracDeltaDistribution	= false;
 	path_context.mEtaScale						= 1.0;
 	path_context.mRandomState					= random_state;
@@ -228,11 +229,6 @@ void TraceRay(inout PixelContext ioPixelContext)
 					if (back_face && !two_sided)
 						emission = 0;
 
-					// IES
-					//float angle = acos(dot(-hit_context.mRayDirectionWS, float3(0,-1,0))) / MATH_PI;
-					//float ies = IESSRV.SampleLevel(BilinearClampSampler, float2(angle, 0), 0).x;
-					//hit_context.mEmission *= ies;
-
 					if (GetDebugInstanceMode() == DebugInstanceMode::Barycentrics && GetDebugInstanceIndex() == hit_context.mInstanceID)
 						emission = hit_context.mBarycentrics;
 				}
@@ -345,6 +341,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 						path_context.mMediumInstanceID				= bsdf_result.mMediumInstanceID; // [TODO] Need a medium stack to handle nested medium
 					
 						path_context.mPrevBSDFSamplePDF				= bsdf_result.mBSDFSamplePDF;
+						path_context.mPrevLobeIndex					= bsdf_result.mLobeIndex;
 						path_context.mPrevDiracDeltaDistribution	= hit_context.DiracDeltaDistribution();
 
 						DebugValue(DebugMode::BSDF__BSDF,			path_context.mRecursionDepth, float3(bsdf_result.mBSDF));

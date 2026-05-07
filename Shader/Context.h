@@ -15,20 +15,21 @@ struct PixelContext
 
 struct PathContext
 {
-	uint			mRandomState;
-	uint			mRandomStateReSTIR;
+	uint			mRandomState;					// [0, +]		Current random state for path tracing
+	uint			mRandomStateReSTIR;				// [0, +]		Current random state for ReSTIR
 
 	float3			mThroughput;					// [0, 1]		Accumulated throughput, [PBRT3] call it beta https://github.com/mmp/pbrt-v3/blob/master/src/integrators/path.cpp#L68
 	float3			mEmission;						// [0, +inf]	Accumulated emission
-	float			mEtaScale;
+	float			mEtaScale;						// [0, +inf]	Accumulated eta scale for handling refraction, see https://www.pbr-book.org/3ed-2018/Light_Transport_II/Specular_Reflection_and_Transmission#HandlingRefraction
 
 	float3			mLightEmission;					// [0, +inf]	Emission from light sample
 
-	float			mPrevBSDFSamplePDF;
-	bool			mPrevDiracDeltaDistribution;
+	float			mPrevBSDFSamplePDF;				// [0, 1]		BSDF Sample PDF from previous hit
+	uint			mPrevLobeIndex;					// [0, +]		[WIP] Not used yet
+	bool			mPrevDiracDeltaDistribution;	// [bool]		Whether BSDF Sample from previous hit is Dirac Delta distribution
 
-	uint			mRecursionDepth;
-	uint			mMediumInstanceID;
+	uint			mRecursionDepth;				// [0, +]		Current recursion depth, starting from 0 for primary ray
+	uint			mMediumInstanceID;				// [0, +]		Current participating medium instance ID, only updated on surface hit (assume participating medium has a hull)
 };
 
 struct meshopt_Meshlet
