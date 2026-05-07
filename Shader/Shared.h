@@ -505,11 +505,10 @@ enum class ShaderPrintEntryType : uint
 	UInt4,
 };
 
-enum_class_cpp DebugFlag : uint
-{
-	None										= 0,
-	UpdateRayInspection							= 1 << 0,
-};
+BEGIN_ENUM_FLAG(DebugFlag)
+	None						= 0,
+	UpdateRayInspection			= 1 << 0,
+END_ENUM_FLAG(DebugFlag)
 ENABLE_UINT_ENUM_BITWISE_OPERATORS(DebugFlag)
 
 struct TextureInfo
@@ -783,11 +782,18 @@ struct SpatialCacheConstants
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 };
 
+BEGIN_ENUM_FLAG(ReSTIRFlag)
+	None						= 0,
+	TemporalReuse				= 1 << 0,
+	SpatialReuse				= 1 << 1,
+END_ENUM_FLAG(ReSTIRFlag)
+ENABLE_UINT_ENUM_BITWISE_OPERATORS(ReSTIRFlag)
+
 struct ReSTIRConstants
 {
-	uint						mTemporalCounter				CONSTANT_DEFAULT(0);
+	uint						mTemporalFrameIndex				CONSTANT_DEFAULT(0);
 	uint						mInitialSampleCount				CONSTANT_DEFAULT(1);
-	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	ENUM_FLAG_TYPE(ReSTIRFlag)	mFlags							CONSTANT_DEFAULT(ReSTIRFlag::None);
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 };
 
@@ -866,7 +872,7 @@ struct Constants
 
 	DebugMode					mDebugMode						CONSTANT_DEFAULT(DebugMode::Manual);
 	int							mDebugRecursion					CONSTANT_DEFAULT(0);
-	DebugFlag					mDebugFlag						CONSTANT_DEFAULT(DebugFlag::None);
+	ENUM_FLAG_TYPE(DebugFlag)	mDebugFlag						CONSTANT_DEFAULT(DebugFlag::None);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
 	AtmosphereConstants			mAtmosphere;

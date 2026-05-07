@@ -50,6 +50,14 @@ void gPrepareImGui()
 
 			SameLine();
 
+			if (Button("Dump Shader"))
+			{
+				gRenderer.mDumpRayQuery = true;
+				gRenderer.mReloadShader = true;
+			}
+
+			SameLine();
+
 			if (Button("Open Dump Folder"))
 				gOpenDumpDirectoryInExplorer();
 		}
@@ -218,8 +226,9 @@ void gPrepareImGui()
 
 			if (gConstants.mLightSampleMode == LightSampleMode::ReSTIR)
 			{
-				InputInt("Temporal Counter", reinterpret_cast<int*>(&gConstants.mReSTIR.mTemporalCounter), 0, 0, ImGuiInputTextFlags_ReadOnly);
-				SliderInt("Initial Sample Count", reinterpret_cast<int*>(&gConstants.mReSTIR.mInitialSampleCount), 1, 32);
+				InputInt("Temporal Frame Index", reinterpret_cast<int*>(&gConstants.mReSTIR.mTemporalFrameIndex), 0, 0, ImGuiInputTextFlags_ReadOnly);
+				if (SliderInt("Initial Sample Count", reinterpret_cast<int*>(&gConstants.mReSTIR.mInitialSampleCount), 1, 32))
+					gRenderer.mAccumulationResetRequested = true;
 			}
 
 			TreePop();
@@ -378,17 +387,6 @@ void gPrepareImGui()
 			if (Button("Reset"))
 			{
 				gConstants.mBRDFExplorer = {};
-			}
-
-			TreePop();
-		}
-
-		if (TreeNodeEx("TraceRayInline (RayQuery)"))
-		{
-			if (Button("Dump Shader"))
-			{
-				gRenderer.mDumpRayQuery = true;
-				gRenderer.mReloadShader = true;
 			}
 
 			TreePop();

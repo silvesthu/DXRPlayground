@@ -51,7 +51,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 	// From https://www.shadertoy.com/view/tsBBWW
 	// [TODO] Need proper noise
 	uint random_state							= uint(uint(ioPixelContext.mPixelIndex.x) * uint(1973) + uint(ioPixelContext.mPixelIndex.y) * uint(9277) + uint(mConstants.mCurrentFrameIndex) * uint(26699)) | uint(1);
-	uint random_state_restir					= uint(uint(ioPixelContext.mPixelIndex.x) * uint(1973) + uint(ioPixelContext.mPixelIndex.y) * uint(9277) + uint(mConstants.mReSTIR.mTemporalCounter) * uint(26699)) | uint(1);
+	uint random_state_restir					= uint(uint(ioPixelContext.mPixelIndex.x) * uint(1973) + uint(ioPixelContext.mPixelIndex.y) * uint(9277) + uint(mConstants.mReSTIR.mTemporalFrameIndex) * uint(26699)) | uint(1);
 
 	float2 screen_coords						= float2(ioPixelContext.mPixelIndex.xy);
 	float2 screen_size							= float2(ioPixelContext.mPixelTotal.xy);
@@ -255,6 +255,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 						uint light_index							= hit_context.LightIndex();
 						Light light									= RaytraceLightsSRV[light_index];
 
+						// [TODO] Need update for ReSTIR
 						LightContext light_context					= LightEvaluation::GenerateContext(LightEvaluation::ContextType::Input, ray.Direction, light_index, ray.Origin, path_context);
 						float light_mis_pdf							= light_context.mSolidAnglePDF * light_context.UniformSelectionPDF();
 					

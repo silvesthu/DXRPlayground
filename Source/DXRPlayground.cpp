@@ -566,7 +566,7 @@ void sRender()
 
 			// ReSTIR
 			{
-				gConstants.mReSTIR.mTemporalCounter++;
+				gConstants.mReSTIR.mTemporalFrameIndex++;
 			}
 			
 			sConstantsCopy = gConstants;

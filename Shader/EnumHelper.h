@@ -4,7 +4,9 @@
 
 #ifdef __cplusplus
 
-#define enum_class_cpp enum class
+#define ENUM_FLAG_TYPE(name) name
+#define BEGIN_ENUM_FLAG(name) enum class name : uint {
+#define END_ENUM_FLAG(name) };
 #define ENABLE_UINT_ENUM_BITWISE_OPERATORS(EnumType)                            \
                                                                                 \
 /* 1. Bitwise OR (|) */                                                         \
@@ -17,7 +19,7 @@ inline EnumType operator&(EnumType lhs, EnumType rhs) { return (EnumType)((uint)
 inline EnumType operator^(EnumType lhs, EnumType rhs) { return (EnumType)((uint)lhs ^ (uint)rhs); } \
                                                                                \
 /* 4. Bitwise NOT (~) */                                                       \
-inline EnumType operator~(EnumType val) { return (EnumType)(~(uint)val); } \
+inline EnumType operator~(EnumType val) { return (EnumType)(~(uint)val); }      \
                                                                                \
 /* 5. Compound OR assignment (|=) */                                           \
 inline EnumType& operator|=(EnumType& lhs, EnumType rhs) { lhs = lhs | rhs; return lhs; } \
@@ -30,7 +32,9 @@ inline EnumType& operator^=(EnumType& lhs, EnumType rhs) { lhs = lhs ^ rhs; retu
 
 #else
 
-#define enum_class_cpp enum
+#define ENUM_FLAG_TYPE(name) uint
+#define BEGIN_ENUM_FLAG(name) struct name { uint use_ENUM_FLAG_TYPE_in_shader[65536]; enum {
+#define END_ENUM_FLAG(name) }; };
 #define ENABLE_UINT_ENUM_BITWISE_OPERATORS(EnumType)
 
 #endif // __cplusplus

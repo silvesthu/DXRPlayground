@@ -395,7 +395,7 @@ int GetDebugRecursion()
 #endif // SHADER_DEBUG
 }
 
-DebugFlag GetDebugFlag()
+ENUM_FLAG_TYPE(DebugFlag) GetDebugFlag()
 {
 #if SHADER_DEBUG
     return mConstants.mDebugFlag;

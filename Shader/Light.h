@@ -160,7 +160,7 @@ namespace LightEvaluation
 			if (mConstants.mLightSampleMode != LightSampleMode::ReSTIR)
 				sample_count = 1;
 				
-			for (uint i = 0; i < min(sample_count, mConstants.mLightCount); i++)
+			for (uint i = 0; i < sample_count; i++)
 			{
 				uint light_index = min(RandomFloat01(ioPathContext.mRandomState) * mConstants.mLightCount, mConstants.mLightCount - 1);
 				
