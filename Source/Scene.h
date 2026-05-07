@@ -337,13 +337,13 @@ private:
 	std::vector<Texture>					mTextures;
  	std::vector<Buffer>						mBuffers;
 
-	struct BufferVisualization
+	struct NanoVDBVisualizer
 	{
 		uint								mInstanceIndex = 0;
 		uint								mBufferIndex = 0;
 		uint								mTexutureIndex = 0;
 	};
-	std::vector<BufferVisualization>		mBufferVisualizations;
+	std::vector<NanoVDBVisualizer>			mNanoVDBVisualizers;
 
 	uint									mNextViewDescriptorIndex = 0;
 };

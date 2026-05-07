@@ -1810,16 +1810,16 @@ void Scene::Render(ID3D12GraphicsCommandList4* inCommandList)
 	for (auto&& buffer : mBuffers)
 		buffer.UpdateGPU(inCommandList);
 
-	for (auto&& buffer_visualization : mBufferVisualizations)
+	for (auto&& visualizer : mNanoVDBVisualizers)
 	{
-		Texture& texture = mTextures[buffer_visualization.mTexutureIndex];
+		Texture& texture = mTextures[visualizer.mTexutureIndex];
 
-		BarrierScope scope(gCommandList, texture.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		BarrierScope scope(inCommandList, texture.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
-		gRenderer.Setup(gRenderer.mRuntime.mNanoVDBVisualizeShader, { .mData0 = { buffer_visualization.mInstanceIndex, texture.mUAVIndex, 0, 0 } });
-		gCommandList->Dispatch(gAlignUpDiv(texture.mWidth, 8u), gAlignUpDiv(texture.mHeight, 8u), texture.mDepth);
+		gRenderer.Setup(gRenderer.mRuntime.mNanoVDBVisualizeShader, { .mData0 = { visualizer.mInstanceIndex, texture.mUAVIndex, 0, 0 } });
+		inCommandList->Dispatch(gAlignUpDiv(texture.mWidth, 8u), gAlignUpDiv(texture.mHeight, 8u), texture.mDepth);
 	}
-	mBufferVisualizations.clear();
+	mNanoVDBVisualizers.clear();
 }
 
 void Scene::InitializeTextures()
@@ -1969,9 +1969,9 @@ void Scene::InitializeBuffers()
 					Name(buffer.mName);
 				texture.Initialize();
 
-				mBufferVisualizations.push_back({});
-				BufferVisualization& buffer_visualization = mBufferVisualizations.back();
-				buffer_visualization =
+				mNanoVDBVisualizers.push_back({});
+				NanoVDBVisualizer& visualizer = mNanoVDBVisualizers.back();
+				visualizer =
 				{
 					.mInstanceIndex = uint(i),
 					.mBufferIndex = uint(&buffer - mBuffers.data()),
