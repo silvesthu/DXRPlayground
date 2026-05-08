@@ -3,20 +3,26 @@
 // Dummies to make INTELLISENSE happy
 #ifdef __INTELLISENSE__
 
+#include "Shared.h"
+#include <vector>
+
 #define in
 #define out
 #define inout
 #define cbuffer struct
 #define groupshared
 template <typename T> struct ConstantBuffer : public T {};
-template <typename T> struct StructuredBuffer {};
-template <typename T> struct RWStructuredBuffer {};
-template <typename T> struct Texture2D {};
+template <typename T> struct StructuredBuffer : public std::vector<T> {};
+template <typename T> struct RWStructuredBuffer : public std::vector<T> {};
+template <typename T> struct Texture2D 
+{
+    void GetDimensions(uint& width, uint& height) const {}
+};
 template <typename T> struct Texture3D {};
-template <typename T> struct RWTexture2D {};
+template <typename T> struct RWTexture2D : public Texture2D<T> {};
 template <typename T> struct RWTexture3D {};
 struct SamplerState {};
-typedef unsigned int uint;
+
 uint ResourceDescriptorHeap[];
 uint SamplerDescriptorHeap[];
 
@@ -30,12 +36,19 @@ template <typename T1, typename T2> T1 max(T1 a, T2 b) { return a; }
 template <typename T1, typename T2> T1 dot(T1 a, T2 b) { return a; }
 template <typename T1, typename T2, typename T3> T1 lerp(T1 a, T2 b, T3 c) { return a; }
 template <typename T1, typename T2, typename T3> T1 clamp(T1 a, T2 b, T3 c) { return a; }
+template <typename T1, typename T2, typename T3> T1 select(T1 a, T2 b, T3 c) { return a; }
+
+float3 reflect(float3 a, float3 b) { return {}; }
+float3 refract(float3 a, float3 b, float c) { return {}; }
+float sin(float) { return 0; }
+float cos(float) { return 0; }
 
 void InterlockedAdd(
     in  uint dest,
     in  uint value,
     out uint original_value
-);
+) {}
+void GroupMemoryBarrierWithGroupSync() {}
 
 struct RaytracingAccelerationStructure {};
 struct RayDesc
@@ -46,7 +59,7 @@ struct RayDesc
     float  TMax;
 };
 
-enum RAY_FLAG : uint
+enum RAY_FLAG
 {
     RAY_FLAG_NONE = 0x00,
     RAY_FLAG_FORCE_OPAQUE = 0x01,
@@ -61,14 +74,14 @@ enum RAY_FLAG : uint
     RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES = 0x200,
 };
 
-enum COMMITTED_STATUS : uint
+enum COMMITTED_STATUS
 {
     COMMITTED_NOTHING,
     COMMITTED_TRIANGLE_HIT,
     COMMITTED_PROCEDURAL_PRIMITIVE_HIT
 };
 
-template <RAY_FLAG RayFlags>
+template <RAY_FLAG Flags>
 struct RayQuery 
 {
 	RAY_FLAG RayFlags() { return RAY_FLAG_NONE; }
@@ -76,6 +89,11 @@ struct RayQuery
 	uint CommittedInstanceID() { return 0; }
 	float CommittedRayT() { return 0.0f; }
 };
+
+#define inGroupThreadID uint3(0, 0, 0)
+#define inGroupID uint3(0, 0, 0)
+#define inDispatchThreadID uint3(0, 0, 0)
+#define inGroupIndex 0
 
 #define SHADER_DEBUG 1
 #define USE_TEXTURE 1
