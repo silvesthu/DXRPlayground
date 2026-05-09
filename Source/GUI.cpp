@@ -198,7 +198,7 @@ void gPrepareImGui()
 			TreePop();
 		}
 
-		if (TreeNodeEx("Sampling", ImGuiTreeNodeFlags_None /*ImGuiTreeNodeFlags_DefaultOpen*/))
+		if (TreeNodeEx("Sampling", ImGuiTreeNodeFlags_DefaultOpen))
 		{
 			Text("Offset Mode");
 			for (int i = 0; i < static_cast<int>(OffsetMode::Count); i++)

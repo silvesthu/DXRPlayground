@@ -331,8 +331,8 @@ namespace InstanceDataCache
 
 struct HitContext : SurfaceContext
 {
-	template<RAY_FLAG RayFlags>
-	static HitContext Generate(RayDesc inRayDesc, RayQuery<RayFlags> inRayQuery)
+	template<RAY_FLAG Flags>
+	static HitContext Generate(RayDesc inRayDesc, RayQuery<Flags> inRayQuery)
 	{
 		// System value intrinsics https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#system-value-intrinsics
 		
@@ -513,11 +513,11 @@ struct MediumContext
 		mSigmaT									*= density * mConstants.mDensityBoost;
 		mSigmaT									= min(mSigmaT, mMajorantSigmaT); // using SigmaT in xml as majorant, clamp with it as max is ignored
 
-		// DebugValue(DebugMode::Manual, ioPathContext.mRecursionDepth, normalized_coords);
-		// DebugValue(DebugMode::Manual, ioPathContext.mRecursionDepth, ijk);
-		// DebugValue(DebugMode::Manual, ioPathContext.mRecursionDepth, density);
-		// DebugValue(DebugMode::Manual, ioPathContext.mRecursionDepth, mMajorantSigmaT);
-		// DebugValue(DebugMode::Manual, ioPathContext.mRecursionDepth, mInstanceData.mMediumSigmaT);
+		// InspectPixel::Update(DebugMode::Manual, ioPathContext, normalized_coords);
+		// InspectPixel::Update(DebugMode::Manual, ioPathContext, ijk);
+		// InspectPixel::Update(DebugMode::Manual, ioPathContext, density);
+		// InspectPixel::Update(DebugMode::Manual, ioPathContext, mMajorantSigmaT);
+		// InspectPixel::Update(DebugMode::Manual, ioPathContext, mInstanceData.mMediumSigmaT);
 	}
 
 	template<RAY_FLAG RayFlags>

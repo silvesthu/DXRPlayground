@@ -1,4 +1,5 @@
 #pragma once
+#include "HLSLHelper.h"
 
 #ifndef SHADER_DEBUG
 #define SHADER_DEBUG 0
@@ -395,15 +396,6 @@ int GetDebugRecursion()
 #endif // SHADER_DEBUG
 }
 
-ENUM_FLAG_TYPE(DebugFlag) GetDebugFlag()
-{
-#if SHADER_DEBUG
-    return mConstants.mDebugFlag;
-#else
-    return DebugFlag::None;
-#endif // SHADER_DEBUG
-}
-
 static float3       sVisualizeModeValue = 0;
 void VisualizeValue(VisualizeMode inDebugMode, float3 inValue)
 {
@@ -424,35 +416,6 @@ void DebugValueInit()
     if (sDebugDispatchRaysIndex.x == mConstants.mPixelDebugCoord.x && sDebugDispatchRaysIndex.y == mConstants.mPixelDebugCoord.y)
         for (int i = 0; i < PixelInspection::kArraySize; i++)
             PixelInspectionUAV[0].mPixelValueArray[i] = 0;
-#endif // SHADER_DEBUG
-}
-
-void DebugValue(DebugMode inDebugMode, uint inRecursionDepth, float3 inValue)
-{
-#if SHADER_DEBUG
-    USING_RESOURCE(RWStructuredBuffer<PixelInspection>, PixelInspectionUAV);
-    if (GetDebugMode() == inDebugMode)
-    {
-        if (sDebugDispatchRaysIndex.x == mConstants.mPixelDebugCoord.x && sDebugDispatchRaysIndex.y == mConstants.mPixelDebugCoord.y && inRecursionDepth < PixelInspection::kArraySize)
-            PixelInspectionUAV[0].mPixelValueArray[inRecursionDepth] = float4(inValue, 1.0); // 1.0 indicate value is written
-
-        if (GetDebugRecursion() == inRecursionDepth)
-        {
-            sDebugValue = float4(inValue, 1.0); // fill alpha to show on ImGui
-            sDebugValueUpdated = true;
-        }
-
-        if (mConstants.mVisualizeMode == VisualizeMode::DebugValue)
-            sVisualizeModeValue = inValue;
-    }
-#endif // SHADER_DEBUG
-}
-
-void DebugValue(float3 inValue)
-{
-#if SHADER_DEBUG
-    sDebugValue = float4(inValue, 1.0); // fill alpha to show on ImGui
-    sDebugValueUpdated = true;
 #endif // SHADER_DEBUG
 }
 

@@ -21,8 +21,8 @@ struct Reservoir
 		return (1.0 / mTargetPDF) * (1.0 / mCountSum * mWeightSum);
 	}
 
-	bool			IsValid()					{ return mLightData != 0; }
-	uint			LightIndex()				{ return mLightData & kLightIndexMask; }
+	bool			IsValid()					{ return (mLightData & kLightValidBit) != 0; }
+	uint			LightIndex()				{ return (mLightData & kLightIndexMask); }
 
 	bool			Update(Reservoir inReservoir, inout PathContext ioPathContext)
 	{

@@ -7,20 +7,24 @@
 
 struct LightContext
 {
-	bool		IsValid()				{ return mReservoir.IsValid(); }
-	uint		LightIndex()			{ return mReservoir.LightIndex() ; }
-	Light		GetLight()
+	bool			IsValid()				{ return mReservoir.IsValid(); }
+	uint			LightIndex()			{ return mReservoir.LightIndex() ; }
+	Light			GetLight()
 	{
 		USING_RESOURCE(StructuredBuffer<Light>, RaytraceLightsSRV);
 		return RaytraceLightsSRV[LightIndex()];
 	}
 	
-	float3		mL;
-	float		mSolidAnglePDF;
+	float3			mL;																						// Direction of this light sample
+	float			mSolidAnglePDF;																			// PDF of selecting mL on this light
 
-	float		SelectionWeight()		{ return mReservoir.StochasticWeight(); }
-	float		UniformSelectionPDF()	{ return 1.0 / mConstants.mLightCount; }
-	Reservoir	mReservoir;
+	float			SelectionWeight()		{ return mReservoir.StochasticWeight(); }
+	Reservoir		mReservoir;
+
+	float			MISPDF()				{ return mSolidAnglePDF * LightContext::BaseSelectionPDF(); }	// PDF for MIS, without (before) RIS as that part of information is not available for other MIS counterparts (e.g. BSDF sample)
+
+	static float	BaseSelectionPDF()		{ return UniformSelectionPDF(); }								// PDF of selecting this light, use uniform now, but can also be based on some precomputed weight
+	static float	UniformSelectionPDF()	{ return 1.0 / mConstants.mLightCount; }						// PDF of selecting light uniformly
 };
 
 namespace LightEvaluation
@@ -168,7 +172,7 @@ namespace LightEvaluation
 				LightContext light_context = LightEvaluation::GenerateContext(LightEvaluation::ContextType::Random, 0, light_index, inLitPositionWS, ioPathContext);
 				light_context.mReservoir.mTargetPDF = light_context.mSolidAnglePDF <= 0.0 ? 0.0 : (RGBToLuminance(RaytraceLightsSRV[light_index].mEmission) / light_context.mSolidAnglePDF);
 				float target_pdf = light_context.mReservoir.mTargetPDF;
-				float candidate_pdf = light_context.UniformSelectionPDF();
+				float candidate_pdf = LightContext::UniformSelectionPDF();
 				light_context.mReservoir.mWeightSum = target_pdf / candidate_pdf;
 
 				if (reservoir.Update(light_context.mReservoir, ioPathContext))

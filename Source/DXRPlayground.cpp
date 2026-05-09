@@ -533,7 +533,7 @@ void sRender()
 			static Constants sConstantsCopy			= gConstants;
 
 			if (sConstantsCopy.mPixelDebugCoord != gConstants.mPixelDebugCoord)
-				gConstants.mDebugFlag |= DebugFlag::UpdateRayInspection;
+				gConstants.mDebugFlag |= DebugFlag::UpdateInspectRay;
 
 			// Whitelist to ignore for accumulation reset
 			sConstantsCopy.mFrameIndex				= gConstants.mFrameIndex;
@@ -577,7 +577,7 @@ void sRender()
 
 		// Reset
 		{
-			gConstants.mDebugFlag &= ~DebugFlag::UpdateRayInspection;
+			gConstants.mDebugFlag &= ~DebugFlag::UpdateInspectRay;
 
 			if (gRenderer.mSpatialCacheActiveOnce)
 			{

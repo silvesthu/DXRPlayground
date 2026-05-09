@@ -3,6 +3,9 @@
 
 #ifdef __cplusplus
 
+#include <glm.h>	// glm
+#include <bit>		// std::bit_cast
+
 using float2 = glm::vec2;
 using float3 = glm::vec3;
 using float4 = glm::vec4;
@@ -30,6 +33,7 @@ using float4x4 = glm::mat4x4;
 #define RETURN_AS_REFERENCE &
 #define GET_COLUMN(x, i) x[i]
 #define STATITC_ASSERT(x) static_assert(x)
+#define COMPUTE_SHADER_INPUT uint3 inGroupThreadID, uint3 inGroupID, uint3 inDispatchThreadID, uint inGroupIndex
 
 inline float asfloat(uint x) { return std::bit_cast<float>(x); }
 inline uint asuint(float x) { return std::bit_cast<uint>(x); }
@@ -40,6 +44,7 @@ inline uint asuint(float x) { return std::bit_cast<uint>(x); }
 #define RETURN_AS_REFERENCE
 #define GET_COLUMN(x, i) transpose(x)[i]
 #define STATITC_ASSERT(x)
+#define COMPUTE_SHADER_INPUT uint3 inGroupThreadID : SV_GroupThreadID, uint3 inGroupID : SV_GroupID, uint3 inDispatchThreadID : SV_DispatchThreadID, uint inGroupIndex : SV_GroupIndex
 
 #endif // __cplusplus
 
@@ -54,7 +59,6 @@ inline uint asuint(float x) { return std::bit_cast<uint>(x); }
 #define GENERATE_PAD_NAME CONCAT(mPad_, __LINE__)
 #define GENERATE_NEW_LINE_NAME CONCAT(_Newline_, __LINE__)
 
-#include "HLSLHelper.h"
 #include "EnumHelper.h"
 
 static const uint kIndexCountPerTriangle		= 3;
@@ -507,7 +511,7 @@ enum class ShaderPrintEntryType : uint
 
 BEGIN_ENUM_FLAG(DebugFlag)
 	None						= 0,
-	UpdateRayInspection			= 1 << 0,
+	UpdateInspectRay			= 1 << 0,
 END_ENUM_FLAG(DebugFlag)
 ENABLE_UINT_ENUM_BITWISE_OPERATORS(DebugFlag)
 

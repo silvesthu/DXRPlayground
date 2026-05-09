@@ -3,7 +3,6 @@
 // Dummies to make INTELLISENSE happy
 #ifdef __INTELLISENSE__
 
-#include "Shared.h"
 #include <vector>
 
 #define in
@@ -14,10 +13,7 @@
 template <typename T> struct ConstantBuffer : public T {};
 template <typename T> struct StructuredBuffer : public std::vector<T> {};
 template <typename T> struct RWStructuredBuffer : public std::vector<T> {};
-template <typename T> struct Texture2D 
-{
-    void GetDimensions(uint& width, uint& height) const {}
-};
+template <typename T> struct Texture2D { void GetDimensions(uint& width, uint& height) const {} };
 template <typename T> struct Texture3D {};
 template <typename T> struct RWTexture2D : public Texture2D<T> {};
 template <typename T> struct RWTexture3D {};
@@ -27,6 +23,7 @@ uint ResourceDescriptorHeap[];
 uint SamplerDescriptorHeap[];
 
 template <typename T> T normalize(T a) { return a; }
+template <typename T> T saturate(T a) { return a; }
 template <typename T> T abs(T a) { return a; }
 template <typename T> T log(T a) { return a; }
 template <typename T> T exp(T a) { return a; }
@@ -37,6 +34,8 @@ template <typename T1, typename T2> T1 dot(T1 a, T2 b) { return a; }
 template <typename T1, typename T2, typename T3> T1 lerp(T1 a, T2 b, T3 c) { return a; }
 template <typename T1, typename T2, typename T3> T1 clamp(T1 a, T2 b, T3 c) { return a; }
 template <typename T1, typename T2, typename T3> T1 select(T1 a, T2 b, T3 c) { return a; }
+template <typename T> bool all(T a) { return a; }
+template <typename T> bool any(T a) { return a; }
 
 float3 reflect(float3 a, float3 b) { return {}; }
 float3 refract(float3 a, float3 b, float c) { return {}; }
@@ -89,11 +88,6 @@ struct RayQuery
 	uint CommittedInstanceID() { return 0; }
 	float CommittedRayT() { return 0.0f; }
 };
-
-#define inGroupThreadID uint3(0, 0, 0)
-#define inGroupID uint3(0, 0, 0)
-#define inDispatchThreadID uint3(0, 0, 0)
-#define inGroupIndex 0
 
 #define SHADER_DEBUG 1
 #define USE_TEXTURE 1

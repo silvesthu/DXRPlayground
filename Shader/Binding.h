@@ -1,5 +1,6 @@
 #pragma once
 #include "Shared.h"
+#include "HLSLHelper.h"
 
 #define USE_DYNAMIC_RESOURCE_CBV		0 // About 2x slower
 #define USE_DYNAMIC_RESOURCE_SRV_UAV	1 // [TODO] Always enabled, need alternative implementation for comparison
@@ -27,12 +28,20 @@ ConstantBuffer<LocalConstants> mLocalConstants : REGISTER_CBV(ROOT_CONSTANTS_REG
 #ifdef __SLANG__
 #define USING_RESOURCE(type, name) type.Handle name = type.Handle(uint2((uint)ViewDescriptorIndex::name, 0));
 #else
+#ifdef __INTELLISENSE__
+#define USING_RESOURCE(type, name) type name;
+#else
 #define USING_RESOURCE(type, name) type name = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::name];
+#endif // __INTELLISENSE__
 #endif // __SLANG__
 
 // SamplerDescriptorHeap Helper
 #ifdef __SLANG__
 #define USING_SAMPLER(type, name) type.Handle name = type.Handle(uint2((uint)SamplerDescriptorIndex::name, 0));
 #else
+#ifdef __INTELLISENSE__
+#define USING_SAMPLER(type, name) type name;
+#else
 #define USING_SAMPLER(type, name) type name = SamplerDescriptorHeap[(uint)SamplerDescriptorIndex::name];
+#endif // __INTELLISENSE__
 #endif // __SLANG__

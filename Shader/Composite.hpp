@@ -1,6 +1,7 @@
 #include "Shared.h"
 #include "Binding.h"
 #include "Common.h"
+#include "DebugUtils.h"
 #include "BRDFExplorer.h"
 #include "NanoVDB.h"
 
@@ -98,7 +99,7 @@ float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 
 	uint2 coords = (uint2)position.xy;
 	float4 color = ScreenColorUAV[position.xy];
-	bool debug_pixel = all(coords == mConstants.mPixelDebugCoord);
+	bool debug_pixel = all(coords == (uint2)mConstants.mPixelDebugCoord);
 	if (debug_pixel)
 	{
 		PixelInspectionUAV[0].mPixelValue = color;
@@ -135,8 +136,7 @@ float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 	
 	color.xyz = ApplySRGBCurve(color.xyz);
 
-	// ShaderToHuman
-	if (false)
+#if 0 // ShaderToHuman
 	{
 		// https://github.com/electronicarts/ShaderToHuman
 
@@ -161,19 +161,15 @@ float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 
 		color.xyz = lerp(color.xyz, ui.dstColor.xyz, ui.dstColor.a);
 	}
+#endif // ShaderToHuman
 
 	return float4(color.xyz, 1);
 }
 
 [numthreads(64, 1, 1)]
-void ClearCS(
-	uint3 inGroupThreadID : SV_GroupThreadID,
-	uint3 inGroupID : SV_GroupID,
-	uint3 inDispatchThreadID : SV_DispatchThreadID,
-	uint inGroupIndex : SV_GroupIndex)
+void ClearCS(COMPUTE_SHADER_INPUT)
 {
 	USING_RESOURCE(RWStructuredBuffer<PixelInspection>, PixelInspectionUAV);
-	USING_RESOURCE(RWStructuredBuffer<RayInspection>, RayInspectionUAV);
 	USING_RESOURCE(RWStructuredBuffer<uint>, ShaderPrintUAV);
 
 	if (inDispatchThreadID.x == 0)
@@ -188,14 +184,7 @@ void ClearCS(
 		PixelInspectionUAV[0].mPixelValueArray[inDispatchThreadID.x] = 0;
 	}
 
-	if (GetDebugFlag() & DebugFlag::UpdateRayInspection)
-		if (inDispatchThreadID.x < RayInspection::kArraySize)
-		{
-			// Initialize position as NaN to kill vertices those are not updated
-			RayInspectionUAV[0].mPositionWS[inDispatchThreadID.x] = sqrt(-1.0);
-			RayInspectionUAV[0].mNormalWS[inDispatchThreadID.x] = sqrt(-1.0);
-			RayInspectionUAV[0].mLightPositionWS[inDispatchThreadID.x] = sqrt(-1.0);
-		}
+	InspectRay::Clear(inDispatchThreadID.x);
 
 #if SHADER_DEBUG
 	ShaderPrintUAV[0] = 1; // 0 stores count
@@ -205,22 +194,14 @@ void ClearCS(
 // Replacement for complex ClearUnorderedAccessViewUint/Float
 // https://asawicki.info/news_1795_secrets_of_direct3d_12_the_behavior_of_clearunorderedaccessviewuintfloat
 [numthreads(64, 1, 1)]
-void ClearBufferCS(
-	uint3 inGroupThreadID : SV_GroupThreadID,
-	uint3 inGroupID : SV_GroupID,
-	uint3 inDispatchThreadID : SV_DispatchThreadID,
-	uint inGroupIndex : SV_GroupIndex)
+void ClearBufferCS(COMPUTE_SHADER_INPUT)
 {
 	RWStructuredBuffer<uint4> buffer = ResourceDescriptorHeap[mRootConstants.mData0.x];
 	buffer[inDispatchThreadID.x] = mRootConstants.mData1;
 }
 
 [numthreads(8, 8, 1)]
-void GeneratTextureCS(
-	uint3 inGroupThreadID : SV_GroupThreadID,
-	uint3 inGroupID : SV_GroupID,
-	uint3 inDispatchThreadID : SV_DispatchThreadID,
-	uint inGroupIndex : SV_GroupIndex)
+void GeneratTextureCS(COMPUTE_SHADER_INPUT)
 {
 	USING_RESOURCE(RWTexture2D<float4>, GeneratedUAV);
 
@@ -231,11 +212,7 @@ void GeneratTextureCS(
 }
 
 [numthreads(8, 8, 1)]
-void BRDFSliceCS(
-	uint3 inGroupThreadID : SV_GroupThreadID,
-	uint3 inGroupID : SV_GroupID,
-	uint3 inDispatchThreadID : SV_DispatchThreadID,
-	uint inGroupIndex : SV_GroupIndex)
+void BRDFSliceCS(COMPUTE_SHADER_INPUT)
 {
 	USING_RESOURCE(RWTexture2D<float4>, BRDFSliceUAV);
 
@@ -252,11 +229,7 @@ void BRDFSliceCS(
 }
 
 [numthreads(8, 8, 1)]
-void ReadbackCS(
-	uint3 inGroupThreadID : SV_GroupThreadID,
-	uint3 inGroupID : SV_GroupID,
-	uint3 inDispatchThreadID : SV_DispatchThreadID,
-	uint inGroupIndex : SV_GroupIndex)
+void ReadbackCS(COMPUTE_SHADER_INPUT)
 {
 	USING_RESOURCE(Texture2D<float4>, ScreenColorSRV);
 	USING_RESOURCE(RWTexture2D<float4>, ScreenReadbackUAV);
@@ -344,11 +317,7 @@ float4 LineHiddenPS(float4 position : SV_POSITION, in float4 inColor : COLOR) : 
 }
 
 [numthreads(8, 8, 1)]
-void NanoVDBVisualizeCS(
-	uint3 inGroupThreadID : SV_GroupThreadID,
-	uint3 inGroupID : SV_GroupID,
-	uint3 inDispatchThreadID : SV_DispatchThreadID,
-	uint inGroupIndex : SV_GroupIndex)
+void NanoVDBVisualizeCS(COMPUTE_SHADER_INPUT)
 {
 	USING_RESOURCE(StructuredBuffer<InstanceData>, RaytraceInstanceDataSRV);
 
