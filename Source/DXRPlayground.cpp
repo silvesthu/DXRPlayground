@@ -541,7 +541,7 @@ void sRender()
 			sConstantsCopy.mCurrentFrameIndex		= gConstants.mCurrentFrameIndex;
 			sConstantsCopy.mCurrentFrameWeight		= gConstants.mCurrentFrameWeight;
 			sConstantsCopy.mPixelDebugCoord			= gConstants.mPixelDebugCoord;
-			sConstantsCopy.mDebugMode				= gConstants.mDebugMode;
+			sConstantsCopy.mInspectPixelMode		= gConstants.mInspectPixelMode;
 			sConstantsCopy.mDebugFlag				= gConstants.mDebugFlag;
 			sConstantsCopy.mSpatialCache			= gConstants.mSpatialCache;
 			sConstantsCopy.mReSTIR					= gConstants.mReSTIR;

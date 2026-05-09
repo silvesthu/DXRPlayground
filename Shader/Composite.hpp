@@ -172,6 +172,10 @@ void ClearCS(COMPUTE_SHADER_INPUT)
 	USING_RESOURCE(RWStructuredBuffer<PixelInspection>, PixelInspectionUAV);
 	USING_RESOURCE(RWStructuredBuffer<uint>, ShaderPrintUAV);
 
+#if SHADER_DEBUG
+	ShaderPrintUAV[0] = 1; // 0 stores count
+#endif // SHADER_DEBUG
+
 	if (inDispatchThreadID.x == 0)
 	{
 		PixelInspectionUAV[0].mPixelValue = 0;
@@ -185,10 +189,6 @@ void ClearCS(COMPUTE_SHADER_INPUT)
 	}
 
 	InspectRay::Clear(inDispatchThreadID.x);
-
-#if SHADER_DEBUG
-	ShaderPrintUAV[0] = 1; // 0 stores count
-#endif // SHADER_DEBUG
 }
 
 // Replacement for complex ClearUnorderedAccessViewUint/Float

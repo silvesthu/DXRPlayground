@@ -3,15 +3,7 @@
 #include "Binding.h"
 #include "Common.h"
 #include "Context.h"
-
-struct BSDFResult
-{
-	float3			mBSDF;
-	float			mBSDFSamplePDF;
-	float			mEta;
-	uint			mLobeIndex;
-	uint			mMediumInstanceID;
-};
+#include "DebugUtils.h"
 
 namespace BSDFEvaluation
 {
@@ -77,7 +69,6 @@ namespace BSDFEvaluation
 			BSDFResult result;
 			result.mBSDF						= inHitContext.Albedo() / MATH_PI;
 			result.mBSDFSamplePDF				= max(0, inBSDFContext.mNdotL) / MATH_PI;
-			result.mLobeIndex					= 0;
 			result.mEta							= 1.0;
 			result.mMediumInstanceID			= InvalidInstanceID;
 
@@ -107,23 +98,11 @@ namespace BSDFEvaluation
 		{
 			float3 F							= F_Conductor_Mitsuba(inHitContext.Eta(), inHitContext.K(), inBSDFContext.mHdotV) * inHitContext.SpecularReflectance();
 
-			if (inBSDFContext.mMode == BSDFContext::Mode::BSDF)
-			{
-				InspectPixel::Update(DebugMode::BSDF__D, ioPathContext, float3(QNaN(), 0, 0));
-				InspectPixel::Update(DebugMode::BSDF__G, ioPathContext, float3(QNaN(), 0, 0));
-				InspectPixel::Update(DebugMode::BSDF__F, ioPathContext, float3(F));
-			}
-			else
-			{
-				InspectPixel::Update(DebugMode::Light_D, ioPathContext, float3(QNaN(), 0, 0));
-				InspectPixel::Update(DebugMode::Light_G, ioPathContext, float3(QNaN(), 0, 0));
-				InspectPixel::Update(DebugMode::Light_F, ioPathContext, float3(F));
-			}
+			InspectPixel::DGF(ioPathContext, inBSDFContext, QNaN(), QNaN(), F);
 
 			BSDFResult result;
 			result.mBSDF						= F;
 			result.mBSDFSamplePDF				= 1.0;
-			result.mLobeIndex					= 0;
 			result.mEta							= 1.0;
 			result.mMediumInstanceID			= InvalidInstanceID;
 
@@ -165,18 +144,7 @@ namespace BSDFEvaluation
 			if (inBSDFContext.mNdotL < 0 || inBSDFContext.mNdotV < 0 || inBSDFContext.mHdotL < 0 || inBSDFContext.mHdotV < 0)
 				D								= 0;
 
-			if (inBSDFContext.mMode == BSDFContext::Mode::BSDF)
-			{
-				InspectPixel::Update(DebugMode::BSDF__D, ioPathContext, float3(D, 0, 0));
-				InspectPixel::Update(DebugMode::BSDF__G, ioPathContext, float3(G, 0, 0));
-				InspectPixel::Update(DebugMode::BSDF__F, ioPathContext, float3(F));
-			}
-			else
-			{
-				InspectPixel::Update(DebugMode::Light_D, ioPathContext, float3(D, 0, 0));
-				InspectPixel::Update(DebugMode::Light_G, ioPathContext, float3(G, 0, 0));
-				InspectPixel::Update(DebugMode::Light_F, ioPathContext, float3(F));
-			}
+			InspectPixel::DGF(ioPathContext, inBSDFContext, D, G, F);
 
 			// [NOTE] Eval/Sample functions may return BSDF * NdotL / PDF as a whole or in separated terms, which varies between implementations.
 			//        Also, NdotL needs to be eliminated for Dirac delta distribution.
@@ -195,7 +163,6 @@ namespace BSDFEvaluation
 			BSDFResult result;
 			result.mBSDF						= D * G * F / (4.0f * inBSDFContext.mNdotV * inBSDFContext.mNdotL);
 			result.mBSDFSamplePDF				= microfacet_pdf * jacobian;
-			result.mLobeIndex					= 0;
 			result.mEta							= 1.0;
 			result.mMediumInstanceID			= InvalidInstanceID;
 			return result;
@@ -204,6 +171,9 @@ namespace BSDFEvaluation
 
 	namespace Dielectric
 	{
+		static uint sReflectionLobeIndex = 0;
+		static uint sRefractionLobeIndex = 1;
+
 		void PatchThinDielectricBefore(HitContext inHitContext, inout float ioCosTheta, inout float ioEta)
 		{
 			if (!USE_BSDF_ThinDielectric || inHitContext.BSDF() != BSDF::ThinDielectric)
@@ -244,12 +214,13 @@ namespace BSDFEvaluation
 			F_Dielectric_Mitsuba(cos_theta, eta, r_i, cos_theta_t, eta_it, eta_ti);
 			PatchThinDielectricAfter(inHitContext, r_i, cos_theta_t, eta_it, eta_ti);
 
-			bool selected_r						= RandomFloat01(ioPathContext.mRandomState) <= r_i;
-			float3 L							= select(selected_r,
+			bool select_reflection				= RandomFloat01(ioPathContext.mRandomState) <= r_i;
+			float3 L							= select(select_reflection,
 													reflect(-inHitContext.ViewWS(), inHitContext.NdotV() < 0 ? -inHitContext.NormalWS() : inHitContext.NormalWS()),
 													refract(-inHitContext.ViewWS(), inHitContext.NdotV() < 0 ? -inHitContext.NormalWS() : inHitContext.NormalWS(), eta_ti));
 			
-			return BSDFContext::Generate(BSDFContext::Mode::BSDF, L, select(selected_r, 1.0, eta_it), selected_r, inHitContext);
+			uint lobe_index						= select_reflection ? sReflectionLobeIndex : sRefractionLobeIndex;
+			return BSDFContext::Generate(BSDFContext::Mode::BSDF, L, select(select_reflection, 1.0, eta_it), lobe_index, inHitContext);
 		}
 
 		BSDFResult Evaluate(inout BSDFContext inBSDFContext, HitContext inHitContext, inout PathContext ioPathContext)
@@ -264,11 +235,11 @@ namespace BSDFEvaluation
 			F_Dielectric_Mitsuba(cos_theta, eta, r_i, cos_theta_t, eta_it, eta_ti);
 			PatchThinDielectricAfter(inHitContext, r_i, cos_theta_t, eta_it, eta_ti);
 
-			bool selected_r						= inBSDFContext.mLobe0Selected;
+			bool select_reflection				= inBSDFContext.mLobeIndex == sReflectionLobeIndex;
 
 			BSDFResult result;
-			result.mBSDF						= select(selected_r, r_i, 1.0 - r_i) * select(selected_r, inHitContext.SpecularReflectance(), inHitContext.SpecularTransmittance());
-			result.mBSDFSamplePDF				= select(selected_r, r_i, 1.0 - r_i);
+			result.mBSDF						= select(select_reflection, r_i, 1.0 - r_i) * select(select_reflection, inHitContext.SpecularReflectance(), inHitContext.SpecularTransmittance());
+			result.mBSDFSamplePDF				= select(select_reflection, r_i, 1.0 - r_i);
 
 			// [NOTE] Account for solid angle compression
 			//        [Mitsuba3] > For transmission, radiance must be scaled to account for the solid angle compression that occurs when crossing the interface. 
@@ -276,16 +247,14 @@ namespace BSDFEvaluation
 			//        [PBRT3] > Account for non-symmetry with transmission to different medium 
 			//	              https://github.com/mmp/pbrt-v3/blob/aaa552a4b9cbf9dccb71450f47b268e0ed6370e2/src/core/reflection.cpp#L163
 			//		          https://www.pbr-book.org/3ed-2018/Light_Transport_III_Bidirectional_Methods/The_Path-Space_Measurement_Equation#x3-Non-symmetryDuetoRefraction
-			result.mBSDF						*= select(selected_r, 1.0, Sqr(eta_ti));
-
-			result.mLobeIndex					= select(selected_r, 0, 1);
+			result.mBSDF						*= select(select_reflection, 1.0, Sqr(eta_ti));
 
 			// [NOTE] Output eta (inverse) to remove its effect on Russian Roulette. 
 			//		  Russian Roulette terminates path early depending on throughput (beta), which in turn depending on BSDF above
 			//		  Refraction in and out may temporarily lower throughput to cause termination unintentionally
 			//		  [PBRT3] > It lets us sometimes avoid terminating refracted rays that are about to be refracted back out of a medium and thus have their beta value increased.
 			//                https://github.com/mmp/pbrt-v3/blob/master/src/integrators/path.cpp#L72
-			result.mEta							= select(selected_r, 1.0, eta_it);
+			result.mEta							= select(select_reflection, 1.0, eta_it);
 			result.mMediumInstanceID			= select(inHitContext.HasMedium() && inBSDFContext.mNdotL < 0, inHitContext.mInstanceID, InvalidInstanceID);
 
 			return result;
@@ -294,6 +263,9 @@ namespace BSDFEvaluation
 
 	namespace RoughDielectric
 	{
+		static uint sReflectionLobeIndex = 0;
+		static uint sRefractionLobeIndex = 1;
+
 		BSDFContext GenerateContext(HitContext inHitContext, inout PathContext ioPathContext)
 		{
 			float cos_theta						= inHitContext.NdotV();
@@ -308,12 +280,13 @@ namespace BSDFEvaluation
 			float3 H							= Distribution::GGX::GenerateMicrofacetDirection(tangent_space, inHitContext, ioPathContext);
 			float3 V							= inHitContext.ViewWS();
 
-			bool select_reflection = RandomFloat01(ioPathContext.mRandomState) <= r_i;
+			bool select_reflection				= RandomFloat01(ioPathContext.mRandomState) <= r_i;
 			float3 L = select(select_reflection,
 				reflect(-inHitContext.ViewWS(), inHitContext.NdotV() < 0 ? -H : H),
 				refract(-inHitContext.ViewWS(), inHitContext.NdotV() < 0 ? -H : H, eta_ti));
 
-			return BSDFContext::Generate(BSDFContext::Mode::BSDF, L, select(select_reflection, 1.0, eta_it), select_reflection, inHitContext);
+			uint lobe_index						= select_reflection ? sReflectionLobeIndex : sRefractionLobeIndex;
+			return BSDFContext::Generate(BSDFContext::Mode::BSDF, L, select(select_reflection, 1.0, eta_it), lobe_index, inHitContext);
 		}
 
 		BSDFResult Evaluate(inout BSDFContext inBSDFContext, HitContext inHitContext, inout PathContext ioPathContext)
@@ -328,21 +301,14 @@ namespace BSDFEvaluation
 			float eta_ti;
 			F_Dielectric_Mitsuba(cos_theta, eta, r_i, cos_theta_t, eta_it, eta_ti);
 
-			bool selected_r						= inBSDFContext.mLobe0Selected;
-
-			if (inBSDFContext.mMode == BSDFContext::Mode::BSDF)
-				InspectPixel::Update(DebugMode::BSDF__I, ioPathContext, float3(selected_r ? 0 : 1, 0, 0));
-			else
-				InspectPixel::Update(DebugMode::Light_I, ioPathContext, float3(selected_r ? 0 : 1, 0, 0));
-
-			if (selected_r)
+			bool select_reflection				= inBSDFContext.mLobeIndex == sReflectionLobeIndex;
+			if (select_reflection)
 			{
 				// Effectively TwoSided for reflection
 				if (inBSDFContext.mNdotV < 0)
 					inBSDFContext.FlipNormal();
 
 				// See RoughConductor::Evaluate
-
 				float D							= D_GGX(inBSDFContext.mNdotH, inHitContext.RoughnessAlpha());
 				float G							= G_SmithGGX(inBSDFContext.mNdotL, inBSDFContext.mNdotV, inHitContext.RoughnessAlpha());
 				float3 F						= r_i * inHitContext.SpecularReflectance();
@@ -350,18 +316,7 @@ namespace BSDFEvaluation
 				if (inBSDFContext.mNdotL < 0 || inBSDFContext.mNdotV < 0 || inBSDFContext.mHdotL < 0 || inBSDFContext.mHdotV < 0)
 					D							= 0;
 
-				if (inBSDFContext.mMode == BSDFContext::Mode::BSDF)
-				{
-					InspectPixel::Update(DebugMode::BSDF__D, ioPathContext, float3(D, 0, 0));
-					InspectPixel::Update(DebugMode::BSDF__G, ioPathContext, float3(G, 0, 0));
-					InspectPixel::Update(DebugMode::BSDF__F, ioPathContext, float3(F));
-				}
-				else
-				{
-					InspectPixel::Update(DebugMode::Light_D, ioPathContext, float3(D, 0, 0));
-					InspectPixel::Update(DebugMode::Light_G, ioPathContext, float3(G, 0, 0));
-					InspectPixel::Update(DebugMode::Light_F, ioPathContext, float3(F));
-				}
+				InspectPixel::DGF(ioPathContext, inBSDFContext, D, G, F);
 
 				float microfacet_pdf			= D * inBSDFContext.mNdotH;
 				float jacobian					= 1.0 / (4.0f * inBSDFContext.mHdotL);
@@ -382,18 +337,7 @@ namespace BSDFEvaluation
 				float G							= G_SmithGGX(inBSDFContext.mNdotL, inBSDFContext.mNdotV, inHitContext.RoughnessAlpha());
 				float3 F						= (1.0 - r_i) * inHitContext.SpecularTransmittance();
 
-				if (inBSDFContext.mMode == BSDFContext::Mode::BSDF)
-				{
-					InspectPixel::Update(DebugMode::BSDF__D, ioPathContext, float3(D, 0, 0));
-					InspectPixel::Update(DebugMode::BSDF__G, ioPathContext, float3(G, 0, 0));
-					InspectPixel::Update(DebugMode::BSDF__F, ioPathContext, float3(F));
-				}
-				else
-				{
-					InspectPixel::Update(DebugMode::Light_D, ioPathContext, float3(D, 0, 0));
-					InspectPixel::Update(DebugMode::Light_G, ioPathContext, float3(G, 0, 0));
-					InspectPixel::Update(DebugMode::Light_F, ioPathContext, float3(F));
-				}
+				InspectPixel::DGF(ioPathContext, inBSDFContext, D, G, F);
 
 				float microfacet_pdf			= D * inBSDFContext.mNdotH;
 				float jacobian					= abs(Sqr(eta_it) * inBSDFContext.mHdotL / Sqr(inBSDFContext.mHdotV + eta_it * inBSDFContext.mHdotL));
@@ -401,12 +345,11 @@ namespace BSDFEvaluation
 				result.mBSDF					= abs(D * G * F * inBSDFContext.mHdotV * jacobian / (abs(inBSDFContext.mNdotV) * abs(inBSDFContext.mNdotL)));
 				result.mBSDFSamplePDF			= microfacet_pdf * jacobian;
 			}
-			result.mBSDFSamplePDF				*= select(selected_r, r_i, 1.0 - r_i);
+			result.mBSDFSamplePDF				*= select(select_reflection, r_i, 1.0 - r_i);
 
 			// See Dielectric::Evaluate
-			result.mBSDF						*= select(selected_r, 1.0, Sqr(eta_ti));
-			result.mLobeIndex					= select(selected_r, 0, 1);
-			result.mEta							= select(selected_r, 1.0, eta_it);
+			result.mBSDF						*= select(select_reflection, 1.0, Sqr(eta_ti));
+			result.mEta							= select(select_reflection, 1.0, eta_it);
 			result.mMediumInstanceID			= select(inHitContext.HasMedium() && inBSDFContext.mNdotL < 0, inHitContext.mInstanceID, InvalidInstanceID);
 
 			return result;
@@ -415,6 +358,9 @@ namespace BSDFEvaluation
 
 	namespace glTF
 	{
+		static uint sSpecularLobeIndex = 0;
+		static uint sDiffuseLobeIndex = 1;
+
 		BSDFContext GenerateContext(HitContext inHitContext, inout PathContext ioPathContext)
 		{
 			BSDFContext bsdf_context;
@@ -439,13 +385,13 @@ namespace BSDFEvaluation
 				bsdf_context = BSDFContext::Generate(BSDFContext::Mode::BSDF, L, inHitContext);
 			}
 
-			bsdf_context.mLobe0Selected			= select_specular;
+			bsdf_context.mLobeIndex				= select_specular ? sSpecularLobeIndex : sDiffuseLobeIndex;
 			return bsdf_context;
 		}
 
 		BSDFResult Evaluate(inout BSDFContext inBSDFContext, HitContext inHitContext, inout PathContext ioPathContext)
 		{
-			bool select_specular					= inBSDFContext.mLobe0Selected;
+			bool select_specular					= inBSDFContext.mLobeIndex == sSpecularLobeIndex;
 			float3 specular_reflectance				= inHitContext.SpecularReflectance();
 			float specular_probability				= MaxComponent(specular_reflectance);			
 			if (!select_specular)
@@ -465,18 +411,7 @@ namespace BSDFEvaluation
 				if (inBSDFContext.mNdotL < 0 || inBSDFContext.mNdotV < 0 || inBSDFContext.mHdotL < 0 || inBSDFContext.mHdotV < 0)
 					D								= 0;
 
-				if (inBSDFContext.mMode == BSDFContext::Mode::BSDF)
-				{
-					InspectPixel::Update(DebugMode::BSDF__D, ioPathContext, float3(D, 0, 0));
-					InspectPixel::Update(DebugMode::BSDF__G, ioPathContext, float3(G, 0, 0));
-					InspectPixel::Update(DebugMode::BSDF__F, ioPathContext, float3(F));
-				}
-				else
-				{
-					InspectPixel::Update(DebugMode::Light_D, ioPathContext, float3(D, 0, 0));
-					InspectPixel::Update(DebugMode::Light_G, ioPathContext, float3(G, 0, 0));
-					InspectPixel::Update(DebugMode::Light_F, ioPathContext, float3(F));
-				}
+				InspectPixel::DGF(ioPathContext, inBSDFContext, D, G, F);
 			
 				float microfacet_pdf				= D * inBSDFContext.mNdotH;
 				float jacobian						= 1.0 / (4.0f * inBSDFContext.mHdotL);
@@ -484,7 +419,6 @@ namespace BSDFEvaluation
 				BSDFResult result;
 				result.mBSDF						= D * G * F / (4.0f * inBSDFContext.mNdotV * inBSDFContext.mNdotL);
 				result.mBSDFSamplePDF				= microfacet_pdf * jacobian * specular_probability;
-				result.mLobeIndex					= 0;
 				result.mEta							= 1.0;
 				result.mMediumInstanceID			= InvalidInstanceID;
 				return result;
@@ -521,10 +455,11 @@ namespace BSDFEvaluation
 		default:								bsdf_context = Diffuse::GenerateContext(inHitContext, ioPathContext); break;
 		}
 
-		InspectPixel::Update(DebugMode::BSDF__L,		ioPathContext, float3(bsdf_context.mL));
-		InspectPixel::Update(DebugMode::BSDF__V,		ioPathContext, float3(bsdf_context.mV));
-		InspectPixel::Update(DebugMode::BSDF__N,		ioPathContext, float3(bsdf_context.mN));
-		InspectPixel::Update(DebugMode::BSDF__H,		ioPathContext, float3(bsdf_context.mH));
+		InspectPixel::Update(InspectPixelMode::BSDF__L,		ioPathContext, float3(bsdf_context.mL));
+		InspectPixel::Update(InspectPixelMode::BSDF__V,		ioPathContext, float3(bsdf_context.mV));
+		InspectPixel::Update(InspectPixelMode::BSDF__N,		ioPathContext, float3(bsdf_context.mN));
+		InspectPixel::Update(InspectPixelMode::BSDF__H,		ioPathContext, float3(bsdf_context.mH));
+		InspectPixel::Update(InspectPixelMode::BSDF__Lobe,	ioPathContext, float3(bsdf_context.mLobeIndex, 0, 0));
 
 		return bsdf_context;
 	}

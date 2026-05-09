@@ -69,7 +69,7 @@ void gPrepareImGui()
 			InputFloat3("Pixel Value", &gRenderer.mRuntime.mPixelInspectionBuffer.GetReadback<PixelInspection>(gGetFrameContextIndex())[0].mPixelValue.x, "%.8f", ImGuiInputTextFlags_ReadOnly);
 			SliderInt("Recursion", &gConstants.mDebugRecursion, 0, gConstants.mRecursionDepthCountMax);
 
-			if (TreeNodeEx("Visualize Mode", ImGuiTreeNodeFlags_None))
+			if (TreeNodeEx("Visualize", ImGuiTreeNodeFlags_None))
 			{
 				for (int i = 0; i < static_cast<int>(VisualizeMode::Count); i++)
 				{
@@ -88,13 +88,13 @@ void gPrepareImGui()
 				TreePop();
 			}
 
-			if (TreeNodeEx("Debug Mode", ImGuiTreeNodeFlags_None))
+			if (TreeNodeEx("Inspect Pixel", ImGuiTreeNodeFlags_None))
 			{
 				InputFloat3("Debug Value", &gRenderer.mRuntime.mPixelInspectionBuffer.GetReadback<PixelInspection>(gGetFrameContextIndex())[0].mDebugValue.x, "%.8f", ImGuiInputTextFlags_ReadOnly);
 
-				for (int i = 0; i < static_cast<int>(DebugMode::Count); i++)
+				for (int i = 0; i < static_cast<int>(InspectPixelMode::Count); i++)
 				{
-					const auto& name = nameof::nameof_enum(static_cast<DebugMode>(i));
+					const auto& name = nameof::nameof_enum(static_cast<InspectPixelMode>(i));
 					if (name.starts_with('_'))
 					{
 						NewLine();
@@ -104,7 +104,7 @@ void gPrepareImGui()
 					if (i != 0)
 						SameLine();
 
-					RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mDebugMode), i);
+					RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mInspectPixelMode), i);
 				}
 
 				for (int i = 0; i < PixelInspection::kArraySize; i++)
@@ -137,41 +137,49 @@ void gPrepareImGui()
 						case ShaderPrintEntryType::Float1:
 						{
 							ss << asfloat(ShaderPrint[uint_index++]);
+							if (option & 0x1) { ss << "\n"; }
 							break;
 						}
 						case ShaderPrintEntryType::Float2:
 						{
 							ss << asfloat(ShaderPrint[uint_index++]) << ", " << asfloat(ShaderPrint[uint_index++]);
+							if (option & 0x1) { ss << "\n"; }
 							break;
 						}
 						case ShaderPrintEntryType::Float3:
 						{
 							ss << asfloat(ShaderPrint[uint_index++]) << ", " << asfloat(ShaderPrint[uint_index++]) << ", " << asfloat(ShaderPrint[uint_index++]);
+							if (option & 0x1) { ss << "\n"; }
 							break;
 						}
 						case ShaderPrintEntryType::Float4:
 						{
 							ss << asfloat(ShaderPrint[uint_index++]) << ", " << asfloat(ShaderPrint[uint_index++]) << ", " << asfloat(ShaderPrint[uint_index++]) << ", " << asfloat(ShaderPrint[uint_index++]);
+							if (option & 0x1) { ss << "\n"; }
 							break;
 						}
 						case ShaderPrintEntryType::UInt1:
 						{
 							ss << (ShaderPrint[uint_index++]);
+							if (option & 0x1) { ss << "\n"; }
 							break;
 						}
 						case ShaderPrintEntryType::UInt2:
 						{
-						 ss << (ShaderPrint[uint_index++]) << ", " << (ShaderPrint[uint_index++]);
+							ss << (ShaderPrint[uint_index++]) << ", " << (ShaderPrint[uint_index++]);
+							if (option & 0x1) { ss << "\n"; }
 							break;
 						}
 						case ShaderPrintEntryType::UInt3:
 						{
 							ss << (ShaderPrint[uint_index++]) << ", " << (ShaderPrint[uint_index++]) << ", " << (ShaderPrint[uint_index++]);
+							if (option & 0x1) { ss << "\n"; }
 							break;
 						}
 						case ShaderPrintEntryType::UInt4:
 						{
 							ss << (ShaderPrint[uint_index++]) << ", " << (ShaderPrint[uint_index++]) << ", " << (ShaderPrint[uint_index++]) << ", " << (ShaderPrint[uint_index++]);
+							if (option & 0x1) { ss << "\n"; }
 							break;
 						}
 						case ShaderPrintEntryType::String:

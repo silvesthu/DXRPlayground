@@ -7,15 +7,15 @@
 #include "Binding.h"
 #include "Context.h"
 
-struct ShaderPrint
+namespace ShaderPrint
 {
-	bool mEnabled;
+	static bool sEnabled;
 
-	void Init(inout PixelContext ioPixelContext)
+	void Initialize(PixelContext ioPixelContext)
 	{
-		mEnabled = false;
+		sEnabled = false;
 #if SHADER_DEBUG
-		mEnabled = !ioPixelContext.mOutputDepth &&
+		sEnabled = !ioPixelContext.mOutputDepth &&
 			ioPixelContext.mPixelIndex.x == mConstants.mPixelDebugCoord.x && 
 			ioPixelContext.mPixelIndex.y == mConstants.mPixelDebugCoord.y;
 #endif // SHADER_DEBUG
@@ -25,7 +25,7 @@ struct ShaderPrint
 	{
 		USING_RESOURCE(RWStructuredBuffer<uint>, ShaderPrintUAV);
 
-		if (!mEnabled) { return 0; }
+		if (!sEnabled) { return 0; }
 
 		uint offset = 0;
 #if SHADER_DEBUG
@@ -39,29 +39,29 @@ struct ShaderPrint
 		return (inType & 0xffff) | (inOption << 16);
 	}
 
-	void _PrintFloat(float4 inValue, uint inN)
+	void _PrintFloat(float4 inValue, uint inN, uint inOption)
 	{
 		USING_RESOURCE(RWStructuredBuffer<uint>, ShaderPrintUAV);
 
-		if (!mEnabled) { return; }
+		if (!sEnabled) { return; }
 		uint offset = _Allocate(1 + inN);
-		ShaderPrintUAV[offset] = _MakeEntryHeader((uint)ShaderPrintEntryType::Float1 + inN - 1, 0);
+		ShaderPrintUAV[offset] = _MakeEntryHeader((uint)ShaderPrintEntryType::Float1 + inN - 1, inOption);
 		for (uint i = 0; i < inN; i++)
 		{
-			ShaderPrintUAV[offset + 1] = asuint(inValue[i]);
+			ShaderPrintUAV[offset + 1 + i] = asuint(inValue[i]);
 		}
 	}
 
-	void _PrintUInt(uint4 inValue, uint inN)
+	void _PrintUInt(uint4 inValue, uint inN, uint inOption)
 	{
 		USING_RESOURCE(RWStructuredBuffer<uint>, ShaderPrintUAV);
 
-		if (!mEnabled) { return; }
+		if (!sEnabled) { return; }
 		uint offset = _Allocate(1 + inN);
-		ShaderPrintUAV[offset] = _MakeEntryHeader((uint)ShaderPrintEntryType::UInt1 + inN - 1, 0);
+		ShaderPrintUAV[offset] = _MakeEntryHeader((uint)ShaderPrintEntryType::UInt1 + inN - 1, inOption);
 		for (uint i = 0; i < inN; i++)
 		{
-			ShaderPrintUAV[offset + 1] = inValue[i];
+			ShaderPrintUAV[offset + 1 + i] = inValue[i];
 		}
 	}
 
@@ -265,19 +265,17 @@ struct ShaderPrint
 	}
 };
 
-static ShaderPrint sShaderPrint;
-
-void Print(float inValue) { sShaderPrint._PrintFloat(inValue.xxxx, 1); }
-void Print(float2 inValue) { sShaderPrint._PrintFloat(inValue.xyxx, 2); }
-void Print(float3 inValue) { sShaderPrint._PrintFloat(inValue.xyzx, 3); }
-void Print(float4 inValue) { sShaderPrint._PrintFloat(inValue.xyzw, 4); }
-void Print(uint inValue) { sShaderPrint._PrintUInt(inValue.xxxx, 1); }
-void Print(uint2 inValue) { sShaderPrint._PrintUInt(inValue.xyxx, 2); }
-void Print(uint3 inValue) { sShaderPrint._PrintUInt(inValue.xyzx, 3); }
-void Print(uint4 inValue) { sShaderPrint._PrintUInt(inValue.xyzw, 4); }
+void Print(float inValue, bool inNewLine = true) { ShaderPrint::_PrintFloat(inValue.xxxx, 1, inNewLine ? 1 : 0); }
+void Print(float2 inValue, bool inNewLine = true) { ShaderPrint::_PrintFloat(inValue.xyxx, 2, inNewLine ? 1 : 0); }
+void Print(float3 inValue, bool inNewLine = true) { ShaderPrint::_PrintFloat(inValue.xyzx, 3, inNewLine ? 1 : 0); }
+void Print(float4 inValue, bool inNewLine = true) { ShaderPrint::_PrintFloat(inValue.xyzw, 4, inNewLine ? 1 : 0); }
+void Print(uint inValue, bool inNewLine = true) { ShaderPrint::_PrintUInt(inValue.xxxx, 1, inNewLine ? 1 : 0); }
+void Print(uint2 inValue, bool inNewLine = true) { ShaderPrint::_PrintUInt(inValue.xyxx, 2, inNewLine ? 1 : 0); }
+void Print(uint3 inValue, bool inNewLine = true) { ShaderPrint::_PrintUInt(inValue.xyzx, 3, inNewLine ? 1 : 0); }
+void Print(uint4 inValue, bool inNewLine = true) { ShaderPrint::_PrintUInt(inValue.xyzw, 4, inNewLine ? 1 : 0); }
 
 #define PrintString(inString)																                \
-if (sShaderPrint.mEnabled)																					\
+if (ShaderPrint::sEnabled)																					\
 {																											\
 	USING_RESOURCE(RWStructuredBuffer<uint>, ShaderPrintUAV);												\
 	uint byte_count = 0;																					\
@@ -286,8 +284,8 @@ if (sShaderPrint.mEnabled)																					\
 		if (inString[byte_count] == "\0"[0]) break;															\
 	}																										\
 	uint uint_count = (byte_count + 3) / 4;																	\
-	uint offset = sShaderPrint._Allocate(1 + uint_count);													\
-	ShaderPrintUAV[offset] = sShaderPrint._MakeEntryHeader((uint)ShaderPrintEntryType::String, byte_count);	\
+	uint offset = ShaderPrint::_Allocate(1 + uint_count);													\
+	ShaderPrintUAV[offset] = ShaderPrint::_MakeEntryHeader((uint)ShaderPrintEntryType::String, byte_count);	\
 	for (uint uint_index = 0; uint_index < uint_count; uint_index++)                                        \
 	{                                                                                                       \
 		uint data = 0;                                                                                      \
@@ -295,11 +293,11 @@ if (sShaderPrint.mEnabled)																					\
         {                                                                                                   \
             uint byte_index = uint_index * 4 + local_byte_index;                                            \
             if (byte_index >= byte_count) { break; }                                                        \
-            data |= (sShaderPrint.CharToUint(inString[byte_index]) << (local_byte_index * 8));              \
+            data |= (ShaderPrint::CharToUint(inString[byte_index]) << (local_byte_index * 8));              \
         }                                                                                                   \
         ShaderPrintUAV[offset + 1 + uint_index] = data;                                                     \
 	}                                                                                                       \
 }
 
 #define PrintNewLine() PrintString("\n")
-#define PrintNameValueLine(inString, inValue) PrintString(inString); Print(inValue); PrintNewLine()
+#define PrintNameValueLine(inString, inValue) PrintString(inString); Print(inValue);

@@ -2,6 +2,7 @@
 
 #include "Shared.h"
 #include "Binding.h"
+#include "Reservoir.h"
 #include "NanoVDB.h"
 
 struct PixelContext
@@ -424,7 +425,7 @@ struct BSDFContext
 	};
 	Mode			mMode;
 
-	static BSDFContext Generate(Mode inMode, float3 inLight, float inEtaIT, bool inLobe0Selected, HitContext inHitContext)
+	static BSDFContext Generate(Mode inMode, float3 inLight, float inEtaIT, uint inLobeIndex, HitContext inHitContext)
 	{
 		BSDFContext bsdf_context;
 
@@ -444,22 +445,19 @@ struct BSDFContext
 		bsdf_context.mHdotV						= dot(bsdf_context.mH, bsdf_context.mV);
 		bsdf_context.mHdotL						= dot(bsdf_context.mH, bsdf_context.mL);
 
-		bsdf_context.mLobe0Selected				= inLobe0Selected;
+		bsdf_context.mLobeIndex					= inLobeIndex;
 
 		return bsdf_context;
 	}
 
 	static BSDFContext Generate(Mode inMode, float3 inLight, HitContext inHitContext)
 	{
-		float dummy_eta_it						= 1.0;
-		bool dummy_lobe0_selected				= false;
-
-		BSDFContext bsdf_context				= Generate(inMode, inLight, dummy_eta_it, dummy_lobe0_selected, inHitContext);
-
-		// Patch
-		bsdf_context.mLobe0Selected				= bsdf_context.mNdotV * bsdf_context.mNdotL > 0;
 		// [NOTE] eta_it can not be determined until BSDF is evaluated. SetEta is used then.
-
+		// [TODO] Should allow BSDFEvaluation to properly generate this context
+		float dummy_eta_it						= 1.0;
+		uint dummy_lobe_index					= 0;
+		BSDFContext bsdf_context				= Generate(inMode, inLight, dummy_eta_it, dummy_lobe_index, inHitContext);
+		bsdf_context.mLobeIndex					= bsdf_context.mNdotV * bsdf_context.mNdotL > 0 ? 0 : 1;
 		return bsdf_context;
 	}
 
@@ -497,9 +495,17 @@ struct BSDFContext
 	float			mHdotV;
 	float			mHdotL;
 
-	bool			mLobe0Selected;				// [TODO] More than 2 lobes? Use lobe index? Still coupled with implementaion detail
+	uint			mLobeIndex;
 
 	float			mLPDF;						// For light sample
+};
+
+struct BSDFResult
+{
+	float3			mBSDF;
+	float			mBSDFSamplePDF;
+	float			mEta;
+	uint			mMediumInstanceID;
 };
 
 struct MediumContext
@@ -513,11 +519,11 @@ struct MediumContext
 		mSigmaT									*= density * mConstants.mDensityBoost;
 		mSigmaT									= min(mSigmaT, mMajorantSigmaT); // using SigmaT in xml as majorant, clamp with it as max is ignored
 
-		// InspectPixel::Update(DebugMode::Manual, ioPathContext, normalized_coords);
-		// InspectPixel::Update(DebugMode::Manual, ioPathContext, ijk);
-		// InspectPixel::Update(DebugMode::Manual, ioPathContext, density);
-		// InspectPixel::Update(DebugMode::Manual, ioPathContext, mMajorantSigmaT);
-		// InspectPixel::Update(DebugMode::Manual, ioPathContext, mInstanceData.mMediumSigmaT);
+		// InspectPixel::Update(InspectPixelMode::Manual, ioPathContext, normalized_coords);
+		// InspectPixel::Update(InspectPixelMode::Manual, ioPathContext, ijk);
+		// InspectPixel::Update(InspectPixelMode::Manual, ioPathContext, density);
+		// InspectPixel::Update(InspectPixelMode::Manual, ioPathContext, mMajorantSigmaT);
+		// InspectPixel::Update(InspectPixelMode::Manual, ioPathContext, mInstanceData.mMediumSigmaT);
 	}
 
 	template<RAY_FLAG RayFlags>
@@ -582,3 +588,24 @@ struct MediumContext
 	NanoVDBContext	mNanoVDBContext;
 };
 
+struct LightContext
+{
+	bool			IsValid() { return mReservoir.IsValid(); }
+	uint			LightIndex() { return mReservoir.LightIndex(); }
+	Light			GetLight()
+	{
+		USING_RESOURCE(StructuredBuffer<Light>, RaytraceLightsSRV);
+		return RaytraceLightsSRV[LightIndex()];
+	}
+
+	float3			mL;																			// Direction of this light sample
+	float			mSolidAnglePDF;																// PDF of selecting mL on this light
+
+	float			SelectionWeight() { return mReservoir.StochasticWeight(); }
+	Reservoir		mReservoir;
+
+	float			MISPDF() { return mSolidAnglePDF * LightContext::BaseSelectionPDF(); }		// PDF for MIS, without (before) RIS as that part of information is not available for other MIS counterparts (e.g. BSDF sample)
+
+	static float	BaseSelectionPDF() { return UniformSelectionPDF(); }						// PDF of selecting this light, use uniform now, but can also be based on some precomputed weight
+	static float	UniformSelectionPDF() { return 1.0 / mConstants.mLightCount; }				// PDF of selecting light uniformly
+};

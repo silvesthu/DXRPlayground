@@ -1,5 +1,4 @@
 #pragma once
-
 #include "Common.h"
 
 struct Reservoir
@@ -24,12 +23,12 @@ struct Reservoir
 	bool			IsValid()					{ return (mLightData & kLightValidBit) != 0; }
 	uint			LightIndex()				{ return (mLightData & kLightIndexMask); }
 
-	bool			Update(Reservoir inReservoir, inout PathContext ioPathContext)
+	bool			Update(Reservoir inReservoir, inout uint ioRandomState)
 	{
 		mWeightSum								+= inReservoir.mWeightSum;
 		mCountSum								+= inReservoir.mCountSum;
 		
-		if (RandomFloat01(ioPathContext.mRandomState) * mWeightSum < inReservoir.mWeightSum)
+		if (RandomFloat01(ioRandomState) * mWeightSum < inReservoir.mWeightSum)
 		{
 			mLightData							= inReservoir.mLightData;
 			mTargetPDF							= inReservoir.mTargetPDF;

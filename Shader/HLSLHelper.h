@@ -80,7 +80,7 @@ enum COMMITTED_STATUS
     COMMITTED_PROCEDURAL_PRIMITIVE_HIT
 };
 
-template <RAY_FLAG Flags>
+template <uint Flags>
 struct RayQuery 
 {
 	RAY_FLAG RayFlags() { return RAY_FLAG_NONE; }

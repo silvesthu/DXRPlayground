@@ -307,7 +307,7 @@ enum class VisualizeMode : uint
 	Count
 };
 
-enum class DebugMode : uint
+enum class InspectPixelMode : uint
 {
 	Manual,
 
@@ -324,7 +324,7 @@ enum class DebugMode : uint
 	BSDF__V,
 	BSDF__N,
 	BSDF__H,
-	BSDF__I,
+	BSDF__Lobe,
 
 	GENERATE_NEW_LINE_NAME,
 
@@ -337,7 +337,6 @@ enum class DebugMode : uint
 	GENERATE_NEW_LINE_NAME,
 
 	DiracDelta,
-	LobeIndex,
 
 	GENERATE_NEW_LINE_NAME,
 	
@@ -352,7 +351,7 @@ enum class DebugMode : uint
 	Light_V,
 	Light_N,
 	Light_H,
-	Light_I,
+	Light_Lobe,
 
 	GENERATE_NEW_LINE_NAME,
 
@@ -874,7 +873,7 @@ struct Constants
 	int							mPixelDebugLightIndex			CONSTANT_DEFAULT(0);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
-	DebugMode					mDebugMode						CONSTANT_DEFAULT(DebugMode::Manual);
+	InspectPixelMode			mInspectPixelMode				CONSTANT_DEFAULT(InspectPixelMode::Manual);
 	int							mDebugRecursion					CONSTANT_DEFAULT(0);
 	ENUM_FLAG_TYPE(DebugFlag)	mDebugFlag						CONSTANT_DEFAULT(DebugFlag::None);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
@@ -904,7 +903,6 @@ struct RayInspection
 
 	float4						mPositionWS[kArraySize];
 	float4						mNormalWS[kArraySize];
-
 	float4						mLightPositionWS[kArraySize];
 };
 

@@ -1,4 +1,6 @@
 #pragma once
+#include "Shared.h"
+#include "Binding.h"
 #include "HLSLHelper.h"
 
 #ifndef SHADER_DEBUG
@@ -342,88 +344,12 @@ SampleMode GetSampleMode()
     return SHADER_DEBUG ? mConstants.mSampleMode : mConstants.mSampleMode;
 }
 
-VisualizeMode GetVisualizeMode()
-{
-#if SHADER_DEBUG
-    return mConstants.mVisualizeMode;
-#else
-    return VisualizeMode::None;
-#endif // SHADER_DEBUG
-}
-
-DebugInstanceMode GetDebugInstanceMode()
-{
-#if SHADER_DEBUG
-    return mConstants.mDebugInstanceMode;
-#else
-    return DebugInstanceMode::None;
-#endif // SHADER_DEBUG
-}
-
-int GetDebugInstanceIndex()
-{
-#if SHADER_DEBUG
-    return mConstants.mDebugInstanceIndex;
-#else
-    return -1;
-#endif // SHADER_DEBUG
-}
-
-int GetDebugLightIndex()
-{
-#if SHADER_DEBUG
-    return mConstants.mDebugLightIndex;
-#else
-    return -1;
-#endif // SHADER_DEBUG
-}
-
-DebugMode GetDebugMode()
-{
-#if SHADER_DEBUG
-    return mConstants.mDebugMode;
-#else
-    return DebugMode::Manual;
-#endif // SHADER_DEBUG
-}
-
-int GetDebugRecursion()
-{
-#if SHADER_DEBUG
-    return mConstants.mDebugRecursion;
-#else
-    return -1;
-#endif // SHADER_DEBUG
-}
-
 static float3       sVisualizeModeValue = 0;
 void VisualizeValue(VisualizeMode inDebugMode, float3 inValue)
 {
 #if SHADER_DEBUG
     if (mConstants.mVisualizeMode == inDebugMode)
         sVisualizeModeValue = inValue;
-#endif // SHADER_DEBUG
-}
-
-static float4       sDebugValue = 0;
-static bool         sDebugValueUpdated = false;
-static uint3        sDebugDispatchRaysIndex = 0;
-static uint3        sDebugDispatchRaysDimensions = 0;
-void DebugValueInit()
-{
-#if SHADER_DEBUG
-    USING_RESOURCE(RWStructuredBuffer<PixelInspection>, PixelInspectionUAV);
-    if (sDebugDispatchRaysIndex.x == mConstants.mPixelDebugCoord.x && sDebugDispatchRaysIndex.y == mConstants.mPixelDebugCoord.y)
-        for (int i = 0; i < PixelInspection::kArraySize; i++)
-            PixelInspectionUAV[0].mPixelValueArray[i] = 0;
-#endif // SHADER_DEBUG
-}
-
-void WriteScreenDebugUAV(uint2 inCoords, float4 inValue)
-{
-#if SHADER_DEBUG
-    USING_RESOURCE(RWTexture2D<float4>, ScreenDebugUAV);
-    ScreenDebugUAV[inCoords] = inValue;
 #endif // SHADER_DEBUG
 }
 

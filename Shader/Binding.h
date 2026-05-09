@@ -45,3 +45,62 @@ ConstantBuffer<LocalConstants> mLocalConstants : REGISTER_CBV(ROOT_CONSTANTS_REG
 #define USING_SAMPLER(type, name) type name = SamplerDescriptorHeap[(uint)SamplerDescriptorIndex::name];
 #endif // __INTELLISENSE__
 #endif // __SLANG__
+
+VisualizeMode GetVisualizeMode()
+{
+#if SHADER_DEBUG
+    return mConstants.mVisualizeMode;
+#else
+    return VisualizeMode::None;
+#endif // SHADER_DEBUG
+}
+
+DebugInstanceMode GetDebugInstanceMode()
+{
+#if SHADER_DEBUG
+    return mConstants.mDebugInstanceMode;
+#else
+    return DebugInstanceMode::None;
+#endif // SHADER_DEBUG
+}
+
+int GetDebugInstanceIndex()
+{
+#if SHADER_DEBUG
+    return mConstants.mDebugInstanceIndex;
+#else
+    return -1;
+#endif // SHADER_DEBUG
+}
+
+int GetDebugLightIndex()
+{
+#if SHADER_DEBUG
+    return mConstants.mDebugLightIndex;
+#else
+    return -1;
+#endif // SHADER_DEBUG
+}
+
+int GetDebugRecursion()
+{
+#if SHADER_DEBUG
+    return mConstants.mDebugRecursion;
+#else
+    return -1;
+#endif // SHADER_DEBUG
+}
+
+bool IsDebugCoord(uint3 inPixelIndex)
+{
+    return inPixelIndex.x == mConstants.mPixelDebugCoord.x && inPixelIndex.y == mConstants.mPixelDebugCoord.y;
+}
+
+ENUM_FLAG_TYPE(DebugFlag) GetDebugFlag()
+{
+#if SHADER_DEBUG
+    return mConstants.mDebugFlag;
+#else
+    return DebugFlag::None;
+#endif // SHADER_DEBUG
+}
