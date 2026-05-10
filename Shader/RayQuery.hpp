@@ -78,7 +78,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 	PathContext path_context					= (PathContext)0;
 	path_context.mThroughput					= 1.0;
 	path_context.mPrevBSDFSamplePDF				= 0.0;
-	path_context.mPrevDiracDeltaDistribution	= false;
+	path_context.mPrevDiracDeltaDistribution	= true; // Allow primary ray to skip MIS
 	path_context.mEtaScale						= 1.0;
 	path_context.mRandomState					= random_state;
 	path_context.mRandomStateReSTIR				= random_state_restir;
@@ -202,14 +202,13 @@ void TraceRay(inout PixelContext ioPixelContext)
 
 				if (hit_context.BSDF() == BSDF::Light) // Ray hit a light / [Mitsuba] Direct emission
 				{
-					if (path_context.mRecursionDepth == 0 ||					// Camera ray hit the light
-						path_context.mPrevDiracDeltaDistribution || 			// Prev hit is DiracDeltaDistribution -> no light sample
-						GetSampleMode() != SampleMode::SampleLight ||			// Ignore hit on light if SampleLight
-						false)
+					if (GetSampleMode() != SampleMode::Light || path_context.mRecursionDepth == 0)
 					{
-						// Add light contribution
 						float mis_weight				= 1.0f;
-						if (GetSampleMode() == SampleMode::MIS && path_context.mMediumInstanceID == InvalidInstanceID)
+						if (GetSampleMode() == SampleMode::MIS &&
+							!path_context.mPrevDiracDeltaDistribution && 			// Prev hit is not DiracDeltaDistribution, otherwise no NEE sample to MIS
+							path_context.mMediumInstanceID == InvalidInstanceID &&	// Path is not inside medium
+							true)
 						{
 							uint light_index			= hit_context.LightIndex();
 							Light light					= RaytraceLightsSRV[light_index];
@@ -232,7 +231,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 				else // Ray hit a surface
 				{
 					// Sample light (NEE) / [Mitsuba] Emitter sampling, before mThroughput updated
-					bool sample_light = GetSampleMode() == SampleMode::SampleLight || GetSampleMode() == SampleMode::MIS;
+					bool sample_light = GetSampleMode() == SampleMode::Light || GetSampleMode() == SampleMode::MIS;
 					if (mConstants.mLightCount > 0 &&											// No light -> no light sample
 						!hit_context.DiracDeltaDistribution() &&								// Current hit is DiracDeltaDistribution -> no light sample
 						sample_light &&															// BSDF mode -> no light sample
@@ -241,7 +240,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 					{
 						// Select light
 						LightContext light_context					= LightEvaluation::SelectLight(hit_context.PositionWS(), path_context);
-						Inspect::SampleLight(path_context, light_context);
+						Inspect::Light(path_context, light_context);
 
 						float light_weight = light_context.mSolidAnglePDF <= 0.0 ? 0.0 : (light_context.SelectionWeight() / light_context.mSolidAnglePDF);
 						if (light_context.IsValid() && light_weight > 0)
@@ -276,7 +275,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 									Inspect::Update(InspectMode::MIS_LIGHT, path_context, float3(bsdf_mis_pdf, light_mis_pdf, mis_weight));
 								}
 
-								if (bsdf_result.mMediumInstanceID == InvalidInstanceID) // NEE ray not inside medium
+								if (bsdf_result.mMediumInstanceID == InvalidInstanceID) // Shadow ray not support medium yet
 								{
 									path_context.mEmission			+= path_context.mThroughput * light_emission;
 								}

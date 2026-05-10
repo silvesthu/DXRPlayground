@@ -138,7 +138,7 @@ namespace Inspect
 		}
     }
 
-    void SampleLight(PathContext inPathContext, LightContext inLightContext)
+    void Light(PathContext inPathContext, LightContext inLightContext)
     {
         Update(InspectMode::LightIndex,    inPathContext, float3(inLightContext.LightIndex(), 0.0, 0.0));
         Update(InspectMode::RIS_SAMPLE,    inPathContext, float3(inLightContext.mReservoir.mTargetPDF, 0.0, 0.0));

@@ -396,9 +396,9 @@ enum class OffsetMode : uint
 
 enum class SampleMode : uint
 {
-	BSDF = 0,
-	SampleLight,
-	MIS,
+	BSDF = 0,	// BSDF sample only
+	Light,		// Light sample (NEE) only
+	MIS,		// MIS
 
 	Count
 };
@@ -544,8 +544,6 @@ STATITC_ASSERT(sizeof(InstanceFlag) == sizeof(float) * 1);
 
 struct InstanceData
 {
-	// [TODO] Split material
-
 	BSDF						mBSDF							CONSTANT_DEFAULT(BSDF::Diffuse);
 	InstanceFlag				mFlags;
 	float						mOpacity						CONSTANT_DEFAULT(1.0f);
