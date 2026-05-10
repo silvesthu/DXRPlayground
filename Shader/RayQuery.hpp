@@ -237,7 +237,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 				}
 				else // Ray hit a surface
 				{
-					// Sample light (NEE) / [Mitsuba] Emitter sampling
+					// Sample light (NEE) / [Mitsuba] Emitter sampling, before mThroughput updated
 					bool sample_light = GetSampleMode() == SampleMode::SampleLight || GetSampleMode() == SampleMode::MIS;
 					if (mConstants.mLightCount > 0 &&											// No light -> no light sample
 						!hit_context.DiracDeltaDistribution() &&								// Current hit is DiracDeltaDistribution -> no light sample
@@ -283,7 +283,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 									InspectPixel::Update(InspectPixelMode::MIS_LIGHT, path_context, float3(bsdf_mis_pdf, light_mis_pdf, mis_weight));
 								}
 
-								path_context.mLightEmission			= path_context.mThroughput * light_emission;
+								path_context.mEmission				+= path_context.mThroughput * light_emission;
 
 								InspectPixel::BSDF(path_context, bsdf_context);
 								InspectPixel::SampleLightDone(path_context, bsdf_context, bsdf_result, 1.0 / light_weight);
@@ -336,14 +336,14 @@ void TraceRay(inout PixelContext ioPixelContext)
 
 			float3 emission						= lerp(sky_luminance, cloud_luminance, 1.0 - cloud_transmittance);
 			path_context.mEmission				+= path_context.mThroughput * emission;
-			
+
 			break;
 		}
-		
+
 		InspectPixel::Update(InspectPixelMode::Emission,	path_context, path_context.mEmission);
 		InspectPixel::Update(InspectPixelMode::Throughput,	path_context, float3(path_context.mThroughput));
 		InspectPixel::Update(InspectPixelMode::EtaScale,	path_context, float3(path_context.mEtaScale, 0, 0));
-		
+
 		if (!continue_bounce)
 			break;
 
@@ -352,13 +352,13 @@ void TraceRay(inout PixelContext ioPixelContext)
 		// https://computergraphics.stackexchange.com/questions/2316/is-russian-roulette-really-the-answer
 		if (path_context.mRecursionDepth + 1 > mConstants.mRecursionDepthCountMax)
 			break;
-		
+
 		// Drop the ray if throughput is 0
 		float throughput_max					= max(path_context.mThroughput.x, max(path_context.mThroughput.y, path_context.mThroughput.z));
 		if (throughput_max <= 0)
 			break;
 
-		// Russian Roulette Depth
+		// Russian Roulette
 		if (path_context.mRecursionDepth + 1 > mConstants.mRussianRouletteDepth)
 		{
 			// Probability can be chosen in almost any manner
@@ -377,8 +377,6 @@ void TraceRay(inout PixelContext ioPixelContext)
 				break;																	// Termination by Russian Roulette
 		}
 
-		path_context.mEmission += path_context.mLightEmission;
-		path_context.mLightEmission = 0;
 		path_context.mRecursionDepth++;
 	}
 

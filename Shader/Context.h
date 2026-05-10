@@ -23,8 +23,6 @@ struct PathContext
 	float3			mEmission;						// [0, +inf]	Accumulated emission
 	float			mEtaScale;						// [0, +inf]	Accumulated eta scale for handling refraction, see https://www.pbr-book.org/3ed-2018/Light_Transport_II/Specular_Reflection_and_Transmission#HandlingRefraction
 
-	float3			mLightEmission;					// [0, +inf]	Emission from light sample
-
 	float			mPrevBSDFSamplePDF;				// [0, 1]		BSDF Sample PDF from previous hit
 	uint			mPrevLobeIndex;					// [0, +]		[WIP] Not used yet
 	bool			mPrevDiracDeltaDistribution;	// [bool]		Whether BSDF Sample from previous hit is Dirac Delta distribution
