@@ -397,7 +397,7 @@ enum class OffsetMode : uint
 
 enum class SampleMode : uint
 {
-	SampleBSDF = 0,
+	BSDF = 0,
 	SampleLight,
 	MIS,
 

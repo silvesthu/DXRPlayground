@@ -93,48 +93,62 @@ namespace InspectPixel
     {
         if (inBSDFContext.mMode == BSDFContext::Mode::BSDF)
         {
-            Update(InspectPixelMode::BSDF__D, inPathContext, float3(D, 0, 0));
-            Update(InspectPixelMode::BSDF__G, inPathContext, float3(G, 0, 0));
-            Update(InspectPixelMode::BSDF__F, inPathContext, float3(F));
+            Update(InspectPixelMode::BSDF__D,       inPathContext, float3(D, 0, 0));
+            Update(InspectPixelMode::BSDF__G,       inPathContext, float3(G, 0, 0));
+            Update(InspectPixelMode::BSDF__F,       inPathContext, float3(F));
         }
         else
         {
-            Update(InspectPixelMode::Light_D, inPathContext, float3(D, 0, 0));
-            Update(InspectPixelMode::Light_G, inPathContext, float3(G, 0, 0));
-            Update(InspectPixelMode::Light_F, inPathContext, float3(F));
+            Update(InspectPixelMode::Light_D,       inPathContext, float3(D, 0, 0));
+            Update(InspectPixelMode::Light_G,       inPathContext, float3(G, 0, 0));
+            Update(InspectPixelMode::Light_F,       inPathContext, float3(F));
         }
+    }
+
+    void BSDF(PathContext inPathContext, BSDFContext inBSDFContext)
+    {
+        if (inBSDFContext.mMode == BSDFContext::Mode::BSDF)
+		{
+			Update(InspectPixelMode::BSDF__L,		inPathContext, float3(inBSDFContext.mL));
+			Update(InspectPixelMode::BSDF__V,		inPathContext, float3(inBSDFContext.mV));
+			Update(InspectPixelMode::BSDF__N,		inPathContext, float3(inBSDFContext.mN));
+			Update(InspectPixelMode::BSDF__H,		inPathContext, float3(inBSDFContext.mH));
+			Update(InspectPixelMode::BSDF__Lobe,	inPathContext, float3(inBSDFContext.mLobeIndex, 0, 0));
+		}
+		else
+		{
+			Update(InspectPixelMode::Light_L,		inPathContext, float3(inBSDFContext.mL));
+			Update(InspectPixelMode::Light_V,		inPathContext, float3(inBSDFContext.mV));
+			Update(InspectPixelMode::Light_N,		inPathContext, float3(inBSDFContext.mN));
+			Update(InspectPixelMode::Light_H,		inPathContext, float3(inBSDFContext.mH));
+			Update(InspectPixelMode::Light_Lobe,	inPathContext, float3(inBSDFContext.mLobeIndex, 0, 0));
+		}
     }
 
     void SampleLight(PathContext inPathContext, LightContext inLightContext)
     {
 #if SHADER_DEBUG
-        Update(InspectPixelMode::LightIndex, inPathContext, float3(inLightContext.LightIndex(), 0.0, 0.0));
-        Update(InspectPixelMode::RIS_SAMPLE, inPathContext, float3(inLightContext.mReservoir.mTargetPDF, 0.0, 0.0));
-        Update(InspectPixelMode::RIS_SUM, inPathContext, float3(inLightContext.mReservoir.mWeightSum, inLightContext.mReservoir.mCountSum, 0.0));
+        Update(InspectPixelMode::LightIndex,    inPathContext, float3(inLightContext.LightIndex(), 0.0, 0.0));
+        Update(InspectPixelMode::RIS_SAMPLE,    inPathContext, float3(inLightContext.mReservoir.mTargetPDF, 0.0, 0.0));
+        Update(InspectPixelMode::RIS_SUM,       inPathContext, float3(inLightContext.mReservoir.mWeightSum, inLightContext.mReservoir.mCountSum, 0.0));
 #endif // SHADER_DEBUG
     }
 
     void SampleLightDone(PathContext inPathContext, BSDFContext inBSDFContext, BSDFResult inBSDFResult, float inLightPDF)
     {
 #if SHADER_DEBUG
-        Update(InspectPixelMode::Light_L,       inPathContext, float3(inBSDFContext.mL));
-        Update(InspectPixelMode::Light_V,       inPathContext, float3(inBSDFContext.mV));
-        Update(InspectPixelMode::Light_N,       inPathContext, float3(inBSDFContext.mN));
-        Update(InspectPixelMode::Light_H,       inPathContext, float3(inBSDFContext.mH));
-        Update(InspectPixelMode::Light_Lobe,    inPathContext, float3(inBSDFContext.mLobeIndex, 0, 0));
-
-        Update(InspectPixelMode::Light_BSDF, inPathContext, float3(inBSDFResult.mBSDF));
-        Update(InspectPixelMode::Light_PDF, inPathContext, float3(inLightPDF, 0, 0));
+        Update(InspectPixelMode::Light_BSDF,    inPathContext, float3(inBSDFResult.mBSDF));
+        Update(InspectPixelMode::Light_PDF,     inPathContext, float3(inLightPDF, 0, 0));
 #endif // SHADER_DEBUG
     }
 
-    void SampleBSDF(PathContext inPathContext, HitContext inHitContext, BSDFContext inBSDFContext, BSDFResult inBSDFResult)
+    void SampleBSDFDone(PathContext inPathContext, HitContext inHitContext, BSDFContext inBSDFContext, BSDFResult inBSDFResult)
     {
 #if SHADER_DEBUG
-        Update(InspectPixelMode::BSDF__BSDF, inPathContext, float3(inBSDFResult.mBSDF));
-        Update(InspectPixelMode::BSDF__PDF, inPathContext, float3(inBSDFResult.mBSDFSamplePDF, 0, 0));
+        Update(InspectPixelMode::BSDF__BSDF,    inPathContext, float3(inBSDFResult.mBSDF));
+        Update(InspectPixelMode::BSDF__PDF,     inPathContext, float3(inBSDFResult.mBSDFSamplePDF, 0, 0));
 
-        Update(InspectPixelMode::DiracDelta, inPathContext, float3(inHitContext.DiracDeltaDistribution(), 0, 0));
+        Update(InspectPixelMode::DiracDelta,    inPathContext, float3(inHitContext.DiracDeltaDistribution(), 0, 0));
 #endif // SHADER_DEBUG
     }
 

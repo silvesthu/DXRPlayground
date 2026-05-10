@@ -18,7 +18,10 @@ namespace BSDFEvaluation
 	//			pdf:							{ pdf } pdf of sampling at given direction
 	//			eval_pdf:						{ eval, pdf }
 	//			eval_pdf_sample:				{ eval_pdf, sample}
-	//
+	
+	static uint sLobeIndexTrivial = 0;
+	static float sEtaITTrivial = 1.0f;
+	static float3 sLUndetermined = 0.0f;
 
 	namespace Distribution
 	{
@@ -55,13 +58,17 @@ namespace BSDFEvaluation
 
 	namespace Diffuse
 	{
-		BSDFContext GenerateContext(HitContext inHitContext, inout PathContext ioPathContext)
+		BSDFContext GenerateContext(BSDFContext::Mode inMode, float3 inL, HitContext inHitContext, inout PathContext ioPathContext)
 		{
-			float3x3 tangent_space				= GenerateTangentSpace(inHitContext.NormalWS());
-			float3 randome_direction			= RandomCosineDirection(ioPathContext.mRandomState);
-			float3 L							= normalize(randome_direction.x * tangent_space[0] + randome_direction.y * tangent_space[1] + randome_direction.z * tangent_space[2]);
+			float3 L = inL;
+			if (inMode == BSDFContext::Mode::BSDF)
+			{
+				float3x3 tangent_space			= GenerateTangentSpace(inHitContext.NormalWS());
+				float3 randome_direction		= RandomCosineDirection(ioPathContext.mRandomState);
+				L								= normalize(randome_direction.x * tangent_space[0] + randome_direction.y * tangent_space[1] + randome_direction.z * tangent_space[2]);
+			}
 
-			return BSDFContext::Generate(BSDFContext::Mode::BSDF, L, inHitContext);
+			return BSDFContext::Generate(inMode, L, sEtaITTrivial, sLobeIndexTrivial, inHitContext);
 		}
 
 		BSDFResult Evaluate(inout BSDFContext inBSDFContext, HitContext inHitContext, inout PathContext ioPathContext)
@@ -87,18 +94,20 @@ namespace BSDFEvaluation
 
 	namespace Conductor
 	{
-		BSDFContext GenerateContext(HitContext inHitContext, inout PathContext ioPathContext)
+		BSDFContext GenerateContext(BSDFContext::Mode inMode, float3 inL, HitContext inHitContext, inout PathContext ioPathContext)
 		{
-			float3 L							= reflect(-inHitContext.ViewWS(), inHitContext.NormalWS());
+			float3 L							= inL;
+			if (inMode == BSDFContext::Mode::BSDF)
+			{
+				L								= reflect(-inHitContext.ViewWS(), inHitContext.NormalWS());
+			}
 
-			return BSDFContext::Generate(BSDFContext::Mode::BSDF, L, inHitContext);
+			return BSDFContext::Generate(inMode, L, sEtaITTrivial, sLobeIndexTrivial, inHitContext);
 		}
 
 		BSDFResult Evaluate(inout BSDFContext inBSDFContext, HitContext inHitContext, inout PathContext ioPathContext)
 		{
 			float3 F							= F_Conductor_Mitsuba(inHitContext.Eta(), inHitContext.K(), inBSDFContext.mHdotV) * inHitContext.SpecularReflectance();
-
-			InspectPixel::DGF(ioPathContext, inBSDFContext, QNaN(), QNaN(), F);
 
 			BSDFResult result;
 			result.mBSDF						= F;
@@ -112,21 +121,27 @@ namespace BSDFEvaluation
 			if (GetDebugInstanceMode() == DebugInstanceMode::Reflection && GetDebugInstanceIndex() == inHitContext.mInstanceID)
 				result.mBSDF					= 1.0;
 
+			InspectPixel::DGF(ioPathContext, inBSDFContext, QNaN(), QNaN(), F);
+
 			return result;
 		}
 	}
 
 	namespace RoughConductor
 	{
-		BSDFContext GenerateContext(HitContext inHitContext, inout PathContext ioPathContext)
+		BSDFContext GenerateContext(BSDFContext::Mode inMode, float3 inL, HitContext inHitContext, inout PathContext ioPathContext)
 		{
-			float3x3 tangent_space				= GenerateTangentSpace(inHitContext.NormalWS());
-			float3 H							= Distribution::GGX::GenerateMicrofacetDirection(tangent_space, inHitContext, ioPathContext);
-			float3 V							= inHitContext.ViewWS();
-			float HdotV							= dot(H, V);
-			float3 L							= 2.0 * HdotV * H - V;
+			float3 L = inL;
+			if (inMode == BSDFContext::Mode::BSDF)
+			{
+				float3x3 tangent_space			= GenerateTangentSpace(inHitContext.NormalWS());
+				float3 H						= Distribution::GGX::GenerateMicrofacetDirection(tangent_space, inHitContext, ioPathContext);
+				float3 V						= inHitContext.ViewWS();
+				float HdotV						= dot(H, V);
+				L								= 2.0 * HdotV * H - V;
+			}
 
-			return BSDFContext::Generate(BSDFContext::Mode::BSDF, L, inHitContext);
+			return BSDFContext::Generate(inMode, L, sEtaITTrivial, sLobeIndexTrivial, inHitContext);
 		}
 
 		BSDFResult Evaluate(inout BSDFContext inBSDFContext, HitContext inHitContext, inout PathContext ioPathContext)
@@ -143,8 +158,6 @@ namespace BSDFEvaluation
 
 			if (inBSDFContext.mNdotL < 0 || inBSDFContext.mNdotV < 0 || inBSDFContext.mHdotL < 0 || inBSDFContext.mHdotV < 0)
 				D								= 0;
-
-			InspectPixel::DGF(ioPathContext, inBSDFContext, D, G, F);
 
 			// [NOTE] Eval/Sample functions may return BSDF * NdotL / PDF as a whole or in separated terms, which varies between implementations.
 			//        Also, NdotL needs to be eliminated for Dirac delta distribution.
@@ -165,14 +178,17 @@ namespace BSDFEvaluation
 			result.mBSDFSamplePDF				= microfacet_pdf * jacobian;
 			result.mEta							= 1.0;
 			result.mMediumInstanceID			= InvalidInstanceID;
+
+			InspectPixel::DGF(ioPathContext, inBSDFContext, D, G, F);
+
 			return result;
 		}
 	}
 
 	namespace Dielectric
 	{
-		static uint sReflectionLobeIndex = 0;
-		static uint sRefractionLobeIndex = 1;
+		static uint sLobeIndexReflection = 0;
+		static uint sLobeIndexRefraction = 1;
 
 		void PatchThinDielectricBefore(HitContext inHitContext, inout float ioCosTheta, inout float ioEta)
 		{
@@ -202,7 +218,7 @@ namespace BSDFEvaluation
 			// https://github.com/mitsuba-renderer/mitsuba/blob/10af06f365886c1b6dd8818e0a3841078a62f283/src/bsdfs/thindielectric.cpp#L226
 		}
 
-		BSDFContext GenerateContext(HitContext inHitContext, inout PathContext ioPathContext)
+		BSDFContext GenerateContext(BSDFContext::Mode inMode, float3 inL, HitContext inHitContext, inout PathContext ioPathContext)
 		{
 			float cos_theta						= inHitContext.NdotV();
 			float eta							= inHitContext.Eta().x;
@@ -214,13 +230,17 @@ namespace BSDFEvaluation
 			F_Dielectric_Mitsuba(cos_theta, eta, r_i, cos_theta_t, eta_it, eta_ti);
 			PatchThinDielectricAfter(inHitContext, r_i, cos_theta_t, eta_it, eta_ti);
 
-			bool select_reflection				= RandomFloat01(ioPathContext.mRandomState) <= r_i;
-			float3 L							= select(select_reflection,
+			uint lobe_index						= inHitContext.NdotV() * dot(inHitContext.NormalWS(), inL) >= 0 ? sLobeIndexReflection : sLobeIndexRefraction;
+			float3 L							= inL;
+			if (inMode == BSDFContext::Mode::BSDF)
+			{
+				lobe_index						= RandomFloat01(ioPathContext.mRandomState) <= r_i ? sLobeIndexReflection : sLobeIndexRefraction;
+				L								= select(lobe_index == sLobeIndexReflection,
 													reflect(-inHitContext.ViewWS(), inHitContext.NdotV() < 0 ? -inHitContext.NormalWS() : inHitContext.NormalWS()),
 													refract(-inHitContext.ViewWS(), inHitContext.NdotV() < 0 ? -inHitContext.NormalWS() : inHitContext.NormalWS(), eta_ti));
-			
-			uint lobe_index						= select_reflection ? sReflectionLobeIndex : sRefractionLobeIndex;
-			return BSDFContext::Generate(BSDFContext::Mode::BSDF, L, select(select_reflection, 1.0, eta_it), lobe_index, inHitContext);
+			}
+
+			return BSDFContext::Generate(inMode, L, select(lobe_index == sLobeIndexReflection, 1.0, eta_it), lobe_index, inHitContext);
 		}
 
 		BSDFResult Evaluate(inout BSDFContext inBSDFContext, HitContext inHitContext, inout PathContext ioPathContext)
@@ -235,7 +255,7 @@ namespace BSDFEvaluation
 			F_Dielectric_Mitsuba(cos_theta, eta, r_i, cos_theta_t, eta_it, eta_ti);
 			PatchThinDielectricAfter(inHitContext, r_i, cos_theta_t, eta_it, eta_ti);
 
-			bool select_reflection				= inBSDFContext.mLobeIndex == sReflectionLobeIndex;
+			bool select_reflection				= inBSDFContext.mLobeIndex == sLobeIndexReflection;
 
 			BSDFResult result;
 			result.mBSDF						= select(select_reflection, r_i, 1.0 - r_i) * select(select_reflection, inHitContext.SpecularReflectance(), inHitContext.SpecularTransmittance());
@@ -263,10 +283,10 @@ namespace BSDFEvaluation
 
 	namespace RoughDielectric
 	{
-		static uint sReflectionLobeIndex = 0;
-		static uint sRefractionLobeIndex = 1;
+		static uint sLobeIndexReflection = 0;
+		static uint sLobeIndexRefraction = 1;
 
-		BSDFContext GenerateContext(HitContext inHitContext, inout PathContext ioPathContext)
+		BSDFContext GenerateContext(BSDFContext::Mode inMode, float3 inL, HitContext inHitContext, inout PathContext ioPathContext)
 		{
 			float cos_theta						= inHitContext.NdotV();
 			float eta							= inHitContext.Eta().x;
@@ -278,15 +298,18 @@ namespace BSDFEvaluation
 
 			float3x3 tangent_space				= GenerateTangentSpace(inHitContext.NormalWS());
 			float3 H							= Distribution::GGX::GenerateMicrofacetDirection(tangent_space, inHitContext, ioPathContext);
-			float3 V							= inHitContext.ViewWS();
 
-			bool select_reflection				= RandomFloat01(ioPathContext.mRandomState) <= r_i;
-			float3 L = select(select_reflection,
-				reflect(-inHitContext.ViewWS(), inHitContext.NdotV() < 0 ? -H : H),
-				refract(-inHitContext.ViewWS(), inHitContext.NdotV() < 0 ? -H : H, eta_ti));
+			uint lobe_index						= inHitContext.NdotV() * dot(inHitContext.NormalWS(), inL) >= 0 ? sLobeIndexReflection : sLobeIndexRefraction;
+			float3 L							= inL;
+			if (inMode == BSDFContext::Mode::BSDF)
+			{
+				lobe_index						= RandomFloat01(ioPathContext.mRandomState) <= r_i ? sLobeIndexReflection : sLobeIndexRefraction;
+				L								= select(lobe_index == sLobeIndexReflection,
+													reflect(-inHitContext.ViewWS(), inHitContext.NdotV() < 0 ? -H : H),
+													refract(-inHitContext.ViewWS(), inHitContext.NdotV() < 0 ? -H : H, eta_ti));
+			}
 
-			uint lobe_index						= select_reflection ? sReflectionLobeIndex : sRefractionLobeIndex;
-			return BSDFContext::Generate(BSDFContext::Mode::BSDF, L, select(select_reflection, 1.0, eta_it), lobe_index, inHitContext);
+			return BSDFContext::Generate(inMode, L, select(lobe_index == sLobeIndexReflection, 1.0, eta_it), lobe_index, inHitContext);
 		}
 
 		BSDFResult Evaluate(inout BSDFContext inBSDFContext, HitContext inHitContext, inout PathContext ioPathContext)
@@ -301,7 +324,7 @@ namespace BSDFEvaluation
 			float eta_ti;
 			F_Dielectric_Mitsuba(cos_theta, eta, r_i, cos_theta_t, eta_it, eta_ti);
 
-			bool select_reflection				= inBSDFContext.mLobeIndex == sReflectionLobeIndex;
+			bool select_reflection				= inBSDFContext.mLobeIndex == sLobeIndexReflection;
 			if (select_reflection)
 			{
 				// Effectively TwoSided for reflection
@@ -316,34 +339,30 @@ namespace BSDFEvaluation
 				if (inBSDFContext.mNdotL < 0 || inBSDFContext.mNdotV < 0 || inBSDFContext.mHdotL < 0 || inBSDFContext.mHdotV < 0)
 					D							= 0;
 
-				InspectPixel::DGF(ioPathContext, inBSDFContext, D, G, F);
-
 				float microfacet_pdf			= D * inBSDFContext.mNdotH;
 				float jacobian					= 1.0 / (4.0f * inBSDFContext.mHdotL);
 
 				result.mBSDF					= D * G * F / (4.0f * inBSDFContext.mNdotV * inBSDFContext.mNdotL);
 				result.mBSDFSamplePDF			= microfacet_pdf * jacobian;
+
+				InspectPixel::DGF(ioPathContext, inBSDFContext, D, G, F);
 			}
 			else
 			{
 				// Based on RoughDieletric in Mitsuba, which is an implementation of [WMLT07] Microfacet Models for Refraction through Rough Surfaces
 				// Omit roughness scale for now
 
-				// Patch eta
-				if (inBSDFContext.mMode == BSDFContext::Mode::Light)
-					inBSDFContext.SetEta(eta_it);
-
 				float D							= D_GGX(inBSDFContext.mNdotH, inHitContext.RoughnessAlpha());
 				float G							= G_SmithGGX(inBSDFContext.mNdotL, inBSDFContext.mNdotV, inHitContext.RoughnessAlpha());
 				float3 F						= (1.0 - r_i) * inHitContext.SpecularTransmittance();
-
-				InspectPixel::DGF(ioPathContext, inBSDFContext, D, G, F);
 
 				float microfacet_pdf			= D * inBSDFContext.mNdotH;
 				float jacobian					= abs(Sqr(eta_it) * inBSDFContext.mHdotL / Sqr(inBSDFContext.mHdotV + eta_it * inBSDFContext.mHdotL));
 
 				result.mBSDF					= abs(D * G * F * inBSDFContext.mHdotV * jacobian / (abs(inBSDFContext.mNdotV) * abs(inBSDFContext.mNdotL)));
 				result.mBSDFSamplePDF			= microfacet_pdf * jacobian;
+
+				InspectPixel::DGF(ioPathContext, inBSDFContext, D, G, F);
 			}
 			result.mBSDFSamplePDF				*= select(select_reflection, r_i, 1.0 - r_i);
 
@@ -358,45 +377,46 @@ namespace BSDFEvaluation
 
 	namespace glTF
 	{
-		static uint sSpecularLobeIndex = 0;
-		static uint sDiffuseLobeIndex = 1;
+		static uint sLobeIndexSpecular = 0;
+		static uint sLobeIndexDiffuse = 1;
 
-		BSDFContext GenerateContext(HitContext inHitContext, inout PathContext ioPathContext)
+		BSDFContext GenerateContext(BSDFContext::Mode inMode, float3 inL, HitContext inHitContext, inout PathContext ioPathContext)
 		{
-			BSDFContext bsdf_context;
-
 			float3 specular_reflectance			= inHitContext.SpecularReflectance();
 			float specular_probability			= MaxComponent(specular_reflectance); // [TODO] Better lobe selection probability? Fresnel based on N?
-			bool select_specular				= RandomFloat01(ioPathContext.mRandomState) <= specular_probability;
-			if (select_specular)
+			uint lobe_index						= RandomFloat01(ioPathContext.mRandomState) <= specular_probability ? sLobeIndexSpecular : sLobeIndexDiffuse;
+
+			float3 L							= inL;
+			if (inMode == BSDFContext::Mode::BSDF)
 			{
-				float3x3 tangent_space			= GenerateTangentSpace(inHitContext.NormalWS());
-				float3 H						= Distribution::GGX::GenerateMicrofacetDirection(tangent_space, inHitContext, ioPathContext);
-				float3 V						= inHitContext.ViewWS();
-				float HdotV						= dot(H, V);
-				float3 L						= 2.0 * HdotV * H - V;
-				bsdf_context = BSDFContext::Generate(BSDFContext::Mode::BSDF, L, inHitContext);
-			}
-			else
-			{
-				float3x3 tangent_space			= GenerateTangentSpace(inHitContext.NormalWS());
-				float3 randome_direction		= RandomCosineDirection(ioPathContext.mRandomState);
-				float3 L						= normalize(randome_direction.x * tangent_space[0] + randome_direction.y * tangent_space[1] + randome_direction.z * tangent_space[2]);
-				bsdf_context = BSDFContext::Generate(BSDFContext::Mode::BSDF, L, inHitContext);
+				if (lobe_index == sLobeIndexSpecular)
+				{
+					float3x3 tangent_space		= GenerateTangentSpace(inHitContext.NormalWS());
+					float3 H					= Distribution::GGX::GenerateMicrofacetDirection(tangent_space, inHitContext, ioPathContext);
+					float3 V					= inHitContext.ViewWS();
+					float HdotV					= dot(H, V);
+					L							= 2.0 * HdotV * H - V;
+				}
+				else
+				{
+					float3x3 tangent_space		= GenerateTangentSpace(inHitContext.NormalWS());
+					float3 randome_direction	= RandomCosineDirection(ioPathContext.mRandomState);
+					L							= normalize(randome_direction.x * tangent_space[0] + randome_direction.y * tangent_space[1] + randome_direction.z * tangent_space[2]);
+				}
 			}
 
-			bsdf_context.mLobeIndex				= select_specular ? sSpecularLobeIndex : sDiffuseLobeIndex;
-			return bsdf_context;
+			return BSDFContext::Generate(inMode, L, sEtaITTrivial, lobe_index, inHitContext);
 		}
 
 		BSDFResult Evaluate(inout BSDFContext inBSDFContext, HitContext inHitContext, inout PathContext ioPathContext)
 		{
-			bool select_specular					= inBSDFContext.mLobeIndex == sSpecularLobeIndex;
 			float3 specular_reflectance				= inHitContext.SpecularReflectance();
-			float specular_probability				= MaxComponent(specular_reflectance);			
+			float specular_probability				= MaxComponent(specular_reflectance);
+			bool select_specular					= RandomFloat01(ioPathContext.mRandomState) <= specular_probability;
+
 			if (!select_specular)
 			{
-				BSDFResult brdf_result = Diffuse::Evaluate(inBSDFContext, inHitContext, ioPathContext);
+				BSDFResult brdf_result				= Diffuse::Evaluate(inBSDFContext, inHitContext, ioPathContext);
 				brdf_result.mBSDFSamplePDF			*= 1.0 - specular_probability;
 
 				return brdf_result;
@@ -411,8 +431,6 @@ namespace BSDFEvaluation
 				if (inBSDFContext.mNdotL < 0 || inBSDFContext.mNdotV < 0 || inBSDFContext.mHdotL < 0 || inBSDFContext.mHdotV < 0)
 					D								= 0;
 
-				InspectPixel::DGF(ioPathContext, inBSDFContext, D, G, F);
-			
 				float microfacet_pdf				= D * inBSDFContext.mNdotH;
 				float jacobian						= 1.0 / (4.0f * inBSDFContext.mHdotL);
 
@@ -421,47 +439,40 @@ namespace BSDFEvaluation
 				result.mBSDFSamplePDF				= microfacet_pdf * jacobian * specular_probability;
 				result.mEta							= 1.0;
 				result.mMediumInstanceID			= InvalidInstanceID;
+
+				InspectPixel::DGF(ioPathContext, inBSDFContext, D, G, F);
+
 				return result;
 			}
 		}
 	};
 
-	BSDFContext GenerateContext(HitContext inHitContext, inout PathContext ioPathContext)
+	BSDFContext GenerateContext(BSDFContext::Mode inMode, float3 inL, HitContext inHitContext, inout PathContext ioPathContext)
 	{
-		BSDFContext bsdf_context;
-
 		switch (inHitContext.BSDF())
 		{
 #if USE_BSDF_Conductor
-		case BSDF::Conductor:					bsdf_context = Conductor::GenerateContext(inHitContext, ioPathContext); break;
+		case BSDF::Conductor:					return Conductor::GenerateContext(inMode, inL, sLUndetermined, inHitContext, ioPathContext); break;
 #endif // USE_BSDF_Conductor
 #if USE_BSDF_RoughConductor
-		case BSDF::RoughConductor:				bsdf_context = RoughConductor::GenerateContext(inHitContext, ioPathContext); break;
+		case BSDF::RoughConductor:				return RoughConductor::GenerateContext(inMode, inL, inHitContext, ioPathContext); break;
 #endif // USE_BSDF_RoughConductor
 #if USE_BSDF_Dielectric
-		case BSDF::Dielectric:					bsdf_context = Dielectric::GenerateContext(inHitContext, ioPathContext); break;
+		case BSDF::Dielectric:					return Dielectric::GenerateContext(inMode, inL, inHitContext, ioPathContext); break;
 #endif // USE_BSDF_Dielectric
 #if USE_BSDF_ThinDielectric
-		case BSDF::ThinDielectric:				bsdf_context = Dielectric::GenerateContext(inHitContext, ioPathContext); break;
+		case BSDF::ThinDielectric:				return Dielectric::GenerateContext(inMode, inL, inHitContext, ioPathContext); break;
 #endif // USE_BSDF_ThinDielectric
 #if USE_BSDF_RoughDielectric
-		case BSDF::RoughDielectric:				bsdf_context = RoughDielectric::GenerateContext(inHitContext, ioPathContext); break;
+		case BSDF::RoughDielectric:				return RoughDielectric::GenerateContext(inMode, inL, inHitContext, ioPathContext); break;
 #endif // USE_BSDF_RoughDielectric
 #if USE_BSDF_pbrMetallicRoughness
-		case BSDF::pbrMetallicRoughness:		bsdf_context = glTF::GenerateContext(inHitContext, ioPathContext); break;
+		case BSDF::pbrMetallicRoughness:		return glTF::GenerateContext(inMode, inL, inHitContext, ioPathContext); break;
 #endif // USE_BSDF_pbrMetallicRoughness
 
 		case BSDF::Diffuse:						// [passthrough]
-		default:								bsdf_context = Diffuse::GenerateContext(inHitContext, ioPathContext); break;
+		default:								return Diffuse::GenerateContext(inMode, inL, inHitContext, ioPathContext); break;
 		}
-
-		InspectPixel::Update(InspectPixelMode::BSDF__L,		ioPathContext, float3(bsdf_context.mL));
-		InspectPixel::Update(InspectPixelMode::BSDF__V,		ioPathContext, float3(bsdf_context.mV));
-		InspectPixel::Update(InspectPixelMode::BSDF__N,		ioPathContext, float3(bsdf_context.mN));
-		InspectPixel::Update(InspectPixelMode::BSDF__H,		ioPathContext, float3(bsdf_context.mH));
-		InspectPixel::Update(InspectPixelMode::BSDF__Lobe,	ioPathContext, float3(bsdf_context.mLobeIndex, 0, 0));
-
-		return bsdf_context;
 	}
 
 	BSDFResult Evaluate(inout BSDFContext inBSDFContext, HitContext inHitContext, inout PathContext ioPathContext)

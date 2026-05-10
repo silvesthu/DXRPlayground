@@ -304,7 +304,6 @@ struct Ray
 	float			mTCurrent;
 };
 
-
 namespace InstanceDataCache
 {
 	const static int CacheSize = 64;
@@ -450,29 +449,7 @@ struct BSDFContext
 		return bsdf_context;
 	}
 
-	static BSDFContext Generate(Mode inMode, float3 inLight, HitContext inHitContext)
-	{
-		// [NOTE] eta_it can not be determined until BSDF is evaluated. SetEta is used then.
-		// [TODO] Should allow BSDFEvaluation to properly generate this context
-		float dummy_eta_it						= 1.0;
-		uint dummy_lobe_index					= 0;
-		BSDFContext bsdf_context				= Generate(inMode, inLight, dummy_eta_it, dummy_lobe_index, inHitContext);
-		bsdf_context.mLobeIndex					= bsdf_context.mNdotV * bsdf_context.mNdotL > 0 ? 0 : 1;
-		return bsdf_context;
-	}
-
-	void			SetEta(float inEtaIT)
-	{
-		mH										= normalize(mV + mL * inEtaIT);	// See roughdielectric::eval
-		if (dot(mN, mH) < 0)
-			mH									= -mH; // Put H on the same side as N
-
-		mNdotH									= dot(mN, mH);
-		mHdotV									= dot(mH, mV);
-		mHdotL									= dot(mH, mL);
-	}
-
-	void			FlipNormal()
+	void FlipNormal()
 	{
 		mN										= -mN;
 		mH										= -mH;

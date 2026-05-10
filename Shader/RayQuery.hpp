@@ -207,7 +207,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 				{
 					if (path_context.mRecursionDepth == 0 ||					// Camera ray hit the light
 						path_context.mPrevDiracDeltaDistribution || 			// Prev hit is DiracDeltaDistribution -> no light sample
-						GetSampleMode() == SampleMode::SampleBSDF ||			// SampleBSDF mode -> no light sample
+						GetSampleMode() == SampleMode::BSDF ||			// BSDF mode -> no light sample
 						false)
 					{
 						// Add light contribution
@@ -241,7 +241,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 					bool sample_light = GetSampleMode() == SampleMode::SampleLight || GetSampleMode() == SampleMode::MIS;
 					if (mConstants.mLightCount > 0 &&											// No light -> no light sample
 						!hit_context.DiracDeltaDistribution() &&								// Current hit is DiracDeltaDistribution -> no light sample
-						sample_light &&															// SampleBSDF mode -> no light sample
+						sample_light &&															// BSDF mode -> no light sample
 						path_context.mRecursionDepth < mConstants.mRecursionDepthCountMax &&	// Skip NEE for exceeding limit of recursion depth
 						true)
 					{
@@ -267,7 +267,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 							{
 								InspectRay::HitLight(path_context, shadow_ray.Origin + shadow_ray.Direction * shadow_query.CommittedRayT());
 							
-								BSDFContext bsdf_context			= BSDFContext::Generate(BSDFContext::Mode::Light, light_context.mL, hit_context);
+								BSDFContext bsdf_context			= BSDFEvaluation::GenerateContext(BSDFContext::Mode::Light, light_context.mL, hit_context, path_context);
 								BSDFResult bsdf_result				= BSDFEvaluation::Evaluate(bsdf_context, hit_context, path_context);
 
 								float3 luminance					= light_context.GetLight().mEmission * (mConstants.mEmissionBoost * kPreExposure);
@@ -285,6 +285,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 
 								path_context.mLightEmission			= path_context.mThroughput * light_emission;
 
+								InspectPixel::BSDF(path_context, bsdf_context);
 								InspectPixel::SampleLightDone(path_context, bsdf_context, bsdf_result, 1.0 / light_weight);
 							}
 						}
@@ -292,7 +293,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 
 					// Sample BSDF / [Mitsuba] BSDF sampling
 					{
-						BSDFContext bsdf_context					= BSDFEvaluation::GenerateContext(hit_context, path_context);
+						BSDFContext bsdf_context					= BSDFEvaluation::GenerateContext(BSDFContext::Mode::BSDF, BSDFEvaluation::sLUndetermined, hit_context, path_context);
 						BSDFResult bsdf_result						= BSDFEvaluation::Evaluate(bsdf_context, hit_context, path_context);
 					
 						path_context.mEmission						+= path_context.mThroughput * emission; // Emissive BSDF
@@ -309,7 +310,8 @@ void TraceRay(inout PixelContext ioPixelContext)
 						ray.Direction								= bsdf_context.mL;
 						continue_bounce								= true;
 
-						InspectPixel::SampleBSDF(path_context, hit_context, bsdf_context, bsdf_result);
+						InspectPixel::BSDF(path_context, bsdf_context);
+						InspectPixel::SampleBSDFDone(path_context, hit_context, bsdf_context, bsdf_result);
 					}
 				}
 
