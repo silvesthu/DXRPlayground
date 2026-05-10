@@ -142,7 +142,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 						// [TODO] Support NEE on participating media
 						// [TODO] Support phase function
 						path_context.mThroughput					*= medium_context.Albedo();
-						path_context.mPrevBSDFSamplePDF				= 1.0f / (4.0f * M_PI);
+						path_context.mPrevBSDFSamplePDF				= 1.0f / (4.0f * MATH_PI);
 						path_context.mPrevDiracDeltaDistribution	= false;
 
 						ray.Origin				= ray.Origin + ray.Direction * free_flight_distance;
