@@ -227,7 +227,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 
 						// [TODO] Need update for ReSTIR
 						LightContext light_context	= LightEvaluation::GenerateContext(LightEvaluation::ContextType::Input, ray.Direction, light_index, ray.Origin, path_context);
-						float light_mis_pdf			= light_context.mSolidAnglePDF * LightContext::UniformSelectionPDF();
+						float light_mis_pdf			= light_context.mSolidAnglePDF * LightContext::BaseSelectionPDF();
 					
 						float mis_weight			= max(0.0f, MIS::PowerHeuristic(1, path_context.mPrevBSDFSamplePDF, 1, light_mis_pdf));
 						path_context.mEmission		+= path_context.mThroughput * emission * mis_weight;
@@ -252,7 +252,6 @@ void TraceRay(inout PixelContext ioPixelContext)
 						float light_weight = light_context.mSolidAnglePDF <= 0.0 ? 0.0 : (light_context.SelectionWeight() / light_context.mSolidAnglePDF);
 						if (light_context.IsValid() && light_weight > 0)
 						{
-							// Cast shadow ray
 							RayDesc shadow_ray;
 							shadow_ray.Origin						= hit_context.PositionWS();
 							shadow_ray.Direction					= light_context.mL;
@@ -261,7 +260,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 
 							RayQuery<RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH> shadow_query;
 							TraceShadowRay(shadow_query, shadow_ray);
-						
+
 							// Shadow ray hit the light
 							if (IsHit(shadow_query) && shadow_query.CommittedInstanceID() == light_context.GetLight().mInstanceID)
 							{
@@ -279,7 +278,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 									float light_mis_pdf				= light_context.MISPDF();
 									float mis_weight				= max(0.0f, MIS::PowerHeuristic(1, light_mis_pdf, 1, bsdf_mis_pdf));
 									light_emission					*= mis_weight;
-								
+
 									InspectPixel::Update(InspectPixelMode::MIS_LIGHT, path_context, float3(bsdf_mis_pdf, light_mis_pdf, mis_weight));
 								}
 
