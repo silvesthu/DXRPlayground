@@ -77,7 +77,6 @@ void TraceRay(inout PixelContext ioPixelContext)
 	PathContext path_context					= (PathContext)0;
 	path_context.mThroughput					= 1.0;
 	path_context.mPrevBSDFSamplePDF				= 0.0;
-	path_context.mPrevLobeIndex					= 0;
 	path_context.mPrevDiracDeltaDistribution	= false;
 	path_context.mEtaScale						= 1.0;
 	path_context.mRandomState					= random_state;
@@ -142,10 +141,14 @@ void TraceRay(inout PixelContext ioPixelContext)
 					bool null_scattering		= RandomFloat01(path_context.mRandomState) >= medium_context.SigmaT()[channel] * inv_majorant_extinction;
 					if (!null_scattering)
 					{
-						path_context.mThroughput *= medium_context.Albedo();
+						// [TODO] Support NEE on participating media
+						// [TODO] Support phase function
+						path_context.mThroughput					*= medium_context.Albedo();
+						path_context.mPrevBSDFSamplePDF				= 1.0f / (4.0f * M_PI);
+						path_context.mPrevDiracDeltaDistribution	= false;
 
 						ray.Origin				= ray.Origin + ray.Direction * free_flight_distance;
-						ray.Direction			= RandomUnitVector(path_context.mRandomState); // [TODO] Support phase function
+						ray.Direction			= RandomUnitVector(path_context.mRandomState);
 
 						ray_scattered			= true;
 						continue_bounce			= true;
@@ -207,32 +210,29 @@ void TraceRay(inout PixelContext ioPixelContext)
 				{
 					if (path_context.mRecursionDepth == 0 ||					// Camera ray hit the light
 						path_context.mPrevDiracDeltaDistribution || 			// Prev hit is DiracDeltaDistribution -> no light sample
-						GetSampleMode() == SampleMode::BSDF ||			// BSDF mode -> no light sample
+						GetSampleMode() != SampleMode::SampleLight ||			// Ignore hit on light if SampleLight
 						false)
 					{
 						// Add light contribution
+						float mis_weight				= 1.0f;
+						if (GetSampleMode() == SampleMode::MIS && path_context.mMediumInstanceID == InvalidInstanceID)
+						{
+							uint light_index			= hit_context.LightIndex();
+							Light light					= RaytraceLightsSRV[light_index];
+
+							// [TODO] Need update for ReSTIR
+							LightContext light_context	= LightEvaluation::GenerateContext(LightEvaluation::ContextType::Input, ray.Direction, light_index, ray.Origin, path_context);
+							float light_mis_pdf			= light_context.mSolidAnglePDF * LightContext::BaseSelectionPDF();
 					
-						path_context.mEmission		+= path_context.mThroughput * emission;
+							mis_weight					= max(0.0f, MIS::PowerHeuristic(1, path_context.mPrevBSDFSamplePDF, 1, light_mis_pdf));
+
+							InspectPixel::Update(InspectPixelMode::MIS_BSDF, path_context, float3(path_context.mPrevBSDFSamplePDF, light_mis_pdf, mis_weight), true);
+						}
+					
+						path_context.mEmission			+= path_context.mThroughput * emission * mis_weight;
 					
 						if (path_context.mRecursionDepth == 0)
 							InspectPixel::Update(InspectPixelMode::LightIndex, path_context, float3(hit_context.LightIndex() + 0.5, 0, 0)); // Add a offset to identify light source in LightIndex debug output
-					}
-					else if (GetSampleMode() == SampleMode::MIS)
-					{
-						// Add light contribution with MIS
-					
-						// Select light
-						uint light_index			= hit_context.LightIndex();
-						Light light					= RaytraceLightsSRV[light_index];
-
-						// [TODO] Need update for ReSTIR
-						LightContext light_context	= LightEvaluation::GenerateContext(LightEvaluation::ContextType::Input, ray.Direction, light_index, ray.Origin, path_context);
-						float light_mis_pdf			= light_context.mSolidAnglePDF * LightContext::BaseSelectionPDF();
-					
-						float mis_weight			= max(0.0f, MIS::PowerHeuristic(1, path_context.mPrevBSDFSamplePDF, 1, light_mis_pdf));
-						path_context.mEmission		+= path_context.mThroughput * emission * mis_weight;
-					
-						InspectPixel::Update(InspectPixelMode::MIS_BSDF, path_context, float3(path_context.mPrevBSDFSamplePDF, light_mis_pdf, mis_weight), true);
 					}
 				}
 				else // Ray hit a surface
@@ -282,7 +282,10 @@ void TraceRay(inout PixelContext ioPixelContext)
 									InspectPixel::Update(InspectPixelMode::MIS_LIGHT, path_context, float3(bsdf_mis_pdf, light_mis_pdf, mis_weight));
 								}
 
-								path_context.mEmission				+= path_context.mThroughput * light_emission;
+								if (bsdf_result.mMediumInstanceID == InvalidInstanceID) // NEE ray not inside medium
+								{
+									path_context.mEmission			+= path_context.mThroughput * light_emission;
+								}
 
 								InspectPixel::BSDF(path_context, bsdf_context);
 								InspectPixel::SampleLightDone(path_context, bsdf_context, bsdf_result, 1.0 / light_weight);
@@ -298,10 +301,9 @@ void TraceRay(inout PixelContext ioPixelContext)
 						path_context.mEmission						+= path_context.mThroughput * emission; // Emissive BSDF
 						path_context.mThroughput					*= bsdf_result.mBSDFSamplePDF > 0 ? (bsdf_result.mBSDF * abs(bsdf_context.mNdotL) / bsdf_result.mBSDFSamplePDF) : 0;
 						path_context.mEtaScale						*= bsdf_result.mEta;
-						path_context.mMediumInstanceID				= bsdf_result.mMediumInstanceID; // [TODO] Need a medium stack to handle nested medium
+						path_context.mMediumInstanceID				= bsdf_result.mMediumInstanceID;
 					
 						path_context.mPrevBSDFSamplePDF				= bsdf_result.mBSDFSamplePDF;
-						path_context.mPrevLobeIndex					= bsdf_context.mLobeIndex;
 						path_context.mPrevDiracDeltaDistribution	= hit_context.DiracDeltaDistribution();
 
 						// Prepare for next bounce

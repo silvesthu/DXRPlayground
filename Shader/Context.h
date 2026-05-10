@@ -24,11 +24,10 @@ struct PathContext
 	float			mEtaScale;						// [0, +inf]	Accumulated eta scale for handling refraction, see https://www.pbr-book.org/3ed-2018/Light_Transport_II/Specular_Reflection_and_Transmission#HandlingRefraction
 
 	float			mPrevBSDFSamplePDF;				// [0, 1]		BSDF Sample PDF from previous hit
-	uint			mPrevLobeIndex;					// [0, +]		[WIP] Not used yet
 	bool			mPrevDiracDeltaDistribution;	// [bool]		Whether BSDF Sample from previous hit is Dirac Delta distribution
 
 	uint			mRecursionDepth;				// [0, +]		Current recursion depth, starting from 0 for primary ray
-	uint			mMediumInstanceID;				// [0, +]		Current participating medium instance ID, only updated on surface hit (assume participating medium has a hull)
+	uint			mMediumInstanceID;				// [0, +]		Current participating medium instance ID, only updated on surface hit (assume participating medium has a surface hull, and not nested)
 };
 
 struct meshopt_Meshlet
