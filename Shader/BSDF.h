@@ -412,9 +412,8 @@ namespace BSDFEvaluation
 		{
 			float3 specular_reflectance				= inHitContext.SpecularReflectance();
 			float specular_probability				= MaxComponent(specular_reflectance);
-			bool select_specular					= RandomFloat01(ioPathContext.mRandomState) <= specular_probability;
 
-			if (!select_specular)
+			if (inBSDFContext.mLobeIndex == sLobeIndexDiffuse)
 			{
 				BSDFResult brdf_result				= Diffuse::Evaluate(inBSDFContext, inHitContext, ioPathContext);
 				brdf_result.mBSDFSamplePDF			*= 1.0 - specular_probability;
