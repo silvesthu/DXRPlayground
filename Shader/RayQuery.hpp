@@ -73,6 +73,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 	ray.Direction								= ray_direction_ws;
 	ray.TMin									= 1E-4;
 	ray.TMax									= 10000;
+	Inspect::RayPrimary(ray);
 
 	PathContext path_context					= (PathContext)0;
 	path_context.mThroughput					= 1.0;
@@ -83,9 +84,6 @@ void TraceRay(inout PixelContext ioPixelContext)
 	path_context.mRandomStateReSTIR				= random_state_restir;
 	path_context.mRecursionDepth				= 0;
 	path_context.mMediumInstanceID				= InvalidInstanceID;
-
-	ShaderPrint::Initialize(ioPixelContext);
-	InspectRay::Initialize(ioPixelContext, ray);
 
 	for (;;)
 	{
@@ -164,9 +162,9 @@ void TraceRay(inout PixelContext ioPixelContext)
 
 				} while (loop_until_event);
 
-				InspectPixel::Update(InspectPixelMode::MediumExtinction, path_context, medium_context.SigmaT());
-				InspectPixel::Update(InspectPixelMode::MediumFreeFlight, path_context, float3(free_flight_distance, query.CommittedRayT(), ray_scattered));
-				InspectPixel::Update(InspectPixelMode::MediumInstanceID, path_context, float3(path_context.mMediumInstanceID, 0, 0));
+				Inspect::Update(InspectMode::MediumExtinction, path_context, medium_context.SigmaT());
+				Inspect::Update(InspectMode::MediumFreeFlight, path_context, float3(free_flight_distance, query.CommittedRayT(), ray_scattered));
+				Inspect::Update(InspectMode::MediumInstanceID, path_context, float3(path_context.mMediumInstanceID, 0, 0));
 			}
 
 			// Participating media (Atmosphere)
@@ -191,8 +189,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 			{
 				// HitContext
 				HitContext hit_context			= HitContext::Generate(ray, query);
-				InspectPixel::Hit(path_context, hit_context);
-				InspectRay::Hit(path_context, hit_context);
+				Inspect::Hit(path_context, hit_context);
 
 				// Emission
 				float3 emission = hit_context.Emission() * (mConstants.mEmissionBoost * kPreExposure);
@@ -223,13 +220,13 @@ void TraceRay(inout PixelContext ioPixelContext)
 					
 							mis_weight					= max(0.0f, MIS::PowerHeuristic(1, path_context.mPrevBSDFSamplePDF, 1, light_mis_pdf));
 
-							InspectPixel::Update(InspectPixelMode::MIS_BSDF, path_context, float3(path_context.mPrevBSDFSamplePDF, light_mis_pdf, mis_weight), true);
+							Inspect::Update(InspectMode::MIS_BSDF, path_context, float3(path_context.mPrevBSDFSamplePDF, light_mis_pdf, mis_weight), true);
 						}
 					
 						path_context.mEmission			+= path_context.mThroughput * emission * mis_weight;
 					
 						if (path_context.mRecursionDepth == 0)
-							InspectPixel::Update(InspectPixelMode::LightIndex, path_context, float3(hit_context.LightIndex() + 0.5, 0, 0)); // Add a offset to identify light source in LightIndex debug output
+							Inspect::Update(InspectMode::LightIndex, path_context, float3(hit_context.LightIndex() + 0.5, 0, 0)); // Add a offset to identify light source in LightIndex debug output
 					}
 				}
 				else // Ray hit a surface
@@ -244,7 +241,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 					{
 						// Select light
 						LightContext light_context					= LightEvaluation::SelectLight(hit_context.PositionWS(), path_context);
-						InspectPixel::SampleLight(path_context, light_context);
+						Inspect::SampleLight(path_context, light_context);
 
 						float light_weight = light_context.mSolidAnglePDF <= 0.0 ? 0.0 : (light_context.SelectionWeight() / light_context.mSolidAnglePDF);
 						if (light_context.IsValid() && light_weight > 0)
@@ -261,7 +258,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 							// Shadow ray hit the light
 							if (IsHit(shadow_query) && shadow_query.CommittedInstanceID() == light_context.GetLight().mInstanceID)
 							{
-								InspectRay::HitLight(path_context, shadow_ray.Origin + shadow_ray.Direction * shadow_query.CommittedRayT());
+								Inspect::HitLight(path_context, shadow_ray.Origin + shadow_ray.Direction * shadow_query.CommittedRayT());
 							
 								BSDFContext bsdf_context			= BSDFEvaluation::GenerateContext(BSDFContext::Mode::Light, light_context.mL, hit_context, path_context);
 								BSDFResult bsdf_result				= BSDFEvaluation::Evaluate(bsdf_context, hit_context, path_context);
@@ -276,7 +273,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 									float mis_weight				= max(0.0f, MIS::PowerHeuristic(1, light_mis_pdf, 1, bsdf_mis_pdf));
 									light_emission					*= mis_weight;
 
-									InspectPixel::Update(InspectPixelMode::MIS_LIGHT, path_context, float3(bsdf_mis_pdf, light_mis_pdf, mis_weight));
+									Inspect::Update(InspectMode::MIS_LIGHT, path_context, float3(bsdf_mis_pdf, light_mis_pdf, mis_weight));
 								}
 
 								if (bsdf_result.mMediumInstanceID == InvalidInstanceID) // NEE ray not inside medium
@@ -284,8 +281,8 @@ void TraceRay(inout PixelContext ioPixelContext)
 									path_context.mEmission			+= path_context.mThroughput * light_emission;
 								}
 
-								InspectPixel::BSDF(path_context, bsdf_context);
-								InspectPixel::SampleLightDone(path_context, bsdf_context, bsdf_result, 1.0 / light_weight);
+								Inspect::BSDF(path_context, bsdf_context);
+								Inspect::SampleLightDone(path_context, bsdf_context, bsdf_result, 1.0 / light_weight);
 							}
 						}
 					}
@@ -308,8 +305,8 @@ void TraceRay(inout PixelContext ioPixelContext)
 						ray.Direction								= bsdf_context.mL;
 						continue_bounce								= true;
 
-						InspectPixel::BSDF(path_context, bsdf_context);
-						InspectPixel::SampleBSDFDone(path_context, hit_context, bsdf_context, bsdf_result);
+						Inspect::BSDF(path_context, bsdf_context);
+						Inspect::SampleBSDFDone(path_context, hit_context, bsdf_context, bsdf_result);
 					}
 				}
 
@@ -323,8 +320,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 		else
 		{
 			// Ray missed (Background)
-			InspectPixel::Miss(path_context, ray);
-			InspectRay::Miss(path_context, ray);
+			Inspect::Miss(path_context, ray);
 
 			float3 sky_luminance				= GetSkyLuminance(Ray::Generate(ray, 0.0f));
 
@@ -338,9 +334,9 @@ void TraceRay(inout PixelContext ioPixelContext)
 			break;
 		}
 
-		InspectPixel::Update(InspectPixelMode::Emission,	path_context, path_context.mEmission);
-		InspectPixel::Update(InspectPixelMode::Throughput,	path_context, float3(path_context.mThroughput));
-		InspectPixel::Update(InspectPixelMode::EtaScale,	path_context, float3(path_context.mEtaScale, 0, 0));
+		Inspect::Update(InspectMode::Emission,	path_context, path_context.mEmission);
+		Inspect::Update(InspectMode::Throughput,	path_context, float3(path_context.mThroughput));
+		Inspect::Update(InspectMode::EtaScale,	path_context, float3(path_context.mEtaScale, 0, 0));
 
 		if (!continue_bounce)
 			break;
@@ -367,7 +363,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 			float probability					= RandomFloat01(path_context.mRandomState);
 			bool probability_passed				= probability < continue_probability;
 
-			InspectPixel::Update(InspectPixelMode::RussianRoulette, path_context, float3(probability_passed, probability, continue_probability));
+			Inspect::Update(InspectMode::RussianRoulette, path_context, float3(probability_passed, probability, continue_probability));
 
 			if (probability_passed)
 				path_context.mThroughput		/= continue_probability; 				// Weight the path to keep result unbiased
@@ -413,7 +409,8 @@ void RayQueryCS(COMPUTE_SHADER_INPUT)
 	pixel_context.mPixelIndex					= inDispatchThreadID.xyz;
 	pixel_context.mPixelTotal					= uint3(output_dimensions.xy, 1);
 
-	InspectPixel::Initialize(pixel_context);
+	Inspect::Initialize(pixel_context);
+	ShaderPrint::Initialize(pixel_context);
 	TraceRay(pixel_context);
 }
 
@@ -431,7 +428,8 @@ void DepthPS(
 	pixel_context.mPixelTotal					= uint3(output_dimensions.xy, 1);
 	pixel_context.mOutputDepth					= true;
 
-	InspectPixel::Initialize(pixel_context);
+	Inspect::Initialize(pixel_context);
+	ShaderPrint::Initialize(pixel_context);
 	TraceRay(pixel_context);
 	
 	outDepth									= pixel_context.mDepth;

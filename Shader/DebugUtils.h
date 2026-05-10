@@ -11,6 +11,7 @@ namespace Visualize
 {
     void Hit(inout PathContext inPathContext, HitContext inHitContext, inout bool ioContinueBounce)
     {
+#if SHADER_DEBUG
         switch (GetVisualizeMode())
         {
         case VisualizeMode::None:							break;
@@ -30,78 +31,90 @@ namespace Visualize
         case VisualizeMode::SpatialData:					inPathContext.mEmission = SpatialCache::LoadData(SpatialCache::FindOrInsert(inHitContext.PositionWS(), 0, SpatialCache::kCellSize)) / 1024.0; ioContinueBounce = false; break;
         default:											inPathContext.mEmission = sVisualizeModeValue; ioContinueBounce = false; break;
         }
+#endif // SHADER_DEBUG
     }
 }
 
-namespace InspectPixel
+namespace Inspect
 {
-    static bool sWritePixel = false;
+    static bool sActive = false;
+    static bool sUpdatePath = false;
+    static USING_RESOURCE(RWStructuredBuffer<InspectData>, InspectDataUAV);
 
-    InspectPixelMode Mode()
+    InspectMode Mode()
     {
 #if SHADER_DEBUG
-        return mConstants.mInspectPixelMode;
+        return mConstants.mInspectMode;
 #else
-        return InspectPixelMode::Manual;
+        return InspectMode::Manual;
 #endif // SHADER_DEBUG
     }
+
+    bool UpdatePath() { return (GetDebugFlag() & DebugFlag::UpdateInspectRay) != 0; }
 
     void Initialize(PixelContext inPixelContext)
     {
 #if SHADER_DEBUG
-        USING_RESOURCE(RWStructuredBuffer<PixelInspection>, PixelInspectionUAV);
-
-        sWritePixel = IsDebugCoord(inPixelContext.mPixelIndex);
-        if (sWritePixel)
-            for (int i = 0; i < PixelInspection::kArraySize; i++)
-                PixelInspectionUAV[0].mPixelValueArray[i] = 0;
+        sActive = IsDebugCoord(inPixelContext.mPixelIndex);
+        sUpdatePath = sActive && UpdatePath();
 #endif // SHADER_DEBUG
+
+        if (sActive)
+            for (int i = 0; i < InspectData::kPathLength; i++)
+                InspectDataUAV[0].mValue[i] = 0;
     }
 
-    void Update(InspectPixelMode inDebugMode, PathContext inPathContext, float3 inValue, bool inPrev = false)
+    void RayPrimary(RayDesc inRay)
     {
-#if SHADER_DEBUG
-        USING_RESOURCE(RWStructuredBuffer<PixelInspection>, PixelInspectionUAV);
+        if (sUpdatePath)
+            InspectDataUAV[0].mPositionWS[0] = float4(inRay.Origin + inRay.Direction * inRay.TMin, 1.0);
+    }
 
-        uint recursion_depth = inPrev ? (inPathContext.mRecursionDepth - 1) : inPathContext.mRecursionDepth;
+    void Update(InspectMode inDebugMode, PathContext inPathContext, float3 inValue, bool inPrev = false)
+    {
         if (Mode() == inDebugMode)
         {
-            if (sWritePixel && recursion_depth < PixelInspection::kArraySize)
-                PixelInspectionUAV[0].mPixelValueArray[recursion_depth] = float4(inValue, 1.0); // 1.0 indicate value is written
+            uint recursion_depth = inPrev ? (inPathContext.mRecursionDepth - 1) : inPathContext.mRecursionDepth;
+            if (sActive && recursion_depth < InspectData::kPathLength)
+                InspectDataUAV[0].mValue[recursion_depth] = float4(inValue, 1.0); // 1.0 indicate value is written
 
-            if (mConstants.mVisualizeMode == VisualizeMode::DebugValue)
+            if (mConstants.mVisualizeMode == VisualizeMode::Inspect)
                 sVisualizeModeValue = inValue;
         }
-#endif // SHADER_DEBUG
     }
 
     void Hit(PathContext inPathContext, HitContext inHitContext)
     {
-#if SHADER_DEBUG
-        USING_RESOURCE(RWStructuredBuffer<PixelInspection>, PixelInspectionUAV);
+        if (sActive && inPathContext.mRecursionDepth == 0)
+            InspectDataUAV[0].mPixelInstanceID = inHitContext.mInstanceID;
 
-        if (sWritePixel && inPathContext.mRecursionDepth == 0)
-            PixelInspectionUAV[0].mPixelInstanceID = inHitContext.mInstanceID;
+        Update(InspectMode::PositionWS, inPathContext, float3(inHitContext.PositionWS()));
+        Update(InspectMode::DirectionWS, inPathContext, float3(inHitContext.DirectionWS()));
+        Update(InspectMode::InstanceID, inPathContext, float3(inHitContext.mInstanceID, 0.0, 0.0));
 
-        Update(InspectPixelMode::PositionWS, inPathContext, float3(inHitContext.PositionWS()));
-        Update(InspectPixelMode::DirectionWS, inPathContext, float3(inHitContext.DirectionWS()));
-        Update(InspectPixelMode::InstanceID, inPathContext, float3(inHitContext.mInstanceID, 0.0, 0.0));
-#endif // SHADER_DEBUG
+        if (sUpdatePath)
+            InspectDataUAV[0].mPositionWS[inPathContext.mRecursionDepth + 1] = float4(inHitContext.PositionWS(), 1.0);
+    }
+
+    void HitLight(PathContext inPathContext, float3 inPositionWS)
+    {
+        if (sUpdatePath)
+            InspectDataUAV[0].mLightPositionWS[inPathContext.mRecursionDepth + 1] = float4(inPositionWS, 1.0);
     }
 
     void DGF(PathContext inPathContext, BSDFContext inBSDFContext, float D, float G, float3 F)
     {
         if (inBSDFContext.mMode == BSDFContext::Mode::BSDF)
         {
-            Update(InspectPixelMode::BSDF__D,       inPathContext, float3(D, 0, 0));
-            Update(InspectPixelMode::BSDF__G,       inPathContext, float3(G, 0, 0));
-            Update(InspectPixelMode::BSDF__F,       inPathContext, float3(F));
+            Update(InspectMode::BSDF__D,       inPathContext, float3(D, 0, 0));
+            Update(InspectMode::BSDF__G,       inPathContext, float3(G, 0, 0));
+            Update(InspectMode::BSDF__F,       inPathContext, float3(F));
         }
         else
         {
-            Update(InspectPixelMode::Light_D,       inPathContext, float3(D, 0, 0));
-            Update(InspectPixelMode::Light_G,       inPathContext, float3(G, 0, 0));
-            Update(InspectPixelMode::Light_F,       inPathContext, float3(F));
+            Update(InspectMode::Light_D,       inPathContext, float3(D, 0, 0));
+            Update(InspectMode::Light_G,       inPathContext, float3(G, 0, 0));
+            Update(InspectMode::Light_F,       inPathContext, float3(F));
         }
     }
 
@@ -109,132 +122,83 @@ namespace InspectPixel
     {
         if (inBSDFContext.mMode == BSDFContext::Mode::BSDF)
 		{
-			Update(InspectPixelMode::BSDF__L,		inPathContext, float3(inBSDFContext.mL));
-			Update(InspectPixelMode::BSDF__V,		inPathContext, float3(inBSDFContext.mV));
-			Update(InspectPixelMode::BSDF__N,		inPathContext, float3(inBSDFContext.mN));
-			Update(InspectPixelMode::BSDF__H,		inPathContext, float3(inBSDFContext.mH));
-			Update(InspectPixelMode::BSDF__Lobe,	inPathContext, float3(inBSDFContext.mLobeIndex, 0, 0));
+			Update(InspectMode::BSDF__L,		inPathContext, float3(inBSDFContext.mL));
+			Update(InspectMode::BSDF__V,		inPathContext, float3(inBSDFContext.mV));
+			Update(InspectMode::BSDF__N,		inPathContext, float3(inBSDFContext.mN));
+			Update(InspectMode::BSDF__H,		inPathContext, float3(inBSDFContext.mH));
+			Update(InspectMode::BSDF__Lobe,	inPathContext, float3(inBSDFContext.mLobeIndex, 0, 0));
 		}
 		else
 		{
-			Update(InspectPixelMode::Light_L,		inPathContext, float3(inBSDFContext.mL));
-			Update(InspectPixelMode::Light_V,		inPathContext, float3(inBSDFContext.mV));
-			Update(InspectPixelMode::Light_N,		inPathContext, float3(inBSDFContext.mN));
-			Update(InspectPixelMode::Light_H,		inPathContext, float3(inBSDFContext.mH));
-			Update(InspectPixelMode::Light_Lobe,	inPathContext, float3(inBSDFContext.mLobeIndex, 0, 0));
+			Update(InspectMode::Light_L,		inPathContext, float3(inBSDFContext.mL));
+			Update(InspectMode::Light_V,		inPathContext, float3(inBSDFContext.mV));
+			Update(InspectMode::Light_N,		inPathContext, float3(inBSDFContext.mN));
+			Update(InspectMode::Light_H,		inPathContext, float3(inBSDFContext.mH));
+			Update(InspectMode::Light_Lobe,	inPathContext, float3(inBSDFContext.mLobeIndex, 0, 0));
 		}
     }
 
     void SampleLight(PathContext inPathContext, LightContext inLightContext)
     {
-#if SHADER_DEBUG
-        Update(InspectPixelMode::LightIndex,    inPathContext, float3(inLightContext.LightIndex(), 0.0, 0.0));
-        Update(InspectPixelMode::RIS_SAMPLE,    inPathContext, float3(inLightContext.mReservoir.mTargetPDF, 0.0, 0.0));
-        Update(InspectPixelMode::RIS_SUM,       inPathContext, float3(inLightContext.mReservoir.mWeightSum, inLightContext.mReservoir.mCountSum, 0.0));
-#endif // SHADER_DEBUG
+        Update(InspectMode::LightIndex,    inPathContext, float3(inLightContext.LightIndex(), 0.0, 0.0));
+        Update(InspectMode::RIS_SAMPLE,    inPathContext, float3(inLightContext.mReservoir.mTargetPDF, 0.0, 0.0));
+        Update(InspectMode::RIS_SUM,       inPathContext, float3(inLightContext.mReservoir.mWeightSum, inLightContext.mReservoir.mCountSum, 0.0));
     }
 
     void SampleLightDone(PathContext inPathContext, BSDFContext inBSDFContext, BSDFResult inBSDFResult, float inLightPDF)
     {
-#if SHADER_DEBUG
-        Update(InspectPixelMode::Light_BSDF,    inPathContext, float3(inBSDFResult.mBSDF));
-        Update(InspectPixelMode::Light_PDF,     inPathContext, float3(inLightPDF, 0, 0));
-#endif // SHADER_DEBUG
+        Update(InspectMode::Light_BSDF,    inPathContext, float3(inBSDFResult.mBSDF));
+        Update(InspectMode::Light_PDF,     inPathContext, float3(inLightPDF, 0, 0));
     }
 
     void SampleBSDFDone(PathContext inPathContext, HitContext inHitContext, BSDFContext inBSDFContext, BSDFResult inBSDFResult)
     {
-#if SHADER_DEBUG
-        Update(InspectPixelMode::BSDF__BSDF,    inPathContext, float3(inBSDFResult.mBSDF));
-        Update(InspectPixelMode::BSDF__PDF,     inPathContext, float3(inBSDFResult.mBSDFSamplePDF, 0, 0));
+        Update(InspectMode::BSDF__BSDF,    inPathContext, float3(inBSDFResult.mBSDF));
+        Update(InspectMode::BSDF__PDF,     inPathContext, float3(inBSDFResult.mBSDFSamplePDF, 0, 0));
 
-        Update(InspectPixelMode::DiracDelta,    inPathContext, float3(inHitContext.DiracDeltaDistribution(), 0, 0));
-#endif // SHADER_DEBUG
+        Update(InspectMode::Eta,           inPathContext, float3(inBSDFResult.mEta, 0, 0));
+        Update(InspectMode::DiracDelta,    inPathContext, float3(inHitContext.DiracDeltaDistribution(), 0, 0));
     }
 
     void Miss(PathContext inPathContext, RayDesc inRay)
     {
-#if SHADER_DEBUG
-        USING_RESOURCE(RWStructuredBuffer<PixelInspection>, PixelInspectionUAV);
+        if (sActive && inPathContext.mRecursionDepth == 0)
+            InspectDataUAV[0].mPixelInstanceID = InvalidInstanceID;
 
-        if (sWritePixel && inPathContext.mRecursionDepth == 0)
-            PixelInspectionUAV[0].mPixelInstanceID = InvalidInstanceID;
+        Update(InspectMode::PositionWS, inPathContext, float3(inRay.Origin));
+        Update(InspectMode::DirectionWS, inPathContext, float3(inRay.Direction));
+        Update(InspectMode::InstanceID, inPathContext, float3(-1.0, 0.0, 0.0));
 
-        Update(InspectPixelMode::PositionWS, inPathContext, float3(inRay.Origin));
-        Update(InspectPixelMode::DirectionWS, inPathContext, float3(inRay.Direction));
-        Update(InspectPixelMode::InstanceID, inPathContext, float3(-1.0, 0.0, 0.0));
-#endif // SHADER_DEBUG
+        const float kMissRayVisualizationLength = 64.0f;
+        if (sUpdatePath)
+            InspectDataUAV[0].mPositionWS[inPathContext.mRecursionDepth + 1] = float4(inRay.Origin + inRay.Direction * kMissRayVisualizationLength, 0.0);
     }
 
     void Manual(PathContext inPathContext, float3 inValue)
     {
-#if SHADER_DEBUG
-        Update(InspectPixelMode::Manual, inPathContext, inValue);
-#endif // SHADER_DEBUG
-    }
-}
-
-namespace InspectRay
-{
-    static bool sUpdatePixel = false;
-	static bool sUpdate = false;
-
-    bool UpdateRequested() { return (GetDebugFlag() & DebugFlag::UpdateInspectRay) != 0; }
-
-    void Initialize(PixelContext inPixelContext, RayDesc inRay)
-    {
-#if SHADER_DEBUG
-        USING_RESOURCE(RWStructuredBuffer<RayInspection>, RayInspectionUAV);
-
-        sUpdate = UpdateRequested() && IsDebugCoord(inPixelContext.mPixelIndex);
-        if (sUpdate)
-            RayInspectionUAV[0].mPositionWS[0] = float4(inRay.Origin + inRay.Direction * inRay.TMin, 1.0);
-#endif // SHADER_DEBUG
+        Update(InspectMode::Manual, inPathContext, inValue);
     }
 
-    void Hit(PathContext inPathContext, HitContext inHitContext)
+    void Clear(uint inPathVertexIndex)
     {
-#if SHADER_DEBUG
-        USING_RESOURCE(RWStructuredBuffer<RayInspection>, RayInspectionUAV);
-
-        if (sUpdate)
-            RayInspectionUAV[0].mPositionWS[inPathContext.mRecursionDepth + 1] = float4(inHitContext.PositionWS(), 1.0);
-#endif // SHADER_DEBUG
-    }
-
-    void Miss(PathContext inPathContext, RayDesc inRay)
-    {
-#if SHADER_DEBUG
-        USING_RESOURCE(RWStructuredBuffer<RayInspection>, RayInspectionUAV);
-
-        const float kMissRayVisualizationLength = 64.0f;
-        if (sUpdate)
-            RayInspectionUAV[0].mPositionWS[inPathContext.mRecursionDepth + 1] = float4(inRay.Origin + inRay.Direction * kMissRayVisualizationLength, 0.0);
-#endif // SHADER_DEBUG
-    }
-
-    void HitLight(PathContext inPathContext, float3 inPositionWS)
-    {
-#if SHADER_DEBUG
-        USING_RESOURCE(RWStructuredBuffer<RayInspection>, RayInspectionUAV);
-
-        if (sUpdate)
-            RayInspectionUAV[0].mLightPositionWS[inPathContext.mRecursionDepth + 1] = float4(inPositionWS, 1.0);
-#endif // SHADER_DEBUG
-    }
-
-    void Clear(uint inIndex)
-    {
-#if SHADER_DEBUG
-        USING_RESOURCE(RWStructuredBuffer<RayInspection>, RayInspectionUAV);
-
-        if (UpdateRequested() && inIndex < RayInspection::kArraySize)
+        if (inPathVertexIndex == 0)
         {
-            // Initialize position as NaN to kill vertices those are not updated
-            RayInspectionUAV[0].mPositionWS[inIndex] = sqrt(-1.0);
-            RayInspectionUAV[0].mNormalWS[inIndex] = sqrt(-1.0);
-            RayInspectionUAV[0].mLightPositionWS[inIndex] = sqrt(-1.0);
+            InspectDataUAV[0].mScreenColor                              = 0;
+            InspectDataUAV[0].mScreenDebug                              = 0;
+            InspectDataUAV[0].mPixelInstanceID                          = -1;
         }
-#endif // SHADER_DEBUG
+
+        if (inPathVertexIndex < InspectData::kPathLength)
+        {
+            InspectDataUAV[0].mValue[inPathVertexIndex]                 = 0;
+            
+            if (UpdatePath())
+            {
+                // Initialize position as NaN to kill vertices those are not updated
+                InspectDataUAV[0].mPositionWS[inPathVertexIndex]        = sqrt(-1.0);
+                InspectDataUAV[0].mNormalWS[inPathVertexIndex]          = sqrt(-1.0);
+                InspectDataUAV[0].mLightPositionWS[inPathVertexIndex]   = sqrt(-1.0);
+            }
+        }
     }
 }

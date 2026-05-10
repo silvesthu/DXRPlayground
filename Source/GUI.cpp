@@ -66,7 +66,7 @@ void gPrepareImGui()
 		{
 			InputInt2("Coords", (int*)&gConstants.mPixelDebugCoord);
 			SliderInt("Light Index", &gConstants.mPixelDebugLightIndex, 0, (int)gScene.GetSceneContent().mLights.size() - 1);
-			InputFloat3("Pixel Value", &gRenderer.mRuntime.mPixelInspectionBuffer.GetReadback<PixelInspection>(gGetFrameContextIndex())[0].mPixelValue.x, "%.8f", ImGuiInputTextFlags_ReadOnly);
+			InputFloat3("Screen Color", &gRenderer.mRuntime.mInspectDataBuffer.GetReadback<InspectData>(gGetFrameContextIndex())[0].mScreenColor.x, "%.8f", ImGuiInputTextFlags_ReadOnly);
 			SliderInt("Recursion", &gConstants.mDebugRecursion, 0, gConstants.mRecursionDepthCountMax);
 
 			if (TreeNodeEx("Visualize", ImGuiTreeNodeFlags_None))
@@ -88,13 +88,13 @@ void gPrepareImGui()
 				TreePop();
 			}
 
-			if (TreeNodeEx("Inspect Pixel", ImGuiTreeNodeFlags_None))
+			if (TreeNodeEx("Inspect", ImGuiTreeNodeFlags_None))
 			{
-				InputFloat3("Debug Value", &gRenderer.mRuntime.mPixelInspectionBuffer.GetReadback<PixelInspection>(gGetFrameContextIndex())[0].mDebugValue.x, "%.8f", ImGuiInputTextFlags_ReadOnly);
+				InputFloat3("Screen Debug", &gRenderer.mRuntime.mInspectDataBuffer.GetReadback<InspectData>(gGetFrameContextIndex())[0].mScreenDebug.x, "%.8f", ImGuiInputTextFlags_ReadOnly);
 
-				for (int i = 0; i < static_cast<int>(InspectPixelMode::Count); i++)
+				for (int i = 0; i < static_cast<int>(InspectMode::Count); i++)
 				{
-					const auto& name = nameof::nameof_enum(static_cast<InspectPixelMode>(i));
+					const auto& name = nameof::nameof_enum(static_cast<InspectMode>(i));
 					if (name.starts_with('_'))
 					{
 						NewLine();
@@ -104,11 +104,16 @@ void gPrepareImGui()
 					if (i != 0)
 						SameLine();
 
-					RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mInspectPixelMode), i);
+					RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mInspectMode), i);
 				}
 
-				for (int i = 0; i < PixelInspection::kArraySize; i++)
-					InputFloat4(std::to_string(i).c_str(), &gRenderer.mRuntime.mPixelInspectionBuffer.GetReadback<PixelInspection>(gGetFrameContextIndex())[0].mPixelValueArray[i].x, "%.8f", ImGuiInputTextFlags_ReadOnly);
+				for (int i = 0; i < InspectData::kPathLength; i++)
+				{
+					float4& value = gRenderer.mRuntime.mInspectDataBuffer.GetReadback<InspectData>(gGetFrameContextIndex())[0].mValue[i];
+					PushStyleColor(ImGuiCol_Text, GetColorU32(ImGuiCol_Text, value.w == 0.0f ? 0.2f : 1.0f));
+					InputFloat4(std::to_string(i).c_str(), &value.x, "%.8f", ImGuiInputTextFlags_ReadOnly);
+					PopStyleColor();
+				}
 
 				TreePop();
 			}
@@ -598,7 +603,7 @@ void gPrepareImGui()
 						if (Selectable(std::to_string(row).c_str(), row == gConstants.mDebugInstanceIndex, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_SelectOnNav))
 							gConstants.mDebugInstanceIndex = row;
 
-						if (row == gRenderer.mRuntime.mPixelInspectionBuffer.GetReadback<PixelInspection>(gGetFrameContextIndex())[0].mPixelInstanceID)
+						if (row == gRenderer.mRuntime.mInspectDataBuffer.GetReadback<InspectData>(gGetFrameContextIndex())[0].mPixelInstanceID)
 							TableSetBgColor(ImGuiTableBgTarget_RowBg1, GetColorU32(ImVec4(0.8f, 0.2f, 0.2f, 0.8f)));
 
 						TableSetColumnIndex(column_index++);
@@ -739,7 +744,7 @@ void gPrepareImGui()
 						if (Selectable(std::to_string(row).c_str(), row == gConstants.mDebugLightIndex, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_SelectOnNav))
 							gConstants.mDebugLightIndex = row;
 
-						if (static_cast<int>(light.mInstanceID) == gRenderer.mRuntime.mPixelInspectionBuffer.GetReadback<PixelInspection>(gGetFrameContextIndex())[0].mPixelInstanceID)
+						if (static_cast<int>(light.mInstanceID) == gRenderer.mRuntime.mInspectDataBuffer.GetReadback<InspectData>(gGetFrameContextIndex())[0].mPixelInstanceID)
 							TableSetBgColor(ImGuiTableBgTarget_RowBg1, GetColorU32(ImVec4(0.8f, 0.2f, 0.2f, 0.8f)));
 
 						TableSetColumnIndex(column_index++);

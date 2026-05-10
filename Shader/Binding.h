@@ -13,7 +13,7 @@ ConstantBuffer<RootConstants> mRootConstants : REGISTER_CBV(ROOT_CONSTANTS_REGIS
 #if USE_DYNAMIC_RESOURCE_CBV
 // 0.11ms
 // Top SOLs    SM 59.4% | TEX 45.3% | L2 17.9% | VRAM 1.5% | VPC 0.0%
-static ConstantBuffer<Constants> mConstants = ResourceDescriptorHeap[0];
+static ConstantBuffer<Constants> mConstants = ResourceDescriptorHeap[(uint)ViewDescriptorIndex::ConstantsCBV];
 ConstantBuffer<Constants> mConstantsUnused : REGISTER_CBV(COMMON_ROOT_CBV_REGISTER, COMMON_ROOT_SIGNATURE_REGISTER_SPACE);
 #else
 // 0.05ms

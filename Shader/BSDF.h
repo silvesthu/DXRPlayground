@@ -111,7 +111,7 @@ namespace BSDFEvaluation
 			if (inBSDFContext.mNdotL < 0 || inBSDFContext.mNdotV < 0 || inBSDFContext.mHdotL < 0 || inBSDFContext.mHdotV < 0)
 				result.mBSDF					= 0;
 
-			InspectPixel::DGF(ioPathContext, inBSDFContext, QNaN(), QNaN(), F);
+			Inspect::DGF(ioPathContext, inBSDFContext, QNaN(), QNaN(), F);
 
 			return result;
 		}
@@ -169,7 +169,7 @@ namespace BSDFEvaluation
 			result.mEta							= 1.0;
 			result.mMediumInstanceID			= InvalidInstanceID;
 
-			InspectPixel::DGF(ioPathContext, inBSDFContext, D, G, F);
+			Inspect::DGF(ioPathContext, inBSDFContext, D, G, F);
 
 			return result;
 		}
@@ -335,7 +335,7 @@ namespace BSDFEvaluation
 				result.mBSDF					= D * G * F / (4.0f * inBSDFContext.mNdotV * inBSDFContext.mNdotL);
 				result.mBSDFSamplePDF			= microfacet_pdf * jacobian;
 
-				InspectPixel::DGF(ioPathContext, inBSDFContext, D, G, F);
+				Inspect::DGF(ioPathContext, inBSDFContext, D, G, F);
 			}
 			else
 			{
@@ -352,7 +352,7 @@ namespace BSDFEvaluation
 				result.mBSDF					= abs(D * G * F * inBSDFContext.mHdotV * jacobian / (abs(inBSDFContext.mNdotV) * abs(inBSDFContext.mNdotL)));
 				result.mBSDFSamplePDF			= microfacet_pdf * jacobian;
 
-				InspectPixel::DGF(ioPathContext, inBSDFContext, D, G, F);
+				Inspect::DGF(ioPathContext, inBSDFContext, D, G, F);
 			}
 			result.mBSDFSamplePDF				*= select(select_reflection, r_i, 1.0 - r_i);
 
@@ -432,7 +432,7 @@ namespace BSDFEvaluation
 				mixed_bsdf_result.mBSDF				+= D * G * F / (4.0f * inBSDFContext.mNdotV * inBSDFContext.mNdotL);
 				mixed_bsdf_result.mBSDFSamplePDF	+= microfacet_pdf * jacobian * specular_probability;
 
-				InspectPixel::DGF(ioPathContext, inBSDFContext, D, G, F);
+				Inspect::DGF(ioPathContext, inBSDFContext, D, G, F);
 			}
 
 			return mixed_bsdf_result;

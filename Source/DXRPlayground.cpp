@@ -541,7 +541,7 @@ void sRender()
 			sConstantsCopy.mCurrentFrameIndex		= gConstants.mCurrentFrameIndex;
 			sConstantsCopy.mCurrentFrameWeight		= gConstants.mCurrentFrameWeight;
 			sConstantsCopy.mPixelDebugCoord			= gConstants.mPixelDebugCoord;
-			sConstantsCopy.mInspectPixelMode		= gConstants.mInspectPixelMode;
+			sConstantsCopy.mInspectMode		= gConstants.mInspectMode;
 			sConstantsCopy.mDebugFlag				= gConstants.mDebugFlag;
 			sConstantsCopy.mSpatialCache			= gConstants.mSpatialCache;
 			sConstantsCopy.mReSTIR					= gConstants.mReSTIR;
@@ -650,7 +650,7 @@ void sRender()
 		GPU_TIMING_SCOPE("Clear", command_list, &gStats.mGPUTimingMS.mClear);
 
 		gRenderer.Setup(gRenderer.mRuntime.mClearShader);
-		command_list->Dispatch(gAlignUpDiv(PixelInspection::kArraySize, 64u), 1, 1);
+		command_list->Dispatch(gAlignUpDiv(InspectData::kPathLength, 64u), 1, 1);
 
 		BarrierScope depth_scope(command_list, gRenderer.mRuntime.mScreenDebugTexture.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		gRenderer.ClearUnorderedAccessViewFloat(gRenderer.mRuntime.mScreenDebugTexture);
@@ -782,12 +782,12 @@ void sRender()
 		// Line
 		gCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
 		gRenderer.Setup(gRenderer.mRuntime.mLineShader);
-		gCommandList->DrawInstanced(RayInspection::kArraySize * 3 /* Position, Normal, LightPosition */ * 2 /* 2 vertex per line */, 1, 0, 0);
+		gCommandList->DrawInstanced(InspectData::kPathLength * 3 /* Position, Normal, LightPosition */ * 2 /* 2 vertex per line */, 1, 0, 0);
 
 		// Line Hidden
 		gCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
 		gRenderer.Setup(gRenderer.mRuntime.mLineHiddenShader);
-		gCommandList->DrawInstanced(RayInspection::kArraySize * 3 /* Position, Normal, LightPosition */ * 2 /* 2 vertex per line */, 1, 0, 0);
+		gCommandList->DrawInstanced(InspectData::kPathLength * 3 /* Position, Normal, LightPosition */ * 2 /* 2 vertex per line */, 1, 0, 0);
 	}
 
 	// Readback Sequence

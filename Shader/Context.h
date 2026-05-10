@@ -498,11 +498,11 @@ struct MediumContext
 		mSigmaT									*= density * mConstants.mDensityBoost;
 		mSigmaT									= min(mSigmaT, mMajorantSigmaT); // using SigmaT in xml as majorant, clamp with it as max is ignored
 
-		// InspectPixel::Update(InspectPixelMode::Manual, ioPathContext, normalized_coords);
-		// InspectPixel::Update(InspectPixelMode::Manual, ioPathContext, ijk);
-		// InspectPixel::Update(InspectPixelMode::Manual, ioPathContext, density);
-		// InspectPixel::Update(InspectPixelMode::Manual, ioPathContext, mMajorantSigmaT);
-		// InspectPixel::Update(InspectPixelMode::Manual, ioPathContext, mInstanceData.mMediumSigmaT);
+		// Inspect::Update(InspectMode::Manual, ioPathContext, normalized_coords);
+		// Inspect::Update(InspectMode::Manual, ioPathContext, ijk);
+		// Inspect::Update(InspectMode::Manual, ioPathContext, density);
+		// Inspect::Update(InspectMode::Manual, ioPathContext, mMajorantSigmaT);
+		// Inspect::Update(InspectMode::Manual, ioPathContext, mInstanceData.mMediumSigmaT);
 	}
 
 	template<RAY_FLAG RayFlags>

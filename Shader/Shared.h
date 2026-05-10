@@ -106,7 +106,7 @@ enum class ViewDescriptorIndex : uint
 	ImGuiNull3D,
 
 	// [Constants]
-	Constants,
+	ConstantsCBV,
 
 	// [Screen]
 	ScreenColorSRV,
@@ -120,9 +120,7 @@ enum class ViewDescriptorIndex : uint
 	ScreenReadbackUAV,
 
 	// [Debug]
-	ConstantsCBV,
-	PixelInspectionUAV,
-	RayInspectionUAV,
+	InspectDataUAV,
 
 	// [UVChecker]
 	UVCheckerSRV,
@@ -302,12 +300,12 @@ enum class VisualizeMode : uint
 
 	GENERATE_NEW_LINE_NAME,
 
-	DebugValue,
+	Inspect,
 
 	Count
 };
 
-enum class InspectPixelMode : uint
+enum class InspectMode : uint
 {
 	Manual,
 
@@ -336,6 +334,7 @@ enum class InspectPixelMode : uint
 
 	GENERATE_NEW_LINE_NAME,
 
+	Eta,
 	DiracDelta,
 
 	GENERATE_NEW_LINE_NAME,
@@ -863,7 +862,7 @@ struct Constants
 	int							mPixelDebugLightIndex			CONSTANT_DEFAULT(0);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
-	InspectPixelMode			mInspectPixelMode				CONSTANT_DEFAULT(InspectPixelMode::Manual);
+	InspectMode					mInspectMode					CONSTANT_DEFAULT(InspectMode::Manual);
 	int							mDebugRecursion					CONSTANT_DEFAULT(0);
 	ENUM_FLAG_TYPE(DebugFlag)	mDebugFlag						CONSTANT_DEFAULT(DebugFlag::None);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
@@ -875,25 +874,19 @@ struct Constants
 	ReSTIRConstants				mReSTIR;
 };
 
-struct PixelInspection
+struct InspectData
 {
-	static const uint			kArraySize						= 16;
-
-	float4						mPixelValue						CONSTANT_DEFAULT(float4(0.0f, 0.0f, 0.0f, 0.0f));
-	float4						mDebugValue						CONSTANT_DEFAULT(float4(0.0f, 0.0f, 0.0f, 0.0f));
-	float4						mPixelValueArray[kArraySize];
+	float4						mScreenColor					CONSTANT_DEFAULT(float4(0.0f, 0.0f, 0.0f, 0.0f));
+	float4						mScreenDebug					CONSTANT_DEFAULT(float4(0.0f, 0.0f, 0.0f, 0.0f));
 
 	int							mPixelInstanceID				CONSTANT_DEFAULT(-1);
 	uint3						GENERATE_PAD_NAME				CONSTANT_DEFAULT(uint3(0, 0, 0));
-};
 
-struct RayInspection
-{
-	static const uint			kArraySize						= 16;
-
-	float4						mPositionWS[kArraySize];
-	float4						mNormalWS[kArraySize];
-	float4						mLightPositionWS[kArraySize];
+	static const uint			kPathLength = 16;
+	float4						mValue[kPathLength];
+	float4						mPositionWS[kPathLength];
+	float4						mNormalWS[kPathLength];
+	float4						mLightPositionWS[kPathLength];
 };
 
 struct LocalConstants

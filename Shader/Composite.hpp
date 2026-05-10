@@ -92,21 +92,14 @@ float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 {
 	USING_RESOURCE(RWTexture2D<float4>, ScreenColorUAV);
 	USING_RESOURCE(RWTexture2D<float4>, ScreenDebugUAV);
-	USING_RESOURCE(RWStructuredBuffer<PixelInspection>, PixelInspectionUAV);
+	USING_RESOURCE(RWStructuredBuffer<InspectData>, InspectDataUAV);
 
 	// USING_RESOURCE(RWTexture2D<uint4>, ScreenReservoirUAV);
 	// ScreenReservoirUAV[position.xy] = uint4(0xffffffff, 0xffff0000, 0x0000ffff, 0x00000000);
 
-	uint2 coords = (uint2)position.xy;
-	float4 color = ScreenColorUAV[position.xy];
-	bool debug_pixel = all(coords == (uint2)mConstants.mPixelDebugCoord);
-	if (debug_pixel)
-	{
-		PixelInspectionUAV[0].mPixelValue = color;
-		PixelInspectionUAV[0].mDebugValue = ScreenDebugUAV[position.xy];
-	}
+	uint2 coords								= (uint2)position.xy;
+	float4 color								= ScreenColorUAV[position.xy];
 	
-	// For visualization
 	switch (mConstants.mVisualizeMode)
 	{
 	case VisualizeMode::None:					color.xyz = LuminanceToColor(color.xyz, mConstants); break;
@@ -123,9 +116,15 @@ float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 	case VisualizeMode::RecursionDepth:			color.xyz = GetDebugRecursion() == 0 ? HSVToRGB(float3(color.x / 8.0, 1, 1)) : color.xxx; break;
 	default:									break;
 	}
-	
-	if (!debug_pixel)
+
+	if (all(coords == (uint2)mConstants.mPixelDebugCoord))
 	{
+		InspectDataUAV[0].mScreenColor = color;
+		InspectDataUAV[0].mScreenDebug = ScreenDebugUAV[position.xy];
+	}
+	else
+	{
+		// Crosshair
 		if (coords.y == mConstants.mPixelDebugCoord.y)
 			if (abs((int)coords.x - mConstants.mPixelDebugCoord.x) < 10)
 				color.xyz = float3(1, 0, 1);
@@ -169,26 +168,14 @@ float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 [numthreads(64, 1, 1)]
 void ClearCS(COMPUTE_SHADER_INPUT)
 {
-	USING_RESOURCE(RWStructuredBuffer<PixelInspection>, PixelInspectionUAV);
+	USING_RESOURCE(RWStructuredBuffer<InspectData>, InspectDataUAV);
 	USING_RESOURCE(RWStructuredBuffer<uint>, ShaderPrintUAV);
 
 #if SHADER_DEBUG
 	ShaderPrintUAV[0] = 1; // 0 stores count
 #endif // SHADER_DEBUG
 
-	if (inDispatchThreadID.x == 0)
-	{
-		PixelInspectionUAV[0].mPixelValue = 0;
-		PixelInspectionUAV[0].mDebugValue = 0;
-		PixelInspectionUAV[0].mPixelInstanceID = -1;
-	}
-
-	if (inDispatchThreadID.x < PixelInspection::kArraySize)
-	{
-		PixelInspectionUAV[0].mPixelValueArray[inDispatchThreadID.x] = 0;
-	}
-
-	InspectRay::Clear(inDispatchThreadID.x);
+	Inspect::Clear(inDispatchThreadID.x);
 }
 
 // Replacement for complex ClearUnorderedAccessViewUint/Float
@@ -246,19 +233,19 @@ void ReadbackCS(COMPUTE_SHADER_INPUT)
 
 float4 LineVS(uint inVertexID : SV_VertexID, out float4 outColor : COLOR) : SV_POSITION
 {
-	USING_RESOURCE(RWStructuredBuffer<RayInspection>, RayInspectionUAV);
+	USING_RESOURCE(RWStructuredBuffer<InspectData>, InspectDataUAV);
 
 	float4 position_ws = 0;
 	outColor = 1.0;
 
-	if (inVertexID < RayInspection::kArraySize * 1 * 2)
+	if (inVertexID < InspectData::kPathLength * 1 * 2)
 	{
 		// Position (BSDF Rays)
 		uint group = inVertexID / 2;
 		uint index = inVertexID % 2;
 
-		float4 position_0 = RayInspectionUAV[0].mPositionWS[group + 0];
-		float4 position_1 = RayInspectionUAV[0].mPositionWS[group + 1];
+		float4 position_0 = InspectDataUAV[0].mPositionWS[group + 0];
+		float4 position_1 = InspectDataUAV[0].mPositionWS[group + 1];
 
 		position_ws = float4(index == 0 ? position_0.xyz : position_1.xyz, 1.0);
 
@@ -274,20 +261,20 @@ float4 LineVS(uint inVertexID : SV_VertexID, out float4 outColor : COLOR) : SV_P
 		if (index == 1 && position_1.w == 0) // Miss Ray
 			outColor = float4(0.0, 0.0, 0.0, distance_along_ray); // -> Black
 	}
-	else if (inVertexID < RayInspection::kArraySize * 2 * 2)
+	else if (inVertexID < InspectData::kPathLength * 2 * 2)
 	{
 		// Normal
 
 		// [TODO]
 	}
-	else if (inVertexID < RayInspection::kArraySize * 3 * 2)
+	else if (inVertexID < InspectData::kPathLength * 3 * 2)
 	{
 		// LightPosition (Light Rays)
-		uint group = (inVertexID - RayInspection::kArraySize * 2 * 2) / 2;
-		uint index = (inVertexID - RayInspection::kArraySize * 2 * 2) % 2;
+		uint group = (inVertexID - InspectData::kPathLength * 2 * 2) / 2;
+		uint index = (inVertexID - InspectData::kPathLength * 2 * 2) % 2;
 
-		float4 position_0 = RayInspectionUAV[0].mPositionWS[group];
-		float4 position_1 = RayInspectionUAV[0].mLightPositionWS[group];
+		float4 position_0 = InspectDataUAV[0].mPositionWS[group];
+		float4 position_1 = InspectDataUAV[0].mLightPositionWS[group];
 
 		position_ws = float4(index == 0 ? position_0.xyz : position_1.xyz, 1.0); 
 

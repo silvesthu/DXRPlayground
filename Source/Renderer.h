@@ -62,8 +62,7 @@ struct Renderer
 																			Texture().Format(kBackBufferFormat).RTVIndex(RTVDescriptorIndex::BackBuffer1).Name("Renderer.BackBuffer1") };
 
 		Buffer									mConstantsBuffer			= Buffer().Stride(sizeof(Constants)).CBVIndex(ViewDescriptorIndex::ConstantsCBV).Name("Constants").Upload(true);
-		Buffer									mPixelInspectionBuffer		= Buffer().Stride(sizeof(PixelInspection)).UAVIndex(ViewDescriptorIndex::PixelInspectionUAV).Name("PixelInspection").Readback(true);
-		Buffer									mRayInspectionBuffer		= Buffer().Stride(sizeof(RayInspection)).UAVIndex(ViewDescriptorIndex::RayInspectionUAV).Name("RayInspection");
+		Buffer									mInspectDataBuffer			= Buffer().Stride(sizeof(InspectData)).UAVIndex(ViewDescriptorIndex::InspectDataUAV).Name("InspectData").Readback(true);
 		Buffer									mQueryBuffer				= Buffer().Stride(sizeof(UINT64)).ElementCount(kTimestampCount).Name("Query").GPU(false).Readback(true);
 		Buffer 									mSpatialHashBuffer			= Buffer().Stride(sizeof(uint32_t)).ElementCount(kSpatialHashSize).UAVIndex(ViewDescriptorIndex::SpatialHashUAV).Name("SpatialHash");
 		Buffer 									mSpatialDataBuffer			= Buffer().Stride(sizeof(uint32_t)).ElementCount(kSpatialHashSize).UAVIndex(ViewDescriptorIndex::SpatialDataUAV).Name("SpatialData");
