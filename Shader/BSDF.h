@@ -83,7 +83,7 @@ namespace BSDFEvaluation
 			if (inHitContext.BSDF() == BSDF::Unsupported)
 				result.mBSDF					= float3(1, 0, 1) / MATH_PI;
 
-			if (inBSDFContext.mNdotL < 0 || inBSDFContext.mNdotV < 0 || inBSDFContext.mHdotL < 0 || inBSDFContext.mHdotV < 0)
+			if (inBSDFContext.mNdotL < 0 || inBSDFContext.mNdotV < 0)
 				result.mBSDF					= 0;
 
 			if (GetDebugInstanceMode() == DebugInstanceMode::Barycentrics && GetDebugInstanceIndex() == inHitContext.mInstanceID)
