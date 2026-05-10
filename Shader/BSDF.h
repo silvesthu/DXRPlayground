@@ -212,10 +212,7 @@ namespace BSDFEvaluation
 		{
 			float cos_theta						= inHitContext.NdotV();
 			float eta							= inHitContext.Eta().x;
-			float r_i;
-			float cos_theta_t;
-			float eta_it;
-			float eta_ti;
+			float r_i, cos_theta_t, eta_it, eta_ti;
 			PatchThinDielectricBefore(inHitContext, cos_theta, eta);
 			F_Dielectric_Mitsuba(cos_theta, eta, r_i, cos_theta_t, eta_it, eta_ti);
 			PatchThinDielectricAfter(inHitContext, r_i, cos_theta_t, eta_it, eta_ti);
@@ -237,10 +234,7 @@ namespace BSDFEvaluation
 		{
 			float cos_theta						= inHitContext.NdotV();
 			float eta							= inHitContext.Eta().x;
-			float r_i;
-			float cos_theta_t;
-			float eta_it;
-			float eta_ti;
+			float r_i, cos_theta_t, eta_it, eta_ti;
 			PatchThinDielectricBefore(inHitContext, cos_theta, eta);
 			F_Dielectric_Mitsuba(cos_theta, eta, r_i, cos_theta_t, eta_it, eta_ti);
 			PatchThinDielectricAfter(inHitContext, r_i, cos_theta_t, eta_it, eta_ti);
@@ -278,41 +272,39 @@ namespace BSDFEvaluation
 
 		BSDFContext GenerateContext(BSDFContext::Mode inMode, float3 inL, HitContext inHitContext, inout PathContext ioPathContext)
 		{
-			float cos_theta						= inHitContext.NdotV();
-			float eta							= inHitContext.Eta().x;
-			float r_i;
-			float cos_theta_t;
-			float eta_it;
-			float eta_ti;
-			F_Dielectric_Mitsuba(cos_theta, eta, r_i, cos_theta_t, eta_it, eta_ti);
-
-			float3x3 tangent_space				= GenerateTangentSpace(inHitContext.NormalWS());
-			float3 H							= Distribution::GGX::GenerateMicrofacetDirection(tangent_space, inHitContext, ioPathContext);
-
-			uint lobe_index						= inHitContext.NdotV() * dot(inHitContext.NormalWS(), inL) >= 0 ? sLobeIndexReflection : sLobeIndexRefraction;
-			float3 L							= inL;
+			// [TODO] eval+sample pattern seems to be better after all...
 			if (inMode == BSDFContext::Mode::BSDF)
 			{
-				lobe_index						= RandomFloat01(ioPathContext.mRandomState) <= r_i ? sLobeIndexReflection : sLobeIndexRefraction;
-				L								= select(lobe_index == sLobeIndexReflection,
+				float3x3 tangent_space			= GenerateTangentSpace(inHitContext.NormalWS());
+				float3 H						= Distribution::GGX::GenerateMicrofacetDirection(tangent_space, inHitContext, ioPathContext);
+				float HdotV						= dot(H, inHitContext.ViewWS());
+
+				float r_i, cos_theta_t, eta_it, eta_ti;
+				F_Dielectric_Mitsuba(HdotV, inHitContext.Eta().x, r_i, cos_theta_t, eta_it, eta_ti);
+
+				uint lobe_index					= RandomFloat01(ioPathContext.mRandomState) <= r_i ? sLobeIndexReflection : sLobeIndexRefraction;
+				float3 L						= select(lobe_index == sLobeIndexReflection,
 													reflect(-inHitContext.ViewWS(), inHitContext.NdotV() < 0 ? -H : H),
 													refract(-inHitContext.ViewWS(), inHitContext.NdotV() < 0 ? -H : H, eta_ti));
-			}
 
-			return BSDFContext::Generate(inMode, L, select(lobe_index == sLobeIndexReflection, 1.0, eta_it), lobe_index, inHitContext);
+				return BSDFContext::Generate(inMode, L, select(lobe_index == sLobeIndexReflection, 1.0, eta_it), lobe_index, inHitContext);
+			}
+			else
+			{
+				uint lobe_index					= inHitContext.NdotV() * dot(inHitContext.NormalWS(), inL) >= 0 ? sLobeIndexReflection : sLobeIndexRefraction;
+				float3 L						= inL;
+				float eta_it					= inHitContext.NdotV() >= 0.0f ? inHitContext.Eta().x : (1.0f / inHitContext.Eta().x);
+
+				return BSDFContext::Generate(inMode, L, select(lobe_index == sLobeIndexReflection, 1.0, eta_it), lobe_index, inHitContext);
+			}
 		}
 
 		BSDFResult Evaluate(inout BSDFContext inBSDFContext, HitContext inHitContext, inout PathContext ioPathContext)
 		{
 			BSDFResult result					= (BSDFResult)0;
 
-			float cos_theta						= inHitContext.NdotV();
-			float eta							= inHitContext.Eta().x;
-			float r_i;
-			float cos_theta_t;
-			float eta_it;
-			float eta_ti;
-			F_Dielectric_Mitsuba(cos_theta, eta, r_i, cos_theta_t, eta_it, eta_ti);
+			float r_i, cos_theta_t, eta_it, eta_ti;
+			F_Dielectric_Mitsuba(inBSDFContext.mHdotV, inHitContext.Eta().x, r_i, cos_theta_t, eta_it, eta_ti);
 
 			bool select_reflection				= inBSDFContext.mLobeIndex == sLobeIndexReflection;
 			if (select_reflection)
