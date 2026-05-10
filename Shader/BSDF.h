@@ -19,11 +19,6 @@ namespace BSDFEvaluation
 	//			eval_pdf:						{ eval, pdf }
 	//			eval_pdf_sample:				{ eval_pdf, sample}
 	
-	static uint sLobeIndexTrivial = 0;
-	static uint sLobeIndexAll = 0xffffffff;
-	static float sEtaITTrivial = 1.0f;
-	static float3 sLUndetermined = 0.0f;
-
 	namespace Distribution
 	{
 		namespace GGX
@@ -69,7 +64,7 @@ namespace BSDFEvaluation
 				L								= normalize(randome_direction.x * tangent_space[0] + randome_direction.y * tangent_space[1] + randome_direction.z * tangent_space[2]);
 			}
 
-			return BSDFContext::Generate(inMode, L, sEtaITTrivial, sLobeIndexTrivial, inHitContext);
+			return BSDFContext::Generate(inMode, L, BSDFConstant::sEtaITTrivial, BSDFConstant::sLobeIndexTrivial, inHitContext);
 		}
 
 		BSDFResult Evaluate(inout BSDFContext inBSDFContext, HitContext inHitContext, inout PathContext ioPathContext)
@@ -86,9 +81,6 @@ namespace BSDFEvaluation
 			if (inBSDFContext.mNdotL < 0 || inBSDFContext.mNdotV < 0)
 				result.mBSDF					= 0;
 
-			if (GetDebugInstanceMode() == DebugInstanceMode::Barycentrics && GetDebugInstanceIndex() == inHitContext.mInstanceID)
-				result.mBSDF					= 0.0;
-
 			return result;
 		}
 	};
@@ -103,7 +95,7 @@ namespace BSDFEvaluation
 				L								= reflect(-inHitContext.ViewWS(), inHitContext.NormalWS());
 			}
 
-			return BSDFContext::Generate(inMode, L, sEtaITTrivial, sLobeIndexTrivial, inHitContext);
+			return BSDFContext::Generate(inMode, L, BSDFConstant::sEtaITTrivial, BSDFConstant::sLobeIndexTrivial, inHitContext);
 		}
 
 		BSDFResult Evaluate(inout BSDFContext inBSDFContext, HitContext inHitContext, inout PathContext ioPathContext)
@@ -118,9 +110,6 @@ namespace BSDFEvaluation
 
 			if (inBSDFContext.mNdotL < 0 || inBSDFContext.mNdotV < 0 || inBSDFContext.mHdotL < 0 || inBSDFContext.mHdotV < 0)
 				result.mBSDF					= 0;
-
-			if (GetDebugInstanceMode() == DebugInstanceMode::Reflection && GetDebugInstanceIndex() == inHitContext.mInstanceID)
-				result.mBSDF					= 1.0;
 
 			InspectPixel::DGF(ioPathContext, inBSDFContext, QNaN(), QNaN(), F);
 
@@ -142,7 +131,7 @@ namespace BSDFEvaluation
 				L								= 2.0 * HdotV * H - V;
 			}
 
-			return BSDFContext::Generate(inMode, L, sEtaITTrivial, sLobeIndexTrivial, inHitContext);
+			return BSDFContext::Generate(inMode, L, BSDFConstant::sEtaITTrivial, BSDFConstant::sLobeIndexTrivial, inHitContext);
 		}
 
 		BSDFResult Evaluate(inout BSDFContext inBSDFContext, HitContext inHitContext, inout PathContext ioPathContext)
@@ -383,7 +372,7 @@ namespace BSDFEvaluation
 
 		BSDFContext GenerateContext(BSDFContext::Mode inMode, float3 inL, HitContext inHitContext, inout PathContext ioPathContext)
 		{
-			uint lobe_index						= sLobeIndexAll;
+			uint lobe_index						= BSDFConstant::sLobeIndexAll;
 			float3 L							= inL;
 			if (inMode == BSDFContext::Mode::BSDF)
 			{
@@ -406,7 +395,7 @@ namespace BSDFEvaluation
 				}
 			}
 
-			return BSDFContext::Generate(inMode, L, sEtaITTrivial, lobe_index, inHitContext);
+			return BSDFContext::Generate(inMode, L, BSDFConstant::sEtaITTrivial, lobe_index, inHitContext);
 		}
 
 		BSDFResult Evaluate(inout BSDFContext inBSDFContext, HitContext inHitContext, inout PathContext ioPathContext)
@@ -420,7 +409,7 @@ namespace BSDFEvaluation
 			mixed_bsdf_result.mEta					= 1.0;
 			mixed_bsdf_result.mMediumInstanceID		= InvalidInstanceID;
 
-			if (inBSDFContext.mLobeIndex == sLobeIndexDiffuse || inBSDFContext.mLobeIndex == sLobeIndexAll)
+			if (inBSDFContext.mLobeIndex == sLobeIndexDiffuse || inBSDFContext.mLobeIndex == BSDFConstant::sLobeIndexAll)
 			{
 				BSDFResult diffuse_bsdf_result		= Diffuse::Evaluate(inBSDFContext, inHitContext, ioPathContext);
 				mixed_bsdf_result.mBSDF				+= diffuse_bsdf_result.mBSDF;
@@ -428,7 +417,7 @@ namespace BSDFEvaluation
 			}
 
 			// Based on RoughConductor::Evaluate
-			if (inBSDFContext.mLobeIndex == sLobeIndexSpecular || inBSDFContext.mLobeIndex == sLobeIndexAll)
+			if (inBSDFContext.mLobeIndex == sLobeIndexSpecular || inBSDFContext.mLobeIndex == BSDFConstant::sLobeIndexAll)
 			{
 				float D								= D_GGX(inBSDFContext.mNdotH, inHitContext.RoughnessAlpha());
 				float G								= G_SmithGGX(inBSDFContext.mNdotL, inBSDFContext.mNdotV, inHitContext.RoughnessAlpha());
@@ -455,7 +444,7 @@ namespace BSDFEvaluation
 		switch (inHitContext.BSDF())
 		{
 #if USE_BSDF_Conductor
-		case BSDF::Conductor:					return Conductor::GenerateContext(inMode, inL, sLUndetermined, inHitContext, ioPathContext); break;
+		case BSDF::Conductor:					return Conductor::GenerateContext(inMode, inL, inHitContext, ioPathContext); break;
 #endif // USE_BSDF_Conductor
 #if USE_BSDF_RoughConductor
 		case BSDF::RoughConductor:				return RoughConductor::GenerateContext(inMode, inL, inHitContext, ioPathContext); break;

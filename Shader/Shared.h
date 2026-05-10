@@ -435,16 +435,6 @@ enum class BSDF : uint
 	Count
 };
 
-enum class DebugInstanceMode : uint
-{
-	None = 0,
-
-	Barycentrics,
-	Reflection,				// [TODO] Handle as dirac delta properly
-
-	Count
-};
-
 enum class LightType : uint
 {
 	Sphere,
@@ -850,9 +840,9 @@ struct Constants
 	float4						mSunDirection					CONSTANT_DEFAULT(float4(1.0f, 0.0f, 0.0f, 0.0f));
 
 	VisualizeMode				mVisualizeMode					CONSTANT_DEFAULT(VisualizeMode::None);
-	DebugInstanceMode			mDebugInstanceMode				CONSTANT_DEFAULT(DebugInstanceMode::None);
 	int							mDebugInstanceIndex				CONSTANT_DEFAULT(-1);
 	int							mDebugLightIndex				CONSTANT_DEFAULT(-1);
+	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
 	uint						mRecursionDepthCountMax			CONSTANT_DEFAULT(1);
 	uint						mRussianRouletteDepth			CONSTANT_DEFAULT(1);

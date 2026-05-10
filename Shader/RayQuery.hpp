@@ -201,9 +201,6 @@ void TraceRay(inout PixelContext ioPixelContext)
 					bool two_sided				= hit_context.TwoSided() && false; // Mitsuba3's emitter does not become twosided even specified on bsdf
 					if (back_face && !two_sided)
 						emission = 0;
-
-					if (GetDebugInstanceMode() == DebugInstanceMode::Barycentrics && GetDebugInstanceIndex() == hit_context.mInstanceID)
-						emission = hit_context.mBarycentrics;
 				}
 
 				if (hit_context.BSDF() == BSDF::Light) // Ray hit a light / [Mitsuba] Direct emission
@@ -295,7 +292,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 
 					// Sample BSDF / [Mitsuba] BSDF sampling
 					{
-						BSDFContext bsdf_context					= BSDFEvaluation::GenerateContext(BSDFContext::Mode::BSDF, BSDFEvaluation::sLUndetermined, hit_context, path_context);
+						BSDFContext bsdf_context					= BSDFEvaluation::GenerateContext(BSDFContext::Mode::BSDF, BSDFConstant::sDirectionUndetermined, hit_context, path_context);
 						BSDFResult bsdf_result						= BSDFEvaluation::Evaluate(bsdf_context, hit_context, path_context);
 					
 						path_context.mEmission						+= path_context.mThroughput * emission; // Emissive BSDF

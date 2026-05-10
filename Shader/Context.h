@@ -98,20 +98,7 @@ struct SurfaceContext
 		}
 	}
 	
-	BSDF			BSDF()
-	{
-		if (mConstants.mDebugInstanceIndex == mInstanceID)
-		{
-			switch (mConstants.mDebugInstanceMode)
-			{
-			case DebugInstanceMode::Barycentrics:				return BSDF::Diffuse;
-			case DebugInstanceMode::Reflection:					return BSDF::Conductor;
-			default: break;
-			}
-		}
-
-		return mInstanceData.mBSDF;
-	}
+	BSDF			BSDF()						{ return mInstanceData.mBSDF; }
 	uint			TwoSided()					{ return mInstanceData.mFlags.mTwoSided; }
 	float			Opacity()					{ return mInstanceData.mOpacity; }
 	uint			LightIndex()				{ return mInstanceData.mLightIndex; }
@@ -474,8 +461,26 @@ struct BSDFContext
 	float			mLPDF;						// For light sample
 };
 
+namespace BSDFConstant
+{
+	static uint		sLobeIndexTrivial = 0;
+	static uint		sLobeIndexAll = 0xffffffff;
+	static float	sEtaITTrivial = 1.0f;
+	static float3	sDirectionUndetermined = sqrt(-1.0);
+}
+
 struct BSDFResult
 {
+	static BSDFResult Generate()
+	{
+		BSDFResult bsdf_result;
+		bsdf_result.mBSDF				= 0.0;
+		bsdf_result.mBSDFSamplePDF		= 1.0f;
+		bsdf_result.mEta				= BSDFConstant::sEtaITTrivial;
+		bsdf_result.mMediumInstanceID	= InvalidInstanceID;
+		return bsdf_result;
+	}
+
 	float3			mBSDF;
 	float			mBSDFSamplePDF;
 	float			mEta;

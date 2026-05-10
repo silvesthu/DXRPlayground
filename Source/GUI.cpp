@@ -541,21 +541,6 @@ void gPrepareImGui()
 
 			if (Begin("Instances"))
 			{
-				for (int i = 0; i < static_cast<int>(DebugInstanceMode::Count); i++)
-				{
-					const auto& name = nameof::nameof_enum(static_cast<DebugInstanceMode>(i));
-					if (name.starts_with('_'))
-					{
-						NewLine();
-						continue;
-					}
-
-					if (i != 0)
-						SameLine();
-
-					RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mDebugInstanceMode), i);
-				}
-
 				const char* columns[] =
 				{
 					"Index",

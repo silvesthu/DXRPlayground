@@ -55,15 +55,6 @@ VisualizeMode GetVisualizeMode()
 #endif // SHADER_DEBUG
 }
 
-DebugInstanceMode GetDebugInstanceMode()
-{
-#if SHADER_DEBUG
-    return mConstants.mDebugInstanceMode;
-#else
-    return DebugInstanceMode::None;
-#endif // SHADER_DEBUG
-}
-
 int GetDebugInstanceIndex()
 {
 #if SHADER_DEBUG
