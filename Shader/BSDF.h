@@ -20,6 +20,7 @@ namespace BSDFEvaluation
 	//			eval_pdf_sample:				{ eval_pdf, sample}
 	
 	static uint sLobeIndexTrivial = 0;
+	static uint sLobeIndexAll = 0xffffffff;
 	static float sEtaITTrivial = 1.0f;
 	static float3 sLUndetermined = 0.0f;
 
@@ -382,13 +383,13 @@ namespace BSDFEvaluation
 
 		BSDFContext GenerateContext(BSDFContext::Mode inMode, float3 inL, HitContext inHitContext, inout PathContext ioPathContext)
 		{
-			float3 specular_reflectance			= inHitContext.SpecularReflectance();
-			float specular_probability			= MaxComponent(specular_reflectance); // [TODO] Better lobe selection probability? Fresnel based on N?
-			uint lobe_index						= RandomFloat01(ioPathContext.mRandomState) <= specular_probability ? sLobeIndexSpecular : sLobeIndexDiffuse;
-
+			uint lobe_index						= sLobeIndexAll;
 			float3 L							= inL;
 			if (inMode == BSDFContext::Mode::BSDF)
 			{
+				float3 specular_reflectance		= inHitContext.SpecularReflectance();
+				float specular_probability		= MaxComponent(specular_reflectance); // [TODO] Better lobe selection probability? Fresnel based on N?
+				lobe_index						= RandomFloat01(ioPathContext.mRandomState) <= specular_probability ? sLobeIndexSpecular : sLobeIndexDiffuse;
 				if (lobe_index == sLobeIndexSpecular)
 				{
 					float3x3 tangent_space		= GenerateTangentSpace(inHitContext.NormalWS());
@@ -413,15 +414,21 @@ namespace BSDFEvaluation
 			float3 specular_reflectance				= inHitContext.SpecularReflectance();
 			float specular_probability				= MaxComponent(specular_reflectance);
 
-			if (inBSDFContext.mLobeIndex == sLobeIndexDiffuse)
-			{
-				BSDFResult brdf_result				= Diffuse::Evaluate(inBSDFContext, inHitContext, ioPathContext);
-				brdf_result.mBSDFSamplePDF			*= 1.0 - specular_probability;
+			BSDFResult mixed_bsdf_result;
+			mixed_bsdf_result.mBSDF					= 0;
+			mixed_bsdf_result.mBSDFSamplePDF		= 0;
+			mixed_bsdf_result.mEta					= 1.0;
+			mixed_bsdf_result.mMediumInstanceID		= InvalidInstanceID;
 
-				return brdf_result;
+			if (inBSDFContext.mLobeIndex == sLobeIndexDiffuse || inBSDFContext.mLobeIndex == sLobeIndexAll)
+			{
+				BSDFResult diffuse_bsdf_result		= Diffuse::Evaluate(inBSDFContext, inHitContext, ioPathContext);
+				mixed_bsdf_result.mBSDF				+= diffuse_bsdf_result.mBSDF;
+				mixed_bsdf_result.mBSDFSamplePDF	+= diffuse_bsdf_result.mBSDFSamplePDF * (1.0 - specular_probability);
 			}
 
 			// Based on RoughConductor::Evaluate
+			if (inBSDFContext.mLobeIndex == sLobeIndexSpecular || inBSDFContext.mLobeIndex == sLobeIndexAll)
 			{
 				float D								= D_GGX(inBSDFContext.mNdotH, inHitContext.RoughnessAlpha());
 				float G								= G_SmithGGX(inBSDFContext.mNdotL, inBSDFContext.mNdotV, inHitContext.RoughnessAlpha());
@@ -433,16 +440,13 @@ namespace BSDFEvaluation
 				float microfacet_pdf				= D * inBSDFContext.mNdotH;
 				float jacobian						= 1.0 / (4.0f * inBSDFContext.mHdotL);
 
-				BSDFResult result;
-				result.mBSDF						= D * G * F / (4.0f * inBSDFContext.mNdotV * inBSDFContext.mNdotL);
-				result.mBSDFSamplePDF				= microfacet_pdf * jacobian * specular_probability;
-				result.mEta							= 1.0;
-				result.mMediumInstanceID			= InvalidInstanceID;
+				mixed_bsdf_result.mBSDF				+= D * G * F / (4.0f * inBSDFContext.mNdotV * inBSDFContext.mNdotL);
+				mixed_bsdf_result.mBSDFSamplePDF	+= microfacet_pdf * jacobian * specular_probability;
 
 				InspectPixel::DGF(ioPathContext, inBSDFContext, D, G, F);
-
-				return result;
 			}
+
+			return mixed_bsdf_result;
 		}
 	};
 
