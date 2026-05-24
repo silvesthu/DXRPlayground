@@ -88,9 +88,9 @@ namespace Inspect
         if (sActive && inPathContext.mRecursionDepth == 0)
             InspectDataUAV[0].mPixelInstanceID = inHitContext.mInstanceID;
 
-        Update(InspectMode::PositionWS, inPathContext, float3(inHitContext.PositionWS()));
-        Update(InspectMode::DirectionWS, inPathContext, float3(inHitContext.DirectionWS()));
-        Update(InspectMode::InstanceID, inPathContext, float3(inHitContext.mInstanceID, 0.0, 0.0));
+        Update(InspectMode::PositionWS,         inPathContext, float3(inHitContext.PositionWS()));
+        Update(InspectMode::DirectionWS,        inPathContext, float3(inHitContext.DirectionWS()));
+        Update(InspectMode::InstanceID_BSDF,    inPathContext, float3(inHitContext.mInstanceID, (uint)inHitContext.BSDF(), inHitContext.BSDF() == BSDF::Light ? Inf() : 0));
 
         if (sUpdatePath)
             InspectDataUAV[0].mPositionWS[inPathContext.mRecursionDepth + 1] = float4(inHitContext.PositionWS(), 1.0);
@@ -106,15 +106,15 @@ namespace Inspect
     {
         if (inBSDFContext.mMode == BSDFContext::Mode::BSDF)
         {
-            Update(InspectMode::BSDF__D,       inPathContext, float3(D, 0, 0));
-            Update(InspectMode::BSDF__G,       inPathContext, float3(G, 0, 0));
-            Update(InspectMode::BSDF__F,       inPathContext, float3(F));
+            Update(InspectMode::BSDF__D,        inPathContext, float3(D, 0, 0));
+            Update(InspectMode::BSDF__G,        inPathContext, float3(G, 0, 0));
+            Update(InspectMode::BSDF__F,        inPathContext, float3(F));
         }
         else
         {
-            Update(InspectMode::Light_D,       inPathContext, float3(D, 0, 0));
-            Update(InspectMode::Light_G,       inPathContext, float3(G, 0, 0));
-            Update(InspectMode::Light_F,       inPathContext, float3(F));
+            Update(InspectMode::Light_D,        inPathContext, float3(D, 0, 0));
+            Update(InspectMode::Light_G,        inPathContext, float3(G, 0, 0));
+            Update(InspectMode::Light_F,        inPathContext, float3(F));
         }
     }
 
@@ -126,7 +126,7 @@ namespace Inspect
 			Update(InspectMode::BSDF__V,		inPathContext, float3(inBSDFContext.mV));
 			Update(InspectMode::BSDF__N,		inPathContext, float3(inBSDFContext.mN));
 			Update(InspectMode::BSDF__H,		inPathContext, float3(inBSDFContext.mH));
-			Update(InspectMode::BSDF__Lobe,	inPathContext, float3(inBSDFContext.mLobeIndex, 0, 0));
+			Update(InspectMode::BSDF__Lobe,	    inPathContext, float3(inBSDFContext.mLobeIndex, 0, 0));
 		}
 		else
 		{
@@ -134,30 +134,28 @@ namespace Inspect
 			Update(InspectMode::Light_V,		inPathContext, float3(inBSDFContext.mV));
 			Update(InspectMode::Light_N,		inPathContext, float3(inBSDFContext.mN));
 			Update(InspectMode::Light_H,		inPathContext, float3(inBSDFContext.mH));
-			Update(InspectMode::Light_Lobe,	inPathContext, float3(inBSDFContext.mLobeIndex, 0, 0));
+			Update(InspectMode::Light_Lobe,	    inPathContext, float3(inBSDFContext.mLobeIndex, 0, 0));
 		}
     }
 
-    void Light(PathContext inPathContext, LightContext inLightContext)
+    void SampleLight(PathContext inPathContext, LightContext inLightContext)
     {
-        Update(InspectMode::LightIndex,    inPathContext, float3(inLightContext.LightIndex(), 0.0, 0.0));
-        Update(InspectMode::RIS_SAMPLE,    inPathContext, float3(inLightContext.mReservoir.mTargetPDF, 0.0, 0.0));
-        Update(InspectMode::RIS_SUM,       inPathContext, float3(inLightContext.mReservoir.mWeightSum, inLightContext.mReservoir.mCountSum, 0.0));
+        Update(InspectMode::Light_Index_UV,     inPathContext, float3(inLightContext.mLightIndex, inLightContext.mUV));
     }
 
-    void SampleLightDone(PathContext inPathContext, BSDFContext inBSDFContext, BSDFResult inBSDFResult, float inLightPDF)
+    void SampleLightResult(PathContext inPathContext, BSDFContext inBSDFContext, BSDFResult inBSDFResult, float inLightPDF)
     {
-        Update(InspectMode::Light_BSDF,    inPathContext, float3(inBSDFResult.mBSDF));
-        Update(InspectMode::Light_PDF,     inPathContext, float3(inLightPDF, 0, 0));
+        Update(InspectMode::Light_BSDF,         inPathContext, float3(inBSDFResult.mBSDF));
+        Update(InspectMode::Light_PDF,          inPathContext, float3(inLightPDF, 0, 0));
     }
 
-    void SampleBSDFDone(PathContext inPathContext, HitContext inHitContext, BSDFContext inBSDFContext, BSDFResult inBSDFResult)
+    void SampleBSDFResult(PathContext inPathContext, HitContext inHitContext, BSDFContext inBSDFContext, BSDFResult inBSDFResult)
     {
-        Update(InspectMode::BSDF__BSDF,    inPathContext, float3(inBSDFResult.mBSDF));
-        Update(InspectMode::BSDF__PDF,     inPathContext, float3(inBSDFResult.mBSDFSamplePDF, 0, 0));
+        Update(InspectMode::BSDF__BSDF,         inPathContext, float3(inBSDFResult.mBSDF));
+        Update(InspectMode::BSDF__PDF,          inPathContext, float3(inBSDFResult.mBSDFSamplePDF, 0, 0));
 
-        Update(InspectMode::Eta,           inPathContext, float3(inBSDFResult.mEta, 0, 0));
-        Update(InspectMode::DiracDelta,    inPathContext, float3(inHitContext.DiracDeltaDistribution(), 0, 0));
+        Update(InspectMode::Eta,                inPathContext, float3(inBSDFResult.mEta, 0, 0));
+        Update(InspectMode::DiracDelta,         inPathContext, float3(inHitContext.DiracDeltaDistribution(), 0, 0));
     }
 
     void Miss(PathContext inPathContext, RayDesc inRay)
@@ -165,9 +163,9 @@ namespace Inspect
         if (sActive && inPathContext.mRecursionDepth == 0)
             InspectDataUAV[0].mPixelInstanceID = InvalidInstanceID;
 
-        Update(InspectMode::PositionWS, inPathContext, float3(inRay.Origin));
-        Update(InspectMode::DirectionWS, inPathContext, float3(inRay.Direction));
-        Update(InspectMode::InstanceID, inPathContext, float3(-1.0, 0.0, 0.0));
+        Update(InspectMode::PositionWS,         inPathContext, float3(inRay.Origin));
+        Update(InspectMode::DirectionWS,        inPathContext, float3(inRay.Direction));
+        Update(InspectMode::InstanceID_BSDF,    inPathContext, QNaN());
 
         const float kMissRayVisualizationLength = 64.0f;
         if (sUpdatePath)
@@ -176,7 +174,7 @@ namespace Inspect
 
     void Manual(PathContext inPathContext, float3 inValue)
     {
-        Update(InspectMode::Manual, inPathContext, inValue);
+        Update(InspectMode::Manual,             inPathContext, inValue);
     }
 
     void Clear(uint inPathVertexIndex)

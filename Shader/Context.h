@@ -2,7 +2,6 @@
 
 #include "Shared.h"
 #include "Binding.h"
-#include "Reservoir.h"
 #include "NanoVDB.h"
 
 struct PixelContext
@@ -17,7 +16,6 @@ struct PixelContext
 struct PathContext
 {
 	uint			mRandomState;					// [0, +]		Current random state for path tracing
-	uint			mRandomStateReSTIR;				// [0, +]		Current random state for ReSTIR
 
 	float3			mThroughput;					// [0, 1]		Accumulated throughput, [PBRT3] call it beta https://github.com/mmp/pbrt-v3/blob/master/src/integrators/path.cpp#L68
 	float3			mEmission;						// [0, +inf]	Accumulated emission
@@ -569,22 +567,17 @@ struct MediumContext
 
 struct LightContext
 {
-	bool			IsValid() { return mReservoir.IsValid(); }
-	uint			LightIndex() { return mReservoir.LightIndex(); }
 	Light			GetLight()
 	{
 		USING_RESOURCE(StructuredBuffer<Light>, RaytraceLightsSRV);
-		return RaytraceLightsSRV[LightIndex()];
+		return RaytraceLightsSRV[mLightIndex];
 	}
 
-	float3			mL;																			// Direction of this light sample
-	float			mSolidAnglePDF;																// PDF of selecting mL on this light
+	uint			mLightIndex;
+	float3			mL;																			// Direction towards the sample
+	float2			mUV;																		// UV on the light
+	float			mSolidAnglePDF;																// PDF of mL on this light
 
-	float			SelectionWeight() { return mReservoir.StochasticWeight(); }
-	Reservoir		mReservoir;
-
-	float			MISPDF() { return mSolidAnglePDF * LightContext::BaseSelectionPDF(); }		// PDF for MIS, without (before) RIS as that part of information is not available for other MIS counterparts (e.g. BSDF sample)
-
-	static float	BaseSelectionPDF() { return UniformSelectionPDF(); }						// PDF of selecting this light, use uniform now, but can also be based on some precomputed weight
-	static float	UniformSelectionPDF() { return 1.0 / mConstants.mLightCount; }				// PDF of selecting light uniformly
+	float			SamplePDF() { return LightContext::UniformSelectPDF() * mSolidAnglePDF; }	// PDF of pick this sample before RIS
+	static float	UniformSelectPDF() { return 1.0 / mConstants.mLightCount; }					// PDF of light uniformly
 };

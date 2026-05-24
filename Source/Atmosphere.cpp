@@ -127,7 +127,7 @@ void Atmosphere::Runtime::Bruneton17::Render(const Profile& inProfile)
 			gBarrierUAV(gCommandList, nullptr);
 		}
 
-		gRenderer.mAccumulationResetRequested = true;
+		gRenderer.mFrameResetRequested = true;
 	}
 	mRecomputeRequested = false;
 }
@@ -850,6 +850,6 @@ void Atmosphere::Runtime::Wilkie21::Render(const Profile& inProfile)
 		};
 	}
 
-	gRenderer.mAccumulationResetRequested = true;
+	gRenderer.mFrameResetRequested = true;
 	mBakeRequested = false;
 }

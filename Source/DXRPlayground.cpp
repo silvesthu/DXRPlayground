@@ -439,7 +439,7 @@ void sLoadScene(bool inLoadCamera)
 	gAtmosphere.mProfile.mConstantColor = preset.mConstantColor;
 
 	gRenderer.mReloadShader = true;
-	gRenderer.mAccumulationResetRequested = true;
+	gRenderer.mFrameResetRequested = true;
 	gRenderer.mSpatialCacheResetRequested = true;
 
 	if (inLoadCamera)
@@ -505,7 +505,7 @@ void sRender()
 		gRenderer.FinalizeShaders();
 		gRenderer.InitializeShaders();
 
-		gRenderer.mAccumulationResetRequested = true;
+		gRenderer.mFrameResetRequested = true;
 
 		gAtmosphere.mRuntime.mBruneton17.mRecomputeRequested = true;
 		gCloud.mRecomputeRequested = true;
@@ -541,36 +541,31 @@ void sRender()
 			sConstantsCopy.mCurrentFrameIndex		= gConstants.mCurrentFrameIndex;
 			sConstantsCopy.mCurrentFrameWeight		= gConstants.mCurrentFrameWeight;
 			sConstantsCopy.mPixelDebugCoord			= gConstants.mPixelDebugCoord;
-			sConstantsCopy.mInspectMode		= gConstants.mInspectMode;
+			sConstantsCopy.mInspectMode				= gConstants.mInspectMode;
 			sConstantsCopy.mDebugFlag				= gConstants.mDebugFlag;
 			sConstantsCopy.mSpatialCache			= gConstants.mSpatialCache;
 			sConstantsCopy.mReSTIR					= gConstants.mReSTIR;
 			sConstantsCopy.mBRDFExplorer			= gConstants.mBRDFExplorer;
 
 			if (memcmp(&sConstantsCopy, &gConstants, sizeof(Constants)) != 0)
-				gRenderer.mAccumulationResetRequested = true;
+				gRenderer.mFrameResetRequested = true;
 
 			{
-				if (gRenderer.mAccumulationResetRequested)
+				if (gRenderer.mFrameResetRequested)
 					gConstants.mCurrentFrameIndex = 0;
 
-				int accumulation_frame_count = gRenderer.mAccumulationFrameUnlimited ? INT_MAX : gRenderer.mAccumulationFrameCount;
+				int accumulation_frame_count = gRenderer.mFrameUnlimited ? INT_MAX : gRenderer.mFrameCount;
 				bool accumulation_done = gConstants.mCurrentFrameIndex + 1 > accumulation_frame_count;
 				gConstants.mCurrentFrameIndex = gMin(gConstants.mCurrentFrameIndex, accumulation_frame_count - 1);
 
-				if (accumulation_done || gRenderer.mAccumulationPaused)
+				if (accumulation_done || gRenderer.mFramePaused)
 					gConstants.mCurrentFrameWeight = 0.0f;
 				else
 					gConstants.mCurrentFrameWeight = 1.0f / (gConstants.mCurrentFrameIndex + 1);
 			}
-
-			// ReSTIR
-			{
-				gConstants.mReSTIR.mTemporalFrameIndex++;
-			}
 			
 			sConstantsCopy = gConstants;
-			gRenderer.mAccumulationResetRequested = false;
+			gRenderer.mFrameResetRequested = false;
 
 			memcpy(gRenderer.mRuntime.mConstantsBuffer.mUploadPointer[gGetFrameContextIndex()], &gConstants, sizeof(gConstants));
 		}
@@ -791,7 +786,7 @@ void sRender()
 	}
 
 	// Readback Sequence
-	bool sequence_recording = gRenderer.mSequenceFrameRecording >= 0 && gConstants.mCurrentFrameIndex + 1 == gRenderer.mAccumulationFrameCount;
+	bool sequence_recording = gRenderer.mSequenceFrameRecording >= 0 && gConstants.mCurrentFrameIndex + 1 == gRenderer.mFrameCount;
 	bool sequence_dump_png = gRenderer.mSequenceDumpPNG; // [NOTE] This flag is updated by UI (sPrepareImGui) below, state from last frame
 	if (sequence_recording || sequence_dump_png)
 	{
@@ -899,7 +894,7 @@ void sRender()
 		gCommandQueue->Signal(gIncrementalFence, signal_value);
 		frame_context.mFenceValue = signal_value;
 
-		if (!gRenderer.mAccumulationPaused)
+		if (!gRenderer.mFramePaused)
 			gConstants.mCurrentFrameIndex++;
 
 		if (!gHeadless) // [TODO] Calculate DeltaTime without ImGui

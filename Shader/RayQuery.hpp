@@ -6,6 +6,7 @@
 #include "DebugUtils.h"
 #include "BSDF.h"
 #include "Light.h"
+#include "Reservoir.h"
 #include "AtmosphereIntegration.h"
 #include "CloudIntegration.h"
 #include "SpatialCache.h"
@@ -47,12 +48,12 @@ void TraceRay(inout PixelContext ioPixelContext)
 	// From https://www.shadertoy.com/view/tsBBWW
 	// [TODO] Need proper noise
 	uint random_state							= uint(uint(ioPixelContext.mPixelIndex.x) * uint(1973) + uint(ioPixelContext.mPixelIndex.y) * uint(9277) + uint(mConstants.mCurrentFrameIndex) * uint(26699)) | uint(1);
-	uint random_state_restir					= uint(uint(ioPixelContext.mPixelIndex.x) * uint(1973) + uint(ioPixelContext.mPixelIndex.y) * uint(9277) + uint(mConstants.mReSTIR.mTemporalFrameIndex) * uint(26699)) | uint(1);
 
 	float2 screen_coords						= float2(ioPixelContext.mPixelIndex.xy);
 	float2 screen_size							= float2(ioPixelContext.mPixelTotal.xy);
 
 	// [TODO] Need proper reconstruction filter, see https://www.pbr-book.org/4ed/Sampling_and_Reconstruction/Image_Reconstruction
+	uint x = mConstants.mCurrentFrameIndex;
 	switch (GetOffsetMode())
 	{
 	case OffsetMode::HalfPixel:	screen_coords	+= 0.5; break;
@@ -81,7 +82,6 @@ void TraceRay(inout PixelContext ioPixelContext)
 	path_context.mPrevDiracDeltaDistribution	= true; // Allow primary ray to skip MIS
 	path_context.mEtaScale						= 1.0;
 	path_context.mRandomState					= random_state;
-	path_context.mRandomStateReSTIR				= random_state_restir;
 	path_context.mRecursionDepth				= 0;
 	path_context.mMediumInstanceID				= InvalidInstanceID;
 
@@ -214,8 +214,8 @@ void TraceRay(inout PixelContext ioPixelContext)
 							Light light					= RaytraceLightsSRV[light_index];
 
 							// [TODO] Need update for ReSTIR
-							LightContext light_context	= LightEvaluation::GenerateContext(LightEvaluation::ContextType::Input, ray.Direction, light_index, ray.Origin, path_context);
-							float light_mis_pdf			= light_context.mSolidAnglePDF * LightContext::BaseSelectionPDF();
+							LightContext light_context	= LightEvaluation::GenerateContext(LightEvaluation::ContextType::Input, ray.Direction, light_index, ray.Origin, path_context.mRandomState);
+							float light_mis_pdf			= light_context.mSolidAnglePDF * LightContext::UniformSelectPDF();
 					
 							mis_weight					= max(0.0f, MIS::PowerHeuristic(1, path_context.mPrevBSDFSamplePDF, 1, light_mis_pdf));
 
@@ -223,9 +223,6 @@ void TraceRay(inout PixelContext ioPixelContext)
 						}
 					
 						path_context.mEmission			+= path_context.mThroughput * emission * mis_weight;
-					
-						if (path_context.mRecursionDepth == 0)
-							Inspect::Update(InspectMode::LightIndex, path_context, float3(hit_context.LightIndex() + 0.5, 0, 0)); // Add a offset to identify light source in LightIndex debug output
 					}
 				}
 				else // Ray hit a surface
@@ -238,18 +235,31 @@ void TraceRay(inout PixelContext ioPixelContext)
 						path_context.mRecursionDepth < mConstants.mRecursionDepthCountMax &&	// Skip NEE for exceeding limit of recursion depth
 						true)
 					{
-						// Select light
-						LightContext light_context					= LightEvaluation::SelectLight(hit_context.PositionWS(), path_context);
-						Inspect::Light(path_context, light_context);
+						LightContext light_context			= LightEvaluation::UniformSelect(hit_context.PositionWS(), path_context.mRandomState);
+						Reservoir reservoir_initial_sample	= Reservoir::Generate();
+						{
+							BSDFContext bsdf_context		= BSDFEvaluation::GenerateContext(BSDFContext::Mode::Light, light_context.mL, hit_context, path_context);
+							BSDFResult bsdf_result			= BSDFEvaluation::Evaluate(bsdf_context, hit_context, path_context);
+							float candidate_pdf				= light_context.UniformSelectPDF();
+							float target_pdf				= light_context.SamplePDF() > 0 ? RGBToLuminance(light_context.GetLight().mEmission * bsdf_result.mBSDF) * abs(bsdf_context.mNdotL) / light_context.SamplePDF() : 0.0f;
 
-						float light_weight = light_context.mSolidAnglePDF <= 0.0 ? 0.0 : (light_context.SelectionWeight() / light_context.mSolidAnglePDF);
-						if (light_context.IsValid() && light_weight > 0)
+							// [TODO] Apply MIS on target_pdf
+
+							reservoir_initial_sample.Stream(light_context, target_pdf, candidate_pdf, path_context.mRandomState);
+						}
+
+						{
+							// [TODO] Temporal reuse
+						}
+
+						Inspect::SampleLight(path_context, light_context);
+						if (light_context.SamplePDF() > 0)
 						{
 							RayDesc shadow_ray;
-							shadow_ray.Origin						= hit_context.PositionWS();
-							shadow_ray.Direction					= light_context.mL;
-							shadow_ray.TMin							= 1E-4;
-							shadow_ray.TMax							= 10000;
+							shadow_ray.Origin				= hit_context.PositionWS();
+							shadow_ray.Direction			= light_context.mL;
+							shadow_ray.TMin					= 1E-4;
+							shadow_ray.TMax					= 10000;
 
 							RayQuery<RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH> shadow_query;
 							TraceShadowRay(shadow_query, shadow_ray);
@@ -258,30 +268,30 @@ void TraceRay(inout PixelContext ioPixelContext)
 							if (IsHit(shadow_query) && shadow_query.CommittedInstanceID() == light_context.GetLight().mInstanceID)
 							{
 								Inspect::HitLight(path_context, shadow_ray.Origin + shadow_ray.Direction * shadow_query.CommittedRayT());
-							
-								BSDFContext bsdf_context			= BSDFEvaluation::GenerateContext(BSDFContext::Mode::Light, light_context.mL, hit_context, path_context);
-								BSDFResult bsdf_result				= BSDFEvaluation::Evaluate(bsdf_context, hit_context, path_context);
 
-								float3 luminance					= light_context.GetLight().mEmission * (mConstants.mEmissionBoost * kPreExposure);
-								float3 light_emission				= luminance * bsdf_result.mBSDF * abs(bsdf_context.mNdotL) * light_weight;
+								BSDFContext bsdf_context	= BSDFEvaluation::GenerateContext(BSDFContext::Mode::Light, light_context.mL, hit_context, path_context);
+								BSDFResult bsdf_result		= BSDFEvaluation::Evaluate(bsdf_context, hit_context, path_context);
+
+								float3 luminance			= light_context.GetLight().mEmission * (mConstants.mEmissionBoost * kPreExposure);
+								float3 light_emission		= luminance * bsdf_result.mBSDF * abs(bsdf_context.mNdotL) / light_context.SamplePDF();
 
 								if (GetSampleMode() == SampleMode::MIS)
 								{
-									float bsdf_mis_pdf				= bsdf_result.mBSDFSamplePDF;
-									float light_mis_pdf				= light_context.MISPDF();
-									float mis_weight				= max(0.0f, MIS::PowerHeuristic(1, light_mis_pdf, 1, bsdf_mis_pdf));
-									light_emission					*= mis_weight;
+									float bsdf_mis_pdf		= bsdf_result.mBSDFSamplePDF;
+									float light_mis_pdf		= light_context.SamplePDF();
+									float mis_weight		= max(0.0f, MIS::PowerHeuristic(1, light_mis_pdf, 1, bsdf_mis_pdf));
+									light_emission			*= mis_weight;
 
 									Inspect::Update(InspectMode::MIS_LIGHT, path_context, float3(bsdf_mis_pdf, light_mis_pdf, mis_weight));
 								}
 
 								if (bsdf_result.mMediumInstanceID == InvalidInstanceID) // Shadow ray not support medium yet
 								{
-									path_context.mEmission			+= path_context.mThroughput * light_emission;
+									path_context.mEmission	+= path_context.mThroughput * light_emission;
 								}
 
 								Inspect::BSDF(path_context, bsdf_context);
-								Inspect::SampleLightDone(path_context, bsdf_context, bsdf_result, 1.0 / light_weight);
+								Inspect::SampleLightResult(path_context, bsdf_context, bsdf_result, light_context.SamplePDF());
 							}
 						}
 					}
@@ -305,7 +315,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 						continue_bounce								= true;
 
 						Inspect::BSDF(path_context, bsdf_context);
-						Inspect::SampleBSDFDone(path_context, hit_context, bsdf_context, bsdf_result);
+						Inspect::SampleBSDFResult(path_context, hit_context, bsdf_context, bsdf_result);
 					}
 				}
 
@@ -374,23 +384,25 @@ void TraceRay(inout PixelContext ioPixelContext)
 	}
 
 	// Accumulation
-	{
-		float3 current_output					= path_context.mEmission;
-		float3 previous_output					= ScreenColorUAV[ioPixelContext.mPixelIndex.xy].xyz;
-		previous_output							= max(0, previous_output); // Eliminate nan
-		float3 mixed_output						= lerp(previous_output, current_output, mConstants.mCurrentFrameWeight);
+	float3 screen_color_current					= path_context.mEmission;
+	float3 screen_color							= screen_color_current;
 
-		if (GetVisualizeMode() != VisualizeMode::None)
-			mixed_output						= current_output;
-
-		if (GetVisualizeMode() == VisualizeMode::RecursionDepth)
-			mixed_output						= GetDebugRecursion() == 0 ? path_context.mRecursionDepth : (GetDebugRecursion() == path_context.mRecursionDepth);
-
-		if (GetVisualizeMode() == VisualizeMode::RandomState)
-			mixed_output						= path_context.mRecursionDepth < GetDebugRecursion() ? 0 : pow(path_context.mRandomState / 4294967296.0, 2.0);
-
-		ScreenColorUAV[ioPixelContext.mPixelIndex.xy] = float4(mixed_output, 1);
+	if (mConstants.mAccumulationMode == AccumulationMode::Average)
+	{	
+		float3 screen_color_previous			= ScreenColorUAV[ioPixelContext.mPixelIndex.xy].xyz;
+		screen_color_previous					= max(0, screen_color_previous); // Eliminate nan
+		screen_color							= lerp(screen_color_previous, screen_color_current, mConstants.mCurrentFrameWeight);
 	}
+
+	switch (GetVisualizeMode())
+	{
+	case VisualizeMode::None: break;
+	case VisualizeMode::RecursionDepth: screen_color = GetDebugRecursion() == 0 ? path_context.mRecursionDepth : (GetDebugRecursion() == path_context.mRecursionDepth); break;
+	case VisualizeMode::RandomState:	screen_color = path_context.mRecursionDepth < GetDebugRecursion() ? 0 : pow(path_context.mRandomState / 4294967296.0, 2.0); break;
+	default:							screen_color = screen_color_current; break;
+	}
+
+	ScreenColorUAV[ioPixelContext.mPixelIndex.xy] = float4(screen_color, 1);
 }
 
 [numthreads(8, 8, 1)]

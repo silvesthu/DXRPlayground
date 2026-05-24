@@ -62,7 +62,7 @@ void gPrepareImGui()
 				gOpenDumpDirectoryInExplorer();
 		}
 
-		if (TreeNodeEx("Debug", ImGuiTreeNodeFlags_DefaultOpen))
+		if (CollapsingHeader("Debug", ImGuiTreeNodeFlags_DefaultOpen))
 		{
 			InputInt2("Coords", (int*)&gConstants.mPixelDebugCoord);
 			SliderInt("Light Index", &gConstants.mPixelDebugLightIndex, 0, (int)gScene.GetSceneContent().mLights.size() - 1);
@@ -207,11 +207,9 @@ void gPrepareImGui()
 
 				TreePop();
 			}
-
-			TreePop();
 		}
 
-		if (TreeNodeEx("Sampling", ImGuiTreeNodeFlags_DefaultOpen))
+		if (CollapsingHeader("Sampling", ImGuiTreeNodeFlags_DefaultOpen))
 		{
 			Text("Offset Mode");
 			for (int i = 0; i < static_cast<int>(OffsetMode::Count); i++)
@@ -229,50 +227,47 @@ void gPrepareImGui()
 				RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mSampleMode), i);
 			}
 
-			Text("Light Sample Mode");
-			for (int i = 0; i < static_cast<int>(LightSampleMode::Count); i++)
+			if (TreeNodeEx("ReSTIR", ImGuiTreeNodeFlags_DefaultOpen))
 			{
-				const auto& name = nameof::nameof_enum(static_cast<LightSampleMode>(i));
-				SameLine();
-				RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mLightSampleMode), i);
-			}
+				if (SliderInt("Initial Sample Count", reinterpret_cast<int*>(&gConstants.mReSTIR.mInitialSampleCount), 1, 8))
+					gRenderer.mFrameResetRequested = true;
 
-			if (gConstants.mLightSampleMode == LightSampleMode::ReSTIR)
-			{
-				InputInt("Temporal Frame Index", reinterpret_cast<int*>(&gConstants.mReSTIR.mTemporalFrameIndex), 0, 0, ImGuiInputTextFlags_ReadOnly);
-				if (SliderInt("Initial Sample Count", reinterpret_cast<int*>(&gConstants.mReSTIR.mInitialSampleCount), 1, 32))
-					gRenderer.mAccumulationResetRequested = true;
+				TreePop();
 			}
-
-			TreePop();
 		}
 
-		if (TreeNodeEx("Accumulation", ImGuiTreeNodeFlags_DefaultOpen))
+		if (CollapsingHeader("Accumulation", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			if (Checkbox("Frame Count Unlimited", &gRenderer.mAccumulationFrameUnlimited))
-				gRenderer.mAccumulationResetRequested = true;
+			for (int i = 0; i < static_cast<int>(AccumulationMode::Count); i++)
+			{
+				const auto& name = nameof::nameof_enum(static_cast<AccumulationMode>(i));
+				RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mAccumulationMode), i);
+				SameLine();
+			}
+			NewLine();
+
+			if (Checkbox("Frame Count Unlimited", &gRenderer.mFrameUnlimited))
+				gRenderer.mFrameResetRequested = true;
 			SameLine();
-			Checkbox("Paused", &gRenderer.mAccumulationPaused);
+			Checkbox("Paused", &gRenderer.mFramePaused);
 			SameLine();
 			Checkbox("Vsync", &gDisplaySettings.mVsync);
 
-			if (!gRenderer.mAccumulationFrameUnlimited)
+			if (!gRenderer.mFrameUnlimited)
 			{
-				if (SliderInt("Frame Count", reinterpret_cast<int*>(&gRenderer.mAccumulationFrameCount), 1, 512))
-					gRenderer.mAccumulationResetRequested = true;
+				if (SliderInt("Frame Count", reinterpret_cast<int*>(&gRenderer.mFrameCount), 1, 512))
+					gRenderer.mFrameResetRequested = true;
 
 				BeginDisabled();
-				SliderInt("Accumulation Frame Index", &gConstants.mCurrentFrameIndex, 0, gRenderer.mAccumulationFrameCount - 1);
+				SliderInt("Frame Index", &gConstants.mCurrentFrameIndex, 0, gRenderer.mFrameCount - 1);
 				EndDisabled();
 			}
 
 			SliderInt("Recursion Depth Max", reinterpret_cast<int*>(&gConstants.mRecursionDepthCountMax), 1, 64);
 			SliderInt("Russian Roulette Depth", reinterpret_cast<int*>(&gConstants.mRussianRouletteDepth), 1, gConstants.mRecursionDepthCountMax);
-
-			TreePop();
 		}
 
-		if (TreeNodeEx("Camera"))
+		if (CollapsingHeader("Camera"))
 		{
 			auto align_right = [](float pivot = GetCursorPosX()) { SetNextItemWidth(GetWindowWidth() * 0.65f - (GetCursorPosX() - pivot)); };
 
@@ -329,11 +324,9 @@ void gPrepareImGui()
 				SameLine();
 				RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mToneMappingMode), i);
 			}
-
-			TreePop();
 		}
 
-		if (TreeNodeEx("Scene"))
+		if (CollapsingHeader("Scene"))
 		{
 			for (int i = 0; i < ScenePreset::sCount(); i++)
 			{
@@ -343,24 +336,19 @@ void gPrepareImGui()
 
 			SliderFloat("Emission Boost", &gConstants.mEmissionBoost, 1E-16f, 1E16F);
 			SliderFloat("Density Boost", &gConstants.mDensityBoost, 1E-16f, 1E16F);
-
-			TreePop();
 		}
 
-		if (TreeNodeEx("Atmosphere"))
+		if (CollapsingHeader("Atmosphere"))
 		{
 			gAtmosphere.ImGuiShowMenus();
-
-			TreePop();
 		}
 
-		//if (TreeNodeEx("Cloud"))
+		//if (CollapsingHeader("Cloud"))
 		//{
 		//	gCloud.ImGuiShowMenus();
-		//	TreePop();
 		//}
 
-		if (TreeNodeEx("Spatial Cache"))
+		if (CollapsingHeader("Spatial Cache"))
 		{
 			Checkbox("Active", (bool*)&gConstants.mSpatialCache.mFrameActive);
 
@@ -372,11 +360,9 @@ void gPrepareImGui()
 
 			if (Button("Reset"))
 				gRenderer.mSpatialCacheResetRequested = true;
-
-			TreePop();
 		}
 
-		if (TreeNodeEx("BRDF Explorer"))
+		if (CollapsingHeader("BRDF Explorer"))
 		{
 			Texture1(gRenderer.mRuntime.mBRDFSliceTexture);
 
@@ -401,11 +387,9 @@ void gPrepareImGui()
 			{
 				gConstants.mBRDFExplorer = {};
 			}
-
-			TreePop();
 		}
 
-		if (TreeNodeEx("NVAPI", ImGuiTreeNodeFlags_None))
+		if (CollapsingHeader("NVAPI", ImGuiTreeNodeFlags_None))
 		{
 			if (Button("Reload Scene"))
 				gRenderer.mReloadScene = true;
@@ -470,11 +454,9 @@ void gPrepareImGui()
 
 				TreePop();
 			}
-
-			TreePop();
 		}
 
-		if (TreeNodeEx("Sequence", ImGuiTreeNodeFlags_None))
+		if (CollapsingHeader("Sequence", ImGuiTreeNodeFlags_None))
 		{
 			Checkbox("Enabled", (bool*)&gConstants.mSequenceEnabled);
 			SameLine();
@@ -488,7 +470,7 @@ void gPrepareImGui()
 			SliderInt("Sequence Frame Count", &gConstants.mSequenceFrameCount, 1, 600);
 			SliderInt("Sequence Frame Index", &gConstants.mSequenceFrameIndex, 0, gConstants.mSequenceFrameCount - 1);
 			BeginDisabled();
-			SliderInt("Accumulation Frame Index", &gConstants.mCurrentFrameIndex, 0, gRenderer.mAccumulationFrameCount - 1);
+			SliderInt("Accumulation Frame Index", &gConstants.mCurrentFrameIndex, 0, gRenderer.mFrameCount - 1);
 			EndDisabled();
 
 			if (Button("Record"))
@@ -499,22 +481,18 @@ void gPrepareImGui()
 
 				gRenderer.mSequenceFrameRecording = 0;
 			}
-
-			TreePop();
 		}
 
-		if (TreeNodeEx("Display"))
+		if (CollapsingHeader("Display"))
 		{
 			Checkbox("Vsync", &gDisplaySettings.mVsync);
 
 			if (Button("1280 x 720")) { gRenderer.mScreenSizeRequested = { 1280, 720 }; }
 			if (Button("1920 x 1080")) { gRenderer.mScreenSizeRequested = { 1920, 1080 }; }
 			if (Button("2560 x 1440")) { gRenderer.mScreenSizeRequested = { 2560, 1440 }; }
-
-			TreePop();
 		}
 
-		if (TreeNodeEx("Config", ImGuiTreeNodeFlags_None))
+		if (CollapsingHeader("Config"))
 		{
 			if (Checkbox("Shader Debug", &gConfigs.mShaderDebug))
 				gRenderer.mReloadShader = true;
@@ -533,8 +511,6 @@ void gPrepareImGui()
 
 			if (Checkbox("NanoVDB Use Texture (Require Generate)", &gConfigs.mNanoVDBUseTexture))
 				gRenderer.mReloadShader = true;
-
-			TreePop();
 		}
 
 		// Floating items

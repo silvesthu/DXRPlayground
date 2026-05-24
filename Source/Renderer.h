@@ -168,10 +168,11 @@ struct Renderer
 	bool										mReloadScene = false;
 	bool										mDumpRayQuery = false;
 
-	bool										mAccumulationFrameUnlimited = false;
-	bool										mAccumulationPaused = false;
-	int											mAccumulationFrameCount = 1;
-	bool										mAccumulationResetRequested = false;
+	bool										mFrameUnlimited = false;
+	bool										mFramePaused = false;
+	int											mFrameCount = 1;
+
+	bool										mFrameResetRequested = false;
 
 	bool										mSpatialCacheActiveOnce = false;
 	bool										mSpatialCacheResetRequested = true;

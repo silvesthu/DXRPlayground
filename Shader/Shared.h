@@ -57,7 +57,7 @@ inline uint asuint(float x) { return std::bit_cast<uint>(x); }
 #define CONCAT(a, b) CONCAT_INNER(a, b)
 #define CONCAT_INNER(a, b) a ## b
 #define GENERATE_PAD_NAME CONCAT(mPad_, __LINE__)
-#define GENERATE_NEW_LINE_NAME CONCAT(_Newline_, __LINE__)
+#define GENERATE_NEW_LINE_NAME CONCAT(_, __LINE__)	// starts_with('_')
 
 #include "EnumHelper.h"
 
@@ -313,7 +313,7 @@ enum class InspectMode : uint
 
 	PositionWS,
 	DirectionWS,
-	InstanceID,
+	InstanceID_BSDF,
 
 	GENERATE_NEW_LINE_NAME,
 
@@ -362,8 +362,7 @@ enum class InspectMode : uint
 
 	GENERATE_NEW_LINE_NAME,
 
-	LightIndex,
-	RISWeight,
+	Light_Index_UV,
 
 	GENERATE_NEW_LINE_NAME,
 
@@ -379,8 +378,8 @@ enum class InspectMode : uint
 
 	GENERATE_NEW_LINE_NAME,
 
-	RIS_SAMPLE,
-	RIS_SUM,
+	ReSTIR_Initial,
+	ReSTIR_Temporal,
 	
 	Count
 };
@@ -403,10 +402,10 @@ enum class SampleMode : uint
 	Count
 };
 
-enum class LightSampleMode : uint
+enum class AccumulationMode : uint
 {
-	Uniform = 0,
-	ReSTIR,
+	Average = 0,
+	Current,
 
 	Count,
 };
@@ -781,9 +780,9 @@ ENABLE_UINT_ENUM_BITWISE_OPERATORS(ReSTIRFlag)
 
 struct ReSTIRConstants
 {
-	uint						mTemporalFrameIndex				CONSTANT_DEFAULT(0);
 	uint						mInitialSampleCount				CONSTANT_DEFAULT(1);
 	ENUM_FLAG_TYPE(ReSTIRFlag)	mFlags							CONSTANT_DEFAULT(ReSTIRFlag::None);
+	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 };
 
@@ -830,7 +829,7 @@ struct Constants
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
 	uint						mLightCount						CONSTANT_DEFAULT(0);
-	LightSampleMode				mLightSampleMode				CONSTANT_DEFAULT(LightSampleMode::Uniform);
+	AccumulationMode			mAccumulationMode				CONSTANT_DEFAULT(AccumulationMode::Average);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 
@@ -899,3 +898,4 @@ struct LocalConstants
 #undef CONCAT
 #undef CONCAT_INNER
 #undef GENERATE_PAD_NAME
+#undef GENERATE_NEW_LINE_NAME

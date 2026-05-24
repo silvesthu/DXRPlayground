@@ -15,7 +15,7 @@ namespace LightEvaluation
 		Input,
 	};
 
-	LightContext GenerateContext(ContextType inContextType, float3 inL, uint inLightIndex, float3 inLitPositionWS, inout PathContext ioPathContext)
+	LightContext GenerateContext(ContextType inContextType, float3 inL, uint inLightIndex, float3 inLitPositionWS, inout uint ioRandomState)
 	{
 		USING_RESOURCE(StructuredBuffer<Light>, RaytraceLightsSRV);
 		Light light								= RaytraceLightsSRV[inLightIndex];
@@ -26,6 +26,15 @@ namespace LightEvaluation
 		LightContext light_context				= (LightContext)0;
 		light_context.mL						= direction_to_light;
 		light_context.mSolidAnglePDF			= 0.0;
+
+		float xi1								= RandomFloat01(ioRandomState);
+		float xi2								= RandomFloat01(ioRandomState);
+		if (inContextType == ContextType::Center)
+		{
+			xi1									= 0.5;
+			xi2									= 0.5;
+		}
+		light_context.mUV						= float2(xi1, xi2);
 		
 		switch (light.mType)
 		{
@@ -49,15 +58,6 @@ namespace LightEvaluation
 			// So pdf is just one over area of it
 			light_context.mSolidAnglePDF		= 1.0 / (2.0 * MATH_PI * (1.0 - cos_theta_max));
 
-			float xi1							= RandomFloat01(ioPathContext.mRandomState);
-			float xi2							= RandomFloat01(ioPathContext.mRandomState);
-
-			if (inContextType == ContextType::Center)
-			{
-				xi1								= 1.0;
-				xi2								= 1.0;
-			}
-
 			// Note uniform distribution is applied on cos_theta due to the form of spherical integration
 			float cos_theta						= lerp(cos_theta_max, 1.0, xi1);
 			float sin_theta_squared				= 1.0 - cos_theta * cos_theta;
@@ -79,15 +79,6 @@ namespace LightEvaluation
 		{
 			// Seems Mitsuba3 just use uniform sampling on rectangle. See Rectangle::sample_position <- Shape::sample_direction
 			// Alternatively sampling of spherical rectangles / triangles could be used (Sample with solid angle instead of surface area)
-
-			float xi1							= RandomFloat01(ioPathContext.mRandomState);
-			float xi2							= RandomFloat01(ioPathContext.mRandomState);
-
-			if (inContextType == ContextType::Center)
-			{
-				xi1								= 0.5;
-				xi2								= 0.5;
-			}
 
 			float3 vector_to_sample				= vector_to_light;
 			vector_to_sample					+= light.mTangent * light.mHalfExtends.x * (xi1 * 2.0 - 1.0);
@@ -120,48 +111,16 @@ namespace LightEvaluation
 			break;
 		}
 
-		light_context.mReservoir.mLightData		= inLightIndex | Reservoir::kLightValidBit;
-		light_context.mReservoir.mCountSum		= 1;
-		light_context.mReservoir.mTargetPDF		= 0.0;
-		light_context.mReservoir.mWeightSum		= 0.0;
+		light_context.mLightIndex				= inLightIndex;
 		return light_context;
 	}
 
-	LightContext SelectLight(float3 inLitPositionWS, inout PathContext ioPathContext)
+	LightContext UniformSelect(float3 inLitPositionWS, inout uint ioRandomState)
 	{
 		USING_RESOURCE(StructuredBuffer<Light>, RaytraceLightsSRV);
 
-		LightContext selected_light_context = (LightContext)0;
-		Reservoir reservoir = Reservoir::Generate();
-		switch (mConstants.mLightSampleMode)
-		{
-		case LightSampleMode::ReSTIR:  // [passthrough]
-		case LightSampleMode::Uniform: // [passthrough]
-		default:
-		{
-			uint sample_count = mConstants.mReSTIR.mInitialSampleCount;
-			if (mConstants.mLightSampleMode != LightSampleMode::ReSTIR)
-				sample_count = 1;
-				
-			for (uint i = 0; i < sample_count; i++)
-			{
-				uint light_index = min(RandomFloat01(ioPathContext.mRandomState) * mConstants.mLightCount, mConstants.mLightCount - 1);
-				
-				// Currently, it is only based on luminance of light and pdf of sampling direction, need to add BRDF evaluation.
-				LightContext light_context = LightEvaluation::GenerateContext(LightEvaluation::ContextType::Random, 0, light_index, inLitPositionWS, ioPathContext);
-				light_context.mReservoir.mTargetPDF = light_context.mSolidAnglePDF <= 0.0 ? 0.0 : (RGBToLuminance(RaytraceLightsSRV[light_index].mEmission) / light_context.mSolidAnglePDF);
-				float target_pdf = light_context.mReservoir.mTargetPDF;
-				float candidate_pdf = LightContext::UniformSelectionPDF();
-				light_context.mReservoir.mWeightSum = target_pdf / candidate_pdf;
-
-				if (reservoir.Update(light_context.mReservoir, ioPathContext.mRandomState))
-					selected_light_context = light_context;
-			}
-
-			selected_light_context.mReservoir = reservoir;
-			return selected_light_context;	
-		}
-		}
+		uint light_index = min(RandomFloat01(ioRandomState) * mConstants.mLightCount, mConstants.mLightCount - 1);
+		return LightEvaluation::GenerateContext(LightEvaluation::ContextType::Random, 0, light_index, inLitPositionWS, ioRandomState);
 	}
 }
 
