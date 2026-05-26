@@ -120,7 +120,7 @@ namespace LightEvaluation
 		USING_RESOURCE(StructuredBuffer<Light>, RaytraceLightsSRV);
 
 		uint light_index = min(RandomFloat01(ioRandomState) * mConstants.mLightCount, mConstants.mLightCount - 1);
-		return LightEvaluation::GenerateContext(LightEvaluation::ContextType::Random, 0, light_index, inLitPositionWS, ioRandomState);
+		return LightEvaluation::GenerateContext(LightEvaluation::ContextType::Random, ContextConstant::sDirectionUndetermined, light_index, inLitPositionWS, ioRandomState);
 	}
 }
 

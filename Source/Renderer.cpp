@@ -109,7 +109,7 @@ void Renderer::Compiler::Initialize()
 	CreateLocalRootSignature();
 }
 
-void Renderer::Compiler::Finalize()
+void Renderer::Compiler::ComputeContributionWeight()
 {
 	HMODULE dxcompilerDll = mDxcompilerDll;
 	*this = {};
@@ -736,10 +736,10 @@ void Renderer::Initialize()
 	InitializeScreenSizeTextures();
 }
 
-void Renderer::Finalize()
+void Renderer::ComputeContributionWeight()
 {
 	mRuntime.Reset();
-	mCompiler.Finalize();
+	mCompiler.ComputeContributionWeight();
 }
 
 void Renderer::Render(ID3D12GraphicsCommandList4* inCommandList)

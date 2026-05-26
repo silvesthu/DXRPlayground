@@ -4,6 +4,7 @@
 #include "Binding.h"
 #include "Common.h"
 #include "Context.h"
+#include "Reservoir.h"
 #include "SpatialCache.h"
 #include "ShaderPrint.h"
 
@@ -136,6 +137,21 @@ namespace Inspect
 			Update(InspectMode::Light_H,		inPathContext, float3(inBSDFContext.mH));
 			Update(InspectMode::Light_Lobe,	    inPathContext, float3(inBSDFContext.mLobeIndex, 0, 0));
 		}
+    }
+
+    void ReSTIRInitial(PathContext inPathContext, Reservoir inReservoir)
+    {
+        Update(InspectMode::ReSTIR_Initial,     inPathContext, float3(inReservoir.mLightData, inReservoir.mWeightSum, inReservoir.mM));
+    }
+
+    void ReSTIRTemporal(PathContext inPathContext, Reservoir inReservoir)
+    {
+        Update(InspectMode::ReSTIR_Temporal,    inPathContext, float3(inReservoir.mLightData, inReservoir.mWeightSum, inReservoir.mM));
+    }
+
+    void ReSTIRFinal(PathContext inPathContext, Reservoir inReservoir)
+    {
+        Update(InspectMode::ReSTIR_Final,       inPathContext, float3(inReservoir.mLightData, inReservoir.mWeightSum, inReservoir.mM));
     }
 
     void SampleLight(PathContext inPathContext, LightContext inLightContext)

@@ -82,7 +82,7 @@ public:
 	Runtime mRuntime;
 
 	void Initialize();
-	void Finalize();
+	void ComputeContributionWeight();
 	void Update();
 	void Render(ID3D12GraphicsCommandList4* inCommandList);
 	void ImGuiShowMenus();

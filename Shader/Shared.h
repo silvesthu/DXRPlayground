@@ -380,6 +380,7 @@ enum class InspectMode : uint
 
 	ReSTIR_Initial,
 	ReSTIR_Temporal,
+	ReSTIR_Final,
 	
 	Count
 };

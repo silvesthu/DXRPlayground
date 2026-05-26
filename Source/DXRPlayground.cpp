@@ -254,8 +254,8 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR lpCmdLine
 	{
 		sWaitForGPU();
 
-		gAtmosphere.Finalize();
-		gCloud.Finalize();
+		gAtmosphere.ComputeContributionWeight();
+		gCloud.ComputeContributionWeight();
 
 		if (!gHeadless)
 		{
@@ -267,7 +267,7 @@ int WinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PSTR lpCmdLine
 
 		gScene.Unload();
 
-		gRenderer.Finalize();
+		gRenderer.ComputeContributionWeight();
 
 		sCleanupDeviceD3D();
 

@@ -75,7 +75,7 @@ struct Renderer
 	struct Compiler
 	{
 		void									Initialize();
-		void									Finalize();
+		void									ComputeContributionWeight();
 
 		void									CreateCommonRootSignature();
 		void									CreateLocalRootSignature();
@@ -103,7 +103,7 @@ struct Renderer
 	Compiler mCompiler;
 
 	void										Initialize();
-	void										Finalize();
+	void										ComputeContributionWeight();
 
 	void										Render(ID3D12GraphicsCommandList4* inCommandList);
 

@@ -235,25 +235,45 @@ void TraceRay(inout PixelContext ioPixelContext)
 						path_context.mRecursionDepth < mConstants.mRecursionDepthCountMax &&	// Skip NEE for exceeding limit of recursion depth
 						true)
 					{
-						LightContext light_context			= LightEvaluation::UniformSelect(hit_context.PositionWS(), path_context.mRandomState);
-						Reservoir reservoir_initial_sample	= Reservoir::Generate();
+						Reservoir reservoir					= Reservoir::Generate();
+
+						const uint initial_sample_count		= max(1, mConstants.mReSTIR.mInitialSampleCount);
+						Reservoir initial_reservoir			= Reservoir::Generate();
+						LightContext initial_light_context	= (LightContext)0;
+						for (uint initial_sample_index = 0; initial_sample_index < initial_sample_count; initial_sample_index++)
 						{
-							BSDFContext bsdf_context		= BSDFEvaluation::GenerateContext(BSDFContext::Mode::Light, light_context.mL, hit_context, path_context);
-							BSDFResult bsdf_result			= BSDFEvaluation::Evaluate(bsdf_context, hit_context, path_context);
-							float candidate_pdf				= light_context.UniformSelectPDF();
-							float target_pdf				= light_context.SamplePDF() > 0 ? RGBToLuminance(light_context.GetLight().mEmission * bsdf_result.mBSDF) * abs(bsdf_context.mNdotL) / light_context.SamplePDF() : 0.0f;
+							LightContext _light_context		= LightEvaluation::UniformSelect(hit_context.PositionWS(), path_context.mRandomState);
+							BSDFContext _bsdf_context		= BSDFEvaluation::GenerateContext(BSDFContext::Mode::Light, _light_context.mL, hit_context, path_context);
+							BSDFResult _bsdf_result			= BSDFEvaluation::Evaluate(_bsdf_context, hit_context, path_context);
 
-							// [TODO] Apply MIS on target_pdf
+							float _mis_weight				= 1.0f / initial_sample_count; // [NOTE] Constant for all candidates here, thus can be applied in Finalize, as in RTXDI
+							float _source_pdf				= _light_context.UniformSelectPDF();
+							float _blended_source_pdf		= _source_pdf; // [TODO] Apply MIS
+							float _target_pdf				= _light_context.SamplePDF() > 0 ? (RGBToLuminance(_light_context.GetLight().mEmission * _bsdf_result.mBSDF) * abs(_bsdf_context.mNdotL) / _light_context.SamplePDF()) : 0.0f;
 
-							reservoir_initial_sample.Stream(light_context, target_pdf, candidate_pdf, path_context.mRandomState);
+							// [TODO] Apply MIS on target_pdf, before resample
+							Reservoir _sample_reservoir		= Reservoir::FromLight(_light_context, _target_pdf, 1.0f / _blended_source_pdf);
+							if (initial_reservoir.Stream(_sample_reservoir, _mis_weight, path_context.mRandomState)) // [TODO] Skip RNG on first sample
+								initial_light_context		= _light_context;
+						}
+						initial_reservoir.ComputeContributionWeight();
+						reservoir = initial_reservoir;
+						Inspect::ReSTIRInitial(path_context, initial_reservoir);
+
+						{
+							// [TODO] Load and Stream temporal reuse
 						}
 
+						LightContext light_context = (LightContext)0;
 						{
-							// [TODO] Temporal reuse
+							// [TODO] Finalize reservoir
+							light_context					= initial_light_context;
+							reservoir						= initial_reservoir;
 						}
 
 						Inspect::SampleLight(path_context, light_context);
-						if (light_context.SamplePDF() > 0)
+						bool light_visible = false;
+						if (reservoir.IsValid())
 						{
 							RayDesc shadow_ray;
 							shadow_ray.Origin				= hit_context.PositionWS();
@@ -265,40 +285,50 @@ void TraceRay(inout PixelContext ioPixelContext)
 							TraceShadowRay(shadow_query, shadow_ray);
 
 							// Shadow ray hit the light
-							if (IsHit(shadow_query) && shadow_query.CommittedInstanceID() == light_context.GetLight().mInstanceID)
-							{
-								Inspect::HitLight(path_context, shadow_ray.Origin + shadow_ray.Direction * shadow_query.CommittedRayT());
+							light_visible = IsHit(shadow_query) && shadow_query.CommittedInstanceID() == light_context.GetLight().mInstanceID;
 
-								BSDFContext bsdf_context	= BSDFEvaluation::GenerateContext(BSDFContext::Mode::Light, light_context.mL, hit_context, path_context);
-								BSDFResult bsdf_result		= BSDFEvaluation::Evaluate(bsdf_context, hit_context, path_context);
-
-								float3 luminance			= light_context.GetLight().mEmission * (mConstants.mEmissionBoost * kPreExposure);
-								float3 light_emission		= luminance * bsdf_result.mBSDF * abs(bsdf_context.mNdotL) / light_context.SamplePDF();
-
-								if (GetSampleMode() == SampleMode::MIS)
-								{
-									float bsdf_mis_pdf		= bsdf_result.mBSDFSamplePDF;
-									float light_mis_pdf		= light_context.SamplePDF();
-									float mis_weight		= max(0.0f, MIS::PowerHeuristic(1, light_mis_pdf, 1, bsdf_mis_pdf));
-									light_emission			*= mis_weight;
-
-									Inspect::Update(InspectMode::MIS_LIGHT, path_context, float3(bsdf_mis_pdf, light_mis_pdf, mis_weight));
-								}
-
-								if (bsdf_result.mMediumInstanceID == InvalidInstanceID) // Shadow ray not support medium yet
-								{
-									path_context.mEmission	+= path_context.mThroughput * light_emission;
-								}
-
-								Inspect::BSDF(path_context, bsdf_context);
-								Inspect::SampleLightResult(path_context, bsdf_context, bsdf_result, light_context.SamplePDF());
-							}
+							Inspect::HitLight(path_context, shadow_ray.Origin + shadow_ray.Direction * shadow_query.CommittedRayT());
 						}
+						
+						if (light_visible)
+						{
+							BSDFContext bsdf_context	= BSDFEvaluation::GenerateContext(BSDFContext::Mode::Light, light_context.mL, hit_context, path_context);
+							BSDFResult bsdf_result		= BSDFEvaluation::Evaluate(bsdf_context, hit_context, path_context);
+
+							float3 luminance			= light_context.GetLight().mEmission * (mConstants.mEmissionBoost * kPreExposure);
+							float3 light_emission		= luminance * bsdf_result.mBSDF * abs(bsdf_context.mNdotL) / light_context.mSolidAnglePDF * reservoir.mContributionWeight;
+
+							if (GetSampleMode() == SampleMode::MIS)
+							{
+								float bsdf_mis_pdf		= bsdf_result.mBSDFSamplePDF;
+								float light_mis_pdf		= light_context.SamplePDF();
+								float mis_weight		= max(0.0f, MIS::PowerHeuristic(1, light_mis_pdf, 1, bsdf_mis_pdf));
+								light_emission			*= mis_weight;
+
+								Inspect::Update(InspectMode::MIS_LIGHT, path_context, float3(bsdf_mis_pdf, light_mis_pdf, mis_weight));
+							}
+
+							if (bsdf_result.mMediumInstanceID == InvalidInstanceID) // Shadow ray not support medium yet
+							{
+								path_context.mEmission	+= path_context.mThroughput * light_emission;
+							}
+
+							Inspect::BSDF(path_context, bsdf_context);
+							Inspect::SampleLightResult(path_context, bsdf_context, bsdf_result, light_context.SamplePDF());
+						}
+						else
+						{
+							reservoir					= Reservoir::Generate();
+						}
+
+						Inspect::ReSTIRFinal(path_context, reservoir);
+						USING_RESOURCE(RWTexture2D<uint4>, ScreenReservoirUAV);
+						ScreenReservoirUAV[ioPixelContext.mPixelIndex.xy] = reservoir.Pack();
 					}
 
 					// Sample BSDF / [Mitsuba] BSDF sampling
 					{
-						BSDFContext bsdf_context					= BSDFEvaluation::GenerateContext(BSDFContext::Mode::BSDF, BSDFConstant::sDirectionUndetermined, hit_context, path_context);
+						BSDFContext bsdf_context					= BSDFEvaluation::GenerateContext(BSDFContext::Mode::BSDF, ContextConstant::sDirectionUndetermined, hit_context, path_context);
 						BSDFResult bsdf_result						= BSDFEvaluation::Evaluate(bsdf_context, hit_context, path_context);
 					
 						path_context.mEmission						+= path_context.mThroughput * emission; // Emissive BSDF

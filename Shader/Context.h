@@ -4,6 +4,14 @@
 #include "Binding.h"
 #include "NanoVDB.h"
 
+namespace ContextConstant
+{
+	static uint		sLobeIndexTrivial = 0;
+	static uint		sLobeIndexAll = 0xffffffff;
+	static float	sEtaITTrivial = 1.0f;
+	static float3	sDirectionUndetermined = sqrt(-1.0);
+}
+
 struct PixelContext
 {
 	uint3			mPixelIndex;
@@ -459,14 +467,6 @@ struct BSDFContext
 	float			mLPDF;						// For light sample
 };
 
-namespace BSDFConstant
-{
-	static uint		sLobeIndexTrivial = 0;
-	static uint		sLobeIndexAll = 0xffffffff;
-	static float	sEtaITTrivial = 1.0f;
-	static float3	sDirectionUndetermined = sqrt(-1.0);
-}
-
 struct BSDFResult
 {
 	static BSDFResult Generate()
@@ -474,7 +474,7 @@ struct BSDFResult
 		BSDFResult bsdf_result;
 		bsdf_result.mBSDF				= 0.0;
 		bsdf_result.mBSDFSamplePDF		= 1.0f;
-		bsdf_result.mEta				= BSDFConstant::sEtaITTrivial;
+		bsdf_result.mEta				= ContextConstant::sEtaITTrivial;
 		bsdf_result.mMediumInstanceID	= InvalidInstanceID;
 		return bsdf_result;
 	}
