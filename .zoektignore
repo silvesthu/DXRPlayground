@@ -1,0 +1,23 @@
+# VCS, IDE, and build outputs.
+.git/
+.vs/
+.vscode/
+build*/
+out/
+CMakeFiles/
+
+# Generated/dependency outputs and package caches.
+_deps/
+bin/
+obj/
+dist/
+.cache/
+
+# Large non-source assets and vendor trees; index project-owned code/docs/shaders.
+Asset/
+Assets/
+Source/Thirdparty/
+
+# Local search-text config files are not project content.
+.zoektignore
+.zoektext
