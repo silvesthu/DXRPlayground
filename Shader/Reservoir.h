@@ -73,7 +73,6 @@ struct Reservoir
 	void			ComputeContributionWeight()
 	{
 		// Unbiased contribution weight (UCW), W_X = \sum w_i / \hat{p}(X) in [Wyman2023]
-		// MIS Weight, (1 / M) is part of Resampling weight, but applied here for less computation
 		mContributionWeight						= (mTargetFunction == 0.0) ? 0.0 : mWeightSum / mTargetFunction;
 	}
 
@@ -89,8 +88,8 @@ struct Reservoir
 
 	void Unpack(uint4 inPacked)
 	{
-		mLightData								= asuint(inPacked.x);
-		mContributionWeight						= inPacked.y;
+		mLightData								= inPacked.x;
+		mContributionWeight						= asfloat(inPacked.y);
 		mUV										= inPacked.z;
 	}
 };
