@@ -104,7 +104,15 @@ struct SurfaceContext
 		}
 	}
 	
-	BSDF			BSDF()						{ return mInstanceData.mBSDF; }
+	BSDF			BSDF()						
+	{
+		if (mConstants.mBRDFExplorer.mOverrideInstance != 0 && mInstanceID == mConstants.mDebugInstanceID)
+		{
+			return BSDF::Explorer;
+		}
+
+		return mInstanceData.mBSDF;
+	}
 	uint			TwoSided()					{ return mInstanceData.mFlags.mTwoSided; }
 	float			Opacity()					{ return mInstanceData.mOpacity; }
 	uint			LightIndex()				{ return mInstanceData.mLightIndex; }
@@ -174,7 +182,7 @@ struct SurfaceContext
 	bool			HasMedium()					{ return mInstanceData.mMedium != 0; }
 
 	// https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#metal-brdf-and-dielectric-brdf
-	float3			AlbedoGLTF()						
+	float3			AlbedoGLTF()
 	{
 		float3 base_color = mInstanceData.mAlbedo;
 		
@@ -436,6 +444,10 @@ struct BSDFContext
 
 		bsdf_context.mLobeIndex					= inLobeIndex;
 
+		float3x3 TBN							= GenerateTangentSpace(bsdf_context.mN);
+		bsdf_context.mT							= TBN[0];
+		bsdf_context.mB							= TBN[1];
+
 		return bsdf_context;
 	}
 
@@ -465,6 +477,9 @@ struct BSDFContext
 	uint			mLobeIndex;
 
 	float			mLPDF;						// For light sample
+
+	float3			mT;
+	float3			mB;
 };
 
 struct BSDFResult

@@ -429,6 +429,8 @@ enum class BSDF : uint
 	pbrMetallicRoughness,	// https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-material-pbrmetallicroughness
 	pbrSpecularGlossiness,	// https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Archived/KHR_materials_pbrSpecularGlossiness/README.md
 
+	Explorer,
+
 	Unsupported,			// Fallback to Diffuse
 
 	Count
@@ -761,7 +763,7 @@ struct BRDFExplorerConstants
 	float						mClearcoatGloss					CONSTANT_DEFAULT(1.0f);
 	float						mPhiD							CONSTANT_DEFAULT(MATH_PI / 2.0);
 	float						mGamma							CONSTANT_DEFAULT(1.0f);
-	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	uint						mOverrideInstance				CONSTANT_DEFAULT(0);
 };
 
 struct SpatialCacheConstants
@@ -772,18 +774,11 @@ struct SpatialCacheConstants
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 };
 
-BEGIN_ENUM_FLAG(ReSTIRFlag)
-	None						= 0,
-	TemporalReuse				= 1 << 0,
-	SpatialReuse				= 1 << 1,
-END_ENUM_FLAG(ReSTIRFlag)
-ENABLE_UINT_ENUM_BITWISE_OPERATORS(ReSTIRFlag)
-
 struct ReSTIRConstants
 {
 	uint						mInitialSampleCount				CONSTANT_DEFAULT(1);
-	ENUM_FLAG_TYPE(ReSTIRFlag)	mFlags							CONSTANT_DEFAULT(ReSTIRFlag::None);
-	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
+	uint						mTemporalReuseCount				CONSTANT_DEFAULT(0);
+	uint						mSpatialReuseCount				CONSTANT_DEFAULT(0);
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 };
 
@@ -837,7 +832,7 @@ struct Constants
 	float4						mSunDirection					CONSTANT_DEFAULT(float4(1.0f, 0.0f, 0.0f, 0.0f));
 
 	VisualizeMode				mVisualizeMode					CONSTANT_DEFAULT(VisualizeMode::None);
-	int							mDebugInstanceIndex				CONSTANT_DEFAULT(-1);
+	int							mDebugInstanceID				CONSTANT_DEFAULT(-1);
 	int							mDebugLightIndex				CONSTANT_DEFAULT(-1);
 	uint						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 

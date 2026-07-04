@@ -55,10 +55,10 @@ VisualizeMode GetVisualizeMode()
 #endif // SHADER_DEBUG
 }
 
-int GetDebugInstanceIndex()
+int GetDebugInstanceID()
 {
 #if SHADER_DEBUG
-    return mConstants.mDebugInstanceIndex;
+    return mConstants.mDebugInstanceID;
 #else
     return -1;
 #endif // SHADER_DEBUG

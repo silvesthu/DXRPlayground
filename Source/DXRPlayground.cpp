@@ -545,7 +545,6 @@ void sRender()
 			sConstantsCopy.mDebugFlag				= gConstants.mDebugFlag;
 			sConstantsCopy.mSpatialCache			= gConstants.mSpatialCache;
 			sConstantsCopy.mReSTIR					= gConstants.mReSTIR;
-			sConstantsCopy.mBRDFExplorer			= gConstants.mBRDFExplorer;
 
 			if (memcmp(&sConstantsCopy, &gConstants, sizeof(Constants)) != 0)
 				gRenderer.mFrameResetRequested = true;

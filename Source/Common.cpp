@@ -369,6 +369,11 @@ namespace ImGui
 {
 	float gDpiScale = 1.0f;
 
+	void W(uint inElementCount)
+	{
+		ImGui::SetNextItemWidth(120.0f * inElementCount);
+	}
+
 	void Texture1(Texture& inTexture)
 	{
 		static Texture* sTexture = nullptr;

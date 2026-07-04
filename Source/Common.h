@@ -900,6 +900,7 @@ namespace ImGui
 {
 	extern float gDpiScale;
 
+	void W(uint inElementCount);
 	void Texture1(Texture& inTexture);
 	void Textures(std::span<Texture> inTextures, const std::string& inName = "Texture", ImGuiTreeNodeFlags inFlags = 0);
 }

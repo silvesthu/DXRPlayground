@@ -46,7 +46,7 @@ struct Reservoir
 	}
 
 	// Add sample to reservoir, see RTXDI_StreamSample, RTXDI_CombineDIReservoirs in RTXDI
-	bool			Stream(Reservoir inReservoir, float inMISWeight, inout uint ioRandomState)
+	bool			Stream(Reservoir inReservoir, float inMISWeight, float inRandom01)
 	{
 		// [Wyman2023]
 		// Resampling Weight:	w_i = m_i * \hat{p}(X_i) / p(X_i)
@@ -58,7 +58,7 @@ struct Reservoir
 
 		mM										+= 1;
 
-		bool select_sample						= RandomFloat01(ioRandomState) * mWeightSum < resampling_weight;
+		bool select_sample						= inRandom01 * mWeightSum < resampling_weight; // [TODO] Notes on < or <=
 		if (select_sample)
 		{
 			mLightData							= inReservoir.mLightData;

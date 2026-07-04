@@ -235,8 +235,9 @@ void TraceRay(inout PixelContext ioPixelContext)
 						path_context.mRecursionDepth < mConstants.mRecursionDepthCountMax &&	// Skip NEE for exceeding limit of recursion depth
 						true)
 					{
-						Reservoir reservoir					= Reservoir::Generate();
+						USING_RESOURCE(RWTexture2D<uint4>, ScreenReservoirUAV);
 
+						// Initial samples
 						const uint initial_sample_count		= max(1, mConstants.mReSTIR.mInitialSampleCount);
 						Reservoir initial_reservoir			= Reservoir::Generate();
 						LightContext initial_light_context	= (LightContext)0;
@@ -252,34 +253,55 @@ void TraceRay(inout PixelContext ioPixelContext)
 							float _target_pdf				= _light_context.SamplePDF() > 0 ? (RGBToLuminance(_light_context.GetLight().mEmission * _bsdf_result.mBSDF) * abs(_bsdf_context.mNdotL) / _light_context.SamplePDF()) : 0.0f;
 
 							// [TODO] Apply MIS on target_pdf, before resample
+							float _random01					= RandomFloat01(path_context.mRandomState);
 							Reservoir _sample_reservoir		= Reservoir::FromLight(_light_context, _target_pdf, 1.0f / _blended_source_pdf);
-							if (initial_reservoir.Stream(_sample_reservoir, _mis_weight, path_context.mRandomState)) // [TODO] Skip RNG on first sample
+							if (initial_reservoir.Stream(_sample_reservoir, _mis_weight, _random01)) // [TODO] Skip RNG on first sample
 								initial_light_context		= _light_context;
 						}
 						initial_reservoir.ComputeContributionWeight();
-						reservoir = initial_reservoir;
 						Inspect::ReSTIRInitial(path_context, initial_reservoir);
 
+						Reservoir reservoir					= Reservoir::Generate();
+
+						bool temporal						= mConstants.mCurrentFrameIndex > 0 && mConstants.mReSTIR.mTemporalReuseCount != 0;
+						float initial_mis_weight			= temporal ? 0.5f : 1.0f; // [TODO]
+						reservoir.Stream(initial_reservoir, initial_mis_weight, kTrivialRandom01);
+						LightContext light_context			= initial_light_context;
+
+						// Temporal Reuse
+						if (temporal)
 						{
-							// [TODO] Load and Stream temporal reuse
+							Reservoir _reservoir			= Reservoir::Generate();
+							_reservoir.Unpack(ScreenReservoirUAV[ioPixelContext.mPixelIndex.xy]);
+
+							Reservoir temporal_reservoir	= _reservoir;
+							Inspect::ReSTIRTemporal(path_context, temporal_reservoir);
+
+							if (temporal_reservoir.IsValid())
+							{
+								// [TODO] Construct LightContext from reservoir
+								// if (reservoir.Stream(temporal_reservoir, 1.0f, path_context.mRandomState))
+							}
 						}
 
-						LightContext light_context = (LightContext)0;
+						// Spatial Reuse
+						for (uint spatial_sample_index = 0; spatial_sample_index < mConstants.mReSTIR.mSpatialReuseCount; spatial_sample_index++)
 						{
-							// [TODO] Finalize reservoir
-							light_context					= initial_light_context;
-							reservoir						= initial_reservoir;
+							// [TODO]
 						}
+
+						// Finalize
+						reservoir.ComputeContributionWeight();
 
 						Inspect::SampleLight(path_context, light_context);
 						bool light_visible = false;
 						if (reservoir.IsValid())
 						{
 							RayDesc shadow_ray;
-							shadow_ray.Origin				= hit_context.PositionWS();
-							shadow_ray.Direction			= light_context.mL;
-							shadow_ray.TMin					= 1E-4;
-							shadow_ray.TMax					= 10000;
+							shadow_ray.Origin			= hit_context.PositionWS();
+							shadow_ray.Direction		= light_context.mL;
+							shadow_ray.TMin				= 1E-4;
+							shadow_ray.TMax				= 10000;
 
 							RayQuery<RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH> shadow_query;
 							TraceShadowRay(shadow_query, shadow_ray);
@@ -288,6 +310,10 @@ void TraceRay(inout PixelContext ioPixelContext)
 							light_visible = IsHit(shadow_query) && shadow_query.CommittedInstanceID() == light_context.GetLight().mInstanceID;
 
 							Inspect::HitLight(path_context, shadow_ray.Origin + shadow_ray.Direction * shadow_query.CommittedRayT());
+						}
+						else
+						{
+							reservoir					= Reservoir::Generate();
 						}
 						
 						if (light_visible)
@@ -318,12 +344,14 @@ void TraceRay(inout PixelContext ioPixelContext)
 						}
 						else
 						{
-							reservoir					= Reservoir::Generate();
+							// Should not reset reseroivr as visibility is not part of target
 						}
 
 						Inspect::ReSTIRFinal(path_context, reservoir);
-						USING_RESOURCE(RWTexture2D<uint4>, ScreenReservoirUAV);
-						ScreenReservoirUAV[ioPixelContext.mPixelIndex.xy] = reservoir.Pack();
+						if (mConstants.mCurrentFrameWeight != 0.0f)
+						{
+							ScreenReservoirUAV[ioPixelContext.mPixelIndex.xy] = reservoir.Pack();
+						}
 					}
 
 					// Sample BSDF / [Mitsuba] BSDF sampling

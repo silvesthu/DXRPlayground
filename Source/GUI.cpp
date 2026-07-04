@@ -18,6 +18,8 @@ void gPrepareImGui()
 		gRenderer.mScreenSize.y);
 	if (Begin(stat.c_str()))
 	{
+		PushItemWidth(240.0f);
+
 		{
 			if (Button("Reload Shader (F5)"))
 				gRenderer.mReloadShader = true;
@@ -85,36 +87,6 @@ void gPrepareImGui()
 
 					RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mVisualizeMode), i);
 				}
-				TreePop();
-			}
-
-			if (TreeNodeEx("Inspect", ImGuiTreeNodeFlags_None))
-			{
-				InputFloat3("Screen Debug", &gRenderer.mRuntime.mInspectDataBuffer.GetReadback<InspectData>(gGetFrameContextIndex())[0].mScreenDebug.x, "%.8f", ImGuiInputTextFlags_ReadOnly);
-
-				for (int i = 0; i < static_cast<int>(InspectMode::Count); i++)
-				{
-					const auto& name = nameof::nameof_enum(static_cast<InspectMode>(i));
-					if (name.starts_with('_'))
-					{
-						NewLine();
-						continue;
-					}
-
-					if (i != 0)
-						SameLine();
-
-					RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mInspectMode), i);
-				}
-
-				for (int i = 0; i < InspectData::kPathLength; i++)
-				{
-					float4& value = gRenderer.mRuntime.mInspectDataBuffer.GetReadback<InspectData>(gGetFrameContextIndex())[0].mValue[i];
-					PushStyleColor(ImGuiCol_Text, GetColorU32(ImGuiCol_Text, value.w == 0.0f ? 0.2f : 1.0f));
-					InputFloat4(std::to_string(i).c_str(), &value.x, "%.8f", ImGuiInputTextFlags_ReadOnly);
-					PopStyleColor();
-				}
-
 				TreePop();
 			}
 
@@ -232,6 +204,12 @@ void gPrepareImGui()
 				if (SliderInt("Initial Sample Count", reinterpret_cast<int*>(&gConstants.mReSTIR.mInitialSampleCount), 1, 8))
 					gRenderer.mFrameResetRequested = true;
 
+				if (Checkbox("Temporal", (bool*)& gConstants.mReSTIR.mTemporalReuseCount))
+					gRenderer.mFrameResetRequested = true;
+
+				if (SliderInt("Spatial Sample Count", reinterpret_cast<int*>(&gConstants.mReSTIR.mSpatialReuseCount), 1, 8))
+					gRenderer.mFrameResetRequested = true;
+
 				TreePop();
 			}
 		}
@@ -269,46 +247,38 @@ void gPrepareImGui()
 
 		if (CollapsingHeader("Camera"))
 		{
-			auto align_right = [](float pivot = GetCursorPosX()) { SetNextItemWidth(GetWindowWidth() * 0.65f - (GetCursorPosX() - pivot)); };
-
 			InputFloat3("Position", (float*)&gConstants.mCameraTransform[3]);
 			InputFloat3("Direction", (float*)&gConstants.mCameraTransform[2], "%.3f", ImGuiInputTextFlags_ReadOnly);
 			SliderFloat("Horz Fov", (float*)&gCameraSettings.mHorizontalFovDegree, 30.0f, 160.0f);
 
 			PushID("Aperture");
 			{
-				float x = GetCursorPosX();
-
+				SliderFloat("Aperture", &gCameraSettings.mExposureControl.mAperture, 1.0f, 22.0f);
+				SameLine();
 				if (Button("<")) { gCameraSettings.mExposureControl.mAperture /= glm::sqrt(2.0f); }
 				SameLine();
 				if (Button(">")) { gCameraSettings.mExposureControl.mAperture *= glm::sqrt(2.0f); }
-				SameLine();
-				align_right(x); SliderFloat("Aperture", &gCameraSettings.mExposureControl.mAperture, 1.0f, 22.0f);
 			}
 			PopID();
 			PushID("Shutter Speed");
 			{
-				float x = GetCursorPosX();
-
-				if (Button("<")) { gCameraSettings.mExposureControl.mInvShutterSpeed /= 2.0f; }
-				SameLine();
-				if (Button(">")) { gCameraSettings.mExposureControl.mInvShutterSpeed *= 2.0f; }
-				SameLine();
 				std::string format = "%.3f";
 				if (gCameraSettings.mExposureControl.mInvShutterSpeed < 1.0f)
 					format += std::format(" ({:.1f}sec)", 1.0f / gCameraSettings.mExposureControl.mInvShutterSpeed);
-				align_right(x); SliderFloat("Shutter Speed (1/sec)", &gCameraSettings.mExposureControl.mInvShutterSpeed, 1.0f, 500.0f, format.c_str());
+				SliderFloat("Shutter Speed (1/sec)", &gCameraSettings.mExposureControl.mInvShutterSpeed, 1.0f, 500.0f, format.c_str());
+				SameLine();
+				if (Button("<")) { gCameraSettings.mExposureControl.mInvShutterSpeed /= 2.0f; }
+				SameLine();
+				if (Button(">")) { gCameraSettings.mExposureControl.mInvShutterSpeed *= 2.0f; }
 			}
 			PopID();
 			PushID("ISO");
 			{
-				float x = GetCursorPosX();
-
+				SliderFloat("ISO", &gCameraSettings.mExposureControl.mSensitivity, 100.0f, 3200.0f);
+				SameLine();
 				if (Button("<")) { gCameraSettings.mExposureControl.mSensitivity /= 2.0f; }
 				SameLine();
 				if (Button(">")) { gCameraSettings.mExposureControl.mSensitivity *= 2.0f; }
-				SameLine();
-				align_right(x); SliderFloat("ISO", &gCameraSettings.mExposureControl.mSensitivity, 100.0f, 3200.0f);
 			}
 			PopID();
 
@@ -382,6 +352,8 @@ void gPrepareImGui()
 
 			SliderAngle("PhiD", &gConstants.mBRDFExplorer.mPhiD, 0.0f, 180.0f);
 			SliderFloat("Gamma", &gConstants.mBRDFExplorer.mGamma, 1.0f, 2.2f);
+
+			Checkbox("Override Instance", (bool*)& gConstants.mBRDFExplorer.mOverrideInstance);
 
 			if (Button("Reset"))
 			{
@@ -520,6 +492,37 @@ void gPrepareImGui()
 			gAtmosphere.ImGuiShowTextures();
 			gCloud.ImGuiShowTextures();
 
+			if (Begin("Inspector"))
+			{
+				InspectData& inspect_data = gRenderer.mRuntime.mInspectDataBuffer.GetReadback<InspectData>(gGetFrameContextIndex())[0];
+
+				InputFloat3("Debug", &inspect_data.mScreenDebug.x, "%.8f", ImGuiInputTextFlags_ReadOnly);
+
+				for (int i = 0; i < static_cast<int>(InspectMode::Count); i++)
+				{
+					const auto& name = nameof::nameof_enum(static_cast<InspectMode>(i));
+					if (name.starts_with('_'))
+					{
+						NewLine();
+						continue;
+					}
+
+					if (i != 0)
+						SameLine();
+
+					RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mInspectMode), i);
+				}
+
+				for (int i = 0; i < InspectData::kPathLength; i++)
+				{
+					float4& value = gRenderer.mRuntime.mInspectDataBuffer.GetReadback<InspectData>(gGetFrameContextIndex())[0].mValue[i];
+					PushStyleColor(ImGuiCol_Text, GetColorU32(ImGuiCol_Text, value.w == 0.0f ? 0.2f : 1.0f));
+					InputFloat4(std::to_string(i).c_str(), &value.x, "%.8f", ImGuiInputTextFlags_ReadOnly);
+					PopStyleColor();
+				}
+			}
+			End();
+
 			if (Begin("Instances"))
 			{
 				const char* columns[] =
@@ -576,8 +579,8 @@ void gPrepareImGui()
 						int column_index = 0;
 
 						TableSetColumnIndex(column_index++);
-						if (Selectable(std::to_string(row).c_str(), row == gConstants.mDebugInstanceIndex, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_SelectOnNav))
-							gConstants.mDebugInstanceIndex = row;
+						if (Selectable(std::to_string(row).c_str(), row == gConstants.mDebugInstanceID, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_SelectOnNav))
+							gConstants.mDebugInstanceID = row;
 
 						if (row == gRenderer.mRuntime.mInspectDataBuffer.GetReadback<InspectData>(gGetFrameContextIndex())[0].mPixelInstanceID)
 							TableSetBgColor(ImGuiTableBgTarget_RowBg1, GetColorU32(ImVec4(0.8f, 0.2f, 0.2f, 0.8f)));
@@ -684,7 +687,7 @@ void gPrepareImGui()
 					EndTable();
 				}
 
-				gConstants.mDebugInstanceIndex = glm::clamp(gConstants.mDebugInstanceIndex, -1, gScene.GetInstanceCount() - 1);
+				gConstants.mDebugInstanceID = glm::clamp(gConstants.mDebugInstanceID, -1, gScene.GetInstanceCount() - 1);
 			}
 			End();
 
@@ -800,6 +803,8 @@ void gPrepareImGui()
 			}
 			End();
 		}
+
+		PopItemWidth();
 	}
 	End();
 }

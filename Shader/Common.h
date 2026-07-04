@@ -49,6 +49,7 @@ float RandomFloat01(inout uint state)
 {
     return float(wang_hash(state)) / 4294967296.0;
 }
+static const float kTrivialRandom01 = 0.0f;
 
 float3 RandomUnitVector(inout uint state)
 {

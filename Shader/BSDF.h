@@ -4,6 +4,7 @@
 #include "Common.h"
 #include "Context.h"
 #include "DebugUtils.h"
+#include "BRDFExplorer.h"
 
 namespace BSDFEvaluation
 {
@@ -431,6 +432,36 @@ namespace BSDFEvaluation
 		}
 	};
 
+	namespace Explorer
+	{
+		BSDFContext GenerateContext(BSDFContext::Mode inMode, float3 inL, HitContext inHitContext, inout PathContext ioPathContext)
+		{
+			float3 L = inL;
+			if (inMode == BSDFContext::Mode::BSDF)
+			{
+				float3x3 tangent_space = GenerateTangentSpace(inHitContext.NormalWS());
+				float3 randome_direction = RandomCosineDirection(ioPathContext.mRandomState);
+				L = normalize(randome_direction.x * tangent_space[0] + randome_direction.y * tangent_space[1] + randome_direction.z * tangent_space[2]);
+			}
+
+			return BSDFContext::Generate(inMode, L, ContextConstant::sEtaITTrivial, ContextConstant::sLobeIndexTrivial, inHitContext);
+		}
+
+		BSDFResult Evaluate(inout BSDFContext inBSDFContext, HitContext inHitContext, inout PathContext ioPathContext)
+		{
+			BSDFResult result;
+			result.mBSDF = BRDFExplorer::BRDF(inBSDFContext.mL, inBSDFContext.mV, inBSDFContext.mN, inBSDFContext.mT, inBSDFContext.mB);
+			result.mBSDFSamplePDF = max(0, inBSDFContext.mNdotL) / MATH_PI;
+			result.mEta = 1.0;
+			result.mMediumInstanceID = InvalidInstanceID;
+
+			if (inBSDFContext.mNdotL < 0 || inBSDFContext.mNdotV < 0)
+				result.mBSDF = 0;
+
+			return result;
+		}
+	};
+
 	BSDFContext GenerateContext(BSDFContext::Mode inMode, float3 inL, HitContext inHitContext, inout PathContext ioPathContext)
 	{
 		switch (inHitContext.BSDF())
@@ -453,7 +484,7 @@ namespace BSDFEvaluation
 #if USE_BSDF_pbrMetallicRoughness
 		case BSDF::pbrMetallicRoughness:		return glTF::GenerateContext(inMode, inL, inHitContext, ioPathContext); break;
 #endif // USE_BSDF_pbrMetallicRoughness
-
+		case BSDF::Explorer:					return Explorer::GenerateContext(inMode, inL, inHitContext, ioPathContext); break;
 		case BSDF::Diffuse:						// [passthrough]
 		default:								return Diffuse::GenerateContext(inMode, inL, inHitContext, ioPathContext); break;
 		}
@@ -482,7 +513,7 @@ namespace BSDFEvaluation
 #if USE_BSDF_pbrMetallicRoughness
 		case BSDF::pbrMetallicRoughness:		result = glTF::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
 #endif // USE_BSDF_pbrMetallicRoughness
-
+		case BSDF::Explorer:					result = Explorer::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
 		case BSDF::Diffuse:						// [passthrough]
 		default:								result = Diffuse::Evaluate(inBSDFContext, inHitContext, ioPathContext); break;
 		}
