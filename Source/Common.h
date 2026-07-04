@@ -365,7 +365,7 @@ extern Stats								gStats;
 
 struct Configs
 {
-	bool									mUseNVAPI = true;
+	bool									mUseNVAPI = false;
 	bool									mShaderDebug = true;
 	bool									mUseTexture = true;
 
@@ -897,6 +897,28 @@ static void gPrintStateObjectDesc(const D3D12_STATE_OBJECT_DESC* desc)
 	}
 	wstr << L"\n";
 	OutputDebugStringW(wstr.str().c_str());
+}
+
+static bool gIsFormatInteger(DXGI_FORMAT format)
+{
+	switch (format)
+	{
+	case DXGI_FORMAT_R8G8B8A8_UINT:
+	case DXGI_FORMAT_R8G8B8A8_SINT:
+	case DXGI_FORMAT_R16G16_UINT:
+	case DXGI_FORMAT_R16G16_SINT:
+	case DXGI_FORMAT_R32_UINT:
+	case DXGI_FORMAT_R32_SINT:
+	case DXGI_FORMAT_R32G32_UINT:
+	case DXGI_FORMAT_R32G32_SINT:
+	case DXGI_FORMAT_R32G32B32_UINT:
+	case DXGI_FORMAT_R32G32B32_SINT:
+	case DXGI_FORMAT_R32G32B32A32_UINT:
+	case DXGI_FORMAT_R32G32B32A32_SINT:
+		return true;
+	default:
+		return false;
+	}
 }
 
 namespace ImGui

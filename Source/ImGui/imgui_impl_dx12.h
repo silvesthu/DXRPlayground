@@ -46,10 +46,17 @@ struct D3D12_SHADER_RESOURCE_VIEW_DESC;
 extern void (*ImGui_ImplDX12_CreateShaderResourceViewCallback)(ID3D12Resource* resource, D3D12_SHADER_RESOURCE_VIEW_DESC& desc);
 struct ImGui_ImplDX12_ShaderContantsType
 {
+    // Common
     float mMin = 0.0f;
     float mMax = 1.0f;
     float mSlice = 0.0f;
     float mAlpha = 0.0f;
+
+    // Per-Draw
+    uint32_t mType = 0;
+    uint32_t mPad0 = 0;
+    uint32_t mPad1 = 0;
+    uint32_t mPad2 = 0;
 };
 extern ImGui_ImplDX12_ShaderContantsType ImGui_ImplDX12_ShaderContants;
 extern ImTextureID ImGui_ImplDX12_FontTextureID;
@@ -57,7 +64,8 @@ extern ImTextureID ImGui_ImplDX12_NullTexture2D;
 extern ImTextureID ImGui_ImplDX12_NullTexture3D;
 enum
 {
-    ImGui_ImplDX12_ImTextureID_Mask_3D  = 0x1,
+    ImGui_ImplDX12_ImTextureID_Mask_3D          = 1 << 0,
+    ImGui_ImplDX12_ImTextureID_Mask_Integer     = 1 << 1,
 };
 
 constexpr unsigned int ImGuiSelectableFlags_SelectOnNav = 1 << 21;  // from imgui_internal.h

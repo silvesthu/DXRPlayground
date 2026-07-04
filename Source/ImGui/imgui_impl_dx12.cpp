@@ -275,18 +275,29 @@ void ImGui_ImplDX12_RenderDrawData(ImDrawData* draw_data, ID3D12GraphicsCommandL
 #ifdef PLAYGROUND_IMGUI
                 bool is_3d = (texture_handle.ptr & ImGui_ImplDX12_ImTextureID_Mask_3D) != 0;
                 texture_handle.ptr &= ~ImGui_ImplDX12_ImTextureID_Mask_3D;
+				bool is_integer = (texture_handle.ptr & ImGui_ImplDX12_ImTextureID_Mask_Integer) != 0;
+                texture_handle.ptr &= ~ImGui_ImplDX12_ImTextureID_Mask_Integer;
 
-                D3D12_GPU_DESCRIPTOR_HANDLE texture_handle_2d = texture_handle;
-                D3D12_GPU_DESCRIPTOR_HANDLE texture_handle_3d = texture_handle;
-                if (is_3d)
-                    texture_handle_2d.ptr = (UINT64)ImGui_ImplDX12_NullTexture2D;
-                else
-                    texture_handle_3d.ptr = (UINT64)ImGui_ImplDX12_NullTexture3D;
+                int type = 0;
+				if (!is_3d && !is_integer) type = 1;
+				if (!is_3d && is_integer) type = 2;
+				if (is_3d && !is_integer) type = 3;
+				if (is_3d && is_integer) type = 4;
 
-                ctx->SetGraphicsRootDescriptorTable(1, texture_handle_2d);
-                ctx->SetGraphicsRootDescriptorTable(2, texture_handle_3d);
+                D3D12_GPU_DESCRIPTOR_HANDLE texture_handle_2d_float = (type == 1) ? texture_handle : (D3D12_GPU_DESCRIPTOR_HANDLE)(UINT64)ImGui_ImplDX12_NullTexture2D;
+                D3D12_GPU_DESCRIPTOR_HANDLE texture_handle_2d_uint = (type == 2) ? texture_handle : (D3D12_GPU_DESCRIPTOR_HANDLE)(UINT64)ImGui_ImplDX12_NullTexture2D;
+                D3D12_GPU_DESCRIPTOR_HANDLE texture_handle_3d_float = (type == 3) ? texture_handle : (D3D12_GPU_DESCRIPTOR_HANDLE)(UINT64)ImGui_ImplDX12_NullTexture3D;
+                D3D12_GPU_DESCRIPTOR_HANDLE texture_handle_3d_uint = (type == 4) ? texture_handle : (D3D12_GPU_DESCRIPTOR_HANDLE)(UINT64)ImGui_ImplDX12_NullTexture3D;
+
+                ctx->SetGraphicsRootDescriptorTable(1, texture_handle_2d_float);
+                ctx->SetGraphicsRootDescriptorTable(2, texture_handle_2d_uint);
+                ctx->SetGraphicsRootDescriptorTable(3, texture_handle_3d_float);
+                ctx->SetGraphicsRootDescriptorTable(4, texture_handle_3d_uint);
                 static ImGui_ImplDX12_ShaderContantsType ImGui_ImplDX12_ShaderContantsDefault = {};
-                ctx->SetGraphicsRoot32BitConstants(3, sizeof(ImGui_ImplDX12_ShaderContantsType) / 4, pcmd->GetTexID() == ImGui_ImplDX12_FontTextureID ? &ImGui_ImplDX12_ShaderContantsDefault : &ImGui_ImplDX12_ShaderContants, 0);
+                ImGui_ImplDX12_ShaderContantsType Constants = ImGui_ImplDX12_ShaderContants;
+				Constants.mType = type;
+                ctx->SetGraphicsRoot32BitConstants(5, sizeof(ImGui_ImplDX12_ShaderContantsType) / 4, 
+                    pcmd->GetTexID() == ImGui_ImplDX12_FontTextureID ? &ImGui_ImplDX12_ShaderContantsDefault : &Constants, 0);
 #else
                 ctx->SetGraphicsRootDescriptorTable(1, texture_handle);
 #endif // PLAYGROUND_IMGUI
@@ -481,15 +492,14 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
 
     // Create the root signature
     {
-        D3D12_DESCRIPTOR_RANGE descRange = {};
-        descRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-        descRange.NumDescriptors = 1;
-        descRange.BaseShaderRegister = 0;
-        descRange.RegisterSpace = 0;
-        descRange.OffsetInDescriptorsFromTableStart = 0;
-
 #ifdef PLAYGROUND_IMGUI
-        D3D12_ROOT_PARAMETER param[4] = {};
+        D3D12_ROOT_PARAMETER param[6] = {};
+
+        param[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+        param[0].Constants.ShaderRegister = 0;
+        param[0].Constants.RegisterSpace = 0;
+        param[0].Constants.Num32BitValues = 16;
+        param[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 
         D3D12_DESCRIPTOR_RANGE descRange1 = {};
         descRange1.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
@@ -498,19 +508,61 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
         descRange1.RegisterSpace = 1;
         descRange1.OffsetInDescriptorsFromTableStart = 0;
 
+        param[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        param[1].DescriptorTable.NumDescriptorRanges = 1;
+        param[1].DescriptorTable.pDescriptorRanges = &descRange1;
+        param[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+        D3D12_DESCRIPTOR_RANGE descRange2 = {};
+        descRange2.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+        descRange2.NumDescriptors = 1;
+        descRange2.BaseShaderRegister = 0;
+        descRange2.RegisterSpace = 2;
+        descRange2.OffsetInDescriptorsFromTableStart = 0;
+
         param[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
         param[2].DescriptorTable.NumDescriptorRanges = 1;
-        param[2].DescriptorTable.pDescriptorRanges = &descRange1;
+        param[2].DescriptorTable.pDescriptorRanges = &descRange2;
         param[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
-        param[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
-        param[3].Constants.ShaderRegister = 1;
-        param[3].Constants.RegisterSpace = 0;
-        param[3].Constants.Num32BitValues = sizeof(ImGui_ImplDX12_ShaderContantsType) / 4;
-        param[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+        D3D12_DESCRIPTOR_RANGE descRange3 = {};
+        descRange3.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+        descRange3.NumDescriptors = 1;
+        descRange3.BaseShaderRegister = 0;
+        descRange3.RegisterSpace = 3;
+        descRange3.OffsetInDescriptorsFromTableStart = 0;
+
+        param[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        param[3].DescriptorTable.NumDescriptorRanges = 1;
+        param[3].DescriptorTable.pDescriptorRanges = &descRange3;
+        param[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+        D3D12_DESCRIPTOR_RANGE descRange4 = {};
+        descRange4.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+        descRange4.NumDescriptors = 1;
+        descRange4.BaseShaderRegister = 0;
+        descRange4.RegisterSpace = 4;
+        descRange4.OffsetInDescriptorsFromTableStart = 0;
+
+        param[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        param[4].DescriptorTable.NumDescriptorRanges = 1;
+        param[4].DescriptorTable.pDescriptorRanges = &descRange4;
+        param[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+        param[5].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+        param[5].Constants.ShaderRegister = 0;
+        param[5].Constants.RegisterSpace = 5;
+        param[5].Constants.Num32BitValues = sizeof(ImGui_ImplDX12_ShaderContantsType) / 4;
+        param[5].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 #else
+        D3D12_DESCRIPTOR_RANGE descRange = {};
+        descRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+        descRange.NumDescriptors = 1;
+        descRange.BaseShaderRegister = 0;
+        descRange.RegisterSpace = 0;
+        descRange.OffsetInDescriptorsFromTableStart = 0;
+
         D3D12_ROOT_PARAMETER param[2] = {};
-#endif // PLAYGROUND_IMGUI
 
         param[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
         param[0].Constants.ShaderRegister = 0;
@@ -522,6 +574,7 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
         param[1].DescriptorTable.NumDescriptorRanges = 1;
         param[1].DescriptorTable.pDescriptorRanges = &descRange;
         param[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+#endif // PLAYGROUND_IMGUI
 
         // Bilinear sampling is required by default. Set 'io.Fonts->Flags |= ImFontAtlasFlags_NoBakedLines' or 'style.AntiAliasedLinesUseTex = false' to allow point/nearest sampling.
         D3D12_STATIC_SAMPLER_DESC staticSampler = {};
@@ -607,15 +660,6 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
     // Create the vertex shader
     {
         static const char* vertexShader =
-#ifdef PLAYGROUND_IMGUI
-            "cbuffer constants : register(b1) \
-            {\
-                float mMin;     \
-                float mMax;     \
-                float mSlice;   \
-                float mAlpha;   \
-            };"
-#endif // PLAYGROUND_IMGUI
             "cbuffer vertexBuffer : register(b0) \
             {\
               float4x4 ProjectionMatrix; \
@@ -661,12 +705,16 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
     {
         static const char* pixelShader =
 #ifdef PLAYGROUND_IMGUI
-            "cbuffer constants : register(b1) \
+            "cbuffer constants : register(b0, space5) \
             {\
                 float mMin;     \
                 float mMax;     \
                 float mSlice;   \
                 float mAlpha;   \
+                uint mType;     \
+                uint mPad0;     \
+                uint mPad1;     \
+                uint mPad2;     \
             };"
             "struct PS_INPUT\
             {\
@@ -675,18 +723,33 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
               float2 uv  : TEXCOORD0;\
             };\
             SamplerState sampler0 : register(s0);\
-            Texture2D texture0 : register(t0);\
-            Texture3D texture1 : register(t0, space1);\
+            Texture2D<float4> texture1 : register(t0, space1);\
+            Texture2D<uint4> texture2 : register(t0, space2);\
+            Texture3D<float4> texture3 : register(t0, space3);\
+            Texture3D<uint4> texture4 : register(t0, space4);\
             \
             float4 main(PS_INPUT input) : SV_Target\
             {\
-                float4 out_col = input.col * texture0.Sample(sampler0, input.uv); \
-                uint width, height, depth; \
-                texture1.GetDimensions(width, height, depth); \
-                float w = (mSlice + 0.5) / depth; \
-                out_col += input.col * texture1.Sample(sampler0, float3(input.uv, w)); \
+                float4 out_col = input.col * texture1.Sample(sampler0, input.uv); \
                 if (mAlpha != 0) out_col.xyz = out_col.aaa; \
-                out_col = (out_col - mMin) / max(mMax - mMin, 1e-6); \
+                uint width, height, depth;\
+                if (mType == 2)\
+                {\
+                    texture2.GetDimensions(width, height); \
+                    out_col += texture2.Load(int3(input.uv * uint2(width, height), 0)) / (1.0f * 0xffffffff); \
+                    if (mAlpha != 0) out_col.xyz = out_col.aaa; \
+                    out_col.a = 1.0; \
+                }\
+                if (mType == 3 || mType == 4)\
+                {\
+                    texture3.GetDimensions(width, height, depth); \
+                    float w = (mSlice + 0.5) / depth; \
+                    out_col += texture3.Sample(sampler0, float3(input.uv, w)); \
+                    out_col += texture4.Load(int4(float3(input.uv, w) * uint3(width, height, depth), 0)) / (1.0f * 0xffffffff); \
+                    if (mAlpha != 0) out_col.xyz = out_col.aaa; \
+                    out_col.a = 1.0; \
+                }\
+                out_col.rgb = (out_col.rgb - mMin) / max(mMax - mMin, 1e-6); \
                 return out_col; \
             }";
 #else

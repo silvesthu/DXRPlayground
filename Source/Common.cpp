@@ -414,6 +414,8 @@ namespace ImGui
 			UINT64 handle = gGetFrameContext().mViewDescriptorHeap.GetGPUHandle(inTexture.mSRVIndex).ptr;
 			if (inTexture.mDepth != 1)
 				handle |= ImGui_ImplDX12_ImTextureID_Mask_3D;
+			if (gIsFormatInteger(inTexture.mFormat))
+				handle |= ImGui_ImplDX12_ImTextureID_Mask_Integer;
 
 			ImGui::Image(reinterpret_cast<ImTextureID>(handle), ImVec2(inTexture.mWidth * inTexture.mUIScale, inTexture.mHeight * inTexture.mUIScale), uv0, uv1);
 
