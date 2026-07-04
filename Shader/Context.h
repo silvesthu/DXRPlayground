@@ -19,6 +19,18 @@ struct PixelContext
 
 	float			mDepth;
 	uint			mOutputDepth : 1;
+
+	uint			mReservoirInitialize : 1;
+	uint			mReservoirTemporal : 1;
+	uint			mReservoirSpatial : 1;
+	uint			mReservoirUse : 1;
+
+	uint			RandomSeed()
+	{
+		// From https://www.shadertoy.com/view/tsBBWW
+		// [TODO] Need proper noise
+		return uint(uint(mPixelIndex.x) * uint(1973) + uint(mPixelIndex.y) * uint(9277) + uint(mConstants.mCurrentFrameIndex) * uint(26699)) | uint(1);
+	}
 };
 
 struct PathContext

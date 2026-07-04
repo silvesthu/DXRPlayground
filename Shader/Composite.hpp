@@ -94,9 +94,6 @@ float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 	USING_RESOURCE(RWTexture2D<float4>, ScreenDebugUAV);
 	USING_RESOURCE(RWStructuredBuffer<InspectData>, InspectDataUAV);
 
-	// USING_RESOURCE(RWTexture2D<uint4>, ScreenReservoirUAV);
-	// ScreenReservoirUAV[position.xy] = uint4(0xffffffff, 0xffff0000, 0x0000ffff, 0x00000000);
-
 	uint2 coords								= (uint2)position.xy;
 	float4 color								= ScreenColorUAV[position.xy];
 	
@@ -165,8 +162,13 @@ float4 CompositePS(float4 position : SV_POSITION) : SV_TARGET
 	return float4(color.xyz, 1);
 }
 
+[numthreads(8, 8, 1)]
+void ClearScreenCS(COMPUTE_SHADER_INPUT)
+{
+}
+
 [numthreads(64, 1, 1)]
-void ClearCS(COMPUTE_SHADER_INPUT)
+void ClearDebugCS(COMPUTE_SHADER_INPUT)
 {
 	USING_RESOURCE(RWStructuredBuffer<InspectData>, InspectDataUAV);
 	USING_RESOURCE(RWStructuredBuffer<uint>, ShaderPrintUAV);

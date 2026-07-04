@@ -59,10 +59,6 @@ namespace Inspect
         sActive = IsDebugCoord(inPixelContext.mPixelIndex);
         sUpdatePath = sActive && UpdatePath();
 #endif // SHADER_DEBUG
-
-        if (sActive)
-            for (int i = 0; i < InspectData::kPathLength; i++)
-                InspectDataUAV[0].mValue[i] = 0;
     }
 
     void RayPrimary(RayDesc inRay)
@@ -139,19 +135,19 @@ namespace Inspect
 		}
     }
 
-    void ReSTIRInitial(PathContext inPathContext, Reservoir inReservoir)
+    void ReSTIRInitialize(PathContext inPathContext, Reservoir inReservoir)
     {
-        Update(InspectMode::ReSTIR_Initial,     inPathContext, float3(inReservoir.LightIndex(), inReservoir.mWeightSum, inReservoir.mM));
+        Update(InspectMode::ReSTIR_Initial,     inPathContext, float3(inReservoir.LightIndex(), inReservoir.mContributionWeight, inReservoir.mUV));
     }
 
     void ReSTIRTemporal(PathContext inPathContext, Reservoir inReservoir)
     {
-        Update(InspectMode::ReSTIR_Temporal,    inPathContext, float3(inReservoir.LightIndex(), inReservoir.mWeightSum, inReservoir.mM));
+        Update(InspectMode::ReSTIR_Temporal,    inPathContext, float3(inReservoir.LightIndex(), inReservoir.mContributionWeight, inReservoir.mUV));
     }
 
-    void ReSTIRFinal(PathContext inPathContext, Reservoir inReservoir)
+    void ReSTIRSpatial(PathContext inPathContext, Reservoir inReservoir)
     {
-        Update(InspectMode::ReSTIR_Final,       inPathContext, float3(inReservoir.LightIndex(), inReservoir.mWeightSum, inReservoir.mM));
+        Update(InspectMode::ReSTIR_Spatial,       inPathContext, float3(inReservoir.LightIndex(), inReservoir.mContributionWeight, inReservoir.mUV));
     }
 
     void SampleLight(PathContext inPathContext, LightContext inLightContext)

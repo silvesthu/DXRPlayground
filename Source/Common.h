@@ -344,6 +344,9 @@ struct Stats
 		float								mClear = 0;
 		float								mDepths = 0;
 		float								mPrepareLights = 0;
+		float								mReservoirInitialize = 0;
+		float								mReservoirTemporal = 0;
+		float								mReservoirSpatial = 0;
 		float								mRayQuery = 0;
 		float								mHitShader = 0;
 		float								mSlangShader = 0;

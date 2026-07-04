@@ -10,8 +10,12 @@ struct Renderer
 	struct Runtime : RuntimeBase<Runtime>
 	{
 		Shader									mRayQueryShader				= Shader().FileName("Shader/RayQuery.hpp").CSName("RayQueryCS");
+		Shader									mReservoirInitializeShader	= Shader().FileName("Shader/RayQuery.hpp").CSName("ReservoirInitializeCS");
+		Shader									mReservoirTemporalShader	= Shader().FileName("Shader/RayQuery.hpp").CSName("ReservoirTemporalCS");
+		Shader									mReservoirSpatialShader		= Shader().FileName("Shader/RayQuery.hpp").CSName("ReservoirSpatialCS");
 		Shader									mDepthShader				= Shader().FileName("Shader/RayQuery.hpp").VSName("ScreenspaceTriangleVS").PSName("DepthPS").DepthWrite(true).DSVFormat(DXGI_FORMAT_D32_FLOAT);
-		Shader									mClearShader				= Shader().FileName("Shader/Composite.hpp").CSName("ClearCS");
+		Shader									mClearScreenShader			= Shader().FileName("Shader/Composite.hpp").CSName("ClearScreenCS");
+		Shader									mClearDebugShader			= Shader().FileName("Shader/Composite.hpp").CSName("ClearDebugCS");
 		Shader									mClearBufferShader			= Shader().FileName("Shader/Composite.hpp").CSName("ClearBufferCS");
 		Shader									mGenerateTextureShader		= Shader().FileName("Shader/Composite.hpp").CSName("GeneratTextureCS");
 		Shader									mBRDFSliceShader			= Shader().FileName("Shader/Composite.hpp").CSName("BRDFSliceCS");
@@ -42,7 +46,9 @@ struct Renderer
 		Texture									mScreenDebugTexture			= Texture().Format(DXGI_FORMAT_R32G32B32A32_FLOAT).UAVIndex(ViewDescriptorIndex::ScreenDebugUAV).SRVIndex(ViewDescriptorIndex::ScreenDebugSRV).Name("Renderer.ScreenDebugTexture");
 		Texture									mScreenReadbackTexture		= Texture().Format(DXGI_FORMAT_R8G8B8A8_UNORM).UAVIndex(ViewDescriptorIndex::ScreenReadbackUAV).SRVIndex(ViewDescriptorIndex::ScreenReadbackSRV).Name("Renderer.ScreenReadbackTexture");
 		Texture									mScreenDepthTexture			= Texture().Format(DXGI_FORMAT_D32_FLOAT).DSVIndex(DSVDescriptorIndex::ScreenDepth).SRVIndex(ViewDescriptorIndex::ScreenDepthSRV).SRVFormat(DXGI_FORMAT_R32_FLOAT).Name("Renderer.ScreenDepthTexture");
-		Texture									mScreenReservoirTexture		= Texture().Format(DXGI_FORMAT_R32G32B32A32_UINT).UAVIndex(ViewDescriptorIndex::ScreenReservoirUAV).SRVIndex(ViewDescriptorIndex::ScreenReservoirSRV).Name("Renderer.ScreenReservoirTexture");
+		Texture									mScreenReservoirInitializeTexture	= Texture().Format(DXGI_FORMAT_R32G32B32A32_UINT).UAVIndex(ViewDescriptorIndex::ScreenReservoirInitializeUAV).SRVIndex(ViewDescriptorIndex::ScreenReservoirInitializeSRV).Name("Renderer.ScreenReservoirInitializeTexture");
+		Texture									mScreenReservoirTemporalTexture		= Texture().Format(DXGI_FORMAT_R32G32B32A32_UINT).UAVIndex(ViewDescriptorIndex::ScreenReservoirTemporalUAV).SRVIndex(ViewDescriptorIndex::ScreenReservoirTemporalSRV).Name("Renderer.ScreenReservoirTemporalTexture");
+		Texture									mScreenReservoirSpatialTexture		= Texture().Format(DXGI_FORMAT_R32G32B32A32_UINT).UAVIndex(ViewDescriptorIndex::ScreenReservoirSpatialUAV).SRVIndex(ViewDescriptorIndex::ScreenReservoirSpatialSRV).Name("Renderer.ScreenReservoirSpatialTexture");
 
 		Texture									mScreenSentinelTexture;
 		std::span<Texture>						mScreenTextures				= std::span<Texture>(&mScreenColorTexture, &mScreenSentinelTexture);

@@ -114,8 +114,12 @@ enum class ViewDescriptorIndex : uint
 	ScreenDebugSRV,
 	ScreenDebugUAV,
 	ScreenDepthSRV,
-	ScreenReservoirSRV,
-	ScreenReservoirUAV,
+	ScreenReservoirInitializeSRV,
+	ScreenReservoirInitializeUAV,
+	ScreenReservoirTemporalSRV,
+	ScreenReservoirTemporalUAV,
+	ScreenReservoirSpatialSRV,
+	ScreenReservoirSpatialUAV,
 	ScreenReadbackSRV,
 	ScreenReadbackUAV,
 
@@ -380,7 +384,7 @@ enum class InspectMode : uint
 
 	ReSTIR_Initial,
 	ReSTIR_Temporal,
-	ReSTIR_Final,
+	ReSTIR_Spatial,
 	
 	Count
 };
@@ -776,9 +780,10 @@ struct SpatialCacheConstants
 
 struct ReSTIRConstants
 {
+	uint						mEnabled						CONSTANT_DEFAULT(1);
 	uint						mInitialSampleCount				CONSTANT_DEFAULT(1);
-	uint						mTemporalReuseCount				CONSTANT_DEFAULT(0);
-	uint						mSpatialReuseCount				CONSTANT_DEFAULT(0);
+	uint						mSampleCountTemporal			CONSTANT_DEFAULT(1);
+	uint						mSampleCountSpatial				CONSTANT_DEFAULT(1);
 	float						GENERATE_PAD_NAME				CONSTANT_DEFAULT(0);
 };
 

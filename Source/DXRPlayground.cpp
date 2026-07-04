@@ -638,12 +638,15 @@ void sRender()
 		gBarrierUAV(command_list, nullptr);
 	}
 
-	// Clear for debug
+	// Clear
 	if (!gHeadless)
 	{
 		GPU_TIMING_SCOPE("Clear", command_list, &gStats.mGPUTimingMS.mClear);
 
-		gRenderer.Setup(gRenderer.mRuntime.mClearShader);
+		gRenderer.Setup(gRenderer.mRuntime.mClearScreenShader);
+		command_list->Dispatch(gAlignUpDiv(gRenderer.mScreenSize.x, 8u), gAlignUpDiv(gRenderer.mScreenSize.y, 8u), 1);
+
+		gRenderer.Setup(gRenderer.mRuntime.mClearDebugShader);
 		command_list->Dispatch(gAlignUpDiv(InspectData::kPathLength, 64u), 1, 1);
 
 		BarrierScope depth_scope(command_list, gRenderer.mRuntime.mScreenDebugTexture.mResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
@@ -683,6 +686,36 @@ void sRender()
 
 		gRenderer.Setup(gRenderer.mRuntime.mDepthShader);
 		command_list->DrawInstanced(3, 1, 0, 0);
+
+		gBarrierUAV(command_list, nullptr);
+	}
+
+	// ReservoirInitialize
+	{
+		GPU_TIMING_SCOPE("ReservoirInitialize", command_list, &gStats.mGPUTimingMS.mReservoirInitialize);
+
+		gRenderer.Setup(gRenderer.mRuntime.mReservoirInitializeShader);
+		command_list->Dispatch(gAlignUpDiv(gRenderer.mScreenSize.x, 8u), gAlignUpDiv(gRenderer.mScreenSize.y, 8u), 1);
+
+		gBarrierUAV(command_list, nullptr);
+	}
+
+	// ReservoirTemporal
+	{
+		GPU_TIMING_SCOPE("ReservoirTemporal", command_list, &gStats.mGPUTimingMS.mReservoirTemporal);
+
+		gRenderer.Setup(gRenderer.mRuntime.mReservoirTemporalShader);
+		command_list->Dispatch(gAlignUpDiv(gRenderer.mScreenSize.x, 8u), gAlignUpDiv(gRenderer.mScreenSize.y, 8u), 1);
+
+		gBarrierUAV(command_list, nullptr);
+	}
+
+	// ReservoirSpatial
+	{
+		GPU_TIMING_SCOPE("ReservoirSpatial", command_list, &gStats.mGPUTimingMS.mReservoirSpatial);
+
+		gRenderer.Setup(gRenderer.mRuntime.mReservoirSpatialShader);
+		command_list->Dispatch(gAlignUpDiv(gRenderer.mScreenSize.x, 8u), gAlignUpDiv(gRenderer.mScreenSize.y, 8u), 1);
 
 		gBarrierUAV(command_list, nullptr);
 	}

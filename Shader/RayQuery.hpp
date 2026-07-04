@@ -45,9 +45,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 	USING_RESOURCE(RWTexture2D<float4>, ScreenColorUAV);
 	USING_RESOURCE(StructuredBuffer<Light>, RaytraceLightsSRV);
 	
-	// From https://www.shadertoy.com/view/tsBBWW
-	// [TODO] Need proper noise
-	uint random_state							= uint(uint(ioPixelContext.mPixelIndex.x) * uint(1973) + uint(ioPixelContext.mPixelIndex.y) * uint(9277) + uint(mConstants.mCurrentFrameIndex) * uint(26699)) | uint(1);
+	uint random_state							= ioPixelContext.RandomSeed();
 
 	float2 screen_coords						= float2(ioPixelContext.mPixelIndex.xy);
 	float2 screen_size							= float2(ioPixelContext.mPixelTotal.xy);
@@ -84,6 +82,8 @@ void TraceRay(inout PixelContext ioPixelContext)
 	path_context.mRandomState					= random_state;
 	path_context.mRecursionDepth				= 0;
 	path_context.mMediumInstanceID				= InvalidInstanceID;
+	
+	Reservoir reservoir_to_write				= Reservoir::Generate();
 
 	for (;;)
 	{
@@ -235,9 +235,6 @@ void TraceRay(inout PixelContext ioPixelContext)
 						path_context.mRecursionDepth < mConstants.mRecursionDepthCountMax &&	// Skip NEE for exceeding limit of recursion depth
 						true)
 					{
-						USING_RESOURCE(RWTexture2D<uint4>, ScreenReservoirUAV);
-
-						// Initial samples
 						const uint initial_sample_count		= max(1, mConstants.mReSTIR.mInitialSampleCount);
 						Reservoir initial_reservoir			= Reservoir::Generate();
 						LightContext initial_light_context	= (LightContext)0;
@@ -258,40 +255,65 @@ void TraceRay(inout PixelContext ioPixelContext)
 							if (initial_reservoir.Stream(_sample_reservoir, _mis_weight, _random01)) // [TODO] Skip RNG on first sample
 								initial_light_context		= _light_context;
 						}
-						initial_reservoir.ComputeContributionWeight();
-						Inspect::ReSTIRInitial(path_context, initial_reservoir);
-
-						Reservoir reservoir					= Reservoir::Generate();
-
-						bool temporal						= mConstants.mCurrentFrameIndex > 0 && mConstants.mReSTIR.mTemporalReuseCount != 0;
-						float initial_mis_weight			= temporal ? 0.5f : 1.0f; // [TODO]
-						reservoir.Stream(initial_reservoir, initial_mis_weight, kTrivialRandom01);
-						LightContext light_context			= initial_light_context;
-
-						// Temporal Reuse
-						if (temporal)
+						initial_reservoir.ComputeContributionWeight();						
+						if (ioPixelContext.mReservoirInitialize)
 						{
-							Reservoir _reservoir			= Reservoir::Generate();
-							_reservoir.Unpack(ScreenReservoirUAV[ioPixelContext.mPixelIndex.xy]);
+							reservoir_to_write				= initial_reservoir;
+							break;
+						}
+						if (ioPixelContext.mReservoirTemporal)
+						{
+							USING_RESOURCE(RWTexture2D<uint4>, ScreenReservoirInitializeUAV);
+							USING_RESOURCE(RWTexture2D<uint4>, ScreenReservoirTemporalUAV);
 
-							Reservoir temporal_reservoir	= _reservoir;
-							Inspect::ReSTIRTemporal(path_context, temporal_reservoir);
+							Reservoir initial_reservoir		= Reservoir::Generate();
+							initial_reservoir.Unpack(ScreenReservoirInitializeUAV[ioPixelContext.mPixelIndex.xy]);
 
-							if (temporal_reservoir.IsValid())
+							Reservoir temporal_reservoir	= Reservoir::Generate();
+							temporal_reservoir.Unpack(ScreenReservoirTemporalUAV[ioPixelContext.mPixelIndex.xy]);
+
+							bool temporal					= mConstants.mCurrentFrameIndex > 0 && mConstants.mReSTIR.mSampleCountTemporal != 0;
+							float initial_mis_weight		= temporal ? 0.5f : 1.0f; // [TODO]
+							float temporal_mis_weight		= 1.0 - initial_mis_weight;
+
+							Reservoir reservoir				= Reservoir::Generate();
+							reservoir.Stream(initial_reservoir, initial_mis_weight, kTrivialRandom01);
+							reservoir.Stream(temporal_reservoir, temporal_mis_weight, RandomFloat01(path_context.mRandomState));
+							reservoir.ComputeContributionWeight();
+							Inspect::ReSTIRTemporal(path_context, reservoir);
+
+							reservoir_to_write				= reservoir;
+							break;
+						}
+						if (ioPixelContext.mReservoirSpatial)
+						{
+							USING_RESOURCE(RWTexture2D<uint4>, ScreenReservoirTemporalUAV);
+
+							Reservoir temporal_reservoir	= Reservoir::Generate();
+							temporal_reservoir.Unpack(ScreenReservoirTemporalUAV[ioPixelContext.mPixelIndex.xy]);
+
+							for (uint sample_index = 0; sample_index < mConstants.mReSTIR.mSampleCountSpatial; sample_index++)
 							{
-								// [TODO] Construct LightContext from reservoir
-								// if (reservoir.Stream(temporal_reservoir, 1.0f, path_context.mRandomState))
+								// [TODO]
 							}
+
+							reservoir_to_write				= temporal_reservoir;
+							break;
 						}
 
-						// Spatial Reuse
-						for (uint spatial_sample_index = 0; spatial_sample_index < mConstants.mReSTIR.mSpatialReuseCount; spatial_sample_index++)
+						Reservoir reservoir					= initial_reservoir;
+						LightContext light_context			= initial_light_context;
+						if (ioPixelContext.mReservoirUse && mConstants.mReSTIR.mEnabled)
 						{
-							// [TODO]
-						}
+							USING_RESOURCE(RWTexture2D<uint4>, ScreenReservoirSpatialUAV);
 
-						// Finalize
-						reservoir.ComputeContributionWeight();
+							Reservoir spatial_reservoir		= Reservoir::Generate();
+							spatial_reservoir.Unpack(ScreenReservoirSpatialUAV[ioPixelContext.mPixelIndex.xy]);
+
+							// [TODO]
+							// reservoir						= spatial_reservoir;
+							// light_context					= ;
+						}
 
 						Inspect::SampleLight(path_context, light_context);
 						bool light_visible = false;
@@ -345,12 +367,6 @@ void TraceRay(inout PixelContext ioPixelContext)
 						else
 						{
 							// Should not reset reseroivr as visibility is not part of target
-						}
-
-						Inspect::ReSTIRFinal(path_context, reservoir);
-						if (mConstants.mCurrentFrameWeight != 0.0f)
-						{
-							ScreenReservoirUAV[ioPixelContext.mPixelIndex.xy] = reservoir.Pack();
 						}
 					}
 
@@ -441,6 +457,28 @@ void TraceRay(inout PixelContext ioPixelContext)
 		path_context.mRecursionDepth++;
 	}
 
+	if (ioPixelContext.mReservoirInitialize)
+	{
+		USING_RESOURCE(RWTexture2D<uint4>, ScreenReservoirInitializeUAV);
+		ScreenReservoirInitializeUAV[ioPixelContext.mPixelIndex.xy] = reservoir_to_write.Pack();
+		Inspect::ReSTIRInitialize(path_context, reservoir_to_write);
+		return;
+	}
+	if (ioPixelContext.mReservoirTemporal)
+	{
+		USING_RESOURCE(RWTexture2D<uint4>, ScreenReservoirTemporalUAV);
+		ScreenReservoirTemporalUAV[ioPixelContext.mPixelIndex.xy] = reservoir_to_write.Pack();
+		Inspect::ReSTIRTemporal(path_context, reservoir_to_write);
+		return;
+	}
+	if (ioPixelContext.mReservoirSpatial)
+	{
+		USING_RESOURCE(RWTexture2D<uint4>, ScreenReservoirSpatialUAV);
+		ScreenReservoirSpatialUAV[ioPixelContext.mPixelIndex.xy] = reservoir_to_write.Pack();
+		Inspect::ReSTIRSpatial(path_context, reservoir_to_write);
+		return;
+	}
+
 	// Accumulation
 	float3 screen_color_current					= path_context.mEmission;
 	float3 screen_color							= screen_color_current;
@@ -477,6 +515,70 @@ void RayQueryCS(COMPUTE_SHADER_INPUT)
 	PixelContext pixel_context					= (PixelContext)0;
 	pixel_context.mPixelIndex					= inDispatchThreadID.xyz;
 	pixel_context.mPixelTotal					= uint3(output_dimensions.xy, 1);
+	pixel_context.mReservoirUse					= true;
+
+	Inspect::Initialize(pixel_context);
+	ShaderPrint::Initialize(pixel_context);
+	TraceRay(pixel_context);
+}
+
+[numthreads(8, 8, 1)]
+void ReservoirInitializeCS(COMPUTE_SHADER_INPUT)
+{
+	USING_RESOURCE(RWTexture2D<float4>, ScreenColorUAV);
+
+	InstanceDataCache::Initialize(inGroupIndex);
+	GroupMemoryBarrierWithGroupSync();
+
+	uint2 output_dimensions;
+	ScreenColorUAV.GetDimensions(output_dimensions.x, output_dimensions.y);
+
+	PixelContext pixel_context = (PixelContext)0;
+	pixel_context.mPixelIndex = inDispatchThreadID.xyz;
+	pixel_context.mPixelTotal = uint3(output_dimensions.xy, 1);
+	pixel_context.mReservoirInitialize = true;
+
+	Inspect::Initialize(pixel_context);
+	ShaderPrint::Initialize(pixel_context);
+	TraceRay(pixel_context);
+}
+
+[numthreads(8, 8, 1)]
+void ReservoirTemporalCS(COMPUTE_SHADER_INPUT)
+{
+	USING_RESOURCE(RWTexture2D<float4>, ScreenColorUAV);
+
+	InstanceDataCache::Initialize(inGroupIndex);
+	GroupMemoryBarrierWithGroupSync();
+
+	uint2 output_dimensions;
+	ScreenColorUAV.GetDimensions(output_dimensions.x, output_dimensions.y);
+
+	PixelContext pixel_context = (PixelContext)0;
+	pixel_context.mPixelIndex = inDispatchThreadID.xyz;
+	pixel_context.mPixelTotal = uint3(output_dimensions.xy, 1);
+	pixel_context.mReservoirTemporal = true;
+
+	Inspect::Initialize(pixel_context);
+	ShaderPrint::Initialize(pixel_context);
+	TraceRay(pixel_context);
+}
+
+[numthreads(8, 8, 1)]
+void ReservoirSpatialCS(COMPUTE_SHADER_INPUT)
+{
+	USING_RESOURCE(RWTexture2D<float4>, ScreenColorUAV);
+
+	InstanceDataCache::Initialize(inGroupIndex);
+	GroupMemoryBarrierWithGroupSync();
+
+	uint2 output_dimensions;
+	ScreenColorUAV.GetDimensions(output_dimensions.x, output_dimensions.y);
+
+	PixelContext pixel_context = (PixelContext)0;
+	pixel_context.mPixelIndex = inDispatchThreadID.xyz;
+	pixel_context.mPixelTotal = uint3(output_dimensions.xy, 1);
+	pixel_context.mReservoirSpatial = true;
 
 	Inspect::Initialize(pixel_context);
 	ShaderPrint::Initialize(pixel_context);

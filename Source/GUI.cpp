@@ -199,18 +199,18 @@ void gPrepareImGui()
 				RadioButton(name.data(), reinterpret_cast<int*>(&gConstants.mSampleMode), i);
 			}
 
-			if (TreeNodeEx("ReSTIR", ImGuiTreeNodeFlags_DefaultOpen))
+			Checkbox("ReSTIR", (bool*)&gConstants.mReSTIR.mEnabled);
+			SameLine();
+			Separator();
 			{
 				if (SliderInt("Initial Sample Count", reinterpret_cast<int*>(&gConstants.mReSTIR.mInitialSampleCount), 1, 8))
 					gRenderer.mFrameResetRequested = true;
 
-				if (Checkbox("Temporal", (bool*)& gConstants.mReSTIR.mTemporalReuseCount))
+				if (SliderInt("Temporal Sample Count", reinterpret_cast<int*>(&gConstants.mReSTIR.mSampleCountTemporal), 0, 1))
 					gRenderer.mFrameResetRequested = true;
 
-				if (SliderInt("Spatial Sample Count", reinterpret_cast<int*>(&gConstants.mReSTIR.mSpatialReuseCount), 1, 8))
+				if (SliderInt("Spatial Sample Count", reinterpret_cast<int*>(&gConstants.mReSTIR.mSampleCountSpatial), 0, 8))
 					gRenderer.mFrameResetRequested = true;
-
-				TreePop();
 			}
 		}
 
