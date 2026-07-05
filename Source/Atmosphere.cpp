@@ -263,7 +263,7 @@ void Atmosphere::Initialize()
 	}
 }
 
-void Atmosphere::ComputeContributionWeight()
+void Atmosphere::Finalize()
 {
 	if (!mEnabled)
 		return;

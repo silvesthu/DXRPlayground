@@ -529,7 +529,7 @@ public:
 	Runtime mRuntime;
 
 	void Initialize();
-	void ComputeContributionWeight();
+	void Finalize();
 	void Update();
 	void Render(ID3D12GraphicsCommandList4* inCommandList);
 	void ImGuiShowMenus();

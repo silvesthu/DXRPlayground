@@ -57,7 +57,7 @@ void Cloud::Initialize()
 		texture.Initialize();
 }
 
-void Cloud::ComputeContributionWeight()
+void Cloud::Finalize()
 {
 	if (!mEnabled)
 		return;

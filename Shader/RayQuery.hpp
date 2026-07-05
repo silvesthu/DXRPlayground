@@ -331,7 +331,9 @@ void TraceRay(inout PixelContext ioPixelContext)
 								int y						= r * sin(theta);
 
 								Reservoir _initial_reservoir = Reservoir::Generate();
-								_initial_reservoir.Unpack(ScreenReservoirTemporalUAV[ioPixelContext.mPixelIndex.xy + int2(x, y)]);
+								int2 coords					= ioPixelContext.mPixelIndex.xy + int2(x, y);
+								if (any(coords < 0) || any(coords >= int2(mConstants.mScreenWidth, mConstants.mScreenHeight))) continue;
+								_initial_reservoir.Unpack(ScreenReservoirTemporalUAV[coords]);
 								if (!_initial_reservoir.IsValid()) continue;
 
 								LightContext _light_context = LightEvaluation::GenerateContext(LightEvaluation::ContextType::UV, ContextConstant::sDirectionUnused, _initial_reservoir.mUV, _initial_reservoir.mLightIndex, hit_context.PositionWS());
