@@ -544,7 +544,6 @@ void sRender()
 			sConstantsCopy.mInspectMode				= gConstants.mInspectMode;
 			sConstantsCopy.mDebugFlag				= gConstants.mDebugFlag;
 			sConstantsCopy.mSpatialCache			= gConstants.mSpatialCache;
-			sConstantsCopy.mReSTIR					= gConstants.mReSTIR;
 
 			if (memcmp(&sConstantsCopy, &gConstants, sizeof(Constants)) != 0)
 				gRenderer.mFrameResetRequested = true;

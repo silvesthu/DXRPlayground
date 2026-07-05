@@ -135,24 +135,29 @@ namespace Inspect
 		}
     }
 
-    void ReSTIRInitialize(PathContext inPathContext, Reservoir inReservoir)
+    void R_Initial(PathContext inPathContext, Reservoir inReservoir)
     {
-        Update(InspectMode::ReSTIR_Initial,     inPathContext, float3(inReservoir.LightIndex(), inReservoir.mContributionWeight, inReservoir.mUV));
+        Update(InspectMode::R_Initial,      inPathContext, float3(inReservoir.mLightIndex, inReservoir.mContributionWeight, inReservoir.mTargetFunction));
     }
 
-    void ReSTIRTemporal(PathContext inPathContext, Reservoir inReservoir)
+    void R_Prev(PathContext inPathContext, Reservoir inReservoir)
     {
-        Update(InspectMode::ReSTIR_Temporal,    inPathContext, float3(inReservoir.LightIndex(), inReservoir.mContributionWeight, inReservoir.mUV));
+        Update(InspectMode::R_Prev,         inPathContext, float3(inReservoir.mLightIndex, inReservoir.mContributionWeight, inReservoir.mTargetFunction));
     }
 
-    void ReSTIRSpatial(PathContext inPathContext, Reservoir inReservoir)
+    void R_TemporalOut(PathContext inPathContext, Reservoir inReservoir)
     {
-        Update(InspectMode::ReSTIR_Spatial,       inPathContext, float3(inReservoir.LightIndex(), inReservoir.mContributionWeight, inReservoir.mUV));
+        Update(InspectMode::R_TemporalOut,  inPathContext, float3(inReservoir.mLightIndex, inReservoir.mContributionWeight, inReservoir.mTargetFunction));
+    }
+
+    void R_Spatial(PathContext inPathContext, Reservoir inReservoir)
+    {
+        Update(InspectMode::R_Spatial,      inPathContext, float3(inReservoir.mLightIndex, inReservoir.mContributionWeight, inReservoir.mTargetFunction));
     }
 
     void SampleLight(PathContext inPathContext, LightContext inLightContext)
     {
-        Update(InspectMode::Light_Index_UV,     inPathContext, float3(inLightContext.mLightIndex, inLightContext.mUV));
+        Update(InspectMode::Light_Index_UV,             inPathContext, float3(inLightContext.mLightIndex, inLightContext.mUV));
     }
 
     void SampleLightResult(PathContext inPathContext, BSDFContext inBSDFContext, BSDFResult inBSDFResult, float inLightPDF)

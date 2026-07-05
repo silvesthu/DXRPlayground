@@ -8,8 +8,8 @@ struct Reservoir
 	static const uint kLightValidBit			= 0x80000000;
 	static const uint kLightIndexMask			= 0x7FFFFFFF;
 	
-	uint			mLightData;                 // Selected sample, X
-	uint			mUV;
+	uint			mLightIndex;                // Selected sample, X
+	float2			mUV;
 
 	float			mTargetFunction;			// Target function (unnormalized), \hat{p}(x). TargetPdf in RTXDI
 	float			mContributionWeight;		// Unbiased contribution weight (UCW), W_X. Not Unbiased in this implementation as visibility is not evaluated for all samples
@@ -18,13 +18,12 @@ struct Reservoir
 
 	float			mM;							// Sample count, M
 
-	bool			IsValid()					{ return mLightData != 0; }
-	uint			LightIndex()				{ return (mLightData & kLightIndexMask); }
+	bool			IsValid()					{ return mLightIndex != ContextConstant::sLightIndexInvalid; }
 
 	static Reservoir Generate()
 	{
 		Reservoir reservoir;
-		reservoir.mLightData					= 0;
+		reservoir.mLightIndex					= ContextConstant::sLightIndexInvalid;
 		reservoir.mUV							= 0;
 		reservoir.mTargetFunction				= 0.0f;
 		reservoir.mContributionWeight			= 0.0f;
@@ -36,8 +35,8 @@ struct Reservoir
 	static Reservoir FromLight(LightContext inLightContex, float inTargetFunction, float inContributionWeight)
 	{
 		Reservoir reservoir;
-		reservoir.mLightData					= inLightContex.mLightIndex | Reservoir::kLightValidBit;
-		reservoir.mUV							= uint(saturate(inLightContex.mUV.x) * 0xffff) | (uint(saturate(inLightContex.mUV.y) * 0xffff) << 16);
+		reservoir.mLightIndex					= inLightContex.mLightIndex;
+		reservoir.mUV							= inLightContex.mUV;
 		reservoir.mTargetFunction				= inTargetFunction;
 		reservoir.mContributionWeight			= inContributionWeight;
 		reservoir.mWeightSum					= 0.0f;
@@ -48,6 +47,8 @@ struct Reservoir
 	// Add sample to reservoir, see RTXDI_StreamSample, RTXDI_CombineDIReservoirs in RTXDI
 	bool			Stream(Reservoir inReservoir, float inMISWeight, float inRandom01)
 	{
+		if (!inReservoir.IsValid())				{ return false; }
+
 		// [Wyman2023]
 		// Resampling Weight:	w_i = m_i * \hat{p}(X_i) / p(X_i)
 		// MIS Weight:			m_i
@@ -61,7 +62,7 @@ struct Reservoir
 		bool select_sample						= inRandom01 * mWeightSum < resampling_weight; // [TODO] Notes on < or <=
 		if (select_sample)
 		{
-			mLightData							= inReservoir.mLightData;
+			mLightIndex							= inReservoir.mLightIndex;
 			mUV									= inReservoir.mUV;
 			mTargetFunction						= inReservoir.mTargetFunction;
 		}
@@ -70,26 +71,27 @@ struct Reservoir
 	}
 
 	// See also RTXDI_FinalizeResampling in RTXDI
-	void			ComputeContributionWeight()
+	void			ComputeContributionWeight(bool inNormalizeMISWeight)
 	{
 		// Unbiased contribution weight (UCW), W_X = \sum w_i / \hat{p}(X) in [Wyman2023]
 		mContributionWeight						= (mTargetFunction == 0.0) ? 0.0 : mWeightSum / mTargetFunction;
+		mContributionWeight						/= (mM > 1 && inNormalizeMISWeight) ? mM : 1.0;
 	}
 
 	uint4 Pack()
 	{
 		uint4 packed							= 0;
-		packed.x								= mLightData;
+		packed.x								= mLightIndex;
 		packed.y								= asuint(mContributionWeight);
-		packed.z								= mUV;
+		packed.z								= uint(saturate(mUV.x) * 0xffff) | (uint(saturate(mUV.y) * 0xffff) << 16);
 		packed.w								= 0;
 		return packed;
 	}
 
 	void Unpack(uint4 inPacked)
 	{
-		mLightData								= inPacked.x;
+		mLightIndex								= inPacked.x;
 		mContributionWeight						= asfloat(inPacked.y);
-		mUV										= inPacked.z;
+		mUV										= float2((inPacked.z & 0xffff) * (1.0 / 0xffff), (inPacked.z >> 16) * (1.0 / 0xffff));
 	}
 };

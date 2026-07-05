@@ -48,6 +48,9 @@ inline uint asuint(float x) { return std::bit_cast<uint>(x); }
 
 #endif // __cplusplus
 
+inline float QNaN() { return asfloat(0x7fc00000); }
+inline float Inf() { return asfloat(0x7f800000); }
+
 #ifdef __SLANG__
 #define MUTATING [mutating]
 #else
@@ -382,10 +385,11 @@ enum class InspectMode : uint
 
 	GENERATE_NEW_LINE_NAME,
 
-	ReSTIR_Initial,
-	ReSTIR_Temporal,
-	ReSTIR_Spatial,
-	
+	R_Initial,
+	R_Prev,
+	R_TemporalOut,
+	R_Spatial,
+
 	Count
 };
 

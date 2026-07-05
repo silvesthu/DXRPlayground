@@ -9,7 +9,9 @@ namespace ContextConstant
 	static uint		sLobeIndexTrivial = 0;
 	static uint		sLobeIndexAll = 0xffffffff;
 	static float	sEtaITTrivial = 1.0f;
-	static float3	sDirectionUndetermined = sqrt(-1.0);
+	static uint		sLightIndexInvalid = 0xffffffff;
+	static float3	sDirectionUnused = QNaN();
+	static float2	sUVUnused = QNaN();
 }
 
 struct PixelContext

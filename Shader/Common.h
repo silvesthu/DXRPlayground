@@ -25,9 +25,6 @@ template <typename T> T SafeSqrt(T x)                           { return sqrt(ma
 #include "packing.hlsli"
 #include "utils.hlsli"
 
-float QNaN()                                                    { return asfloat(0x7fc00000); }
-float Inf()                                                     { return asfloat(0x7f800000); }
-
 float MinComponent(float2 inValue)                              { return min(inValue.x, inValue.y); }
 float MinComponent(float3 inValue)                              { return min(MinComponent(inValue.xy), inValue.z); }
 float MinComponent(float4 inValue)                              { return min(MinComponent(inValue.xyz), inValue.z); }

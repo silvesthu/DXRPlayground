@@ -214,7 +214,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 							Light light					= RaytraceLightsSRV[light_index];
 
 							// [TODO] Need update for ReSTIR
-							LightContext light_context	= LightEvaluation::GenerateContext(LightEvaluation::ContextType::Input, ray.Direction, light_index, ray.Origin, path_context.mRandomState);
+							LightContext light_context	= LightEvaluation::GenerateContext(LightEvaluation::ContextType::Input, ray.Direction, ContextConstant::sUVUnused, light_index, ray.Origin);
 							float light_mis_pdf			= light_context.mSolidAnglePDF * LightContext::UniformSelectPDF();
 					
 							mis_weight					= max(0.0f, MIS::PowerHeuristic(1, path_context.mPrevBSDFSamplePDF, 1, light_mis_pdf));
@@ -240,25 +240,24 @@ void TraceRay(inout PixelContext ioPixelContext)
 						LightContext initial_light_context	= (LightContext)0;
 						for (uint initial_sample_index = 0; initial_sample_index < initial_sample_count; initial_sample_index++)
 						{
-							LightContext _light_context		= LightEvaluation::UniformSelect(hit_context.PositionWS(), path_context.mRandomState);
-							BSDFContext _bsdf_context		= BSDFEvaluation::GenerateContext(BSDFContext::Mode::Light, _light_context.mL, hit_context, path_context);
-							BSDFResult _bsdf_result			= BSDFEvaluation::Evaluate(_bsdf_context, hit_context, path_context);
-
-							float _mis_weight				= 1.0f / initial_sample_count; // [NOTE] Constant for all candidates here, thus can be applied in Finalize, as in RTXDI
-							float _source_pdf				= _light_context.UniformSelectPDF();
-							float _blended_source_pdf		= _source_pdf; // [TODO] Apply MIS
-							float _target_pdf				= _light_context.SamplePDF() > 0 ? (RGBToLuminance(_light_context.GetLight().mEmission * _bsdf_result.mBSDF) * abs(_bsdf_context.mNdotL) / _light_context.SamplePDF()) : 0.0f;
+							LightContext _light_context			= LightEvaluation::UniformSelect(hit_context.PositionWS(), path_context.mRandomState);
+							BSDFContext _bsdf_context			= BSDFEvaluation::GenerateContext(BSDFContext::Mode::Light, _light_context.mL, hit_context, path_context);
+							BSDFResult _bsdf_result				= BSDFEvaluation::Evaluate(_bsdf_context, hit_context, path_context);
+							float _target_pdf					= _light_context.SamplePDF() > 0 ? (RGBToLuminance(_light_context.GetLight().mEmission * _bsdf_result.mBSDF) * abs(_bsdf_context.mNdotL) / _light_context.SamplePDF()) : 0.0f;
 
 							// [TODO] Apply MIS on target_pdf, before resample
-							float _random01					= RandomFloat01(path_context.mRandomState);
-							Reservoir _sample_reservoir		= Reservoir::FromLight(_light_context, _target_pdf, 1.0f / _blended_source_pdf);
-							if (initial_reservoir.Stream(_sample_reservoir, _mis_weight, _random01)) // [TODO] Skip RNG on first sample
-								initial_light_context		= _light_context;
+							float _source_pdf					= _light_context.UniformSelectPDF();
+							float _blended_source_pdf			= _source_pdf;
+							Reservoir _sample_reservoir			= Reservoir::FromLight(_light_context, _target_pdf, 1.0f / _blended_source_pdf);
+							float _random01						= RandomFloat01(path_context.mRandomState);
+							if (initial_reservoir.Stream(_sample_reservoir, 1.0, _random01)) // [TODO] Skip RNG on first sample
+								initial_light_context			= _light_context;
 						}
-						initial_reservoir.ComputeContributionWeight();						
+						initial_reservoir.ComputeContributionWeight(true);						
 						if (ioPixelContext.mReservoirInitialize)
 						{
-							reservoir_to_write				= initial_reservoir;
+							reservoir_to_write					= initial_reservoir;
+							Inspect::R_Initial(path_context, reservoir_to_write);
 							break;
 						}
 						if (ioPixelContext.mReservoirTemporal)
@@ -266,38 +265,91 @@ void TraceRay(inout PixelContext ioPixelContext)
 							USING_RESOURCE(RWTexture2D<uint4>, ScreenReservoirInitializeUAV);
 							USING_RESOURCE(RWTexture2D<uint4>, ScreenReservoirTemporalUAV);
 
-							Reservoir initial_reservoir		= Reservoir::Generate();
-							initial_reservoir.Unpack(ScreenReservoirInitializeUAV[ioPixelContext.mPixelIndex.xy]);
+							Reservoir reservoir					= Reservoir::Generate();
+							Reservoir initial_reservoir			= Reservoir::Generate();
+							Reservoir temporal_reservoir		= Reservoir::Generate();
 
-							Reservoir temporal_reservoir	= Reservoir::Generate();
-							temporal_reservoir.Unpack(ScreenReservoirTemporalUAV[ioPixelContext.mPixelIndex.xy]);
+							{
+								
+								initial_reservoir.Unpack(ScreenReservoirInitializeUAV[ioPixelContext.mPixelIndex.xy]);
+								if (initial_reservoir.IsValid())
+								{
+									LightContext _light_context = LightEvaluation::GenerateContext(LightEvaluation::ContextType::UV, ContextConstant::sDirectionUnused, initial_reservoir.mUV, initial_reservoir.mLightIndex, hit_context.PositionWS());
+									BSDFContext _bsdf_context	= BSDFEvaluation::GenerateContext(BSDFContext::Mode::Light, _light_context.mL, hit_context, path_context);
+									BSDFResult _bsdf_result		= BSDFEvaluation::Evaluate(_bsdf_context, hit_context, path_context);
+									float _target_pdf			= _light_context.SamplePDF() > 0 ? (RGBToLuminance(_light_context.GetLight().mEmission * _bsdf_result.mBSDF) * abs(_bsdf_context.mNdotL) / _light_context.SamplePDF()) : 0.0f;
+									initial_reservoir.mTargetFunction = _target_pdf;
+								}
+							}
 
-							bool temporal					= mConstants.mCurrentFrameIndex > 0 && mConstants.mReSTIR.mSampleCountTemporal != 0;
-							float initial_mis_weight		= temporal ? 0.5f : 1.0f; // [TODO]
-							float temporal_mis_weight		= 1.0 - initial_mis_weight;
+							bool temporal						= mConstants.mCurrentFrameIndex > 0 && mConstants.mReSTIR.mSampleCountTemporal != 0;
+							if (temporal)
+							{
+								temporal_reservoir.Unpack(ScreenReservoirTemporalUAV[ioPixelContext.mPixelIndex.xy]);
+								if (temporal_reservoir.IsValid())
+								{
+									LightContext _light_context = LightEvaluation::GenerateContext(LightEvaluation::ContextType::UV, ContextConstant::sDirectionUnused, temporal_reservoir.mUV, temporal_reservoir.mLightIndex, hit_context.PositionWS());
+									BSDFContext _bsdf_context	= BSDFEvaluation::GenerateContext(BSDFContext::Mode::Light, _light_context.mL, hit_context, path_context);
+									BSDFResult _bsdf_result		= BSDFEvaluation::Evaluate(_bsdf_context, hit_context, path_context);
+									float _target_pdf			= _light_context.SamplePDF() > 0 ? (RGBToLuminance(_light_context.GetLight().mEmission * _bsdf_result.mBSDF) * abs(_bsdf_context.mNdotL) / _light_context.SamplePDF()) : 0.0f;
+									temporal_reservoir.mTargetFunction = _target_pdf;
+								}
+								Inspect::R_Prev(path_context, temporal_reservoir);
+							}
 
-							Reservoir reservoir				= Reservoir::Generate();
-							reservoir.Stream(initial_reservoir, initial_mis_weight, kTrivialRandom01);
-							reservoir.Stream(temporal_reservoir, temporal_mis_weight, RandomFloat01(path_context.mRandomState));
-							reservoir.ComputeContributionWeight();
-							Inspect::ReSTIRTemporal(path_context, reservoir);
-
-							reservoir_to_write				= reservoir;
+							reservoir.Stream(initial_reservoir, 1.0, kTrivialRandom01);
+							reservoir.Stream(temporal_reservoir, 1.0, RandomFloat01(path_context.mRandomState));
+							reservoir.ComputeContributionWeight(true);
+							reservoir_to_write					= reservoir;
+							Inspect::R_TemporalOut(path_context, reservoir_to_write);
 							break;
 						}
 						if (ioPixelContext.mReservoirSpatial)
 						{
+							USING_RESOURCE(RWTexture2D<uint4>, ScreenReservoirInitializeUAV);
 							USING_RESOURCE(RWTexture2D<uint4>, ScreenReservoirTemporalUAV);
 
+							Reservoir reservoir				= Reservoir::Generate();
 							Reservoir temporal_reservoir	= Reservoir::Generate();
+							Reservoir spatial_reservoir		= Reservoir::Generate();
+
 							temporal_reservoir.Unpack(ScreenReservoirTemporalUAV[ioPixelContext.mPixelIndex.xy]);
+							if (temporal_reservoir.IsValid())
+							{
+								LightContext _light_context = LightEvaluation::GenerateContext(LightEvaluation::ContextType::UV, ContextConstant::sDirectionUnused, temporal_reservoir.mUV, temporal_reservoir.mLightIndex, hit_context.PositionWS());
+								BSDFContext _bsdf_context	= BSDFEvaluation::GenerateContext(BSDFContext::Mode::Light, _light_context.mL, hit_context, path_context);
+								BSDFResult _bsdf_result		= BSDFEvaluation::Evaluate(_bsdf_context, hit_context, path_context);
+								float _target_pdf			= _light_context.SamplePDF() > 0 ? (RGBToLuminance(_light_context.GetLight().mEmission * _bsdf_result.mBSDF) * abs(_bsdf_context.mNdotL) / _light_context.SamplePDF()) : 0.0f;
+								temporal_reservoir.mTargetFunction = _target_pdf;
+							}
 
 							for (uint sample_index = 0; sample_index < mConstants.mReSTIR.mSampleCountSpatial; sample_index++)
 							{
-								// [TODO]
-							}
+								float r						= 5.0 * RandomFloat01(path_context.mRandomState);
+								float theta					= 2.0 * MATH_PI * RandomFloat01(path_context.mRandomState);
+								int x						= r * cos(theta);
+								int y						= r * sin(theta);
 
-							reservoir_to_write				= temporal_reservoir;
+								Reservoir _initial_reservoir = Reservoir::Generate();
+								_initial_reservoir.Unpack(ScreenReservoirTemporalUAV[ioPixelContext.mPixelIndex.xy + int2(x, y)]);
+								if (!_initial_reservoir.IsValid()) continue;
+
+								LightContext _light_context = LightEvaluation::GenerateContext(LightEvaluation::ContextType::UV, ContextConstant::sDirectionUnused, _initial_reservoir.mUV, _initial_reservoir.mLightIndex, hit_context.PositionWS());
+								BSDFContext _bsdf_context	= BSDFEvaluation::GenerateContext(BSDFContext::Mode::Light, _light_context.mL, hit_context, path_context);
+								BSDFResult _bsdf_result		= BSDFEvaluation::Evaluate(_bsdf_context, hit_context, path_context);
+								float _target_pdf			= _light_context.SamplePDF() > 0 ? (RGBToLuminance(_light_context.GetLight().mEmission * _bsdf_result.mBSDF) * abs(_bsdf_context.mNdotL) / _light_context.SamplePDF()) : 0.0f;
+
+								_initial_reservoir.mTargetFunction	= _target_pdf;
+								float _random01						= RandomFloat01(path_context.mRandomState);
+								spatial_reservoir.Stream(_initial_reservoir, 1.0, _random01);
+							}
+							spatial_reservoir.ComputeContributionWeight(true);
+
+							reservoir.Stream(temporal_reservoir, 1.0, kTrivialRandom01);
+							reservoir.Stream(spatial_reservoir, 1.0, RandomFloat01(path_context.mRandomState));
+							reservoir.ComputeContributionWeight(true);
+							reservoir_to_write				= reservoir;
+							Inspect::R_Spatial(path_context, reservoir_to_write);
 							break;
 						}
 
@@ -309,10 +361,17 @@ void TraceRay(inout PixelContext ioPixelContext)
 
 							Reservoir spatial_reservoir		= Reservoir::Generate();
 							spatial_reservoir.Unpack(ScreenReservoirSpatialUAV[ioPixelContext.mPixelIndex.xy]);
+							if (spatial_reservoir.IsValid())
+							{
+								LightContext _light_context = LightEvaluation::GenerateContext(LightEvaluation::ContextType::UV, ContextConstant::sDirectionUnused, spatial_reservoir.mUV, spatial_reservoir.mLightIndex, hit_context.PositionWS());
+								BSDFContext _bsdf_context	= BSDFEvaluation::GenerateContext(BSDFContext::Mode::Light, _light_context.mL, hit_context, path_context);
+								BSDFResult _bsdf_result		= BSDFEvaluation::Evaluate(_bsdf_context, hit_context, path_context);
+								float _target_pdf			= _light_context.SamplePDF() > 0 ? (RGBToLuminance(_light_context.GetLight().mEmission * _bsdf_result.mBSDF) * abs(_bsdf_context.mNdotL) / _light_context.SamplePDF()) : 0.0f;
+								spatial_reservoir.mTargetFunction = _target_pdf;
 
-							// [TODO]
-							// reservoir						= spatial_reservoir;
-							// light_context					= ;
+								light_context				= _light_context;
+							}
+							reservoir						= spatial_reservoir;
 						}
 
 						Inspect::SampleLight(path_context, light_context);
@@ -372,7 +431,7 @@ void TraceRay(inout PixelContext ioPixelContext)
 
 					// Sample BSDF / [Mitsuba] BSDF sampling
 					{
-						BSDFContext bsdf_context					= BSDFEvaluation::GenerateContext(BSDFContext::Mode::BSDF, ContextConstant::sDirectionUndetermined, hit_context, path_context);
+						BSDFContext bsdf_context					= BSDFEvaluation::GenerateContext(BSDFContext::Mode::BSDF, ContextConstant::sDirectionUnused, hit_context, path_context);
 						BSDFResult bsdf_result						= BSDFEvaluation::Evaluate(bsdf_context, hit_context, path_context);
 					
 						path_context.mEmission						+= path_context.mThroughput * emission; // Emissive BSDF
@@ -460,22 +519,22 @@ void TraceRay(inout PixelContext ioPixelContext)
 	if (ioPixelContext.mReservoirInitialize)
 	{
 		USING_RESOURCE(RWTexture2D<uint4>, ScreenReservoirInitializeUAV);
-		ScreenReservoirInitializeUAV[ioPixelContext.mPixelIndex.xy] = reservoir_to_write.Pack();
-		Inspect::ReSTIRInitialize(path_context, reservoir_to_write);
+		if (mConstants.mCurrentFrameWeight != 0.0f)
+			ScreenReservoirInitializeUAV[ioPixelContext.mPixelIndex.xy] = reservoir_to_write.Pack();
 		return;
 	}
 	if (ioPixelContext.mReservoirTemporal)
 	{
 		USING_RESOURCE(RWTexture2D<uint4>, ScreenReservoirTemporalUAV);
-		ScreenReservoirTemporalUAV[ioPixelContext.mPixelIndex.xy] = reservoir_to_write.Pack();
-		Inspect::ReSTIRTemporal(path_context, reservoir_to_write);
+		if (mConstants.mCurrentFrameWeight != 0.0f)
+			ScreenReservoirTemporalUAV[ioPixelContext.mPixelIndex.xy] = reservoir_to_write.Pack();
 		return;
 	}
 	if (ioPixelContext.mReservoirSpatial)
 	{
 		USING_RESOURCE(RWTexture2D<uint4>, ScreenReservoirSpatialUAV);
-		ScreenReservoirSpatialUAV[ioPixelContext.mPixelIndex.xy] = reservoir_to_write.Pack();
-		Inspect::ReSTIRSpatial(path_context, reservoir_to_write);
+		if (mConstants.mCurrentFrameWeight != 0.0f)
+			ScreenReservoirSpatialUAV[ioPixelContext.mPixelIndex.xy] = reservoir_to_write.Pack();
 		return;
 	}
 

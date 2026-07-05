@@ -10,12 +10,11 @@ namespace LightEvaluation
 {
 	enum ContextType
 	{
-		Random,
-		Center,
+		UV,
 		Input,
 	};
 
-	LightContext GenerateContext(ContextType inContextType, float3 inL, uint inLightIndex, float3 inLitPositionWS, inout uint ioRandomState)
+	LightContext GenerateContext(ContextType inContextType, float3 inL, float2 inUV, uint inLightIndex, float3 inLitPositionWS)
 	{
 		USING_RESOURCE(StructuredBuffer<Light>, RaytraceLightsSRV);
 		Light light								= RaytraceLightsSRV[inLightIndex];
@@ -24,17 +23,12 @@ namespace LightEvaluation
 		const float3 direction_to_light			= normalize(vector_to_light);
 		
 		LightContext light_context				= (LightContext)0;
-		light_context.mL						= direction_to_light;
-		light_context.mSolidAnglePDF			= 0.0;
+		light_context.mL						= 0;
+		light_context.mUV						= inUV;
+		light_context.mSolidAnglePDF			= 0;
 
-		float xi1								= RandomFloat01(ioRandomState);
-		float xi2								= RandomFloat01(ioRandomState);
-		if (inContextType == ContextType::Center)
-		{
-			xi1									= 0.5;
-			xi2									= 0.5;
-		}
-		light_context.mUV						= float2(xi1, xi2);
+		float xi1								= inUV.x;
+		float xi2								= inUV.y;
 		
 		switch (light.mType)
 		{
@@ -68,7 +62,6 @@ namespace LightEvaluation
 			float phi							= 2.0 * MATH_PI * xi2;
 
 			light_context.mL					= (tangent_space[0] * cos(phi) + tangent_space[1] * sin(phi)) * sin_theta + tangent_space[2] * cos_theta;
-
 			if (inContextType == ContextType::Input)
 			{
 				light_context.mL				= inL;
@@ -85,7 +78,6 @@ namespace LightEvaluation
 			vector_to_sample					+= light.mBitangent * light.mHalfExtends.y * (xi2 * 2.0 - 1.0);
 
 			light_context.mL					= normalize(vector_to_sample);
-
 			if (inContextType == ContextType::Input)
 			{
 				// [TODO] Validate this
@@ -107,8 +99,7 @@ namespace LightEvaluation
 				light_context.mSolidAnglePDF	= 0;
 		}
 		break;
-		default:
-			break;
+		default: break;
 		}
 
 		light_context.mLightIndex				= inLightIndex;
@@ -119,8 +110,9 @@ namespace LightEvaluation
 	{
 		USING_RESOURCE(StructuredBuffer<Light>, RaytraceLightsSRV);
 
-		uint light_index = min(RandomFloat01(ioRandomState) * mConstants.mLightCount, mConstants.mLightCount - 1);
-		return LightEvaluation::GenerateContext(LightEvaluation::ContextType::Random, ContextConstant::sDirectionUndetermined, light_index, inLitPositionWS, ioRandomState);
+		uint light_index	= min(RandomFloat01(ioRandomState) * mConstants.mLightCount, mConstants.mLightCount - 1);
+		float2 uv			= float2(RandomFloat01(ioRandomState), RandomFloat01(ioRandomState));
+		return LightEvaluation::GenerateContext(LightEvaluation::ContextType::UV, ContextConstant::sDirectionUnused, uv, light_index, inLitPositionWS);
 	}
 }
 
