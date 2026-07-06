@@ -53,3 +53,6 @@
 [submodule "Source/Thirdparty/slang"]
 	path = Source/Thirdparty/slang
 	url = https://github.com/shader-slang/slang
+[submodule "Source/Thirdparty/tinybvh"]
+	path = Source/Thirdparty/tinybvh
+	url = https://github.com/jbikker/tinybvh.git

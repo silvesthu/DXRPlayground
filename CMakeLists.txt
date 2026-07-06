@@ -135,6 +135,7 @@ target_include_directories(DXRPlayground PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/Source/Thirdparty
   ${CMAKE_CURRENT_SOURCE_DIR}/Source/Thirdparty/imgui
   ${CMAKE_CURRENT_SOURCE_DIR}/Source/Thirdparty/openvdb
+  ${CMAKE_CURRENT_SOURCE_DIR}/Source/Thirdparty/tinybvh
 )
 
 target_compile_definitions(DXRPlayground PRIVATE
