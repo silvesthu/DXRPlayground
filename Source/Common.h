@@ -365,7 +365,6 @@ extern Stats								gStats;
 
 struct Configs
 {
-	bool									mUseNVAPI = false;
 	bool									mShaderDebug = true;
 	bool									mUseTexture = true;
 
@@ -521,7 +520,7 @@ struct Shader
 	SHADER_MEMBER(DXGI_FORMAT, RTVFormat, DXGI_FORMAT_UNKNOWN);
 	SHADER_MEMBER(DXGI_FORMAT, DSVFormat, DXGI_FORMAT_UNKNOWN);
 	const std::string_view HitName() const { return !mAnyHitName.empty() ? mAnyHitName : (!mClosestHitName.empty() ? mClosestHitName : mIntersectionName); }
-	const std::string HitGroupName() const { if (HitName() == nullptr) return ""; std::string name; name += HitName(); name += "Group"; return name; }
+	const std::string HitGroupName() const { if (HitName().empty()) return ""; std::string name; name += HitName(); name += "Group"; return name; }
 
 	struct DescriptorInfo
 	{

@@ -180,7 +180,7 @@ ComPtr<ID3D12StateObject> Renderer::Compiler::CreateStateObject(IDxcBlob* inBlob
 	std::wstring hit_group_name = gToWString(ioShader.HitGroupName()); // Need the string object on stack
 	std::wstring any_hit_name = gToWString(ioShader.mAnyHitName);
 	std::wstring closest_hit_name = gToWString(ioShader.mClosestHitName);
-	D3D12_HIT_GROUP_DESC hit_group_desc{ .HitGroupExport = hit_group_name.c_str(), .Type = D3D12_HIT_GROUP_TYPE_TRIANGLES, .AnyHitShaderImport = any_hit_name.c_str(), .ClosestHitShaderImport = closest_hit_name.c_str() };
+	D3D12_HIT_GROUP_DESC hit_group_desc{ .HitGroupExport = hit_group_name.c_str(), .Type = D3D12_HIT_GROUP_TYPE_TRIANGLES, .AnyHitShaderImport = any_hit_name.empty() ? nullptr : any_hit_name.c_str(), .ClosestHitShaderImport = closest_hit_name.c_str() };
 	if (ioShader.mAnyHitReference != nullptr)
 	{
 		any_hit_name = gToWString(ioShader.mAnyHitReference->mAnyHitName);

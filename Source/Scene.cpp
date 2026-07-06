@@ -501,6 +501,7 @@ std::vector<ScenePreset> ScenePreset::sPresets =
 
 	// CornellBox
 	ScenePreset().Name("CornellBox").Path("Asset/Comparison/benedikt-bitterli/cornell-box/scene_v3.xml").EmissionBoost(1E4f),
+	ScenePreset().Name("CornellBoxSphere").Path("Asset/Comparison/benedikt-bitterli/cornell-box-sphere/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("CornellBoxDielectric").Path("Asset/Comparison/benedikt-bitterli/cornell-box-dielectric/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("CornellBoxTeapot").Path("Asset/Comparison/benedikt-bitterli/cornell-box-teapot/scene_v3.xml").EmissionBoost(1E4f),
 	ScenePreset().Name("CornellBoxMonkey").Path("Asset/Comparison/benedikt-bitterli/cornell-box-monkey/scene_v3.xml").EmissionBoost(1E4f),

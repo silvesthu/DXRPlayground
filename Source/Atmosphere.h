@@ -398,10 +398,10 @@ public:
 		
 		struct Hillaire20
 		{
-			Shader mTransLUTShader								= Shader().FileName("Shader/Atmosphere.hlsl").CSName("TransLUT");
-			Shader mNewMultiScatCSShader						= Shader().FileName("Shader/Atmosphere.hlsl").CSName("NewMultiScatCS");
-			Shader mSkyViewLutShader							= Shader().FileName("Shader/Atmosphere.hlsl").CSName("SkyViewLut");
-			Shader mCameraVolumesShader							= Shader().FileName("Shader/Atmosphere.hlsl").CSName("CameraVolumes");
+			Shader mTransLUTShader								= Shader().FileName("Shader/Atmosphere.hpp").CSName("TransLUT");
+			Shader mNewMultiScatCSShader						= Shader().FileName("Shader/Atmosphere.hpp").CSName("NewMultiScatCS");
+			Shader mSkyViewLutShader							= Shader().FileName("Shader/Atmosphere.hpp").CSName("SkyViewLut");
+			Shader mCameraVolumesShader							= Shader().FileName("Shader/Atmosphere.hpp").CSName("CameraVolumes");
 
 			Shader mSentinelShader								= Shader();
 			std::span<Shader> mShaders							= std::span<Shader>(&mTransLUTShader, &mSentinelShader);
@@ -535,7 +535,7 @@ public:
 	void ImGuiShowMenus();
 	void ImGuiShowTextures();
 
-	bool mEnabled = false;
+	bool mEnabled = true;
 };
 
 extern Atmosphere gAtmosphere;

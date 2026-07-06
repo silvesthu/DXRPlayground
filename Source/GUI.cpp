@@ -304,8 +304,8 @@ void gPrepareImGui()
 					RadioButton(ScenePreset::sPresets[i].mName.data(), &ScenePreset::sCurrentIndex, i);
 			}
 
-			SliderFloat("Emission Boost", &gConstants.mEmissionBoost, 1E-16f, 1E16F);
-			SliderFloat("Density Boost", &gConstants.mDensityBoost, 1E-16f, 1E16F);
+			InputFloat("Emission Boost", &gConstants.mEmissionBoost, 10000.0f, 100000.0f);
+			SliderFloat("Density Boost", &gConstants.mDensityBoost, 10.0f, 100.0f);
 		}
 
 		if (CollapsingHeader("Atmosphere"))

@@ -24,6 +24,7 @@ extern "C" { __declspec(dllexport) extern const char8_t*		D3D12SDKPath = u8".\\D
 #define DX12_ENABLE_DEBUG_LAYER			(1)
 #define DX12_ENABLE_INFO_QUEUE_CALLBACK (0)
 #define DX12_ENABLE_GBV					(0)
+#define DX12_NVAPI						(1)
 
 static const wchar_t*											kApplicationTitleW = L"DXR Playground";
 static const std::wstring										kINIPathStringW = std::filesystem::absolute(L"DXRPlayground.ini").wstring();
@@ -1011,7 +1012,7 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		return false;
 
 	// NVAPI, based on RTXDI, RTXCR. NvAPI_Unload is not used.
-	if (gConfigs.mUseNVAPI)
+	if (DX12_NVAPI)
 		gNVAPI.mInitialized = NvAPI_Initialize() == NVAPI_OK;
 	if (gNVAPI.mInitialized)
 	{
