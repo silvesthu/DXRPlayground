@@ -321,6 +321,7 @@ extern ID3D12Device7*						gDevice;
 extern ID3D12DescriptorHeap* 				gRTVDescriptorHeap;
 extern ID3D12CommandQueue* 					gCommandQueue;
 extern ID3D12GraphicsCommandList4* 			gCommandList;
+extern ID3D12DeviceTools*					gDeviceTools;
 
 extern ID3D12QueryHeap*						gQueryHeap;
 struct Stats
@@ -365,6 +366,8 @@ extern Stats								gStats;
 
 struct Configs
 {
+	D3D12_GPU_VIRTUAL_ADDRESS_RANGE			mGPUVAAtCreateRange = { .StartAddress = 0x0000000010000000, .SizeInBytes = 0x0000000010000000, };
+
 	bool									mShaderDebug = true;
 	bool									mUseTexture = true;
 
@@ -557,6 +560,12 @@ struct Buffer
 	BUFFER_MEMBER(bool,						Upload,			false);
 	BUFFER_MEMBER(bool,						UploadOnce,		false);
 	BUFFER_MEMBER(bool,						Readback,		false);
+
+	// GPU Crash Test
+	BUFFER_MEMBER(bool,						Placed,			false);
+	BUFFER_MEMBER(bool,						Reserved,		false);
+	BUFFER_MEMBER(bool,						Evicted,		false);
+	BUFFER_MEMBER(bool,						GPUVAAtCreate,	false);
 
 	uint GetSizeInBytes() const { return mStride * mElementCount; }
 	

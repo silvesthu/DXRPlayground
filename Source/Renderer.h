@@ -67,12 +67,16 @@ struct Renderer
 																			Texture().Format(kBackBufferFormat).RTVIndex(RTVDescriptorIndex::BackBuffer0).Name("Renderer.BackBuffer0"),
 																			Texture().Format(kBackBufferFormat).RTVIndex(RTVDescriptorIndex::BackBuffer1).Name("Renderer.BackBuffer1") };
 
-		Buffer									mConstantsBuffer			= Buffer().Stride(sizeof(Constants)).CBVIndex(ViewDescriptorIndex::ConstantsCBV).Name("Constants").Upload(true);
-		Buffer									mInspectDataBuffer			= Buffer().Stride(sizeof(InspectData)).UAVIndex(ViewDescriptorIndex::InspectDataUAV).Name("InspectData").Readback(true);
-		Buffer									mQueryBuffer				= Buffer().Stride(sizeof(UINT64)).ElementCount(kTimestampCount).Name("Query").GPU(false).Readback(true);
-		Buffer 									mSpatialHashBuffer			= Buffer().Stride(sizeof(uint32_t)).ElementCount(kSpatialHashSize).UAVIndex(ViewDescriptorIndex::SpatialHashUAV).Name("SpatialHash");
-		Buffer 									mSpatialDataBuffer			= Buffer().Stride(sizeof(uint32_t)).ElementCount(kSpatialHashSize).UAVIndex(ViewDescriptorIndex::SpatialDataUAV).Name("SpatialData");
-		Buffer 									mShaderPrintBuffer			= Buffer().Stride(sizeof(uint32_t)).ElementCount(64 * 1024).UAVIndex(ViewDescriptorIndex::ShaderPrintUAV).Readback(true).Name("ShaderPrintUAV");
+		Buffer									mConstantsBuffer			= Buffer().Stride(sizeof(Constants)).CBVIndex(ViewDescriptorIndex::ConstantsCBV).Name("Renderer.Constants").Upload(true);
+		Buffer									mInspectDataBuffer			= Buffer().Stride(sizeof(InspectData)).UAVIndex(ViewDescriptorIndex::InspectDataUAV).Name("Renderer.InspectData").Readback(true);
+		Buffer									mQueryBuffer				= Buffer().Stride(sizeof(UINT64)).ElementCount(kTimestampCount).Name("Renderer.Query").GPU(false).Readback(true);
+		Buffer 									mSpatialHashBuffer			= Buffer().Stride(sizeof(uint32_t)).ElementCount(kSpatialHashSize).UAVIndex(ViewDescriptorIndex::SpatialHashUAV).Name("Renderer.SpatialHash");
+		Buffer 									mSpatialDataBuffer			= Buffer().Stride(sizeof(uint32_t)).ElementCount(kSpatialHashSize).UAVIndex(ViewDescriptorIndex::SpatialDataUAV).Name("Renderer.SpatialData");
+		Buffer 									mShaderPrintBuffer			= Buffer().Stride(sizeof(uint32_t)).ElementCount(64 * 1024).UAVIndex(ViewDescriptorIndex::ShaderPrintUAV).Readback(true).Name("Renderer.ShaderPrintUAV");
+		Buffer									mReservedBuffer				= Buffer().Stride(sizeof(uint32_t)).ElementCount(1).UAVIndex(ViewDescriptorIndex::ReservedUAV).Reserved(true).Name("Renderer.Reserved");
+		Buffer									mPlacedBuffer				= Buffer().Stride(sizeof(uint32_t)).ElementCount(1).UAVIndex(ViewDescriptorIndex::PlacedUAV).Placed(true).Name("Renderer.Placed");
+		Buffer									mEvictedBuffer				= Buffer().Stride(sizeof(uint32_t)).ElementCount(1).UAVIndex(ViewDescriptorIndex::EvictedUAV).Evicted(true).Name("Renderer.Evicted");
+		Buffer									mGPUVAAtCreateBuffer		= Buffer().Stride(sizeof(uint32_t)).ElementCount(1).UAVIndex(ViewDescriptorIndex::GPUVAAtCreateUAV).GPUVAAtCreate(true).Name("Renderer.GPUVAAtCreate");
 		Buffer									mSentinelBuffer;
 		std::span<Buffer>						mBuffers					= std::span<Buffer>(&mConstantsBuffer, &mSentinelBuffer);
 	};

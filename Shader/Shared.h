@@ -154,6 +154,12 @@ enum class ViewDescriptorIndex : uint
 	// [Misc]
 	IESSRV,
 
+	// [Invalid]
+	PlacedUAV,
+	ReservedUAV,
+	EvictedUAV,
+	GPUVAAtCreateUAV,
+
 	// [Raytrace] - [Input]
 	RaytraceTLASSRV,
 	RaytraceInstanceDataSRV,

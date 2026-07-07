@@ -31,6 +31,7 @@ void BLAS::Initialize(const Initializer& inInitializer)
 		return;
 	}
 
+	// [NOTE] StartAddress = 0 cause GPU crash on Nvidia, but non-zero address don't (not always). Likely null check on driver side.
 	mDesc = {};
 	mDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
 	mDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
@@ -418,6 +419,7 @@ void BLAS::Build(ID3D12GraphicsCommandList4* inCommandList)
 	} 
 	else if (gNVAPI.mLinearSweptSpheresSupported)
 	{
+		// [NOTE] destAccelerationStructureData = 0/Reserved/Placed/Evicted and doubled call to Build cause GPU crash on Nvidia, other address don't (not always).
 		NVAPI_D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC_EX desc = {};
 		desc.inputs = mInputsEx;
 		desc.destAccelerationStructureData = mDest->GetGPUVirtualAddress();
@@ -446,12 +448,12 @@ void BLAS::Build(ID3D12GraphicsCommandList4* inCommandList)
 
 void TLAS::Build(ID3D12GraphicsCommandList4* inCommandList)
 {
+	// [NOTE] DestAccelerationStructureData = 0/Reserved cause GPU crash on Nvidia, Placed/Evicted and other address don't (not always).
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC desc = {};
 	desc.Inputs = mInputs;
 	desc.Inputs.InstanceDescs = mInstanceDescs->GetGPUVirtualAddress();
 	desc.DestAccelerationStructureData = mDest->GetGPUVirtualAddress();
 	desc.ScratchAccelerationStructureData = mScratch->GetGPUVirtualAddress();
-
 	inCommandList->BuildRaytracingAccelerationStructure(&desc, 0, nullptr);
 }
 

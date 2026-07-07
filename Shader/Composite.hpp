@@ -178,6 +178,14 @@ void ClearDebugCS(COMPUTE_SHADER_INPUT)
 #endif // SHADER_DEBUG
 
 	Inspect::Clear(inDispatchThreadID.x);
+
+	// [NOTE] None of these trigger GPU crash on Nvidia
+	//USING_RESOURCE(RWStructuredBuffer<uint>, ReservedUAV);
+	//ReservedUAV[inDispatchThreadID.x] = 1;
+	//USING_RESOURCE(RWStructuredBuffer<uint>, PlacedUAV);
+	//PlacedUAV[inDispatchThreadID.x] = 1;
+	//USING_RESOURCE(RWStructuredBuffer<uint>, EvictedUAV);
+	//EvictedUAV[inDispatchThreadID.x] = 1;
 }
 
 // Replacement for complex ClearUnorderedAccessViewUint/Float

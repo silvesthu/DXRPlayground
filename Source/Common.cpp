@@ -19,6 +19,7 @@ ID3D12Device7*						gDevice = nullptr;
 ID3D12DescriptorHeap*				gRTVDescriptorHeap = nullptr;
 ID3D12CommandQueue*					gCommandQueue = nullptr;
 ID3D12GraphicsCommandList4*			gCommandList = nullptr; // [TODO] Split commandlist for build (direct) and render (per-frame)
+ID3D12DeviceTools*					gDeviceTools = nullptr;
 
 ID3D12QueryHeap*					gQueryHeap = nullptr;
 Stats								gStats;
@@ -56,7 +57,39 @@ void Buffer::Initialize()
 		if (mUAVIndex != ViewDescriptorIndex::Invalid)
 			resource_desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
-		gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mResource)));
+		if (mReserved)
+			gValidate(gDevice->CreateReservedResource(&resource_desc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mResource)));
+		else if (mPlaced)
+		{
+			D3D12_HEAP_DESC heap_desc =
+			{
+				.SizeInBytes = byte_count,
+				.Properties = props,
+				.Alignment = 0,
+				.Flags = D3D12_HEAP_FLAG_NONE
+			};
+			ComPtr<ID3D12Heap> Heap; // Release after scope, intentially
+			gValidate(gDevice->CreateHeap(&heap_desc, IID_PPV_ARGS(&Heap)));
+			gSetName(Heap, "Buffer.", mName, "Heap");
+			gValidate(gDevice->CreatePlacedResource(Heap.Get(), 0, &resource_desc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mResource)));
+		}
+		else
+		{
+			if (mGPUVAAtCreate)
+				gDeviceTools->SetNextAllocationAddress(gConfigs.mGPUVAAtCreateRange.StartAddress);
+
+			gValidate(gDevice->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &resource_desc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mResource)));
+
+			if (mGPUVAAtCreate)
+				gTrace(std::format("Reserving GPU VA range at create 0x{:016X}\n", mResource->GetGPUVirtualAddress()));
+
+			if (mEvicted)
+			{
+				ID3D12Pageable* Pageable = mResource.Get();
+				gValidate(gDevice->Evict(1, &Pageable));
+			}
+		}
+
 		gSetName(mResource, "Buffer.", mName, "");
 
 		if (mCBVIndex != ViewDescriptorIndex::Invalid)

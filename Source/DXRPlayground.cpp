@@ -24,7 +24,7 @@ extern "C" { __declspec(dllexport) extern const char8_t*		D3D12SDKPath = u8".\\D
 #define DX12_ENABLE_DEBUG_LAYER			(1)
 #define DX12_ENABLE_INFO_QUEUE_CALLBACK (0)
 #define DX12_ENABLE_GBV					(0)
-#define DX12_NVAPI						(1)
+#define DX12_NVAPI						(0)
 
 static const wchar_t*											kApplicationTitleW = L"DXR Playground";
 static const std::wstring										kINIPathStringW = std::filesystem::absolute(L"DXRPlayground.ini").wstring();
@@ -976,16 +976,25 @@ static bool sCreateDeviceD3D(HWND hWnd)
 		enable_debug_layer = false;
 	if (enable_debug_layer)
 	{
-		ComPtr<ID3D12Debug> dx12Debug = nullptr;
-		if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&dx12Debug))))
-			dx12Debug->EnableDebugLayer();
+		ComPtr<ID3D12Debug> dx12_debug = nullptr;
+		if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&dx12_debug))))
+			dx12_debug->EnableDebugLayer();
 
 		if (DX12_ENABLE_GBV)
 		{
-			ComPtr<ID3D12Debug1> dx12Debug1 = nullptr;
-			if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&dx12Debug1))))
-				dx12Debug1->SetEnableGPUBasedValidation(true);
+			ComPtr<ID3D12Debug1> dx12_debug1 = nullptr;
+			if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&dx12_debug1))))
+				dx12_debug1->SetEnableGPUBasedValidation(true);
 		}
+	}
+
+	ID3D12DeviceFactory* device_factory;
+	D3D12GetInterface(CLSID_D3D12DeviceFactory, IID_PPV_ARGS(&device_factory));
+	ID3D12Tools1* dx12_tools;
+	gValidate(device_factory->GetConfigurationInterface(CLSID_D3D12Tools, IID_PPV_ARGS(&dx12_tools)));
+	if (dx12_tools != nullptr)
+	{
+		gValidate(dx12_tools->ReserveGPUVARangesAtCreate(&gConfigs.mGPUVAAtCreateRange, 1));
 	}
 
 	// Create device with highest feature level as possible
@@ -1009,6 +1018,13 @@ static bool sCreateDeviceD3D(HWND hWnd)
 	D3D12_FEATURE_DATA_D3D12_OPTIONS12 options12 = {};
 	if (FAILED(gDevice->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS12, &options12, sizeof(options12)))
 		|| !options12.EnhancedBarriersSupported)
+		return false;
+
+	// Check RecreateAtTier, see https://devblogs.microsoft.com/directx/agility-sdk-1-716-0-preview-recreate-at-gpuva/
+	gDevice->QueryInterface(&gDeviceTools);
+	D3D12_FEATURE_DATA_D3D12_OPTIONS20 options20 = {};
+	if (FAILED(gDevice->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS20, &options20, sizeof(options20)))
+		|| options20.RecreateAtTier != D3D12_RECREATE_AT_TIER_1)
 		return false;
 
 	// NVAPI, based on RTXDI, RTXCR. NvAPI_Unload is not used.
