@@ -116,6 +116,8 @@ enum class ViewDescriptorIndex : uint
 	ScreenColorUAV,
 	ScreenDebugSRV,
 	ScreenDebugUAV,
+	ScreenReadbackSRV,
+	ScreenReadbackUAV,
 	ScreenDepthSRV,
 	ScreenReservoirInitializeSRV,
 	ScreenReservoirInitializeUAV,
@@ -123,8 +125,8 @@ enum class ViewDescriptorIndex : uint
 	ScreenReservoirTemporalUAV,
 	ScreenReservoirSpatialSRV,
 	ScreenReservoirSpatialUAV,
-	ScreenReadbackSRV,
-	ScreenReadbackUAV,
+	Screen9995SRV,
+	Screen9995UAV,
 
 	// [Debug]
 	InspectDataUAV,

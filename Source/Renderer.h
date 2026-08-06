@@ -49,6 +49,7 @@ struct Renderer
 		Texture									mScreenReservoirInitializeTexture	= Texture().Format(DXGI_FORMAT_R32G32B32A32_UINT).UAVIndex(ViewDescriptorIndex::ScreenReservoirInitializeUAV).SRVIndex(ViewDescriptorIndex::ScreenReservoirInitializeSRV).Name("Renderer.ScreenReservoirInitializeTexture");
 		Texture									mScreenReservoirTemporalTexture		= Texture().Format(DXGI_FORMAT_R32G32B32A32_UINT).UAVIndex(ViewDescriptorIndex::ScreenReservoirTemporalUAV).SRVIndex(ViewDescriptorIndex::ScreenReservoirTemporalSRV).Name("Renderer.ScreenReservoirTemporalTexture");
 		Texture									mScreenReservoirSpatialTexture		= Texture().Format(DXGI_FORMAT_R32G32B32A32_UINT).UAVIndex(ViewDescriptorIndex::ScreenReservoirSpatialUAV).SRVIndex(ViewDescriptorIndex::ScreenReservoirSpatialSRV).Name("Renderer.ScreenReservoirSpatialTexture");
+		// Texture									mScreen9995Texture			= Texture().Format(DXGI_FORMAT_R9G9B9E5_SHAREDEXP).UAVIndex(ViewDescriptorIndex::Screen9995UAV).SRVIndex(ViewDescriptorIndex::Screen9995SRV).Name("Renderer.Screen9995Texture");
 
 		Texture									mScreenSentinelTexture;
 		std::span<Texture>						mScreenTextures				= std::span<Texture>(&mScreenColorTexture, &mScreenSentinelTexture);
